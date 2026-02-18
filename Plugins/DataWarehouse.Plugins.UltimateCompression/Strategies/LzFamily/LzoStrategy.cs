@@ -404,7 +404,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             if (_decompressed != null)
                 return _decompressed;
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             _input.CopyTo(ms);
             var compressed = ms.ToArray();
 

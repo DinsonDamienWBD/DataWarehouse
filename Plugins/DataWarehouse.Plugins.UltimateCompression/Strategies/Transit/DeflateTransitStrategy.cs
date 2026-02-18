@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
             using (var deflateStream = new DeflateStream(outputStream, _deflateLevel, leaveOpen: true))
             {
                 deflateStream.Write(input, 0, input.Length);
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             using var inputStream = new MemoryStream(input);
             using var deflateStream = new DeflateStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
 
             deflateStream.CopyTo(outputStream);
             return outputStream.ToArray();
@@ -75,7 +75,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         /// <inheritdoc/>
         protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken)
         {
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
             using (var deflateStream = new DeflateStream(outputStream, _deflateLevel, leaveOpen: true))
             {
                 await deflateStream.WriteAsync(input, 0, input.Length, cancellationToken).ConfigureAwait(false);
@@ -88,7 +88,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             using var inputStream = new MemoryStream(input);
             using var deflateStream = new DeflateStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
 
             await deflateStream.CopyToAsync(outputStream, 81920, cancellationToken).ConfigureAwait(false);
             return outputStream.ToArray();

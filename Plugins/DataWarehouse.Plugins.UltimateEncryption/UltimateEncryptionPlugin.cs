@@ -334,7 +334,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         var strategy = GetStrategyOrThrow(strategyId);
 
         // Read input
-        using var inputMs = new MemoryStream();
+        using var inputMs = new MemoryStream(4096);
         await input.CopyToAsync(inputMs);
         var plaintext = inputMs.ToArray();
 
@@ -396,7 +396,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Read payload
-        using var inputMs = new MemoryStream();
+        using var inputMs = new MemoryStream(4096);
         await stored.CopyToAsync(inputMs);
         var payloadBytes = inputMs.ToArray();
 
@@ -441,7 +441,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
     #region Message Handlers
 
-    private Task HandleEncryptAsync(PluginMessage message)
+    private async Task HandleEncryptAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
         {
@@ -467,7 +467,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         var aad = message.Payload.TryGetValue("associatedData", out var aadObj) && aadObj is byte[] associatedData
             ? associatedData : null;
 
-        var ciphertext = strategy.EncryptAsync(data, key, aad).GetAwaiter().GetResult();
+        var ciphertext = await strategy.EncryptAsync(data, key, aad);
 
         message.Payload["result"] = ciphertext;
         message.Payload["strategyId"] = strategyId;
@@ -475,11 +475,9 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         Interlocked.Increment(ref _totalEncryptions);
         Interlocked.Add(ref _totalBytesEncrypted, data.Length);
         IncrementUsageStats(strategyId);
-
-        return Task.CompletedTask;
     }
 
-    private Task HandleDecryptAsync(PluginMessage message)
+    private async Task HandleDecryptAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
         {
@@ -499,14 +497,12 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         var aad = message.Payload.TryGetValue("associatedData", out var aadObj) && aadObj is byte[] associatedData
             ? associatedData : null;
 
-        var plaintext = strategy.DecryptAsync(data, key, aad).GetAwaiter().GetResult();
+        var plaintext = await strategy.DecryptAsync(data, key, aad);
 
         message.Payload["result"] = plaintext;
 
         Interlocked.Increment(ref _totalDecryptions);
         Interlocked.Add(ref _totalBytesDecrypted, plaintext.Length);
-
-        return Task.CompletedTask;
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)

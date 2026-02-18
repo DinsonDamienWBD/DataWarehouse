@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
             var lenBytes = new byte[4];
@@ -378,11 +378,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
 
                 if (isCompression)
                 {
-                    _buffer = new MemoryStream();
+                    _buffer = new MemoryStream(4096);
                 }
                 else
                 {
-                    using var temp = new MemoryStream();
+                    using var temp = new MemoryStream(4096);
                     inner.CopyTo(temp);
                     var compressed = temp.ToArray();
                     var decompressed = compressed.Length > 0 ? transform(compressed) : Array.Empty<byte>();

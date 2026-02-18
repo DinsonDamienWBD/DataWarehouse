@@ -90,7 +90,7 @@ internal sealed class FlinkStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(jarPath); } catch { }
+                try { File.Delete(jarPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

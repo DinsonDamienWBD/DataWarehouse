@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             var endpoint = GetEndpointUrl(key);
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             await SignRequestAsync(request, null, ct);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 

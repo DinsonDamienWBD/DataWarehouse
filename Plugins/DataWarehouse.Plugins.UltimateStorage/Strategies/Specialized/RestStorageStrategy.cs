@@ -790,7 +790,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// </summary>
         private async Task<string> BuildJsonStorePayload(Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var dataBytes = ms.ToArray();
 

@@ -537,7 +537,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return ms.ToArray();
             }
 
-            using var memoryStream = new MemoryStream();
+            using var memoryStream = new MemoryStream(65536);
             await stream.CopyToAsync(memoryStream, ct);
             return memoryStream.ToArray();
         }

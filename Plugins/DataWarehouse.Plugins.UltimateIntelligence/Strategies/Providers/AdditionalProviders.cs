@@ -56,7 +56,8 @@ public sealed class GeminiProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "google", "gemini", "gemini-pro", "gemini-ultra", "bard", "vision", "multimodal" }
     };
 
-    public GeminiProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public GeminiProviderStrategy() : this(SharedHttpClient) { }
 
     public GeminiProviderStrategy(HttpClient httpClient)
     {
@@ -317,7 +318,8 @@ public sealed class MistralProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "mistral", "mistral-ai", "european-ai", "mixtral" }
     };
 
-    public MistralProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public MistralProviderStrategy() : this(SharedHttpClient) { }
 
     public MistralProviderStrategy(HttpClient httpClient)
     {
@@ -593,7 +595,8 @@ public sealed class CohereProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "cohere", "command", "enterprise-ai", "rerank", "rag" }
     };
 
-    public CohereProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public CohereProviderStrategy() : this(SharedHttpClient) { }
 
     public CohereProviderStrategy(HttpClient httpClient)
     {
@@ -821,7 +824,8 @@ public sealed class PerplexityProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "perplexity", "search", "web-search", "real-time", "llama-3" }
     };
 
-    public PerplexityProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public PerplexityProviderStrategy() : this(SharedHttpClient) { }
 
     public PerplexityProviderStrategy(HttpClient httpClient)
     {
@@ -1041,7 +1045,8 @@ public sealed class GroqProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "groq", "fast-inference", "llama-3", "mixtral", "gemma", "lpu" }
     };
 
-    public GroqProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public GroqProviderStrategy() : this(SharedHttpClient) { }
 
     public GroqProviderStrategy(HttpClient httpClient)
     {
@@ -1288,7 +1293,8 @@ public sealed class TogetherProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "together", "open-source", "fine-tuning", "mixtral", "llama" }
     };
 
-    public TogetherProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public TogetherProviderStrategy() : this(SharedHttpClient) { }
 
     public TogetherProviderStrategy(HttpClient httpClient)
     {

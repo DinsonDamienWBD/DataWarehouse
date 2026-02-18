@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
 
             using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
             {
@@ -79,7 +79,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             var entry = archive.Entries[0];
 
             using var entryStream = entry.Open();
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
 
             entryStream.CopyTo(outputStream);
             return outputStream.ToArray();

@@ -55,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Write header
@@ -76,7 +76,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
         private static byte[] CompressFast(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             var hashTable = new int[HashTableSize];
             Array.Fill(hashTable, -1);
 
@@ -394,7 +394,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             {
                 if (_decompressedData == null)
                 {
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream(4096);
                     _input.CopyTo(ms);
                     _decompressedData = _strategy.DecompressCore(ms.ToArray());
                 }

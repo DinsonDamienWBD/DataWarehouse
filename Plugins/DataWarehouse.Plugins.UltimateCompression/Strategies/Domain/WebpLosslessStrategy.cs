@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Header: magic + original length + stride
@@ -296,7 +296,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             private void EnsureDecoded()
             {
                 if (_readData != null) return;
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 _inner.CopyTo(ms);
                 _readData = _codec(ms.ToArray());
             }

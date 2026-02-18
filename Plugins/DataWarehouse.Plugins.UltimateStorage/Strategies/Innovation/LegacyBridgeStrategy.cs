@@ -79,7 +79,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Store);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var asciiData = ms.ToArray();
 

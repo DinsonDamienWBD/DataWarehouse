@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             var writer = new BinaryWriter(output);
 
             // Header: magic + uncompressed length
@@ -196,7 +196,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
             // Assemble output
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             var writer = new BinaryWriter(output);
 
             writer.Write((byte)0x4C);
@@ -238,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
         private static byte[] CompressBlock(byte[] block)
         {
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(block.Length + 256);
 
             try
             {

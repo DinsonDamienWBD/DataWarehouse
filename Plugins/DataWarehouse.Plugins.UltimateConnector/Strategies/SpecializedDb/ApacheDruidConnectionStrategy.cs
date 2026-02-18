@@ -62,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var response = await _httpClient.GetAsync("/status", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch { return false; /* Connection validation - failure acceptable */ }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

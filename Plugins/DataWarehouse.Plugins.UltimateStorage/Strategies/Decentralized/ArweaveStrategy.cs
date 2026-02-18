@@ -185,7 +185,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateStream(data);
 
             // Read stream into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
             var dataBytes = ms.ToArray();
@@ -279,7 +279,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 throw new IOException($"Failed to retrieve object '{key}' from Arweave: {ex.Message}", ex);
             }
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -1164,7 +1164,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
         private byte[] BuildSigningData(ArweaveTransaction transaction)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
 
             // Arweave signature format: owner + target + data + quantity + reward + last_tx + tags
             ms.Write(DecodeBase64Url(transaction.Owner));

@@ -38,13 +38,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
     /// </remarks>
     public sealed class DuressNetworkAlertStrategy : AccessControlStrategyBase
     {
+        private static readonly HttpClient SharedHttpClient = new HttpClient();
         private readonly ILogger _logger;
         private readonly HttpClient _httpClient;
 
         public DuressNetworkAlertStrategy(ILogger? logger = null, HttpClient? httpClient = null)
         {
             _logger = logger ?? NullLogger.Instance;
-            _httpClient = httpClient ?? new HttpClient();
+            _httpClient = httpClient ?? SharedHttpClient;
         }
 
         /// <inheritdoc/>

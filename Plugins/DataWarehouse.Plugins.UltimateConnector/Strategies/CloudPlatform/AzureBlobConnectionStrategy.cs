@@ -29,12 +29,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             // Load account name from config or environment
-            var accountName = GetConfiguration<string>(config, "AccountName", null!)
+            var accountName = GetConfiguration<string?>(config, "AccountName", null)
                 ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_ACCOUNT");
 
             // Load credentials - support multiple authentication methods
             // 1. Connection string (most common)
-            var connectionString = GetConfiguration<string>(config, "ConnectionString", null!)
+            var connectionString = GetConfiguration<string?>(config, "ConnectionString", null)
                 ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING");
 
             BlobServiceClient blobServiceClient;
@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             else if (!string.IsNullOrEmpty(accountName))
             {
                 // Use DefaultAzureCredential (supports managed identity, environment variables, etc.)
-                var endpoint = GetConfiguration<string>(config, "Endpoint", null!)
+                var endpoint = GetConfiguration<string?>(config, "Endpoint", null)
                     ?? $"https://{accountName}.blob.core.windows.net";
                 blobServiceClient = new BlobServiceClient(new Uri(endpoint), new DefaultAzureCredential());
             }

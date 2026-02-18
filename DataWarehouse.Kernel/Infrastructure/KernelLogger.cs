@@ -428,7 +428,7 @@ namespace DataWarehouse.Kernel.Infrastructure
 
             foreach (var file in files)
             {
-                try { File.Delete(file); } catch { }
+                try { File.Delete(file); } catch { /* Best-effort cleanup */ }
             }
 
             EnsureWriter();

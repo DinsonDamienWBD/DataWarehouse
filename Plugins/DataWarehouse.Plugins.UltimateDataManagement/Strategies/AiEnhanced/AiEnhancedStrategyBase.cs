@@ -309,7 +309,7 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
     {
         foreach (var sub in _subscriptions)
         {
-            try { sub.Dispose(); } catch { }
+            try { sub.Dispose(); } catch { /* Best-effort cleanup */ }
         }
         _subscriptions.Clear();
 

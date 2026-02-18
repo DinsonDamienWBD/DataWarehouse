@@ -189,7 +189,7 @@ internal sealed class CompressionInTransitLayer : IDataTransitStrategy
     /// <returns>A memory stream containing the GZip-compressed data.</returns>
     private static async Task<Stream> CompressWithGZipAsync(Stream source, CancellationToken ct)
     {
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(4096);
 
         using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal, leaveOpen: true))
         {

@@ -341,7 +341,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
 
             // Read file with optimized I/O
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
             using (var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, _ioBlockSize, useAsync: true))
             {
                 await fileStream.CopyToAsync(memoryStream, _ioBlockSize, ct);
@@ -992,7 +992,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             if (request.Content != null)
             {
-                var ms = new MemoryStream();
+                var ms = new MemoryStream(65536);
                 await request.Content.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
                 ms.Position = 0;
                 clone.Content = new StreamContent(ms);

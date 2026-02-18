@@ -1903,7 +1903,7 @@ users:
                     {
                         snapshot.ProcessPath = process.MainModule?.FileName;
                     }
-                    catch { }
+                    catch { /* Best-effort honeypot cleanup */ }
 
                     // Get parent process
                     try
@@ -1911,10 +1911,10 @@ users:
                         // Note: Getting parent process requires additional P/Invoke on Windows
                         // This is a simplified version
                     }
-                    catch { }
+                    catch { /* Best-effort honeypot cleanup */ }
                 }
             }
-            catch { }
+            catch { /* Best-effort honeypot cleanup */ }
         }
 
         private static void CaptureNetworkState(ForensicSnapshot snapshot)
@@ -1944,7 +1944,7 @@ users:
                 var localIp = host.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
                 snapshot.LocalIpAddress = localIp?.ToString();
             }
-            catch { }
+            catch { /* Best-effort honeypot cleanup */ }
         }
 
         private static void CaptureSystemInfo(ForensicSnapshot snapshot)
@@ -1960,7 +1960,7 @@ users:
                     .Where(v => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(v)))
                     .ToDictionary(v => v, v => Environment.GetEnvironmentVariable(v)!);
             }
-            catch { }
+            catch { /* Best-effort honeypot cleanup */ }
         }
     }
 

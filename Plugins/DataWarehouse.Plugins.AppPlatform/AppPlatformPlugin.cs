@@ -1611,7 +1611,7 @@ public sealed class AppPlatformPlugin : PlatformPluginBase, IDisposable
     {
         foreach (var subscription in _subscriptions)
         {
-            try { subscription.Dispose(); } catch { }
+            try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
         }
         _subscriptions.Clear();
     }

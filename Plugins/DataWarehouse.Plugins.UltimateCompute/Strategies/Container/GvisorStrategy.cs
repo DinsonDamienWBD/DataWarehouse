@@ -75,7 +75,7 @@ internal sealed class GvisorStrategy : ComputeRuntimeStrategyBase
                     timeout: timeout, cancellationToken: cancellationToken);
 
                 // Cleanup container
-                try { await RunProcessAsync("runsc", $"--rootless delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { }
+                try { await RunProcessAsync("runsc", $"--rootless delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"gVisor exited with code {result.ExitCode}: {result.StandardError}");
@@ -84,7 +84,7 @@ internal sealed class GvisorStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { Directory.Delete(bundleDir, true); } catch { }
+                try { Directory.Delete(bundleDir, true); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

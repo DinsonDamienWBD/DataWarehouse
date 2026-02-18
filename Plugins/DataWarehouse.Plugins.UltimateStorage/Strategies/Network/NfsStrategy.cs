@@ -1222,7 +1222,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _innerStream?.Dispose();
                     if (_lockHandle != null)
                     {
-                        _strategy.ReleaseFileLockAsync(_lockHandle, CancellationToken.None).GetAwaiter().GetResult();
+                        // Sync bridge: Dispose cannot be async without IAsyncDisposable
+                        Task.Run(() => _strategy.ReleaseFileLockAsync(_lockHandle, CancellationToken.None)).GetAwaiter().GetResult();
                     }
                 }
                 _disposed = true;

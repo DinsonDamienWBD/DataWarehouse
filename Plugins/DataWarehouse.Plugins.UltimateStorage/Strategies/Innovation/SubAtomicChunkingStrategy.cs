@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             IncrementOperationCounter(StorageOperationType.Store);
 
             // Read entire file
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var fileData = ms.ToArray();
             var originalSize = fileData.Length;

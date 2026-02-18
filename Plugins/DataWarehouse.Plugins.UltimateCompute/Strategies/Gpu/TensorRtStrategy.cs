@@ -103,7 +103,7 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(modelPath); File.Delete(enginePath); } catch { }
+                try { File.Delete(modelPath); File.Delete(enginePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

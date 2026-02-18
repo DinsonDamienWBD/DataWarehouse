@@ -80,7 +80,7 @@ internal sealed class OneApiStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(srcPath); File.Delete(binPath); } catch { }
+                try { File.Delete(srcPath); File.Delete(binPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

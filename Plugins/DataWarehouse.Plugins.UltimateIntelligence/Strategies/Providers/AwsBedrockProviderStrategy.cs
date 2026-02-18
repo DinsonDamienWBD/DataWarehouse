@@ -57,7 +57,8 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "aws", "bedrock", "claude", "titan", "llama", "enterprise" }
     };
 
-    public AwsBedrockProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public AwsBedrockProviderStrategy() : this(SharedHttpClient) { }
 
     public AwsBedrockProviderStrategy(HttpClient httpClient)
     {

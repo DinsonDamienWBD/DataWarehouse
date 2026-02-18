@@ -87,8 +87,8 @@ internal sealed class BubbleWrapStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
-                try { Directory.Delete(tmpDir, true); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
+                try { Directory.Delete(tmpDir, true); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

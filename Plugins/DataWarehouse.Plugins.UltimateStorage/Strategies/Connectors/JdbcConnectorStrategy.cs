@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             }
 
             using var reader = await command.ExecuteReaderAsync(ct);
-            var stream = new MemoryStream();
+            var stream = new MemoryStream(4096);
 
             // Export to JSON
             using var writer = new Utf8JsonWriter(stream);

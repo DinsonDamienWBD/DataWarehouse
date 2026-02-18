@@ -1129,7 +1129,8 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
 
         if (disposing)
         {
-            DisconnectAsync().GetAwaiter().GetResult();
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
+            Task.Run(() => DisconnectAsync()).GetAwaiter().GetResult();
         }
 
         _disposed = true;

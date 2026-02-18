@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             if (_httpClient == null) return false;
             try { var response = await _httpClient.GetAsync("/exec?query=SELECT%201", ct); return response.IsSuccessStatusCode; }
-            catch { return false; }
+            catch { return false; /* Connection validation - failure acceptable */ }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

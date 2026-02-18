@@ -84,7 +84,7 @@ internal sealed class YoukiStrategy : ComputeRuntimeStrategyBase
                     timeout: timeout, cancellationToken: cancellationToken);
 
                 // Cleanup
-                try { await RunProcessAsync("youki", $"delete --force {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { }
+                try { await RunProcessAsync("youki", $"delete --force {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"Youki exited with code {result.ExitCode}: {result.StandardError}");
@@ -93,7 +93,7 @@ internal sealed class YoukiStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { Directory.Delete(bundleDir, true); } catch { }
+                try { Directory.Delete(bundleDir, true); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

@@ -501,7 +501,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             var response = await ExecuteWithRetryAsync(async () =>
                 await _s3Client!.GetObjectAsync(request, ct), ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.ResponseStream.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
 

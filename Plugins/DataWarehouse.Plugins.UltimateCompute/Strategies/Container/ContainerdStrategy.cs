@@ -66,7 +66,7 @@ internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
                 timeout: timeout, cancellationToken: cancellationToken);
 
             // Cleanup
-            try { await RunProcessAsync("ctr", $"-n {ns} containers delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { }
+            try { await RunProcessAsync("ctr", $"-n {ns} containers delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
 
             if (result.ExitCode != 0)
                 throw new InvalidOperationException($"containerd exited with code {result.ExitCode}: {result.StandardError}");

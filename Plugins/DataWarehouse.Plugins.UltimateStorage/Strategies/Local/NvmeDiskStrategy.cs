@@ -267,7 +267,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 // Use aligned I/O for NVMe optimization
                 if (_isNvmeDevice && _useDirectIO)
                 {
-                    var ms = new MemoryStream();
+                    var ms = new MemoryStream(65536);
                     await ReadAlignedAsync(filePath, ms, ct);
                     ms.Position = 0;
                     return ms;

@@ -53,7 +53,7 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
                     environment: task.Environment,
                     timeout: timeout, cancellationToken: cancellationToken);
 
-                try { File.Delete(wrapperPath); } catch { }
+                try { File.Delete(wrapperPath); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"Landlock sandbox exited with code {result.ExitCode}: {result.StandardError}");
@@ -62,7 +62,7 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

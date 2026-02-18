@@ -402,7 +402,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpLoginAsync(CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             // Write command
@@ -464,7 +464,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpOpenVolAsync(CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPOpenVol);
@@ -491,7 +491,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpCloseVolAsync(CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPCloseVol);
@@ -507,7 +507,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<uint> AfpCreateFileAsync(uint directoryId, string filename, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPCreateFile);
@@ -533,7 +533,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<ushort> AfpOpenForkAsync(uint directoryId, string filename, AfpForkType forkType, AfpAccessMode accessMode, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)(forkType == AfpForkType.DataFork ? AfpCommand.FPOpenFork : AfpCommand.FPOpenFork));
@@ -566,7 +566,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpCloseForkAsync(ushort forkRefNum, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPCloseFork);
@@ -582,7 +582,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<byte[]> AfpReadAsync(ushort forkRefNum, long offset, int count, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPRead);
@@ -600,7 +600,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpWriteAsync(ushort forkRefNum, long offset, byte[] data, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPWrite);
@@ -621,7 +621,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task AfpDeleteAsync(uint directoryId, string filename, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPDelete);
@@ -650,7 +650,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
             while (true)
             {
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
                 using var bw = new BinaryWriter(ms);
 
                 bw.Write((byte)AfpCommand.FPEnumerate);
@@ -727,7 +727,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<AfpFileInfo> AfpGetFileDirParmsAsync(uint directoryId, string filename, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPGetFileDirParms);
@@ -762,7 +762,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<uint> AfpCreateDirAsync(uint parentDirectoryId, string dirname, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)AfpCommand.FPCreateDir);
@@ -898,7 +898,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             try
             {
                 // Read entire file into memory stream
-                var memoryStream = new MemoryStream();
+                var memoryStream = new MemoryStream(65536);
                 var buffer = new byte[_maxBufferSize];
                 long offset = 0;
                 var fileSize = fileInfo.Size;

@@ -196,7 +196,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             IncrementOperationCounter(StorageOperationType.Store);
 
             // Read data
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var originalData = ms.ToArray();
             var originalSize = originalData.Length;

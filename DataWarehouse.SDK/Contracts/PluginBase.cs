@@ -970,7 +970,7 @@ namespace DataWarehouse.SDK.Contracts
             // Dispose subscriptions
             foreach (var sub in _knowledgeSubscriptions)
             {
-                try { sub.Dispose(); } catch { }
+                try { sub.Dispose(); } catch { /* Best-effort cleanup */ }
             }
             _knowledgeSubscriptions.Clear();
 

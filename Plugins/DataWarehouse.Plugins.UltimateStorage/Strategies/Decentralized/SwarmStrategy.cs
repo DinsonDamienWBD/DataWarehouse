@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateStream(data);
 
             // Read stream into memory for upload
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
             var dataSize = ms.Length;
@@ -521,7 +521,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             var response = await _httpClient!.GetAsync($"/bytes/{reference}", ct);
             response.EnsureSuccessStatusCode();
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 

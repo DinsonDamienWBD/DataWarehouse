@@ -330,7 +330,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task SendLoginRequestAsync(IscsiLoginStage stage, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var writer = new BinaryWriter(ms);
 
             // Basic Header Segment (BHS) - 48 bytes
@@ -479,7 +479,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task SendLogoutAsync(CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var writer = new BinaryWriter(ms);
 
             // Logout Request PDU
@@ -504,7 +504,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             try
             {
                 // Build SCSI Command PDU
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
                 using var writer = new BinaryWriter(ms);
 
                 // BHS
@@ -579,7 +579,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var numBlocks = (data.Length + BlockSize - 1) / BlockSize;
 
                 // Build SCSI Command PDU with data
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
                 using var writer = new BinaryWriter(ms);
 
                 // BHS
@@ -734,7 +734,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             await EnsureConnectedAsync(ct);
 
             // Read data into buffer
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 

@@ -559,7 +559,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         /// </summary>
         private async Task<MemoryStream> ExportDataAsync(OdbcDataReader reader, string format, CancellationToken ct)
         {
-            var stream = new MemoryStream();
+            var stream = new MemoryStream(4096);
 
             if (format == "json")
             {

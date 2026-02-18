@@ -308,7 +308,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             // Check if object is in Archive/Coldline and retrieve
             // Note: GCS Archive/Coldline objects can be accessed directly, but may have higher latency
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             await ExecuteWithRetryAsync(async () =>
             {

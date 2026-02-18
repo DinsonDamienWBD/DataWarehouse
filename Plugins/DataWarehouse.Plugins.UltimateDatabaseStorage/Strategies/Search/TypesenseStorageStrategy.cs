@@ -51,7 +51,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _collectionName = GetConfiguration("CollectionName", "storage");
-        _apiKey = GetConfiguration<string>("ApiKey", null!)
+        _apiKey = GetConfiguration<string?>("ApiKey", null)
             ?? throw new InvalidOperationException("ApiKey is required");
 
         var connectionString = GetConnectionString();

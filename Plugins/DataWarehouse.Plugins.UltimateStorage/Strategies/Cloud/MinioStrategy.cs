@@ -251,7 +251,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             EnsureInitialized();
             ValidateKey(key);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             await ExecuteWithRetryAsync(async () =>
             {

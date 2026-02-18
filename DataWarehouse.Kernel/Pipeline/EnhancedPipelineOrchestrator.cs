@@ -903,7 +903,7 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
             // Cleanup intermediate streams on failure
             foreach (var stream in intermediateStreams)
             {
-                try { stream.Dispose(); } catch { }
+                try { stream.Dispose(); } catch { /* Best-effort cleanup */ }
             }
             throw;
         }

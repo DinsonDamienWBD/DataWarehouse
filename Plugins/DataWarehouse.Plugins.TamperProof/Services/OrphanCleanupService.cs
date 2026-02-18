@@ -494,7 +494,7 @@ internal class OrphanCleanupService : IDisposable
         {
             try
             {
-                // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+                // Sync bridge: Dispose cannot be async without IAsyncDisposable
                 Task.Run(() => StopAsync()).GetAwaiter().GetResult();
             }
             catch (Exception ex)

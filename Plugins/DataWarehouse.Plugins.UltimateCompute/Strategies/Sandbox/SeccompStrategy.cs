@@ -82,8 +82,8 @@ internal sealed class SeccompStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(profilePath); } catch { }
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(profilePath); } catch { /* Best-effort cleanup */ }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

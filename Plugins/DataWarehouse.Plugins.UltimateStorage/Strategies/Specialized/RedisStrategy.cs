@@ -170,7 +170,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             var startTime = DateTime.UtcNow;
 
             // Read stream into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
             var originalSize = content.Length;
@@ -683,7 +683,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             }
 
             // Reconstruct the data
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             foreach (var entry in entries.OrderBy(e => e.Values.FirstOrDefault(v => v.Name == "chunk").Value))
             {
                 var dataValue = entry.Values.FirstOrDefault(v => v.Name == "data").Value;

@@ -79,7 +79,7 @@ internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
                         {
                             winnerOutput = EncodeOutput(result.StandardOutput);
                             winnerLogs = $"SpecExec winner: {runtime} in {result.Elapsed.TotalMilliseconds:F0}ms";
-                            try { await raceCts.CancelAsync(); } catch { }
+                            try { await raceCts.CancelAsync(); } catch { /* Best-effort cleanup */ }
                         }
                     }
                 }
@@ -94,7 +94,7 @@ internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
                 }
                 finally
                 {
-                    try { File.Delete(codePath); } catch { }
+                    try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                 }
             }, cancellationToken)).ToArray();
 

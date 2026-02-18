@@ -81,7 +81,7 @@ internal sealed class CudaStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(cudaPath); File.Delete(binPath); } catch { }
+                try { File.Delete(cudaPath); File.Delete(binPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

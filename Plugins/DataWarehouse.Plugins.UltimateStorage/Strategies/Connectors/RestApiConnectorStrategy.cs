@@ -199,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 var response = await _httpClient!.GetAsync(endpoint, ct);
                 response.EnsureSuccessStatusCode();
 
-                var stream = new MemoryStream();
+                var stream = new MemoryStream(4096);
                 await response.Content.CopyToAsync(stream, ct);
                 stream.Position = 0;
 

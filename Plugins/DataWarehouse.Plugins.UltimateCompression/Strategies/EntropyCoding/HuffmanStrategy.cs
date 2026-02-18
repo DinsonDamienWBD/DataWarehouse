@@ -75,7 +75,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             var codes = BuildCanonicalCodes(codeLengths);
 
             // Encode data
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
             var lenBytes = new byte[4];
@@ -280,7 +280,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
 
         private static byte[] CreateEmptyCompressedBlock()
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(Magic, 0, 4);
             ms.Write(new byte[4], 0, 4); // length = 0
             ms.Write(new byte[256], 0, 256); // code lengths all zero
@@ -435,10 +435,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                 _isCompression = isCompression;
 
                 if (isCompression)
-                    _buffer = new MemoryStream();
+                    _buffer = new MemoryStream(4096);
                 else
                 {
-                    using var temp = new MemoryStream();
+                    using var temp = new MemoryStream(4096);
                     inner.CopyTo(temp);
                     var compressed = temp.ToArray();
                     var decompressed = compressed.Length > 0 ? transform(compressed) : Array.Empty<byte>();

@@ -285,7 +285,7 @@ public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
     {
         foreach (var tx in _transactions.Values)
         {
-            try { tx.Dispose(); } catch { }
+            try { tx.Dispose(); } catch { /* Best-effort cleanup */ }
         }
         _transactions.Clear();
 

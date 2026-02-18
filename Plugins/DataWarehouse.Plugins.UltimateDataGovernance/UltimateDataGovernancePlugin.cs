@@ -262,7 +262,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
                 break;
             case "get":
                 var id = GetRequiredString(message.Payload, "id");
-                message.Payload["policy"] = _policies.TryGetValue(id, out var p) ? p : null!; // Dictionary<string, object> can store null
+                message.Payload["policy"] = _policies.TryGetValue(id, out var p) ? (object)p : null!; // Dictionary<string, object?> stores null when not found
                 break;
             case "list":
                 message.Payload["policies"] = _policies.Values.ToList();
@@ -301,7 +301,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
                 break;
             case "get":
                 var assetId = GetRequiredString(message.Payload, "assetId");
-                message.Payload["ownership"] = _ownerships.TryGetValue(assetId, out var o) ? o : null!; // Dictionary<string, object> can store null
+                message.Payload["ownership"] = _ownerships.TryGetValue(assetId, out var o) ? (object)o : null!; // Dictionary<string, object?> stores null when not found
                 break;
             case "list":
                 message.Payload["ownerships"] = _ownerships.Values.ToList();
@@ -343,7 +343,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
                 break;
             case "get":
                 var assetId = GetRequiredString(message.Payload, "assetId");
-                message.Payload["classification"] = _classifications.TryGetValue(assetId, out var c) ? c : null!; // Dictionary<string, object> can store null
+                message.Payload["classification"] = _classifications.TryGetValue(assetId, out var c) ? (object)c : null!; // Dictionary<string, object?> stores null when not found
                 break;
             case "list":
                 message.Payload["classifications"] = _classifications.Values.ToList();

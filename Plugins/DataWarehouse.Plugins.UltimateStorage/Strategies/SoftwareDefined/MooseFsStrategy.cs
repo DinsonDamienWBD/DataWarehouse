@@ -335,7 +335,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new FileNotFoundException($"File not found: {key}", filePath);
             }
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             var fileOptions = FileOptions.Asynchronous | FileOptions.SequentialScan;
 

@@ -144,7 +144,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
         // Release all acquired semaphores
         for (int i = 0; i < MaxConcurrentExecutions; i++)
         {
-            try { _executionSemaphore.Release(); } catch { }
+            try { _executionSemaphore.Release(); } catch { /* Best-effort release */ }
         }
 
         LogInfo("WASM Compute plugin stopped");

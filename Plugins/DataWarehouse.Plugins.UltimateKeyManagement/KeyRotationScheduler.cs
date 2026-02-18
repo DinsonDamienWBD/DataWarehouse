@@ -320,7 +320,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             _disposed = true;
 
-            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
             Task.Run(() => StopAsync()).GetAwaiter().GetResult();
 
             _shutdownCts.Dispose();

@@ -335,7 +335,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
 
                 // Read content into memory stream to allow multiple reads
-                var memoryStream = new MemoryStream();
+                var memoryStream = new MemoryStream(65536);
                 await response.Content.CopyToAsync(memoryStream, ct);
                 memoryStream.Position = 0;
 
@@ -1299,7 +1299,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _innerStream?.Dispose();
                     if (_lockToken != null)
                     {
-                        _strategy.ReleaseLockAsync(_resourceUrl, _lockToken, CancellationToken.None).GetAwaiter().GetResult();
+                        // Sync bridge: Dispose cannot be async without IAsyncDisposable
+                        Task.Run(() => _strategy.ReleaseLockAsync(_resourceUrl, _lockToken, CancellationToken.None)).GetAwaiter().GetResult();
                     }
                 }
                 _disposed = true;

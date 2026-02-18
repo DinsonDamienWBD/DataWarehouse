@@ -57,7 +57,8 @@ public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "openai", "gpt", "gpt-4", "chatgpt", "embeddings", "dalle" }
     };
 
-    public OpenAiProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public OpenAiProviderStrategy() : this(SharedHttpClient) { }
 
     public OpenAiProviderStrategy(HttpClient httpClient)
     {

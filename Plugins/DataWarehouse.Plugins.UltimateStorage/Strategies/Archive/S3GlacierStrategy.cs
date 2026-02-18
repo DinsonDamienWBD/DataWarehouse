@@ -362,7 +362,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             var response = await ExecuteWithRetryAsync(() => _s3Client!.GetObjectAsync(request, ct), ct);
 
             // Copy to memory stream
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
             await response.ResponseStream.CopyToAsync(memoryStream, ct);
             memoryStream.Position = 0;
 

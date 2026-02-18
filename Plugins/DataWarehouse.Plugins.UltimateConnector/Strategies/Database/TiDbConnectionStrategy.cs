@@ -81,7 +81,7 @@ public sealed class TiDbConnectionStrategy : DatabaseConnectionStrategyBase
             await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
             return true;
         }
-        catch { return false; }
+        catch { return false; /* Connection validation - failure acceptable */ }
     }
 
     /// <inheritdoc/>

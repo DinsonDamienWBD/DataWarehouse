@@ -71,7 +71,7 @@ internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
                     timeout: timeout, cancellationToken: cancellationToken);
 
                 // Remove profile
-                try { await RunProcessAsync("apparmor_parser", $"-R \"{profilePath}\"", timeout: TimeSpan.FromSeconds(10)); } catch { }
+                try { await RunProcessAsync("apparmor_parser", $"-R \"{profilePath}\"", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"AppArmor sandbox exited with code {result.ExitCode}: {result.StandardError}");
@@ -80,8 +80,8 @@ internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
-                try { File.Delete(profilePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
+                try { File.Delete(profilePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

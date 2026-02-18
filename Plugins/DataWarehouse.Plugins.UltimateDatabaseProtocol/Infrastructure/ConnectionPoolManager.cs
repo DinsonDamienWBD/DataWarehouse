@@ -327,7 +327,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
         _disposed = true;
 
         _shutdownCts.Cancel();
-        try { _maintenanceTask.Wait(TimeSpan.FromSeconds(5)); } catch { }
+        try { _maintenanceTask.Wait(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
         _shutdownCts.Dispose();
 
         foreach (var pool in _pools.Values)
@@ -343,7 +343,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
         _disposed = true;
 
         _shutdownCts.Cancel();
-        try { await _maintenanceTask.WaitAsync(TimeSpan.FromSeconds(5)); } catch { }
+        try { await _maintenanceTask.WaitAsync(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
         _shutdownCts.Dispose();
 
         foreach (var pool in _pools.Values)
@@ -627,7 +627,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             if (_disposed) return;
             _disposed = true;
 
-            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
             Task.Run(() => ClearAsync()).GetAwaiter().GetResult();
             _acquireSemaphore.Dispose();
             _createLock.Dispose();

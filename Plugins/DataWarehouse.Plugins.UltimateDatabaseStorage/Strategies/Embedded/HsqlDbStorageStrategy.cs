@@ -366,7 +366,7 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
                     command.CommandText = "SHUTDOWN";
                     command.ExecuteNonQuery();
                 }
-                catch { }
+                catch { /* Non-critical operation */ }
 
                 _connection.Dispose();
                 _connection = null;

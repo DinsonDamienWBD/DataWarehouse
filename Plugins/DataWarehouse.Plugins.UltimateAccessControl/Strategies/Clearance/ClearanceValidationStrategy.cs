@@ -15,13 +15,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
     /// </summary>
     public sealed class ClearanceValidationStrategy : AccessControlStrategyBase
     {
+        private static readonly HttpClient SharedHttpClient = new HttpClient();
         private readonly ILogger _logger;
         private readonly HttpClient _httpClient;
 
         public ClearanceValidationStrategy(ILogger? logger = null, HttpClient? httpClient = null)
         {
             _logger = logger ?? NullLogger.Instance;
-            _httpClient = httpClient ?? new HttpClient();
+            _httpClient = httpClient ?? SharedHttpClient;
         }
 
         /// <inheritdoc/>

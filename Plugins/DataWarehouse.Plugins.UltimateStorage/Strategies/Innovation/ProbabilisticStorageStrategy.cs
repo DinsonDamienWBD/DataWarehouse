@@ -833,7 +833,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     structureType = typeValue;
             }
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var content = Encoding.UTF8.GetString(ms.ToArray());
             var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);

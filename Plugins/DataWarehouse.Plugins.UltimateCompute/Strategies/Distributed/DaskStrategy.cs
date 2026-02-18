@@ -69,7 +69,7 @@ internal sealed class DaskStrategy : ComputeRuntimeStrategyBase
                     stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,
                     environment: task.Environment, timeout: timeout, cancellationToken: cancellationToken);
 
-                try { File.Delete(wrapperPath); } catch { }
+                try { File.Delete(wrapperPath); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"Dask exited with code {result.ExitCode}: {result.StandardError}");
@@ -78,7 +78,7 @@ internal sealed class DaskStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

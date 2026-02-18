@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             ValidateStream(data);
 
             // Read data into memory
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var dataBytes = ms.ToArray();
             var size = dataBytes.LongLength;
@@ -232,7 +232,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             return new MemoryStream(entry.Data, writable: false);
         }
 
-        protected override Task DeleteAsyncCore(string key, CancellationToken ct)
+        protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             ValidateKey(key);
 
@@ -241,14 +241,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 Interlocked.Add(ref _currentMemoryBytes, -entry.Size);
 
                 // Remove from LRU index
-                RemoveLruAsync(key, ct).GetAwaiter().GetResult();
+                await RemoveLruAsync(key, ct);
 
                 // Update statistics
                 IncrementBytesDeleted(entry.Size);
                 IncrementOperationCounter(StorageOperationType.Delete);
             }
-
-            return Task.CompletedTask;
         }
 
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
@@ -281,7 +279,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             }
         }
 
-        protected override Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
+        protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
         {
             ValidateKey(key);
 
@@ -293,13 +291,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // Check expiration
             if (entry.ExpiresAt < DateTime.UtcNow)
             {
-                DeleteAsync(key, ct).GetAwaiter().GetResult();
+                await DeleteAsync(key, ct);
                 throw new FileNotFoundException($"Object expired: {key}");
             }
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
-            return Task.FromResult(CreateMetadata(entry));
+            return CreateMetadata(entry);
         }
 
         protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)

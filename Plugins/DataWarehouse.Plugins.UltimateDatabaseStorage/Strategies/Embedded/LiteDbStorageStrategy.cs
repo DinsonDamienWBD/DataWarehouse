@@ -371,7 +371,7 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
             throw new FileNotFoundException($"Object not found: {key}");
         }
 
-        var ms = new MemoryStream();
+        var ms = new MemoryStream(65536);
         await fileStorage.DownloadAsync(fileInfo.Id, ms);
         ms.Position = 0;
         return ms;

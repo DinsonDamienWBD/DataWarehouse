@@ -56,7 +56,8 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "huggingface", "open-source", "mistral", "llama", "embeddings", "transformers" }
     };
 
-    public HuggingFaceProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public HuggingFaceProviderStrategy() : this(SharedHttpClient) { }
 
     public HuggingFaceProviderStrategy(HttpClient httpClient)
     {

@@ -42,7 +42,8 @@ public sealed class ArangoGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "arangodb", "multi-model", "aql", "graph-db", "document-db" }
     };
 
-    public ArangoGraphStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public ArangoGraphStrategy() : this(SharedHttpClient) { }
     public ArangoGraphStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 
     private string GetBaseUrl() => $"{GetConfig("Host") ?? DefaultHost}/_db/{GetConfig("Database") ?? DefaultDatabase}";
@@ -382,7 +383,8 @@ public sealed class TigerGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "tigergraph", "gsql", "analytics", "high-performance" }
     };
 
-    public TigerGraphStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public TigerGraphStrategy() : this(SharedHttpClient) { }
     public TigerGraphStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 
     public override async Task<GraphNode> AddNodeAsync(string label, Dictionary<string, object>? properties = null, CancellationToken ct = default)

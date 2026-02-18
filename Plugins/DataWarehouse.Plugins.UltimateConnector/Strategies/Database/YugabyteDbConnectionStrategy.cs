@@ -88,7 +88,7 @@ public sealed class YugabyteDbConnectionStrategy : DatabaseConnectionStrategyBas
             await using var cmd = new NpgsqlCommand("SELECT 1", connection);
             return await cmd.ExecuteScalarAsync(ct) != null;
         }
-        catch { return false; }
+        catch { return false; /* Connection validation - failure acceptable */ }
     }
 
     /// <inheritdoc/>

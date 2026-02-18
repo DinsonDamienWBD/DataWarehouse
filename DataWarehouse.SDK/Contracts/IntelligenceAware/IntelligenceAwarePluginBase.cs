@@ -1571,13 +1571,13 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         {
             foreach (var subscription in _intelligenceSubscriptions)
             {
-                try { subscription.Dispose(); } catch { }
+                try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
             }
             _intelligenceSubscriptions.Clear();
 
             foreach (var subscription in _typedHandlerSubscriptions)
             {
-                try { subscription.Dispose(); } catch { }
+                try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
             }
             _typedHandlerSubscriptions.Clear();
             _pendingHandlers.Clear();

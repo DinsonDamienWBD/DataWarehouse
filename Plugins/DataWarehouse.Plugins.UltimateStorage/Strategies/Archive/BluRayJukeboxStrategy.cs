@@ -189,7 +189,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 if (dataLength == 0)
                 {
                     // Read into memory to get size
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream(65536);
                     await data.CopyToAsync(ms, 81920, ct);
                     dataLength = ms.Length;
                     ms.Position = 0;
@@ -529,7 +529,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
 
             // Read file from disc into memory (optical media is sequential, better to buffer)
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.SequentialScan | FileOptions.Asynchronous))
             {
                 await fs.CopyToAsync(ms, 81920, ct);

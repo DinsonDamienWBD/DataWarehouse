@@ -137,7 +137,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             var startTime = DateTime.UtcNow;
 
             // Read stream into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
             var originalSize = content.Length;
@@ -255,7 +255,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 if (metadataObj.IsChunked)
                 {
                     // Retrieve chunks
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream(65536);
 
                     for (int i = 0; i < metadataObj.ChunkCount; i++)
                     {

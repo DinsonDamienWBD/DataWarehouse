@@ -236,7 +236,7 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
         // Auto-register default destinations if none registered
         if (GetDestinations().Count == 0)
         {
-            RegisterDefaultDestinations();
+            await RegisterDefaultDestinationsAsync();
         }
 
         // Validate active strategy has required destinations
@@ -366,7 +366,7 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
         return new Dictionary<string, long>(_writeStats);
     }
 
-    private void RegisterDefaultDestinations()
+    private async Task RegisterDefaultDestinationsAsync()
     {
         // Register primary storage destination (via message bus)
         RegisterDestination(new PrimaryStorageDestination(_messageBus));
@@ -376,18 +376,18 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
 
         // Register text index destination
         var fullTextIndex = new FullTextIndexStrategy();
-        fullTextIndex.InitializeAsync().GetAwaiter().GetResult();
+        await fullTextIndex.InitializeAsync();
         RegisterDestination(new TextIndexDestination(fullTextIndex));
 
         // Register vector store destination
         var semanticIndex = new SemanticIndexStrategy();
         semanticIndex.SetMessageBus(_messageBus);
-        semanticIndex.InitializeAsync().GetAwaiter().GetResult();
+        await semanticIndex.InitializeAsync();
         RegisterDestination(new VectorStoreDestination(semanticIndex, _messageBus));
 
         // Register cache destination
         var cache = new InMemoryCacheStrategy();
-        cache.InitializeAsync().GetAwaiter().GetResult();
+        await cache.InitializeAsync();
         RegisterDestination(new CacheDestination(cache));
 
         // Register TamperProof-specific destinations

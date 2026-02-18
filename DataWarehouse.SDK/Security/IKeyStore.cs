@@ -1062,7 +1062,8 @@ namespace DataWarehouse.SDK.Security
         [Obsolete("Use GetKeyAsync instead. Sync-over-async causes threadpool starvation under load.")]
         public virtual byte[] GetKey(string keyId)
         {
-            return GetKeyAsync(keyId, CreateSystemContext()).GetAwaiter().GetResult();
+            // Sync bridge: obsolete sync API wrapper
+            return Task.Run(() => GetKeyAsync(keyId, CreateSystemContext())).GetAwaiter().GetResult();
         }
 
         /// <summary>

@@ -66,9 +66,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             // Build suffix array for the input (treating it as "old" data)
             var suffixArray = BuildSuffixArray(input);
 
-            using var controlStream = new MemoryStream();
-            using var diffStream = new MemoryStream();
-            using var extraStream = new MemoryStream();
+            using var controlStream = new MemoryStream(1024);
+            using var diffStream = new MemoryStream(4096);
+            using var extraStream = new MemoryStream(4096);
 
             int scan = 0;
             int lastMatch = 0;
@@ -136,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             }
 
             // Build final output
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
             var lenBytes = new byte[4];
@@ -324,7 +324,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
 
         private static byte[] CreateEmptyBlock()
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(Magic, 0, 4);
             ms.Write(new byte[4], 0, 4); // length = 0
             ms.Write(new byte[4], 0, 4); // control length = 0
@@ -370,10 +370,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 _isCompression = isCompression;
 
                 if (isCompression)
-                    _buffer = new MemoryStream();
+                    _buffer = new MemoryStream(4096);
                 else
                 {
-                    using var temp = new MemoryStream();
+                    using var temp = new MemoryStream(4096);
                     inner.CopyTo(temp);
                     var compressed = temp.ToArray();
                     var decompressed = compressed.Length > 0 ? transform(compressed) : Array.Empty<byte>();

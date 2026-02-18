@@ -1071,7 +1071,7 @@ public sealed class SpatialIndexStrategy : IndexingStrategyBase
                 }
                 return result;
             }
-            catch { }
+            catch { /* Non-critical operation */ }
         }
 
         // Parse key:value pairs

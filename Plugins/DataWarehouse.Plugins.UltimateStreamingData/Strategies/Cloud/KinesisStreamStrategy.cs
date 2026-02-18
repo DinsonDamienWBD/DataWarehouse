@@ -389,7 +389,7 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
     /// <param name="records">Records to put (partition key + data pairs).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Results for each record including sequence numbers and any failures.</returns>
-    public Task<IReadOnlyList<KinesisPutResult>> PutRecordsBatchAsync(
+    public async Task<IReadOnlyList<KinesisPutResult>> PutRecordsBatchAsync(
         string streamName,
         IReadOnlyList<(string PartitionKey, byte[] Data)> records,
         CancellationToken ct = default)
@@ -412,11 +412,11 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
         var results = new List<KinesisPutResult>(records.Count);
         foreach (var (partitionKey, data) in records)
         {
-            var result = PutRecordAsync(streamName, partitionKey, data, ct: ct).GetAwaiter().GetResult();
+            var result = await PutRecordAsync(streamName, partitionKey, data, ct: ct);
             results.Add(result);
         }
 
-        return Task.FromResult<IReadOnlyList<KinesisPutResult>>(results);
+        return results;
     }
 
     /// <summary>

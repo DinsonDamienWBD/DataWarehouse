@@ -105,7 +105,7 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                 }
                 finally
                 {
-                    try { File.Delete(codePath); } catch { }
+                    try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                 }
             }, cancellationToken);
 
@@ -155,7 +155,7 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                 }
                 finally
                 {
-                    try { File.Delete(gpuCodePath); } catch { }
+                    try { File.Delete(gpuCodePath); } catch { /* Best-effort cleanup */ }
                 }
 
                 sw.Stop();

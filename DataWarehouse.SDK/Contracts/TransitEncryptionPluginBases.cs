@@ -533,7 +533,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             // Default implementation: read stream to byte array and use byte array encryption
             // Derived classes should override for true streaming encryption
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream((int)(plaintextStream.CanSeek ? plaintextStream.Length : 4096));
             await plaintextStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
             var plaintext = ms.ToArray();
 
@@ -602,7 +602,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             // Default implementation: read stream to byte array and use byte array decryption
             // Derived classes should override for true streaming decryption
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream((int)(ciphertextStream.CanSeek ? ciphertextStream.Length : 4096));
             await ciphertextStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
             var ciphertext = ms.ToArray();
 
@@ -940,7 +940,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             // Default implementation: use byte array transcryption
             // Derived classes should override for true streaming
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream((int)(sourceCiphertextStream.CanSeek ? sourceCiphertextStream.Length : 4096));
             await sourceCiphertextStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
             var sourceCiphertext = ms.ToArray();
 

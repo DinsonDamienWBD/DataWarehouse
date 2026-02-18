@@ -505,7 +505,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             ? p : GenerateStoragePath();
 
         // Read input data
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         await input.CopyToAsync(ms);
         var data = ms.ToArray();
 
@@ -1320,7 +1320,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var strategy = await GetStrategyWithFailoverAsync(_defaultStrategyId);
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         await data.CopyToAsync(ms, ct);
         var bytes = ms.ToArray();
         var options = BuildStorageOptions(new Dictionary<string, object>());

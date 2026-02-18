@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var namespace_ = GetConfiguration<string>(config, "Namespace", null!);
+            var namespace_ = GetConfiguration<string?>(config, "Namespace", null);
             if (string.IsNullOrEmpty(namespace_))
                 throw new InvalidOperationException("Azure Service Bus Namespace is required.");
 

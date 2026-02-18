@@ -90,7 +90,7 @@ public sealed class DataGovernanceStrategyRegistry
                     count++;
                 }
             }
-            catch { }
+            catch { /* Non-critical operation */ }
         }
 
         return count;

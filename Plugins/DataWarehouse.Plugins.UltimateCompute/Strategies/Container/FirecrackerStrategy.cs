@@ -63,7 +63,7 @@ internal sealed class FirecrackerStrategy : ComputeRuntimeStrategyBase
                 stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,
                 timeout: timeout, cancellationToken: cancellationToken);
 
-            try { File.Delete(socketPath); } catch { }
+            try { File.Delete(socketPath); } catch { /* Best-effort cleanup */ }
 
             if (result.ExitCode != 0)
                 throw new InvalidOperationException($"Firecracker exited with code {result.ExitCode}: {result.StandardError}");

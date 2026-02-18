@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
 
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Write header: magic + uncompressed size
@@ -203,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             {
                 _baseStream = output ?? throw new ArgumentNullException(nameof(output));
                 _leaveOpen = leaveOpen;
-                _buffer = new MemoryStream();
+                _buffer = new MemoryStream(4096);
             }
 
             public override bool CanRead => false;

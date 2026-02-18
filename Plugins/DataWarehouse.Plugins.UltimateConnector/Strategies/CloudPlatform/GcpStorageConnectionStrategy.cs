@@ -32,12 +32,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             // Load project ID from config or environment
-            var projectId = GetConfiguration<string>(config, "ProjectId", null!)
+            var projectId = GetConfiguration<string?>(config, "ProjectId", null)
                 ?? Environment.GetEnvironmentVariable("GCP_PROJECT_ID")
                 ?? Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
 
             // Load credentials path from config or environment
-            var credentialsPath = GetConfiguration<string>(config, "CredentialsPath", null!)
+            var credentialsPath = GetConfiguration<string?>(config, "CredentialsPath", null)
                 ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
 
             // Create storage client - supports credential file or application default credentials

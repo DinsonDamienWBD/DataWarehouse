@@ -1109,7 +1109,7 @@ public sealed class TranscryptionService : ITranscryptionService
         try
         {
             // Read source ciphertext
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             await sourceStream.CopyToAsync(ms, StreamingChunkSize, cancellationToken);
             ciphertext = ms.ToArray();
 

@@ -124,7 +124,7 @@ internal sealed class DataGravitySchedulerStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }
