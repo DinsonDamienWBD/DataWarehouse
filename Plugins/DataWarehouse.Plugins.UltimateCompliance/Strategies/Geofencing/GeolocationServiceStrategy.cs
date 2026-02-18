@@ -34,6 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private readonly ConcurrentDictionary<string, CachedLocation> _locationCache = new();
         private readonly List<IGeolocationProvider> _providers = new();
         private readonly SemaphoreSlim _providerLock = new(1, 1);
+        private bool _disposed;
 
         private TimeSpan _cacheTtl = TimeSpan.FromHours(24);
         private int _consensusThreshold = 2;
@@ -373,6 +374,38 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             }
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                _providerLock.Wait();
+                try
+                {
+                    // Dispose all disposable providers
+                    foreach (var provider in _providers.OfType<IDisposable>())
+                    {
+                        provider.Dispose();
+                    }
+
+                    _providers.Clear();
+                    _locationCache.Clear();
+                }
+                catch
+                {
+                    // Suppress exceptions during disposal
+                }
+                finally
+                {
+                    _providerLock.Dispose();
+                }
+            }
+
+            _disposed = true;
+            base.Dispose(disposing);
+        }
+
         private sealed class CachedLocation
         {
             public required GeolocationResult Location { get; init; }
@@ -440,11 +473,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <summary>
     /// MaxMind GeoIP2 provider implementation.
     /// </summary>
-    internal sealed class MaxMindProvider : IGeolocationProvider
+    internal sealed class MaxMindProvider : IGeolocationProvider, IDisposable
     {
         private string? _databasePath;
         private string? _apiKey;
+        private MaxMind.GeoIP2.DatabaseReader? _reader;
         private readonly object _readerLock = new();
+        private bool _disposed;
 
         public string ProviderName => "MaxMind";
         public bool IsEnabled { get; set; } = true;
@@ -454,6 +489,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             if (configuration.TryGetValue("DatabasePath", out var pathObj) && pathObj is string path)
             {
                 _databasePath = path;
+                InitializeDatabaseReader();
             }
             if (configuration.TryGetValue("ApiKey", out var keyObj) && keyObj is string key)
             {
@@ -468,76 +504,108 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 return Task.FromResult<GeolocationResult?>(null);
             }
 
-            // Production implementation would use MaxMind.GeoIP2 library
-            // This provides the structure for actual database lookup
             try
             {
-                var countryCode = DeriveCountryFromIp(ip);
+                // Ensure database reader is initialized
+                if (_reader == null && !string.IsNullOrWhiteSpace(_databasePath))
+                {
+                    lock (_readerLock)
+                    {
+                        if (_reader == null)
+                        {
+                            InitializeDatabaseReader();
+                        }
+                    }
+                }
+
+                if (_reader == null)
+                {
+                    // No database available, log warning and return null
+                    return Task.FromResult<GeolocationResult?>(null);
+                }
+
+                // Perform actual MaxMind GeoIP2 lookup
+                var response = _reader.Country(ip);
 
                 return Task.FromResult<GeolocationResult?>(new GeolocationResult
                 {
                     IpAddress = ipAddress,
-                    CountryCode = countryCode,
-                    CountryName = GetCountryName(countryCode),
-                    Confidence = 0.95,
+                    CountryCode = response.Country.IsoCode ?? "UNKNOWN",
+                    CountryName = response.Country.Name,
+                    Confidence = response.Country.Confidence ?? 0.95,
                     ProviderName = ProviderName,
-                    IsReliable = true
+                    IsReliable = response.Country.IsoCode != null
                 });
             }
-            catch
+            catch (MaxMind.GeoIP2.Exceptions.AddressNotFoundException)
             {
+                // IP not found in database, return unknown result
+                return Task.FromResult<GeolocationResult?>(new GeolocationResult
+                {
+                    IpAddress = ipAddress,
+                    CountryCode = "UNKNOWN",
+                    Confidence = 0.0,
+                    ProviderName = ProviderName,
+                    IsReliable = false
+                });
+            }
+            catch (Exception)
+            {
+                // Other errors (database file issues, etc.)
                 return Task.FromResult<GeolocationResult?>(null);
             }
         }
 
-        private static string DeriveCountryFromIp(IPAddress ip)
+        private void InitializeDatabaseReader()
         {
-            var bytes = ip.GetAddressBytes();
-            if (ip.AddressFamily == AddressFamily.InterNetwork && bytes.Length >= 1)
+            if (string.IsNullOrWhiteSpace(_databasePath) || !System.IO.File.Exists(_databasePath))
             {
-                // Real implementation uses MaxMind database
-                // This is a deterministic mapping for testing
-                return bytes[0] switch
-                {
-                    >= 1 and <= 50 => "US",
-                    >= 51 and <= 80 => "GB",
-                    >= 81 and <= 100 => "DE",
-                    >= 101 and <= 120 => "FR",
-                    >= 121 and <= 140 => "JP",
-                    >= 141 and <= 160 => "CN",
-                    >= 161 and <= 180 => "AU",
-                    >= 181 and <= 200 => "BR",
-                    >= 201 and <= 220 => "IN",
-                    _ => "UNKNOWN"
-                };
+                // Log warning: Database file not found or path not configured
+                return;
             }
-            return "UNKNOWN";
+
+            try
+            {
+                // DatabaseReader is thread-safe and should be reused
+                _reader?.Dispose();
+                _reader = new MaxMind.GeoIP2.DatabaseReader(_databasePath);
+            }
+            catch (Exception)
+            {
+                // Log error: Failed to initialize MaxMind database reader
+                _reader = null;
+            }
         }
 
-        private static string GetCountryName(string code) => code switch
+        public void Dispose()
         {
-            "US" => "United States",
-            "GB" => "United Kingdom",
-            "DE" => "Germany",
-            "FR" => "France",
-            "JP" => "Japan",
-            "CN" => "China",
-            "AU" => "Australia",
-            "BR" => "Brazil",
-            "IN" => "India",
-            _ => "Unknown"
-        };
+            if (_disposed) return;
+
+            lock (_readerLock)
+            {
+                if (_disposed) return;
+
+                _reader?.Dispose();
+                _reader = null;
+                _disposed = true;
+            }
+        }
     }
 
     /// <summary>
     /// IP2Location provider implementation.
     /// </summary>
+    /// <remarks>
+    /// This provider is disabled by default and requires IP2Location database files.
+    /// For production use with IP2Location.IO.IpTools, add the NuGet package and database files.
+    /// Currently acts as a fallback provider with no database requirement.
+    /// </remarks>
     internal sealed class Ip2LocationProvider : IGeolocationProvider
     {
         private string? _databasePath;
 
         public string ProviderName => "IP2Location";
-        public bool IsEnabled { get; set; } = true;
+        public bool IsEnabled { get; set; } = false; // Disabled by default - no IP2Location library integrated
 
         public void Configure(Dictionary<string, object> configuration)
         {
@@ -545,41 +613,30 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             {
                 _databasePath = path;
             }
+            if (configuration.TryGetValue("Enabled", out var enabledObj) && enabledObj is bool enabled)
+            {
+                IsEnabled = enabled;
+            }
         }
 
         public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default)
         {
-            if (!IPAddress.TryParse(ipAddress, out var ip))
+            if (!IPAddress.TryParse(ipAddress, out _))
             {
                 return Task.FromResult<GeolocationResult?>(null);
             }
 
-            try
-            {
-                var bytes = ip.GetAddressBytes();
-                var hash = BitConverter.ToInt32(SHA256.HashData(bytes), 0);
-                var countryIndex = Math.Abs(hash) % _countryCodes.Length;
+            // IP2Location database integration requires IP2Location.IO.IpTools NuGet package
+            // For production use:
+            // 1. Add PackageReference: IP2Location.IO.IpTools
+            // 2. Initialize IPTools with database path
+            // 3. Call ipTools.Get(ipAddress) to retrieve location data
+            //
+            // Current implementation returns null to avoid fake data.
+            // Enable MaxMindProvider or LocalDatabaseProvider for actual geolocation.
 
-                return Task.FromResult<GeolocationResult?>(new GeolocationResult
-                {
-                    IpAddress = ipAddress,
-                    CountryCode = _countryCodes[countryIndex],
-                    Confidence = 0.90,
-                    ProviderName = ProviderName,
-                    IsReliable = true
-                });
-            }
-            catch
-            {
-                return Task.FromResult<GeolocationResult?>(null);
-            }
+            return Task.FromResult<GeolocationResult?>(null);
         }
-
-        private static readonly string[] _countryCodes =
-        {
-            "US", "GB", "DE", "FR", "JP", "CN", "AU", "BR", "IN", "CA",
-            "IT", "ES", "NL", "SE", "CH", "KR", "SG", "HK", "NZ", "IE"
-        };
     }
 
     /// <summary>

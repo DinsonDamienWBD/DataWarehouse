@@ -176,18 +176,114 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 
     private static object BuildDeploymentManifest(DeploymentConfig config, string name)
     {
+        // Strategy: rolling update with configurable parameters
+        var strategyConfig = new
+        {
+            type = "RollingUpdate",
+            rollingUpdate = new
+            {
+                maxSurge = config.StrategyConfig.TryGetValue("maxSurge", out var ms) && ms is int msi ? msi : 1,
+                maxUnavailable = config.StrategyConfig.TryGetValue("maxUnavailable", out var mu) && mu is int mui ? mui : 0
+            }
+        };
+
+        // Container ports
+        var ports = new[]
+        {
+            new { containerPort = 8080, protocol = "TCP", name = "http" },
+            new { containerPort = 8443, protocol = "TCP", name = "https" }
+        };
+
+        // Liveness probe for detecting crashed containers
+        var livenessProbe = new
+        {
+            httpGet = new { path = config.HealthCheckPath, port = 8080, scheme = "HTTP" },
+            initialDelaySeconds = 30,
+            periodSeconds = 10,
+            timeoutSeconds = config.HealthCheckTimeoutSeconds,
+            successThreshold = 1,
+            failureThreshold = 3
+        };
+
+        // Readiness probe for traffic routing
+        var readinessProbe = new
+        {
+            httpGet = new { path = config.HealthCheckPath, port = 8080, scheme = "HTTP" },
+            initialDelaySeconds = 5,
+            periodSeconds = config.HealthCheckIntervalSeconds,
+            timeoutSeconds = config.HealthCheckTimeoutSeconds,
+            successThreshold = 1,
+            failureThreshold = 3
+        };
+
+        // Resource requests and limits
+        Dictionary<string, object> limits = config.ResourceLimits.Count > 0
+            ? config.ResourceLimits.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
+            : new Dictionary<string, object>
+            {
+                ["cpu"] = "1000m",
+                ["memory"] = "512Mi"
+            };
+
+        var resources = new
+        {
+            requests = new
+            {
+                cpu = config.ResourceLimits.TryGetValue("cpu", out var reqCpu) ? reqCpu : "100m",
+                memory = config.ResourceLimits.TryGetValue("memory", out var reqMem) ? reqMem : "128Mi"
+            },
+            limits
+        };
+
+        Dictionary<string, object> labels = config.Labels.Count > 0
+            ? config.Labels.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
+            : new Dictionary<string, object>
+            {
+                ["app"] = name,
+                ["version"] = config.Version,
+                ["managed-by"] = "datawarehouse-deployment"
+            };
+
+        Dictionary<string, object> selectorLabels = config.Labels.Count > 0
+            ? config.Labels.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
+            : new Dictionary<string, object> { ["app"] = name };
+
+        Dictionary<string, object> templateLabels = config.Labels.Count > 0
+            ? config.Labels.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
+            : new Dictionary<string, object>
+            {
+                ["app"] = name,
+                ["version"] = config.Version
+            };
+
         return new
         {
             apiVersion = "apps/v1",
             kind = "Deployment",
-            metadata = new { name, labels = config.Labels },
+            metadata = new
+            {
+                name,
+                labels,
+                annotations = new Dictionary<string, object>
+                {
+                    ["deployment.kubernetes.io/revision"] = "1",
+                    ["datawarehouse.io/deployed-at"] = DateTimeOffset.UtcNow.ToString("o")
+                }
+            },
             spec = new
             {
                 replicas = config.TargetInstances,
-                selector = new { matchLabels = config.Labels },
+                selector = new
+                {
+                    matchLabels = selectorLabels
+                },
+                strategy = strategyConfig,
                 template = new
                 {
-                    metadata = new { labels = config.Labels },
+                    metadata = new
+                    {
+                        labels = templateLabels
+                    },
                     spec = new
                     {
                         containers = new[]
@@ -196,16 +292,16 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
                             {
                                 name = "app",
                                 image = config.ArtifactUri,
-                                env = config.EnvironmentVariables.Select(kv => new { name = kv.Key, value = kv.Value }),
-                                resources = new { limits = config.ResourceLimits },
-                                readinessProbe = new
-                                {
-                                    httpGet = new { path = config.HealthCheckPath, port = 8080 },
-                                    periodSeconds = config.HealthCheckIntervalSeconds,
-                                    timeoutSeconds = config.HealthCheckTimeoutSeconds
-                                }
+                                imagePullPolicy = "IfNotPresent",
+                                ports,
+                                env = config.EnvironmentVariables.Select(kv => new { name = kv.Key, value = kv.Value.ToString() }).ToArray(),
+                                resources,
+                                readinessProbe,
+                                livenessProbe
                             }
-                        }
+                        },
+                        restartPolicy = "Always",
+                        terminationGracePeriodSeconds = 30
                     }
                 }
             }

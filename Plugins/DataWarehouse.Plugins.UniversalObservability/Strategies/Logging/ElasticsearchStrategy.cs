@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -22,6 +23,15 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     private string _username = "";
     private string _password = "";
     private string _apiKey = "";
+    private readonly ConcurrentQueue<Dictionary<string, object>> _logsBatch = new();
+    private readonly System.Timers.Timer _flushTimer;
+    private readonly SemaphoreSlim _flushLock = new(1, 1);
+    private int _batchSize = 500; // Elasticsearch can handle larger batches
+    private int _flushIntervalSeconds = 5;
+    private int _circuitBreakerFailures = 0;
+    private const int CircuitBreakerThreshold = 5;
+    private bool _circuitOpen = false;
+    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc/>
     public override string StrategyId => "elasticsearch";
@@ -41,6 +51,10 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         SupportedExporters: new[] { "Elasticsearch", "Logstash", "Kibana" }))
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        _flushTimer = new System.Timers.Timer(_flushIntervalSeconds * 1000);
+        _flushTimer.Elapsed += async (_, _) => await FlushLogsAsync(CancellationToken.None);
+        _flushTimer.AutoReset = true;
+        _flushTimer.Start();
     }
 
     /// <summary>
@@ -81,20 +95,92 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("ApiKey", apiKey);
     }
 
+    private async Task FlushLogsAsync(CancellationToken ct)
+    {
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open, skip flush
+
+        if (_logsBatch.IsEmpty) return;
+
+        await _flushLock.WaitAsync(ct);
+        try
+        {
+            var batch = new List<Dictionary<string, object>>();
+            while (batch.Count < _batchSize && _logsBatch.TryDequeue(out var doc))
+                batch.Add(doc);
+
+            if (batch.Count == 0) return;
+
+            await SendWithRetryAsync(async () =>
+            {
+                var indexName = $"{_indexPrefix}-{DateTime.UtcNow:yyyy.MM.dd}";
+                var bulkBody = new StringBuilder();
+
+                foreach (var doc in batch)
+                {
+                    bulkBody.AppendLine(JsonSerializer.Serialize(new { index = new { _index = indexName } }));
+                    bulkBody.AppendLine(JsonSerializer.Serialize(doc));
+                }
+
+                var content = new StringContent(bulkBody.ToString(), Encoding.UTF8, "application/x-ndjson");
+                var response = await _httpClient.PostAsync($"{_url}/_bulk", content, ct);
+                response.EnsureSuccessStatusCode();
+
+                // Check for partial failures in bulk response
+                var responseContent = await response.Content.ReadAsStringAsync(ct);
+                var bulkResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                if (bulkResult.TryGetProperty("errors", out var errors) && errors.GetBoolean())
+                {
+                    throw new HttpRequestException("Elasticsearch bulk operation had errors");
+                }
+            }, ct);
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+    }
+
+    private async Task SendWithRetryAsync(Func<Task> action, CancellationToken ct)
+    {
+        var maxRetries = 3;
+        var baseDelay = TimeSpan.FromMilliseconds(200);
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                await action();
+                _circuitBreakerFailures = 0; // Reset on success
+                _circuitOpen = false;
+                return;
+            }
+            catch (Exception) when (attempt < maxRetries - 1)
+            {
+                var delay = baseDelay * Math.Pow(2, attempt); // Exponential backoff
+                await Task.Delay(delay, ct);
+            }
+            catch (Exception)
+            {
+                _circuitBreakerFailures++;
+                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                {
+                    _circuitOpen = true;
+                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                }
+                throw;
+            }
+        }
+    }
+
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        var indexName = $"{_indexPrefix}-{DateTime.UtcNow:yyyy.MM.dd}";
-
-        // Use bulk API for efficiency
-        var bulkBody = new StringBuilder();
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open, drop logs
 
         foreach (var entry in logEntries)
         {
-            // Index action
-            bulkBody.AppendLine(JsonSerializer.Serialize(new { index = new { _index = indexName } }));
-
-            // Document
             var doc = new Dictionary<string, object>
             {
                 ["@timestamp"] = entry.Timestamp.ToString("o"),
@@ -122,12 +208,12 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
                 };
             }
 
-            bulkBody.AppendLine(JsonSerializer.Serialize(doc));
+            _logsBatch.Enqueue(doc);
         }
 
-        var content = new StringContent(bulkBody.ToString(), Encoding.UTF8, "application/x-ndjson");
-        var response = await _httpClient.PostAsync($"{_url}/_bulk", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        // Flush immediately if batch size reached
+        if (_logsBatch.Count >= _batchSize)
+            await FlushLogsAsync(cancellationToken);
     }
 
     /// <summary>
@@ -316,6 +402,18 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     {
         if (disposing)
         {
+            _flushTimer?.Stop();
+            _flushTimer?.Dispose();
+            _flushLock.Wait();
+            try
+            {
+                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                _flushLock.Release();
+            }
+            _flushLock.Dispose();
             _httpClient.Dispose();
         }
         base.Dispose(disposing);

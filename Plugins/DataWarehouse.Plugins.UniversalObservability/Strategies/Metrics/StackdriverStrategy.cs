@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -19,6 +20,16 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     private string _projectId = "";
     private string _accessToken = "";
     private string _metricPrefix = "custom.googleapis.com/datawarehouse";
+    private readonly ConcurrentQueue<object> _metricsBatch = new();
+    private readonly ConcurrentQueue<object> _logsBatch = new();
+    private readonly System.Timers.Timer _flushTimer;
+    private readonly SemaphoreSlim _flushLock = new(1, 1);
+    private int _batchSize = 100;
+    private int _flushIntervalSeconds = 10;
+    private int _circuitBreakerFailures = 0;
+    private const int CircuitBreakerThreshold = 5;
+    private bool _circuitOpen = false;
+    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc/>
     public override string StrategyId => "stackdriver";
@@ -38,6 +49,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         SupportedExporters: new[] { "CloudMonitoring", "CloudLogging", "CloudTrace" }))
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        _flushTimer = new System.Timers.Timer(_flushIntervalSeconds * 1000);
+        _flushTimer.Elapsed += async (_, _) => await FlushBatchesAsync(CancellationToken.None);
+        _flushTimer.AutoReset = true;
+        _flushTimer.Start();
     }
 
     /// <summary>
@@ -55,10 +70,102 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
     }
 
+    private async Task FlushBatchesAsync(CancellationToken ct)
+    {
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open, skip flush
+
+        await _flushLock.WaitAsync(ct);
+        try
+        {
+            if (_metricsBatch.Count >= _batchSize)
+                await FlushMetricsAsync(ct);
+            if (_logsBatch.Count >= _batchSize)
+                await FlushLogsAsync(ct);
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+    }
+
+    private async Task FlushMetricsAsync(CancellationToken ct)
+    {
+        var batch = new List<object>();
+        while (batch.Count < _batchSize && _metricsBatch.TryDequeue(out var ts))
+            batch.Add(ts);
+
+        if (batch.Count == 0) return;
+
+        await SendWithRetryAsync(async () =>
+        {
+            var payload = new { timeSeries = batch };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(
+                $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
+                content, ct);
+            response.EnsureSuccessStatusCode();
+        }, ct);
+    }
+
+    private async Task FlushLogsAsync(CancellationToken ct)
+    {
+        var batch = new List<object>();
+        while (batch.Count < _batchSize && _logsBatch.TryDequeue(out var entry))
+            batch.Add(entry);
+
+        if (batch.Count == 0) return;
+
+        await SendWithRetryAsync(async () =>
+        {
+            var payload = new { entries = batch };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(
+                $"https://logging.googleapis.com/v2/entries:write",
+                content, ct);
+            response.EnsureSuccessStatusCode();
+        }, ct);
+    }
+
+    private async Task SendWithRetryAsync(Func<Task> action, CancellationToken ct)
+    {
+        var maxRetries = 3;
+        var baseDelay = TimeSpan.FromMilliseconds(100);
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                await action();
+                _circuitBreakerFailures = 0; // Reset on success
+                _circuitOpen = false;
+                return;
+            }
+            catch (Exception) when (attempt < maxRetries - 1)
+            {
+                var delay = baseDelay * Math.Pow(2, attempt); // Exponential backoff
+                await Task.Delay(delay, ct);
+            }
+            catch (Exception)
+            {
+                _circuitBreakerFailures++;
+                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                {
+                    _circuitOpen = true;
+                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                }
+                throw;
+            }
+        }
+    }
+
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        var timeSeries = new List<object>();
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open, drop metrics
 
         foreach (var metric in metrics)
         {
@@ -97,7 +204,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 }
             };
 
-            timeSeries.Add(new
+            var ts = new
             {
                 metric = new
                 {
@@ -115,19 +222,14 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 metricKind,
                 valueType,
                 points = new[] { point }
-            });
+            };
+
+            _metricsBatch.Enqueue(ts);
         }
 
-        var payload = new { timeSeries };
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PostAsync(
-            $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
-            content,
-            cancellationToken);
-
-        response.EnsureSuccessStatusCode();
+        // Flush immediately if batch size reached
+        if (_metricsBatch.Count >= _batchSize)
+            await FlushMetricsAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -187,48 +289,49 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        var entries = logEntries.Select(entry => new
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open, drop logs
+
+        foreach (var entry in logEntries)
         {
-            logName = $"projects/{_projectId}/logs/datawarehouse",
-            resource = new
+            var logEntry = new
             {
-                type = "global",
-                labels = new { project_id = _projectId }
-            },
-            timestamp = entry.Timestamp.ToString("o"),
-            severity = entry.Level switch
-            {
-                LogLevel.Trace => "DEBUG",
-                LogLevel.Debug => "DEBUG",
-                LogLevel.Information => "INFO",
-                LogLevel.Warning => "WARNING",
-                LogLevel.Error => "ERROR",
-                LogLevel.Critical => "CRITICAL",
-                _ => "DEFAULT"
-            },
-            jsonPayload = new Dictionary<string, object?>
-            {
-                ["message"] = entry.Message,
-                ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
-                ["exception"] = entry.Exception != null ? new
+                logName = $"projects/{_projectId}/logs/datawarehouse",
+                resource = new
                 {
-                    type = entry.Exception.GetType().Name,
-                    message = entry.Exception.Message,
-                    stackTrace = entry.Exception.StackTrace ?? ""
-                } : null
-            }
-        }).ToList();
+                    type = "global",
+                    labels = new { project_id = _projectId }
+                },
+                timestamp = entry.Timestamp.ToString("o"),
+                severity = entry.Level switch
+                {
+                    LogLevel.Trace => "DEBUG",
+                    LogLevel.Debug => "DEBUG",
+                    LogLevel.Information => "INFO",
+                    LogLevel.Warning => "WARNING",
+                    LogLevel.Error => "ERROR",
+                    LogLevel.Critical => "CRITICAL",
+                    _ => "DEFAULT"
+                },
+                jsonPayload = new Dictionary<string, object?>
+                {
+                    ["message"] = entry.Message,
+                    ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
+                    ["exception"] = entry.Exception != null ? new
+                    {
+                        type = entry.Exception.GetType().Name,
+                        message = entry.Exception.Message,
+                        stackTrace = entry.Exception.StackTrace ?? ""
+                    } : null
+                }
+            };
 
-        var payload = new { entries };
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+            _logsBatch.Enqueue(logEntry);
+        }
 
-        var response = await _httpClient.PostAsync(
-            $"https://logging.googleapis.com/v2/entries:write",
-            content,
-            cancellationToken);
-
-        response.EnsureSuccessStatusCode();
+        // Flush immediately if batch size reached
+        if (_logsBatch.Count >= _batchSize)
+            await FlushLogsAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -263,6 +366,19 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     {
         if (disposing)
         {
+            _flushTimer?.Stop();
+            _flushTimer?.Dispose();
+            _flushLock.Wait();
+            try
+            {
+                Task.Run(() => FlushMetricsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
+                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                _flushLock.Release();
+            }
+            _flushLock.Dispose();
             _httpClient.Dispose();
         }
         base.Dispose(disposing);

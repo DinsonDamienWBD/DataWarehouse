@@ -170,6 +170,90 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
 
     private Task<(bool Success, string RequestId, double DurationMs, double BilledDurationMs)> InvokeFunctionAsync(string functionName, CancellationToken ct)
         => Task.FromResult((true, "req-123", 50.0, 100.0));
+
+    /// <summary>Configures Lambda@Edge for CloudFront distribution.</summary>
+    public async Task<LambdaEdgeConfig> ConfigureLambdaEdgeAsync(
+        string functionArn,
+        string distributionId,
+        LambdaEdgeEventType eventType,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(functionArn);
+        ArgumentException.ThrowIfNullOrEmpty(distributionId);
+
+        // Lambda@Edge associations can be added to CloudFront distribution behaviors
+        await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
+
+        return new LambdaEdgeConfig
+        {
+            FunctionArn = functionArn,
+            DistributionId = distributionId,
+            EventType = eventType,
+            ConfiguredAt = DateTimeOffset.UtcNow,
+            Status = "Active"
+        };
+    }
+
+    /// <summary>Configures provisioned concurrency for Lambda function.</summary>
+    public async Task<ProvisionedConcurrencyConfig> ConfigureProvisionedConcurrencyAsync(
+        string functionName,
+        string aliasOrVersion,
+        int concurrentExecutions,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(functionName);
+        ArgumentException.ThrowIfNullOrEmpty(aliasOrVersion);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(concurrentExecutions);
+
+        // Provisioned concurrency eliminates cold starts by keeping instances warm
+        await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
+
+        return new ProvisionedConcurrencyConfig
+        {
+            FunctionName = functionName,
+            AliasOrVersion = aliasOrVersion,
+            AllocatedConcurrentExecutions = concurrentExecutions,
+            AvailableConcurrentExecutions = concurrentExecutions,
+            Status = "Ready",
+            ConfiguredAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+
+/// <summary>
+/// Lambda@Edge configuration.
+/// </summary>
+public sealed class LambdaEdgeConfig
+{
+    public required string FunctionArn { get; init; }
+    public required string DistributionId { get; init; }
+    public LambdaEdgeEventType EventType { get; init; }
+    public required string Status { get; init; }
+    public DateTimeOffset ConfiguredAt { get; init; }
+}
+
+/// <summary>
+/// Lambda@Edge event types.
+/// </summary>
+public enum LambdaEdgeEventType
+{
+    ViewerRequest,
+    ViewerResponse,
+    OriginRequest,
+    OriginResponse
+}
+
+/// <summary>
+/// Provisioned concurrency configuration.
+/// </summary>
+public sealed class ProvisionedConcurrencyConfig
+{
+    public required string FunctionName { get; init; }
+    public required string AliasOrVersion { get; init; }
+    public int AllocatedConcurrentExecutions { get; init; }
+    public int AvailableConcurrentExecutions { get; init; }
+    public required string Status { get; init; }
+    public DateTimeOffset ConfiguredAt { get; init; }
 }
 
 /// <summary>
@@ -301,6 +385,122 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
 
     private Task SwapSlotsAsync(string rg, string app, string sourceSlot, string targetSlot, CancellationToken ct)
         => Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+
+    /// <summary>Deploys Durable Functions orchestration.</summary>
+    public async Task<DurableFunctionDeployment> DeployDurableFunctionAsync(
+        string resourceGroup,
+        string functionAppName,
+        DurableFunctionDefinition definition,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(resourceGroup);
+        ArgumentException.ThrowIfNullOrEmpty(functionAppName);
+        ArgumentNullException.ThrowIfNull(definition);
+
+        // Durable Functions require storage backend (Azure Storage or Netherite)
+        // and TaskHub configuration
+        await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
+
+        return new DurableFunctionDeployment
+        {
+            ResourceGroup = resourceGroup,
+            FunctionAppName = functionAppName,
+            OrchestrationName = definition.OrchestrationName,
+            TaskHubName = definition.TaskHubName ?? "DefaultTaskHub",
+            StorageProvider = definition.StorageProvider,
+            DeployedAt = DateTimeOffset.UtcNow,
+            Status = "Active",
+            Endpoints = new Dictionary<string, string>
+            {
+                ["orchestration"] = $"https://{functionAppName}.azurewebsites.net/api/{definition.OrchestrationName}",
+                ["status"] = $"https://{functionAppName}.azurewebsites.net/runtime/webhooks/durabletask/instances/{{instanceId}}"
+            }
+        };
+    }
+
+    /// <summary>Configures Premium plan for Azure Functions.</summary>
+    public async Task<PremiumPlanConfig> ConfigurePremiumPlanAsync(
+        string resourceGroup,
+        string planName,
+        string sku,
+        int maxInstances,
+        bool preWarmedInstances,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(resourceGroup);
+        ArgumentException.ThrowIfNullOrEmpty(planName);
+        ArgumentException.ThrowIfNullOrEmpty(sku);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxInstances);
+
+        // Premium plan provides VNet integration, faster scaling, and pre-warmed instances
+        await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+
+        return new PremiumPlanConfig
+        {
+            ResourceGroup = resourceGroup,
+            PlanName = planName,
+            Sku = sku, // EP1, EP2, EP3
+            MaxInstances = maxInstances,
+            MinInstances = preWarmedInstances ? 1 : 0,
+            PreWarmedInstances = preWarmedInstances,
+            VNetIntegrationEnabled = true,
+            Status = "Ready",
+            ConfiguredAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+
+/// <summary>
+/// Durable Function definition.
+/// </summary>
+public sealed class DurableFunctionDefinition
+{
+    public required string OrchestrationName { get; init; }
+    public string? TaskHubName { get; init; }
+    public DurableStorageProvider StorageProvider { get; init; } = DurableStorageProvider.AzureStorage;
+    public List<string> ActivityFunctions { get; init; } = new();
+    public Dictionary<string, object> OrchestrationConfig { get; init; } = new();
+}
+
+/// <summary>
+/// Durable Function deployment result.
+/// </summary>
+public sealed class DurableFunctionDeployment
+{
+    public required string ResourceGroup { get; init; }
+    public required string FunctionAppName { get; init; }
+    public required string OrchestrationName { get; init; }
+    public required string TaskHubName { get; init; }
+    public DurableStorageProvider StorageProvider { get; init; }
+    public required Dictionary<string, string> Endpoints { get; init; }
+    public required string Status { get; init; }
+    public DateTimeOffset DeployedAt { get; init; }
+}
+
+/// <summary>
+/// Durable Functions storage provider.
+/// </summary>
+public enum DurableStorageProvider
+{
+    AzureStorage,
+    Netherite,
+    Emulator
+}
+
+/// <summary>
+/// Premium plan configuration for Azure Functions.
+/// </summary>
+public sealed class PremiumPlanConfig
+{
+    public required string ResourceGroup { get; init; }
+    public required string PlanName { get; init; }
+    public required string Sku { get; init; }
+    public int MaxInstances { get; init; }
+    public int MinInstances { get; init; }
+    public bool PreWarmedInstances { get; init; }
+    public bool VNetIntegrationEnabled { get; init; }
+    public required string Status { get; init; }
+    public DateTimeOffset ConfiguredAt { get; init; }
 }
 
 /// <summary>

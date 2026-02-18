@@ -267,6 +267,10 @@ public readonly record struct Bitrate(long BitsPerSecond)
 /// <param name="ProgressCallback">
 /// Optional callback to report transcoding progress (0.0 to 1.0).
 /// </param>
+/// <param name="CustomMetadata">
+/// Optional key-value pairs for advanced transcoding parameters such as watermarking,
+/// HDR tone mapping, rotation, cropping, interpolation modes, and codec-specific options.
+/// </param>
 public sealed record TranscodeOptions(
     MediaFormat TargetFormat,
     string? VideoCodec = null,
@@ -275,7 +279,8 @@ public sealed record TranscodeOptions(
     Bitrate? TargetBitrate = null,
     double? FrameRate = null,
     bool TwoPass = false,
-    Action<double>? ProgressCallback = null);
+    Action<double>? ProgressCallback = null,
+    IReadOnlyDictionary<string, string>? CustomMetadata = null);
 
 /// <summary>
 /// Contains metadata extracted from a media file.

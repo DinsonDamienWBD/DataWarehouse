@@ -128,12 +128,167 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
     private static string GetProjectKey(DeploymentConfig config) => config.StrategyConfig.TryGetValue("projectKey", out var pk) && pk is string pks ? pks : "default";
     private static string GetFlagKey(DeploymentConfig config) => config.StrategyConfig.TryGetValue("flagKey", out var fk) && fk is string fks ? fks : $"feature-{config.Version}";
 
-    private Task EnsureFlagExistsAsync(string project, string flag, CancellationToken ct) => Task.Delay(20, ct);
-    private Task ConfigureTargetingAsync(string project, string flag, string env, DeploymentConfig config, CancellationToken ct) => Task.Delay(20, ct);
-    private Task SetRolloutPercentageAsync(string project, string flag, string env, int percent, CancellationToken ct) => Task.Delay(20, ct);
-    private Task EnableFlagAsync(string project, string flag, string env, CancellationToken ct) => Task.Delay(10, ct);
-    private Task DisableFlagAsync(string project, string flag, string env, CancellationToken ct) => Task.Delay(10, ct);
-    private Task<(bool IsOn, long EvaluationCount)> GetFlagStatusAsync(string project, string flag, string env, CancellationToken ct) => Task.FromResult((true, 1000L));
+    private async Task EnsureFlagExistsAsync(string project, string flag, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.ensure",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["FlagType"] = "boolean",
+                    ["DefaultValue"] = false,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.SendAsync("featureflag.ensure.exists", message, ct);
+        }
+        await Task.Delay(20, ct);
+    }
+
+    private async Task ConfigureTargetingAsync(string project, string flag, string env, DeploymentConfig config, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            // Build targeting rules from config
+            var targetingRules = new List<object>();
+
+            if (config.StrategyConfig.TryGetValue("targetUsers", out var users) && users is IEnumerable<string> userList)
+            {
+                targetingRules.Add(new
+                {
+                    attribute = "user_id",
+                    @operator = "in",
+                    values = userList,
+                    variation = true
+                });
+            }
+
+            if (config.StrategyConfig.TryGetValue("targetSegments", out var segments) && segments is IEnumerable<string> segList)
+            {
+                targetingRules.Add(new
+                {
+                    attribute = "segment",
+                    @operator = "in",
+                    values = segList,
+                    variation = true
+                });
+            }
+
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.configure.targeting",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["EnvironmentKey"] = env,
+                    ["TargetingRules"] = targetingRules,
+                    ["FallbackVariation"] = false,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.SendAsync("featureflag.configure.targeting", message, ct);
+        }
+        await Task.Delay(20, ct);
+    }
+
+    private async Task SetRolloutPercentageAsync(string project, string flag, string env, int percent, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.rollout.percentage",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["EnvironmentKey"] = env,
+                    ["Percentage"] = percent,
+                    ["BucketBy"] = "user_id",
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.SendAsync("featureflag.rollout.percentage", message, ct);
+        }
+        await Task.Delay(20, ct);
+    }
+
+    private async Task EnableFlagAsync(string project, string flag, string env, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.enable",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["EnvironmentKey"] = env,
+                    ["EnabledAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("featureflag.enable", message, ct);
+        }
+        await Task.Delay(10, ct);
+    }
+
+    private async Task DisableFlagAsync(string project, string flag, string env, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.disable",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["EnvironmentKey"] = env,
+                    ["DisabledAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("featureflag.disable", message, ct);
+        }
+        await Task.Delay(10, ct);
+    }
+
+    private async Task<(bool IsOn, long EvaluationCount)> GetFlagStatusAsync(string project, string flag, string env, CancellationToken ct)
+    {
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "featureflag.status",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Provider"] = "LaunchDarkly",
+                    ["ProjectKey"] = project,
+                    ["FlagKey"] = flag,
+                    ["EnvironmentKey"] = env,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.SendAsync("featureflag.status.get", message, ct);
+
+            var isOn = message.Payload.TryGetValue("IsOn", out var onObj) && (bool)onObj;
+            var count = message.Payload.TryGetValue("EvaluationCount", out var cntObj) ? Convert.ToInt64(cntObj) : 0L;
+
+            return (isOn, count);
+        }
+
+        return (true, 1000L);
+    }
 }
 
 /// <summary>

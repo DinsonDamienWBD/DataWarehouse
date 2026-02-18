@@ -472,6 +472,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     totalBytesWritten += bytesRead;
                 }
 
+                // Store object size for retrieval
+                await StoreObjectSizeAsync(key, totalBytesWritten, ct);
+
                 // Store metadata in companion .meta file on a management LUN
                 if (metadata != null && metadata.Count > 0)
                 {
@@ -865,11 +868,60 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<long> GetObjectSizeAsync(string key, CancellationToken ct)
         {
-            // Would query from metadata store
-            // Simplified implementation
-            return _blockSize * 10; // Assume 10 blocks
+            try
+            {
+                var sizePath = GetObjectSizeFilePath(key);
+                if (File.Exists(sizePath))
+                {
+                    var sizeText = await File.ReadAllTextAsync(sizePath, ct);
+                    if (long.TryParse(sizeText, out var size))
+                    {
+                        return size;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to get FC object size for {key}: {ex.Message}");
+            }
 
-            await Task.CompletedTask; // Keep async signature
+            return _blockSize * 10; // Default fallback
+        }
+
+        /// <summary>
+        /// Stores the size of an object.
+        /// </summary>
+        private async Task StoreObjectSizeAsync(string key, long size, CancellationToken ct)
+        {
+            try
+            {
+                var sizePath = GetObjectSizeFilePath(key);
+                var directory = Path.GetDirectoryName(sizePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                await File.WriteAllTextAsync(sizePath, size.ToString(), ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to store FC object size for {key}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets the object size file path.
+        /// </summary>
+        private string GetObjectSizeFilePath(string key)
+        {
+            var safeKey = string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            var sizeDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "DataWarehouse", "FC", "sizes",
+                _fabricSwitchAddress.Replace(":", "_").Replace(".", "_"));
+
+            return Path.Combine(sizeDir, $"{safeKey}.size");
         }
 
         /// <summary>
@@ -880,8 +932,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             IDictionary<string, string> metadata,
             CancellationToken ct)
         {
-            // Would write to management LUN or metadata service
-            await Task.CompletedTask; // Simplified
+            try
+            {
+                var metadataPath = GetMetadataFilePath(key);
+                var directory = Path.GetDirectoryName(metadataPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+                await File.WriteAllTextAsync(metadataPath, json, ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to store FC metadata for {key}: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -891,8 +961,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             string key,
             CancellationToken ct)
         {
-            // Would read from management LUN or metadata service
-            await Task.CompletedTask; // Simplified
+            try
+            {
+                var metadataPath = GetMetadataFilePath(key);
+                if (File.Exists(metadataPath))
+                {
+                    var json = await File.ReadAllTextAsync(metadataPath, ct);
+                    var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                    return metadata;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load FC metadata for {key}: {ex.Message}");
+            }
+
             return null;
         }
 
@@ -901,8 +984,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task DeleteMetadataAsync(string key, CancellationToken ct)
         {
-            // Would delete from management LUN or metadata service
-            await Task.CompletedTask; // Simplified
+            try
+            {
+                var metadataPath = GetMetadataFilePath(key);
+                if (File.Exists(metadataPath))
+                {
+                    File.Delete(metadataPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to delete FC metadata for {key}: {ex.Message}");
+            }
+
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -912,9 +1007,65 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             string? prefix,
             CancellationToken ct)
         {
-            // Would query from management LUN or object index service
-            await Task.CompletedTask; // Simplified
-            return new List<StorageObjectMetadata>();
+            var results = new List<StorageObjectMetadata>();
+
+            try
+            {
+                var metadataDir = GetMetadataDirectory();
+                if (Directory.Exists(metadataDir))
+                {
+                    var metadataFiles = Directory.GetFiles(metadataDir, "*.json", SearchOption.TopDirectoryOnly);
+                    foreach (var metadataFile in metadataFiles)
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        var key = Path.GetFileNameWithoutExtension(metadataFile);
+                        if (string.IsNullOrEmpty(prefix) || key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var metadata = await LoadMetadataAsync(key, ct);
+                            var objectSize = await GetObjectSizeAsync(key, ct);
+
+                            results.Add(new StorageObjectMetadata
+                            {
+                                Key = key,
+                                Size = objectSize,
+                                Created = File.GetCreationTimeUtc(metadataFile),
+                                Modified = File.GetLastWriteTimeUtc(metadataFile),
+                                ETag = GenerateETag(key, objectSize),
+                                ContentType = GetContentType(key),
+                                CustomMetadata = metadata,
+                                Tier = Tier
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to list FC objects: {ex.Message}");
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Gets the metadata directory path.
+        /// </summary>
+        private string GetMetadataDirectory()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "DataWarehouse", "FC", "metadata",
+                _fabricSwitchAddress.Replace(":", "_").Replace(".", "_"));
+        }
+
+        /// <summary>
+        /// Gets the metadata file path for a specific key.
+        /// </summary>
+        private string GetMetadataFilePath(string key)
+        {
+            var safeKey = string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            return Path.Combine(GetMetadataDirectory(), $"{safeKey}.json");
         }
 
         /// <summary>
