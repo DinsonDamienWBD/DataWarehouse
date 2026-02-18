@@ -1,6 +1,10 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
@@ -26,6 +30,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         private const int MaxMatchLen = 255 + MinMatch;
         private const int MaxDistance = 65535;
         private const uint Magic = 0x4C5A4653; // 'LZFS'
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
+        private int _configuredBlockSize = 64 * 1024;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LzfseStrategy"/> class
@@ -33,6 +40,84 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// </summary>
         public LzfseStrategy() : base(CompressionLevel.Default)
         {
+        }
+
+        /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+
+            // Load and validate LZFSE configuration
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZFSE:BlockSize", out var blockSizeObj)
+                && blockSizeObj is int blockSize)
+            {
+                if (blockSize < 4096 || blockSize > 1048576)
+                    throw new ArgumentException($"LZFSE block size must be between 4096 and 1048576, got {blockSize}");
+                _configuredBlockSize = blockSize;
+            }
+        }
+
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    // Round-trip test: compress + decompress 16 bytes of test data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (decompressed[i] != testData[i])
+                        {
+                            return new StrategyHealthCheckResult(
+                                false,
+                                $"Health check failed: byte mismatch at position {i}");
+                        }
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZFSE strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["BlockSize"] = _configuredBlockSize,
+                            ["CompressOperations"] = GetCounter("lzfse.compress"),
+                            ["DecompressOperations"] = GetCounter("lzfse.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up in LZFSE
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            // No async resources to dispose
+            return base.DisposeAsyncCore();
         }
 
         /// <inheritdoc/>
@@ -55,6 +140,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lzfse.compress");
+
+            // Edge case: maximum input size guard
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB");
+
             if (input.Length < MinMatch)
                 return CreateUncompressedBlock(input);
 
@@ -156,6 +248,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lzfse.decompress");
+
+            // Edge case: validate header
             if (input.Length < 12)
                 throw new InvalidDataException("LZFSE data too short.");
 
@@ -169,14 +265,16 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 if (magic == 0x4C5A4655) // 'LZFU' - uncompressed marker
                 {
                     int len = reader.ReadInt32();
+                    if (len < 0 || len > MaxInputSize)
+                        throw new InvalidDataException($"Invalid LZFSE uncompressed block length: {len}");
                     return reader.ReadBytes(len);
                 }
                 throw new InvalidDataException("Invalid LZFSE magic.");
             }
 
             int uncompressedLen = reader.ReadInt32();
-            if (uncompressedLen < 0 || uncompressedLen > 256 * 1024 * 1024)
-                throw new InvalidDataException("Invalid LZFSE uncompressed length.");
+            if (uncompressedLen < 0 || uncompressedLen > MaxInputSize)
+                throw new InvalidDataException($"Invalid LZFSE uncompressed length: {uncompressedLen}");
 
             int encodedLen = reader.ReadInt32();
             var encoded = reader.ReadBytes(encodedLen);

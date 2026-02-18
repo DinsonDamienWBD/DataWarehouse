@@ -1,6 +1,10 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
@@ -24,6 +28,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         private const int HashSize = 4096;
         private const int LiteralBase = 256;
         private const int SymbolCount = LiteralBase + MaxMatch - MinMatch + 1;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
+        private int _configuredWindowSize = WindowSize;
+        private int _configuredMaxMatch = MaxMatch;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LzhStrategy"/> class
@@ -31,6 +39,93 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// </summary>
         public LzhStrategy() : base(CompressionLevel.Default)
         {
+        }
+
+        /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+
+            // Load and validate LZH configuration
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZH:WindowSize", out var windowSizeObj)
+                && windowSizeObj is int windowSize)
+            {
+                if (windowSize < 4096 || windowSize > 32768)
+                    throw new ArgumentException($"LZH window size must be between 4096 and 32768, got {windowSize}");
+                _configuredWindowSize = windowSize;
+            }
+
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZH:MaxMatchLength", out var maxMatchObj)
+                && maxMatchObj is int maxMatch)
+            {
+                if (maxMatch < 3 || maxMatch > 256)
+                    throw new ArgumentException($"LZH max match length must be between 3 and 256, got {maxMatch}");
+                _configuredMaxMatch = maxMatch;
+            }
+        }
+
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    // Round-trip test: compress + decompress 16 bytes of test data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (decompressed[i] != testData[i])
+                        {
+                            return new StrategyHealthCheckResult(
+                                false,
+                                $"Health check failed: byte mismatch at position {i}");
+                        }
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZH strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["WindowSize"] = _configuredWindowSize,
+                            ["MaxMatchLength"] = _configuredMaxMatch,
+                            ["CompressOperations"] = GetCounter("lzh.compress"),
+                            ["DecompressOperations"] = GetCounter("lzh.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up in LZH
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            // No async resources to dispose
+            return base.DisposeAsyncCore();
         }
 
         /// <inheritdoc/>
@@ -53,6 +148,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lzh.compress");
+
+            // Edge case: maximum input size guard
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB");
+
             if (input.Length < MinMatch)
                 return StoreUncompressed(input);
 
@@ -185,6 +287,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lzh.decompress");
+
+            // Edge case: validate header
             if (input.Length < 8)
                 throw new InvalidDataException("LZH data too short.");
 
@@ -192,6 +298,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             if (input[0] == 0x4C && input[1] == 0x5A && input[2] == 0x48 && input[3] == 0x30) // "LZH0"
             {
                 int len = BinaryPrimitives.ReadInt32LittleEndian(input.AsSpan(4));
+                if (len < 0 || len > MaxInputSize)
+                    throw new InvalidDataException($"Invalid LZH uncompressed block length: {len}");
                 var result = new byte[len];
                 Buffer.BlockCopy(input, 8, result, 0, Math.Min(len, input.Length - 8));
                 return result;
@@ -205,8 +313,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             var bitReader = new LzhBitReader(stream);
 
             int uncompressedLen = bitReader.ReadInt32();
-            if (uncompressedLen < 0 || uncompressedLen > 256 * 1024 * 1024)
-                throw new InvalidDataException("Invalid LZH uncompressed length.");
+            if (uncompressedLen < 0 || uncompressedLen > MaxInputSize)
+                throw new InvalidDataException($"Invalid LZH uncompressed length: {uncompressedLen}");
 
             // Read literal code table
             int litCount = bitReader.ReadByte();
