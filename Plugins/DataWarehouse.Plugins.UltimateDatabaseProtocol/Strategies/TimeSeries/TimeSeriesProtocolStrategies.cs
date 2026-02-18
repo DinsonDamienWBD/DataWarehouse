@@ -367,13 +367,15 @@ public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
         }
     };
 
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+
     /// <inheritdoc/>
     protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         var baseUri = $"http{(parameters.UseSsl ? "s" : "")}://{parameters.Host}:{parameters.Port ?? 9090}";
         _remoteWriteUrl = $"{baseUri}/api/v1/write";
 
-        _httpClient = new HttpClient();
+        _httpClient = SharedHttpClient;
         if (!string.IsNullOrEmpty(parameters.Password))
         {
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {parameters.Password}");

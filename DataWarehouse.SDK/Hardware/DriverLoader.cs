@@ -456,47 +456,51 @@ namespace DataWarehouse.SDK.Hardware
             }
         }
 
-        private async void OnHardwareChangedHandler(object? sender, HardwareChangeEventArgs e)
+        private void OnHardwareChangedHandler(object? sender, HardwareChangeEventArgs e)
         {
-            if (_disposed || !_options.AutoLoadOnHardwareChange)
-                return;
-
-            if (e.ChangeType != HardwareChangeType.Added)
-                return;
-
-            try
+            // Event handlers must be void, so we use Task.Run for async work
+            _ = Task.Run(async () =>
             {
-                // Check if we already have a loaded driver supporting this device type
-                var hasMatchingDriver = _loadedDrivers.Values.Any(h =>
-                    (h.Info.SupportedDevices & e.Device.Type) != 0);
-
-                if (hasMatchingDriver)
+                if (_disposed || !_options.AutoLoadOnHardwareChange)
                     return;
 
-                // Scan driver directory for a matching driver
-                if (string.IsNullOrWhiteSpace(_options.DriverDirectory) || !Directory.Exists(_options.DriverDirectory))
+                if (e.ChangeType != HardwareChangeType.Added)
                     return;
 
-                var availableDrivers = await ScanDirectoryAsync(_options.DriverDirectory);
-                var matchingDriver = availableDrivers.FirstOrDefault(d =>
-                    d.AutoLoad && (d.SupportedDevices & e.Device.Type) != 0);
-
-                if (matchingDriver != null)
+                try
                 {
-                    try
+                    // Check if we already have a loaded driver supporting this device type
+                    var hasMatchingDriver = _loadedDrivers.Values.Any(h =>
+                        (h.Info.SupportedDevices & e.Device.Type) != 0);
+
+                    if (hasMatchingDriver)
+                        return;
+
+                    // Scan driver directory for a matching driver
+                    if (string.IsNullOrWhiteSpace(_options.DriverDirectory) || !Directory.Exists(_options.DriverDirectory))
+                        return;
+
+                    var availableDrivers = await ScanDirectoryAsync(_options.DriverDirectory);
+                    var matchingDriver = availableDrivers.FirstOrDefault(d =>
+                        d.AutoLoad && (d.SupportedDevices & e.Device.Type) != 0);
+
+                    if (matchingDriver != null)
                     {
-                        await LoadAsync(matchingDriver.AssemblyPath, matchingDriver.TypeName);
-                    }
-                    catch
-                    {
-                        // Log and continue - don't fail hardware change handling
+                        try
+                        {
+                            await LoadAsync(matchingDriver.AssemblyPath, matchingDriver.TypeName);
+                        }
+                        catch
+                        {
+                            // Log and continue - don't fail hardware change handling
+                        }
                     }
                 }
-            }
-            catch
-            {
-                // Log and continue - don't fail hardware change handling
-            }
+                catch
+                {
+                    // Log and continue - don't fail hardware change handling
+                }
+            });
         }
 
         private static IEnumerable<Type> GetTypesWithAttribute(Assembly assembly)

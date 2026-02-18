@@ -170,6 +170,8 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     private string? _cachedAccessToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
 
+    protected static readonly HttpClient SharedHttpClient = new HttpClient();
+
     /// <summary>
     /// Gets the unique identifier for this strategy.
     /// </summary>
@@ -579,7 +581,6 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
             return null;
         }
 
-        using var client = new HttpClient();
         var requestBody = new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
@@ -592,7 +593,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
             requestBody["scope"] = string.Join(" ", Config.OAuth2Scopes);
         }
 
-        var response = await client.PostAsync(
+        var response = await SharedHttpClient.PostAsync(
             Config.OAuth2TokenEndpoint,
             new FormUrlEncodedContent(requestBody),
             cancellationToken);

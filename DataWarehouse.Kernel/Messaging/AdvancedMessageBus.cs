@@ -8,11 +8,13 @@ namespace DataWarehouse.Kernel.Messaging
     /// <summary>
     /// Thread-safe subscription list that ensures atomic operations.
     /// Wraps a List with proper synchronization to avoid race conditions.
+    /// Uses read-copy-update pattern to cache array snapshot for hot-path reads.
     /// </summary>
     internal sealed class ThreadSafeSubscriptionList<T>
     {
         private readonly List<T> _handlers = new();
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
+        private volatile T[] _cachedArray = Array.Empty<T>();
 
         public int Count
         {
@@ -27,22 +29,33 @@ namespace DataWarehouse.Kernel.Messaging
         public void Add(T handler)
         {
             _lock.EnterWriteLock();
-            try { _handlers.Add(handler); }
+            try
+            {
+                _handlers.Add(handler);
+                _cachedArray = _handlers.ToArray(); // Update cache on write
+            }
             finally { _lock.ExitWriteLock(); }
         }
 
         public bool Remove(T handler)
         {
             _lock.EnterWriteLock();
-            try { return _handlers.Remove(handler); }
+            try
+            {
+                bool removed = _handlers.Remove(handler);
+                if (removed)
+                {
+                    _cachedArray = _handlers.ToArray(); // Update cache on write
+                }
+                return removed;
+            }
             finally { _lock.ExitWriteLock(); }
         }
 
         public T[] ToArray()
         {
-            _lock.EnterReadLock();
-            try { return _handlers.ToArray(); }
-            finally { _lock.ExitReadLock(); }
+            // Hot path: return cached array without locking
+            return _cachedArray;
         }
 
         public T? FirstOrDefault()
@@ -55,7 +68,11 @@ namespace DataWarehouse.Kernel.Messaging
         public void Clear()
         {
             _lock.EnterWriteLock();
-            try { _handlers.Clear(); }
+            try
+            {
+                _handlers.Clear();
+                _cachedArray = Array.Empty<T>(); // Update cache on write
+            }
             finally { _lock.ExitWriteLock(); }
         }
     }

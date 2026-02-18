@@ -198,11 +198,17 @@ public sealed class CassandraStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
         // Note: Full table scan - consider using secondary index for prefix queries
-        var query = string.IsNullOrEmpty(prefix)
-            ? $"SELECT key, size, content_type, etag, metadata, created_at, modified_at FROM {_tableName}"
-            : $"SELECT key, size, content_type, etag, metadata, created_at, modified_at FROM {_tableName} WHERE key >= '{prefix}' ALLOW FILTERING";
+        SimpleStatement statement;
+        if (string.IsNullOrEmpty(prefix))
+        {
+            statement = new SimpleStatement($"SELECT key, size, content_type, etag, metadata, created_at, modified_at FROM {_tableName}");
+        }
+        else
+        {
+            statement = new SimpleStatement($"SELECT key, size, content_type, etag, metadata, created_at, modified_at FROM {_tableName} WHERE key >= ? ALLOW FILTERING", prefix);
+        }
 
-        var result = await _session!.ExecuteAsync(new SimpleStatement(query).SetConsistencyLevel(_readConsistency));
+        var result = await _session!.ExecuteAsync(statement.SetConsistencyLevel(_readConsistency));
 
         foreach (var row in result)
         {

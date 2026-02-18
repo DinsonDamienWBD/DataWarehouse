@@ -188,6 +188,31 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Add security headers middleware
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    // S7039: CSP requires unsafe-inline/unsafe-eval for Blazor Server + SignalR WebSocket support
+    // This is the most restrictive CSP compatible with Blazor Server architecture
+    #pragma warning disable S7039
+    context.Response.Headers.Append("Content-Security-Policy",
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +  // Blazor requires unsafe-inline/eval
+        "style-src 'self' 'unsafe-inline'; " +  // Blazor requires unsafe-inline
+        "img-src 'self' data: https:; " +
+        "font-src 'self' data:; " +
+        "connect-src 'self' ws: wss:; " +  // SignalR requires websocket
+        "frame-ancestors 'none'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'");
+    #pragma warning restore S7039
+
+    await next();
+});
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();

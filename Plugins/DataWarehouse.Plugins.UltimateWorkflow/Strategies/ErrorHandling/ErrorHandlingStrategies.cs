@@ -63,7 +63,7 @@ public sealed class ExponentialBackoffRetryStrategy : WorkflowStrategyBase
         WorkflowContext context,
         CancellationToken cancellationToken)
     {
-        var random = new Random();
+        var random = Random.Shared;
         var baseDelay = task.RetryDelay.TotalMilliseconds;
         var attempt = 0;
 
@@ -78,7 +78,7 @@ public sealed class ExponentialBackoffRetryStrategy : WorkflowStrategyBase
                 return result with { RetryCount = attempt };
 
             var delay = baseDelay * Math.Pow(2, attempt - 1);
-            var jitter = delay * 0.2 * (random.NextDouble() - 0.5);
+            var jitter = delay * 0.2 * (Random.Shared.NextDouble() - 0.5);
             await Task.Delay(TimeSpan.FromMilliseconds(delay + jitter), cancellationToken);
         }
 

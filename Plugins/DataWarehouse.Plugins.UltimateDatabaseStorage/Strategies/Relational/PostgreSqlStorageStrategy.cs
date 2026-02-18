@@ -96,6 +96,10 @@ public sealed class PostgreSqlStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct)
     {
+        // Validate schema and table names to prevent SQL injection
+        ValidateIdentifier(_schemaName, nameof(_schemaName));
+        ValidateIdentifier(_tableName, nameof(_tableName));
+
         await using var conn = await _dataSource!.OpenConnectionAsync(ct);
 
         var createTableSql = $@"
@@ -421,6 +425,23 @@ public sealed class PostgreSqlStorageStrategy : DatabaseStorageStrategyBase
 
             await _transaction.DisposeAsync();
             await _connection.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Validates a SQL identifier (schema or table name) to prevent SQL injection.
+    /// </summary>
+    private static void ValidateIdentifier(string identifier, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            throw new ArgumentException("Identifier cannot be null or empty.", paramName);
+        }
+
+        // PostgreSQL identifiers: must start with letter or underscore, followed by alphanumerics or underscores
+        if (!System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+        {
+            throw new ArgumentException($"Invalid SQL identifier '{identifier}'. Only alphanumeric characters and underscores are allowed.", paramName);
         }
     }
 }

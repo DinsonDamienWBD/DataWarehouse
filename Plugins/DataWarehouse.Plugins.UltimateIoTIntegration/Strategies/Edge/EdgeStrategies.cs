@@ -52,12 +52,12 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
 
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new SyncResult
         {
             Success = true,
-            ItemsSynced = random.Next(10, 100),
-            BytesSynced = random.Next(1000, 100000),
+            ItemsSynced = Random.Shared.Next(10, 100),
+            BytesSynced = Random.Shared.Next(1000, 100000),
             SyncedAt = DateTimeOffset.UtcNow
         });
     }
@@ -68,18 +68,18 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
         {
             Success = true,
             Output = new Dictionary<string, object> { ["result"] = "computed" },
-            ExecutionTime = TimeSpan.FromMilliseconds(new Random().Next(10, 500))
+            ExecutionTime = TimeSpan.FromMilliseconds(Random.Shared.Next(10, 500))
         });
     }
 
     public override Task<EdgeDeviceStatus> GetEdgeStatusAsync(string edgeDeviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new EdgeDeviceStatus
         {
             EdgeDeviceId = edgeDeviceId,
-            IsOnline = random.NextDouble() > 0.1,
-            LastSeen = DateTimeOffset.UtcNow.AddMinutes(-random.Next(0, 10)),
+            IsOnline = Random.Shared.NextDouble() > 0.1,
+            LastSeen = DateTimeOffset.UtcNow.AddMinutes(-Random.Shared.Next(0, 10)),
             Modules = new List<EdgeModuleStatus>
             {
                 new() { ModuleName = "edgeAgent", Status = "running", Version = "1.2.0", LastStarted = DateTimeOffset.UtcNow.AddHours(-24) },
@@ -87,11 +87,11 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
             },
             ResourceUsage = new EdgeResourceUsage
             {
-                CpuPercent = random.NextDouble() * 50,
-                MemoryUsedBytes = random.Next(100000000, 500000000),
-                DiskUsedBytes = random.NextInt64(1000000000L, 10000000000L),
-                NetworkInBytes = random.Next(10000, 1000000),
-                NetworkOutBytes = random.Next(10000, 1000000)
+                CpuPercent = Random.Shared.NextDouble() * 50,
+                MemoryUsedBytes = Random.Shared.Next(100000000, 500000000),
+                DiskUsedBytes = Random.Shared.NextInt64(1000000000L, 10000000000L),
+                NetworkInBytes = Random.Shared.Next(10000, 1000000),
+                NetworkOutBytes = Random.Shared.Next(10000, 1000000)
             }
         });
     }
@@ -130,9 +130,9 @@ public class EdgeSyncStrategy : EdgeIntegrationStrategyBase
 
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
-        var itemCount = request.FullSync ? random.Next(100, 1000) : random.Next(1, 50);
-        var byteCount = itemCount * random.Next(100, 1000);
+        var random = Random.Shared;
+        var itemCount = request.FullSync ? Random.Shared.Next(100, 1000) : Random.Shared.Next(1, 50);
+        var byteCount = itemCount * Random.Shared.Next(100, 1000);
 
         return Task.FromResult(new SyncResult
         {
@@ -202,14 +202,14 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default)
     {
         var startTime = DateTimeOffset.UtcNow;
-        var random = new Random();
+        var random = Random.Shared;
 
         // Simulate computation
         var output = new Dictionary<string, object>
         {
             ["function"] = request.FunctionName,
             ["input_count"] = request.Input.Count,
-            ["result"] = random.NextDouble() * 100,
+            ["result"] = Random.Shared.NextDouble() * 100,
             ["computed_at"] = DateTimeOffset.UtcNow
         };
 
@@ -217,13 +217,13 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
         {
             Success = true,
             Output = output,
-            ExecutionTime = DateTimeOffset.UtcNow - startTime + TimeSpan.FromMilliseconds(random.Next(5, 50))
+            ExecutionTime = DateTimeOffset.UtcNow - startTime + TimeSpan.FromMilliseconds(Random.Shared.Next(5, 50))
         });
     }
 
     public override Task<EdgeDeviceStatus> GetEdgeStatusAsync(string edgeDeviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new EdgeDeviceStatus
         {
             EdgeDeviceId = edgeDeviceId,
@@ -235,8 +235,8 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
             },
             ResourceUsage = new EdgeResourceUsage
             {
-                CpuPercent = random.NextDouble() * 80,
-                MemoryUsedBytes = random.Next(200000000, 800000000)
+                CpuPercent = Random.Shared.NextDouble() * 80,
+                MemoryUsedBytes = Random.Shared.Next(200000000, 800000000)
             }
         });
     }
@@ -286,14 +286,14 @@ public class EdgeMonitoringStrategy : EdgeIntegrationStrategyBase
 
     public override Task<EdgeDeviceStatus> GetEdgeStatusAsync(string edgeDeviceId, CancellationToken ct = default)
     {
-        var random = new Random();
-        var isOnline = random.NextDouble() > 0.05;
+        var random = Random.Shared;
+        var isOnline = Random.Shared.NextDouble() > 0.05;
 
         return Task.FromResult(new EdgeDeviceStatus
         {
             EdgeDeviceId = edgeDeviceId,
             IsOnline = isOnline,
-            LastSeen = isOnline ? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow.AddMinutes(-random.Next(5, 60)),
+            LastSeen = isOnline ? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow.AddMinutes(-Random.Shared.Next(5, 60)),
             Modules = new List<EdgeModuleStatus>
             {
                 new() { ModuleName = "edgeAgent", Status = isOnline ? "running" : "stopped", Version = "1.2.0" },
@@ -302,11 +302,11 @@ public class EdgeMonitoringStrategy : EdgeIntegrationStrategyBase
             },
             ResourceUsage = new EdgeResourceUsage
             {
-                CpuPercent = random.NextDouble() * 100,
-                MemoryUsedBytes = random.Next(100000000, 1000000000),
-                DiskUsedBytes = random.NextInt64(1000000000L, 50000000000L),
-                NetworkInBytes = random.Next(100000, 10000000),
-                NetworkOutBytes = random.Next(100000, 10000000)
+                CpuPercent = Random.Shared.NextDouble() * 100,
+                MemoryUsedBytes = Random.Shared.Next(100000000, 1000000000),
+                DiskUsedBytes = Random.Shared.NextInt64(1000000000L, 50000000000L),
+                NetworkInBytes = Random.Shared.Next(100000, 10000000),
+                NetworkOutBytes = Random.Shared.Next(100000, 10000000)
             }
         });
     }
@@ -336,35 +336,35 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
 
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new SyncResult
         {
             Success = true,
-            ItemsSynced = random.Next(50, 500),
-            BytesSynced = random.Next(50000, 500000),
+            ItemsSynced = Random.Shared.Next(50, 500),
+            BytesSynced = Random.Shared.Next(50000, 500000),
             SyncedAt = DateTimeOffset.UtcNow
         });
     }
 
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new EdgeComputeResult
         {
             Success = true,
             Output = new Dictionary<string, object>
             {
-                ["fog_node"] = $"fog-{random.Next(1, 10)}",
-                ["latency_ms"] = random.Next(5, 50),
-                ["result"] = random.NextDouble() * 100
+                ["fog_node"] = $"fog-{Random.Shared.Next(1, 10)}",
+                ["latency_ms"] = Random.Shared.Next(5, 50),
+                ["result"] = Random.Shared.NextDouble() * 100
             },
-            ExecutionTime = TimeSpan.FromMilliseconds(random.Next(10, 100))
+            ExecutionTime = TimeSpan.FromMilliseconds(Random.Shared.Next(10, 100))
         });
     }
 
     public override Task<EdgeDeviceStatus> GetEdgeStatusAsync(string edgeDeviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new EdgeDeviceStatus
         {
             EdgeDeviceId = edgeDeviceId,
@@ -377,8 +377,8 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
             },
             ResourceUsage = new EdgeResourceUsage
             {
-                CpuPercent = random.NextDouble() * 60,
-                MemoryUsedBytes = random.Next(500000000, 2000000000)
+                CpuPercent = Random.Shared.NextDouble() * 60,
+                MemoryUsedBytes = Random.Shared.Next(500000000, 2000000000)
             }
         });
     }

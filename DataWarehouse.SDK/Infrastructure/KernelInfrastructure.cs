@@ -1855,30 +1855,34 @@ public sealed class AIProviderRegistry : IAIProviderRegistry, IAsyncDisposable
             .ThenBy(p => p.Info.LatencyTier);
     }
 
-    private async void CheckAvailability(object? state)
+    private void CheckAvailability(object? state)
     {
-        if (_disposed) return;
-
-        foreach (var provider in _providers.Values)
+        // Timer callbacks must be void, so we use Task.Run for async work
+        _ = Task.Run(async () =>
         {
-            try
+            if (_disposed) return;
+
+            foreach (var provider in _providers.Values)
             {
-                var wasAvailable = provider.Info.IsAvailable;
-                var isAvailable = await provider.CheckAvailabilityAsync();
-
-                provider.Info.IsAvailable = isAvailable;
-
-                if (wasAvailable && !isAvailable)
+                try
                 {
+                    var wasAvailable = provider.Info.IsAvailable;
+                    var isAvailable = await provider.CheckAvailabilityAsync();
+
+                    provider.Info.IsAvailable = isAvailable;
+
+                    if (wasAvailable && !isAvailable)
+                    {
+                        OnProviderUnavailable?.Invoke(provider.Info.ProviderId);
+                    }
+                }
+                catch
+                {
+                    provider.Info.IsAvailable = false;
                     OnProviderUnavailable?.Invoke(provider.Info.ProviderId);
                 }
             }
-            catch
-            {
-                provider.Info.IsAvailable = false;
-                OnProviderUnavailable?.Invoke(provider.Info.ProviderId);
-            }
-        }
+        });
     }
 
     /// <inheritdoc/>

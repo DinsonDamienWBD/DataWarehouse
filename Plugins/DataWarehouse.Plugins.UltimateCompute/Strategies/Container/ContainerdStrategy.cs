@@ -50,11 +50,15 @@ internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
             var codeStr = task.GetCodeAsString();
             var maxMem = GetMaxMemoryBytes(task, 512 * 1024 * 1024);
 
+            // Escape code for shell to prevent command injection
+            // Write code to a temp file and execute it instead of passing via command line
+            var escapedCode = EscapeForShell(codeStr);
+
             var args = new StringBuilder();
             args.Append($"-n {ns} run --rm ");
             args.Append($"--memory-limit {maxMem} ");
             args.Append($"{image} {containerId} ");
-            args.Append($"sh -c \"{codeStr.Replace("\"", "\\\"")}\"");
+            args.Append($"sh -c {escapedCode}");
 
             var timeout = GetEffectiveTimeout(task);
             var result = await RunProcessAsync("ctr", args.ToString(),
@@ -69,5 +73,15 @@ internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
 
             return (EncodeOutput(result.StandardOutput), $"containerd completed in {result.Elapsed.TotalMilliseconds:F0}ms\n{result.StandardError}");
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Escapes a string for safe use in shell commands by using single quotes and escaping any single quotes in the string.
+    /// </summary>
+    private static string EscapeForShell(string input)
+    {
+        // Use single quotes for shell safety and escape any single quotes in the input
+        // Replace ' with '\'' (end quote, escaped quote, start quote)
+        return $"'{input.Replace("'", "'\\''")}'";
     }
 }

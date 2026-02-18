@@ -603,13 +603,25 @@ public class DeveloperToolsService : IDeveloperToolsService
     {
         var sb = new StringBuilder();
 
+        // Validate collection name to prevent SQL injection in preview
+        ValidateSqlIdentifier(query.Collection, nameof(query.Collection));
+
         switch (query.Operation)
         {
             case QueryOperation.Select:
                 sb.Append("SELECT ");
-                sb.Append(query.SelectFields.Any()
-                    ? string.Join(", ", query.SelectFields)
-                    : "*");
+                if (query.SelectFields.Any())
+                {
+                    foreach (var field in query.SelectFields)
+                    {
+                        ValidateSqlIdentifier(field, "SelectField");
+                    }
+                    sb.Append(string.Join(", ", query.SelectFields));
+                }
+                else
+                {
+                    sb.Append("*");
+                }
                 sb.AppendLine();
                 sb.Append($"FROM {query.Collection}");
                 break;
@@ -636,6 +648,10 @@ public class DeveloperToolsService : IDeveloperToolsService
         // Add joins
         foreach (var join in query.Joins)
         {
+            ValidateSqlIdentifier(join.Collection, "Join.Collection");
+            ValidateSqlIdentifier(join.LocalField, "Join.LocalField");
+            ValidateSqlIdentifier(join.ForeignField, "Join.ForeignField");
+
             sb.AppendLine();
             sb.Append($"{join.Type.ToString().ToUpper()} JOIN {join.Collection} ");
             sb.Append($"ON {query.Collection}.{join.LocalField} = {join.Collection}.{join.ForeignField}");
@@ -650,8 +666,12 @@ public class DeveloperToolsService : IDeveloperToolsService
 
             foreach (var filter in query.Filters)
             {
+                ValidateSqlIdentifier(filter.Field, "Filter.Field");
                 var op = GetOperatorString(filter.Operator);
-                var value = filter.Value is string ? $"'{filter.Value}'" : filter.Value?.ToString() ?? "NULL";
+                // Sanitize value for display - escape single quotes
+                var value = filter.Value is string strVal
+                    ? $"'{strVal.Replace("'", "''")}'"
+                    : filter.Value?.ToString() ?? "NULL";
                 filterStrings.Add($"{filter.Field} {op} {value}");
             }
 
@@ -661,6 +681,10 @@ public class DeveloperToolsService : IDeveloperToolsService
         // Add aggregation
         if (query.Aggregation != null && query.Aggregation.GroupBy.Any())
         {
+            foreach (var groupByField in query.Aggregation.GroupBy)
+            {
+                ValidateSqlIdentifier(groupByField, "GroupBy");
+            }
             sb.AppendLine();
             sb.Append($"GROUP BY {string.Join(", ", query.Aggregation.GroupBy)}");
         }
@@ -670,8 +694,12 @@ public class DeveloperToolsService : IDeveloperToolsService
         {
             sb.AppendLine();
             sb.Append("ORDER BY ");
-            var sortStrings = query.Sorting.Select(s =>
-                $"{s.Field} {(s.Direction == SortDirection.Ascending ? "ASC" : "DESC")}");
+            var sortStrings = new List<string>();
+            foreach (var sort in query.Sorting)
+            {
+                ValidateSqlIdentifier(sort.Field, "Sort.Field");
+                sortStrings.Add($"{sort.Field} {(sort.Direction == SortDirection.Ascending ? "ASC" : "DESC")}");
+            }
             sb.Append(string.Join(", ", sortStrings));
         }
 
@@ -713,5 +741,22 @@ public class DeveloperToolsService : IDeveloperToolsService
             QueryOperator.EndsWith => "ENDS WITH",
             _ => "="
         };
+    }
+
+    /// <summary>
+    /// Validates a SQL identifier to prevent SQL injection.
+    /// </summary>
+    private static void ValidateSqlIdentifier(string identifier, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            throw new ArgumentException("SQL identifier cannot be null or empty.", paramName);
+        }
+
+        // Allow alphanumeric, underscore, and dot (for qualified names like table.column)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_.]*$"))
+        {
+            throw new ArgumentException($"Invalid SQL identifier '{identifier}'. Only alphanumeric characters, underscores, and dots are allowed.", paramName);
+        }
     }
 }

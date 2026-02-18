@@ -37,6 +37,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private HttpClient? _httpClient;
         private bool _disposed;
 
+        private static readonly HttpClient SharedHttpClient = new HttpClient();
+
         // Earth's radius in kilometers for Haversine calculation
         private const double EarthRadiusKm = 6371.0;
 
@@ -84,7 +86,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             if (Configuration.TryGetValue("TimeWindows", out var twObj) && twObj is TimeWindow[] windows)
                 _config.AllowedTimeWindows = windows.ToList();
 
-            _httpClient = new HttpClient();
+            _httpClient = SharedHttpClient;
             await LoadKeysFromStorage();
         }
 

@@ -224,12 +224,19 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        var query = string.IsNullOrEmpty(prefix)
-            ? "SELECT c.id, c.size, c.contentType, c.eTag, c.metadata, c.createdAt, c.modifiedAt FROM c"
-            : $"SELECT c.id, c.size, c.contentType, c.eTag, c.metadata, c.createdAt, c.modifiedAt FROM c WHERE STARTSWITH(c.id, '{prefix}')";
+        QueryDefinition query;
+        if (string.IsNullOrEmpty(prefix))
+        {
+            query = new QueryDefinition("SELECT c.id, c.size, c.contentType, c.eTag, c.metadata, c.createdAt, c.modifiedAt FROM c");
+        }
+        else
+        {
+            query = new QueryDefinition("SELECT c.id, c.size, c.contentType, c.eTag, c.metadata, c.createdAt, c.modifiedAt FROM c WHERE STARTSWITH(c.id, @prefix)")
+                .WithParameter("@prefix", prefix);
+        }
 
         using var iterator = _container!.GetItemQueryIterator<StorageDocument>(
-            new QueryDefinition(query),
+            query,
             requestOptions: new QueryRequestOptions { MaxItemCount = 100 });
 
         while (iterator.HasMoreResults)
