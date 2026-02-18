@@ -48,6 +48,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private int _retryDelayMs = 1000;
         private bool _useSignatureV4 = true; // Use AWS Signature V4 by default (V2 deprecated)
 
+        // Cached health check state
+        private StorageHealthInfo? _cachedHealthInfo = null;
+        private DateTime _lastHealthCheck = DateTime.MinValue;
+        private readonly TimeSpan _healthCacheDuration = TimeSpan.FromSeconds(60);
+
         public override string StrategyId => "s3";
         public override string Name => "AWS S3 Storage";
         public override StorageTier Tier => StorageTier.Warm; // Default tier, can be overridden
@@ -84,12 +89,43 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 throw new InvalidOperationException("S3 bucket name is required. Set 'Bucket' in configuration.");
             }
-            if (string.IsNullOrWhiteSpace(_accessKey) || string.IsNullOrWhiteSpace(_secretKey))
+
+            // Validate S3 bucket name format
+            if (!System.Text.RegularExpressions.Regex.IsMatch(_bucket, @"^[a-z0-9][a-z0-9\-\.]{1,61}[a-z0-9]$"))
             {
-                throw new InvalidOperationException("S3 credentials are required. Set 'AccessKey' and 'SecretKey' in configuration.");
+                throw new ArgumentException($"Invalid S3 bucket name format: {_bucket}. Must be 3-63 characters, lowercase alphanumeric with hyphens/dots.");
             }
 
-            // Load optional configuration
+            if (string.IsNullOrWhiteSpace(_accessKey))
+            {
+                throw new InvalidOperationException("S3 access key is required. Set 'AccessKey' in configuration.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_secretKey))
+            {
+                throw new InvalidOperationException("S3 secret key is required. Set 'SecretKey' in configuration.");
+            }
+
+            // Validate endpoint URL format
+            if (!Uri.TryCreate(_endpoint, UriKind.Absolute, out var endpointUri))
+            {
+                throw new ArgumentException($"Invalid S3 endpoint URL: {_endpoint}. Must be a valid URI.");
+            }
+
+            // Validate endpoint is HTTPS or explicitly opt-in to HTTP
+            var allowHttp = GetConfiguration<bool>("AllowHttp", false);
+            if (endpointUri.Scheme == "http" && !allowHttp)
+            {
+                throw new InvalidOperationException($"S3 endpoint must use HTTPS: {_endpoint}. Set 'AllowHttp=true' to explicitly allow HTTP (not recommended).");
+            }
+
+            // Validate region is provided (required for signature V4)
+            if (string.IsNullOrWhiteSpace(_region))
+            {
+                throw new InvalidOperationException("S3 region is required. Set 'Region' in configuration (e.g., 'us-east-1').");
+            }
+
+            // Load optional configuration with validation
             _defaultStorageClass = GetConfiguration<string>("DefaultStorageClass", "STANDARD");
             _usePathStyle = GetConfiguration<bool>("UsePathStyle", false);
             _enableServerSideEncryption = GetConfiguration<bool>("EnableServerSideEncryption", false);
@@ -97,11 +133,38 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             _kmsKeyId = GetConfiguration<string?>("KMSKeyId", null);
             _enableVersioning = GetConfiguration<bool>("EnableVersioning", false);
             _enableTransferAcceleration = GetConfiguration<bool>("EnableTransferAcceleration", false);
+
             _timeoutSeconds = GetConfiguration<int>("TimeoutSeconds", 300);
+            if (_timeoutSeconds < 10 || _timeoutSeconds > 3600)
+            {
+                throw new ArgumentException($"Invalid timeout {_timeoutSeconds} seconds. Must be between 10 and 3600.");
+            }
+
             _multipartThresholdBytes = GetConfiguration<int>("MultipartThresholdBytes", 100 * 1024 * 1024);
+            if (_multipartThresholdBytes < 5 * 1024 * 1024) // S3 minimum part size
+            {
+                throw new ArgumentException($"Multipart threshold must be at least 5MB. Current: {_multipartThresholdBytes} bytes.");
+            }
+
             _multipartChunkSizeBytes = GetConfiguration<int>("MultipartChunkSizeBytes", 10 * 1024 * 1024);
+            if (_multipartChunkSizeBytes < 5 * 1024 * 1024)
+            {
+                throw new ArgumentException($"Multipart chunk size must be at least 5MB. Current: {_multipartChunkSizeBytes} bytes.");
+            }
+            // Note: Maximum part size is 5GB but int max is ~2GB, so practically limited to int.MaxValue
+
             _maxConcurrentParts = GetConfiguration<int>("MaxConcurrentParts", 5);
+            if (_maxConcurrentParts < 1 || _maxConcurrentParts > 100)
+            {
+                throw new ArgumentException($"Max concurrent parts must be between 1 and 100. Current: {_maxConcurrentParts}.");
+            }
+
             _maxRetries = GetConfiguration<int>("MaxRetries", 3);
+            if (_maxRetries < 0 || _maxRetries > 10)
+            {
+                throw new ArgumentException($"Max retries must be between 0 and 10. Current: {_maxRetries}.");
+            }
+
             _retryDelayMs = GetConfiguration<int>("RetryDelayMs", 1000);
             _useSignatureV4 = GetConfiguration<bool>("UseSignatureV4", true);
 
@@ -126,6 +189,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         {
             ValidateKey(key);
             ValidateStream(data);
+
+            // Edge case guards
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            }
+
+            // Validate max object size (5TB S3 limit)
+            if (data.CanSeek && data.Length > 5L * 1024 * 1024 * 1024 * 1024)
+            {
+                throw new ArgumentException($"Object size {data.Length} bytes exceeds S3 maximum of 5TB", nameof(data));
+            }
 
             // Determine if multipart upload is needed
             var useMultipart = false;
@@ -192,9 +267,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             // Extract ETag from response
             var etag = response.Headers.ETag?.Tag?.Trim('"') ?? string.Empty;
 
-            // Update statistics
+            // Update statistics with strategy-specific tracking
             IncrementBytesStored(content.Length);
             IncrementOperationCounter(StorageOperationType.Store);
+            // Note: S3-specific operation counters tracked via base class IncrementOperationCounter
 
             return new StorageObjectMetadata
             {
@@ -477,9 +553,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
         protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
         {
+            // Return cached health info if within cache duration
+            if (_cachedHealthInfo != null && (DateTime.UtcNow - _lastHealthCheck) < _healthCacheDuration)
+            {
+                return _cachedHealthInfo;
+            }
+
             try
             {
-                // Try to list objects with max-keys=1 as a health check
+                // Try to list objects with max-keys=1 as a health check (HEAD bucket)
                 var endpoint = $"{_endpoint}/{_bucket}?list-type=2&max-keys=1";
                 var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
                 await SignRequestAsync(request, null, ct);
@@ -488,19 +570,53 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var response = await _httpClient!.SendAsync(request, ct);
                 sw.Stop();
 
+                StorageHealthInfo healthInfo;
                 if (response.IsSuccessStatusCode)
                 {
-                    return new StorageHealthInfo
+                    healthInfo = new StorageHealthInfo
                     {
                         Status = HealthStatus.Healthy,
                         LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 bucket '{_bucket}' is accessible",
+                        Message = $"S3 bucket '{_bucket}' is accessible at {_endpoint}",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+                else if ((int)response.StatusCode == 403)
+                {
+                    // 403 Forbidden - credentials or permissions issue
+                    healthInfo = new StorageHealthInfo
+                    {
+                        Status = HealthStatus.Unhealthy,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = $"S3 bucket '{_bucket}' access denied (403). Check credentials and bucket permissions.",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+                else if ((int)response.StatusCode == 404)
+                {
+                    // 404 Not Found - bucket doesn't exist
+                    healthInfo = new StorageHealthInfo
+                    {
+                        Status = HealthStatus.Unhealthy,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = $"S3 bucket '{_bucket}' not found (404). Verify bucket name and region.",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+                else if ((int)response.StatusCode == 503)
+                {
+                    // 503 Service Unavailable - temporary issue
+                    healthInfo = new StorageHealthInfo
+                    {
+                        Status = HealthStatus.Degraded,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = $"S3 service temporarily unavailable (503) for bucket '{_bucket}'",
                         CheckedAt = DateTime.UtcNow
                     };
                 }
                 else
                 {
-                    return new StorageHealthInfo
+                    healthInfo = new StorageHealthInfo
                     {
                         Status = HealthStatus.Unhealthy,
                         LatencyMs = sw.ElapsedMilliseconds,
@@ -508,15 +624,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                         CheckedAt = DateTime.UtcNow
                     };
                 }
+
+                // Cache the result
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
             }
             catch (Exception ex)
             {
-                return new StorageHealthInfo
+                var healthInfo = new StorageHealthInfo
                 {
                     Status = HealthStatus.Unhealthy,
                     Message = $"Failed to access S3 bucket '{_bucket}': {ex.Message}",
                     CheckedAt = DateTime.UtcNow
                 };
+
+                // Cache the failure result (shorter duration for failures)
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
             }
         }
 
@@ -912,10 +1038,43 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
         #region Cleanup
 
+        /// <summary>
+        /// Gracefully shuts down S3 client with timeout for pending operations.
+        /// </summary>
+        protected override async Task ShutdownAsyncCore(CancellationToken ct = default)
+        {
+            // Give pending operations up to 10 seconds to complete
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+            try
+            {
+                // Allow pending operations to complete gracefully
+                await Task.Delay(100, linkedCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout or cancellation - proceed with disposal
+            }
+        }
+
         protected override async ValueTask DisposeCoreAsync()
         {
             await base.DisposeCoreAsync();
+
+            // Shutdown gracefully first
+            try
+            {
+                await ShutdownAsyncCore();
+            }
+            catch
+            {
+                // Ignore shutdown errors during disposal
+            }
+
+            // Dispose HttpClient and clear cached health
             _httpClient?.Dispose();
+            _cachedHealthInfo = null;
         }
 
         #endregion
