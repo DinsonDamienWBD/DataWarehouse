@@ -87,12 +87,30 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        // Input validation
+        if (inputStream == null || !inputStream.CanRead)
+        {
+            throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
+        }
+
         var outputStream = new MemoryStream(1024 * 1024);
 
         var targetResolution = options.TargetResolution ?? Resolution.FullHD;
         var targetBitrateKbps = options.TargetBitrate.HasValue
             ? (int)(options.TargetBitrate.Value.BitsPerSecond / 1000)
             : 5000;
+
+        // Validate resolution
+        if (targetResolution.Width < 64 || targetResolution.Height < 64)
+        {
+            throw new ArgumentException("Target resolution must be at least 64x64 pixels.");
+        }
+
+        // Validate bitrate
+        if (targetBitrateKbps < 100 || targetBitrateKbps > 100_000)
+        {
+            throw new ArgumentException("Target bitrate must be between 100 kbps and 100 Mbps.");
+        }
 
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
         var estimatedDuration = EstimateInputDuration(sourceBytes);

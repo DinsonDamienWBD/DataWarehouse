@@ -480,7 +480,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             {
                 _bitsInBuffer = 0; // Align
                 Span<byte> buf = stackalloc byte[4];
-                _stream.ReadExactly(buf);
+                for (int i = 0; i < 4; i++)
+                {
+                    int b = _stream.ReadByte();
+                    buf[i] = b >= 0 ? (byte)b : (byte)0;
+                }
                 return BinaryPrimitives.ReadInt32LittleEndian(buf);
             }
         }

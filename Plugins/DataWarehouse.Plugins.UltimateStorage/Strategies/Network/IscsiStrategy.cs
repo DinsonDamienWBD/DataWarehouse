@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -705,22 +706,78 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         }
 
         /// <summary>
-        /// Persists block mappings to metadata storage (simplified - would use a metadata LUN in production).
+        /// Persists block mappings to metadata storage file.
         /// </summary>
         private async Task PersistBlockMappingsAsync(CancellationToken ct)
         {
-            // In production, this would write to a dedicated metadata LUN or external database
-            // For now, keep in memory
-            await Task.CompletedTask;
+            try
+            {
+                var metadataPath = GetMetadataFilePath();
+                var directory = Path.GetDirectoryName(metadataPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var json = JsonSerializer.Serialize(_blockMappings, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+                await File.WriteAllTextAsync(metadataPath, json, ct);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail - metadata persistence is non-critical for operations
+                System.Diagnostics.Debug.WriteLine($"Failed to persist iSCSI block mappings: {ex.Message}");
+            }
         }
 
         /// <summary>
-        /// Loads block mappings from metadata storage.
+        /// Loads block mappings from metadata storage file.
         /// </summary>
         private async Task LoadBlockMappingsAsync(CancellationToken ct)
         {
-            // In production, load from metadata LUN or external database
-            await Task.CompletedTask;
+            try
+            {
+                var metadataPath = GetMetadataFilePath();
+                if (File.Exists(metadataPath))
+                {
+                    var json = await File.ReadAllTextAsync(metadataPath, ct);
+                    var loadedMappings = JsonSerializer.Deserialize<Dictionary<string, BlockMapping>>(json);
+                    if (loadedMappings != null)
+                    {
+                        foreach (var kvp in loadedMappings)
+                        {
+                            _blockMappings[kvp.Key] = kvp.Value;
+                        }
+
+                        // Update next block address
+                        if (_blockMappings.Any())
+                        {
+                            _nextBlockAddress = _blockMappings.Values.Max(m => m.StartLBA + m.BlockCount);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail - start fresh if metadata can't be loaded
+                System.Diagnostics.Debug.WriteLine($"Failed to load iSCSI block mappings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets the metadata file path for block mappings.
+        /// </summary>
+        private string GetMetadataFilePath()
+        {
+            var baseDir = GetConfiguration<string>("MetadataDirectory", Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "DataWarehouse", "iSCSI"));
+
+            var filename = $"blockmappings_{_targetAddress.Replace(":", "_").Replace(".", "_")}_{_lun}.json";
+            return Path.Combine(baseDir, filename);
         }
 
         #endregion
@@ -910,17 +967,91 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 await EnsureConnectedAsync(ct);
 
-                // In production, would query LUN capacity via SCSI READ CAPACITY command
-                // For now, return estimated capacity
+                // Query LUN capacity via SCSI READ CAPACITY(10) command
+                var totalBlocks = await ReadCapacityAsync(ct);
                 var allocatedBlocks = _nextBlockAddress;
-                var estimatedTotalBlocks = 10_000_000; // 5GB at 512 bytes per block
-                var availableBlocks = estimatedTotalBlocks - allocatedBlocks;
+                var availableBlocks = Math.Max(0, totalBlocks - allocatedBlocks);
 
                 return availableBlocks * BlockSize;
             }
             catch
             {
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Executes SCSI READ CAPACITY(10) command to get LUN size.
+        /// </summary>
+        private async Task<long> ReadCapacityAsync(CancellationToken ct)
+        {
+            await _ioLock.WaitAsync(ct);
+
+            try
+            {
+                using var ms = new MemoryStream(65536);
+                using var writer = new BinaryWriter(ms);
+
+                // BHS
+                byte opcode = 0x01; // SCSI Command
+                byte flags = 0xC0; // Final + Read
+                writer.Write(opcode);
+                writer.Write(flags);
+                writer.Write(new byte[6]); // Reserved, TotalAHSLength, DataSegmentLength
+
+                writer.Write((ushort)_lun);
+                writer.Write(new byte[6]); // Reserved
+
+                writer.Write(_commandSequenceNumber);
+                writer.Write(_expectedStatusSequenceNumber);
+                writer.Write(new byte[12]); // Reserved
+
+                // SCSI CDB - READ CAPACITY(10) command
+                var cdb = new byte[16];
+                cdb[0] = 0x25; // READ CAPACITY(10) opcode
+                cdb[1] = (byte)_lun;
+
+                writer.Write(cdb);
+
+                var buffer = ms.ToArray();
+                await _stream!.WriteAsync(buffer, ct);
+                await _stream.FlushAsync(ct);
+
+                // Receive SCSI Response
+                var responseHeader = new byte[48];
+                await ReadExactAsync(responseHeader, 0, 48, ct);
+
+                var dataSegmentLength = (responseHeader[5] << 16) | (responseHeader[6] << 8) | responseHeader[7];
+
+                // Read capacity data (8 bytes: last LBA + block length)
+                if (dataSegmentLength >= 8)
+                {
+                    var capacityData = new byte[8];
+                    await ReadExactAsync(capacityData, 0, 8, ct);
+
+                    // Parse last LBA (big-endian)
+                    var lastLba = ((long)capacityData[0] << 24) |
+                                  ((long)capacityData[1] << 16) |
+                                  ((long)capacityData[2] << 8) |
+                                  ((long)capacityData[3]);
+
+                    _commandSequenceNumber++;
+                    _expectedStatusSequenceNumber++;
+
+                    return lastLba + 1; // Total blocks = last LBA + 1
+                }
+
+                // Fallback estimate if READ CAPACITY fails
+                return 10_000_000; // 5GB at 512 bytes per block
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"READ CAPACITY failed: {ex.Message}");
+                return 10_000_000; // Fallback estimate
+            }
+            finally
+            {
+                _ioLock.Release();
             }
         }
 

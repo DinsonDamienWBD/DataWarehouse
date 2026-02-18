@@ -273,16 +273,72 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
         {
             sb.Append($" -preset {preset} -profile:v {profile} -crf {crf}");
             sb.Append(" -level 4.1");
+
+            // 10-bit encoding support (high10 profile)
+            if (profile == "high10")
+            {
+                sb.Append(" -pix_fmt yuv420p10le");
+            }
+            else
+            {
+                sb.Append(" -pix_fmt yuv420p");
+            }
         }
         else
         {
             // Hardware encoders use different quality parameters
             sb.Append($" -qp {crf}");
+
+            // Check for 10-bit support in hardware encoder
+            if (profile == "high10" && (encoder.Contains("nvenc") || encoder.Contains("qsv")))
+            {
+                sb.Append(" -pix_fmt p010le"); // 10-bit for hardware encoders
+            }
+            else
+            {
+                sb.Append(" -pix_fmt yuv420p");
+            }
         }
 
         sb.Append($" -s {resolution.Width}x{resolution.Height}");
         sb.Append($" -r {frameRate:F2}");
-        sb.Append(" -pix_fmt yuv420p"); // Maximum compatibility
+
+        // Video watermarking via overlay filter
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("watermark_text", out var watermarkText))
+        {
+            var fontSize = options.CustomMetadata.TryGetValue("watermark_fontsize", out var fontSizeStr)
+                ? fontSizeStr : "24";
+            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                ? pos : "x=W-w-10:y=H-h-10"; // Bottom right by default
+            var opacity = options.CustomMetadata.TryGetValue("watermark_opacity", out var opacityStr)
+                ? opacityStr : "0.7";
+
+            sb.Append($" -vf \"drawtext=text='{watermarkText}':fontsize={fontSize}:{position}:fontcolor=white@{opacity}\"");
+        }
+        else if (options.CustomMetadata != null &&
+                 options.CustomMetadata.TryGetValue("watermark_image", out var watermarkImagePath))
+        {
+            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                ? pos : "overlay=W-w-10:H-h-10"; // Bottom right by default
+
+            sb.Append($" -i \"{watermarkImagePath}\" -filter_complex \"{position}\"");
+        }
+
+        // HDR tone mapping for SDR output (if source is HDR)
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("tonemap", out var tonemapMode))
+        {
+            var tonemapParams = tonemapMode switch
+            {
+                "hable" => "tonemap=hable:desat=0",
+                "mobius" => "tonemap=mobius:desat=0",
+                "reinhard" => "tonemap=reinhard:desat=0",
+                _ => "tonemap=hable:desat=0"
+            };
+
+            sb.Append($" -vf \"zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,{tonemapParams},zscale=t=bt709:m=bt709:r=tv,format=yuv420p\"");
+        }
 
         // Two-pass encoding for better quality
         if (options.TwoPass)
@@ -304,21 +360,8 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
     /// </summary>
     private static MediaFormat DetectContainerFormat(byte[] data)
     {
-        if (data.Length < 12) return MediaFormat.Unknown;
-
-        // Check for ftyp box (MP4/MOV)
-        if (data.Length >= 8 && data[4] == 0x66 && data[5] == 0x74 && data[6] == 0x79 && data[7] == 0x70)
-            return MediaFormat.MP4;
-
-        // Check for EBML (WebM/MKV)
-        if (data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3)
-            return MediaFormat.WebM;
-
-        // Check for RIFF (AVI)
-        if (data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46)
-            return MediaFormat.AVI;
-
-        return MediaFormat.MP4; // Default assumption for H.264 content
+        var detected = MediaFormatDetector.DetectFormat(data);
+        return detected != MediaFormat.Unknown ? detected : MediaFormat.MP4;
     }
 
     /// <summary>

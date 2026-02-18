@@ -251,7 +251,72 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
 
         sb.Append($" -s {resolution.Width}x{resolution.Height}");
         sb.Append($" -r {frameRate:F2}");
-        sb.Append(" -pix_fmt yuv420p10le"); // 10-bit for HDR support
+
+        // 10-bit encoding for HDR support (default for H.265)
+        // Can be overridden to 8-bit via custom metadata
+        var pixelFormat = "yuv420p10le";
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("bit_depth", out var bitDepth) &&
+            bitDepth == "8")
+        {
+            pixelFormat = "yuv420p";
+        }
+        sb.Append($" -pix_fmt {pixelFormat}");
+
+        // HDR metadata transfer (HDR10, HDR10+, HLG, Dolby Vision)
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("hdr_transfer", out var hdrTransfer))
+        {
+            var colorSpace = options.CustomMetadata.TryGetValue("color_space", out var cs) ? cs : "bt2020nc";
+            var colorPrimaries = options.CustomMetadata.TryGetValue("color_primaries", out var cp) ? cp : "bt2020";
+            var colorTransfer = hdrTransfer; // smpte2084 (PQ), arib-std-b67 (HLG), bt2020-10
+
+            sb.Append($" -colorspace {colorSpace} -color_primaries {colorPrimaries} -color_trc {colorTransfer}");
+
+            // HDR10 static metadata
+            if (options.CustomMetadata.TryGetValue("master_display", out var masterDisplay) &&
+                options.CustomMetadata.TryGetValue("max_cll", out var maxCll))
+            {
+                sb.Append($" -x265-params \"master-display={masterDisplay}:max-cll={maxCll}\"");
+            }
+        }
+
+        // Video watermarking via overlay filter
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("watermark_text", out var watermarkText))
+        {
+            var fontSize = options.CustomMetadata.TryGetValue("watermark_fontsize", out var fontSizeStr)
+                ? fontSizeStr : "24";
+            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                ? pos : "x=W-w-10:y=H-h-10";
+            var opacity = options.CustomMetadata.TryGetValue("watermark_opacity", out var opacityStr)
+                ? opacityStr : "0.7";
+
+            sb.Append($" -vf \"drawtext=text='{watermarkText}':fontsize={fontSize}:{position}:fontcolor=white@{opacity}\"");
+        }
+        else if (options.CustomMetadata != null &&
+                 options.CustomMetadata.TryGetValue("watermark_image", out var watermarkImagePath))
+        {
+            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                ? pos : "overlay=W-w-10:H-h-10";
+
+            sb.Append($" -i \"{watermarkImagePath}\" -filter_complex \"{position}\"");
+        }
+
+        // HDR to SDR tone mapping
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("tonemap", out var tonemapMode))
+        {
+            var tonemapParams = tonemapMode switch
+            {
+                "hable" => "tonemap=hable:desat=0",
+                "mobius" => "tonemap=mobius:desat=0",
+                "reinhard" => "tonemap=reinhard:desat=0",
+                _ => "tonemap=hable:desat=0"
+            };
+
+            sb.Append($" -vf \"zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,{tonemapParams},zscale=t=bt709:m=bt709:r=tv,format=yuv420p\"");
+        }
 
         if (options.TwoPass)
         {

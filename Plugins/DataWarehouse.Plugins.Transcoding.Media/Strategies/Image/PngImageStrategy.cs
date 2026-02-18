@@ -73,13 +73,60 @@ internal sealed class PngImageStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        // Input validation
+        if (inputStream == null || !inputStream.CanRead)
+        {
+            throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
+        }
+
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
+
+        // Validate source data
+        if (sourceBytes.Length == 0)
+        {
+            throw new ArgumentException("Input stream is empty.");
+        }
+
+        if (sourceBytes.Length > 500_000_000) // 500 MB limit for in-memory processing
+        {
+            throw new ArgumentException("Input file is too large for in-memory processing (limit 500 MB). Use streaming mode.");
+        }
+
         var outputStream = new MemoryStream(1024 * 1024);
 
         var compressionLevel = DetermineCompressionLevel(options);
+
+        // Validate compression level
+        if (compressionLevel < 0 || compressionLevel > 9)
+        {
+            throw new ArgumentException("PNG compression level must be between 0 and 9.");
+        }
         var interlaced = options.VideoCodec?.Equals("png-interlaced", StringComparison.OrdinalIgnoreCase) ?? false;
         var targetWidth = options.TargetResolution?.Width ?? 0;
         var targetHeight = options.TargetResolution?.Height ?? 0;
+
+        // Extract image manipulation parameters
+        var rotationAngle = 0;
+        var cropRectangle = "";
+        var interpolationMode = "bicubic";
+
+        if (options.CustomMetadata != null)
+        {
+            if (options.CustomMetadata.TryGetValue("rotation", out var rotStr) && int.TryParse(rotStr, out var angle))
+            {
+                rotationAngle = angle % 360;
+            }
+
+            if (options.CustomMetadata.TryGetValue("crop", out var cropStr))
+            {
+                cropRectangle = cropStr; // Format: "x,y,width,height"
+            }
+
+            if (options.CustomMetadata.TryGetValue("interpolation", out var interpStr))
+            {
+                interpolationMode = interpStr;
+            }
+        }
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
@@ -95,10 +142,11 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         // sRGB chunk
         WriteSrgbChunk(writer);
 
-        // tEXt metadata chunk
+        // tEXt metadata chunk with transformation info
         WriteTextChunk(writer, "Software", "DataWarehouse.Transcoding.Media");
         WriteTextChunk(writer, "Comment",
-            $"compression={compressionLevel};resize={targetWidth}x{targetHeight}");
+            $"compression={compressionLevel};resize={targetWidth}x{targetHeight};" +
+            $"rotation={rotationAngle};crop={cropRectangle};interpolation={interpolationMode}");
 
         // Compress image data using DEFLATE with selected compression level
         var compressedData = CompressImageData(sourceBytes, compressionLevel);

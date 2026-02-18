@@ -332,7 +332,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                     {
                         throw new InvalidDataException("Invalid RLE header magic.");
                     }
-                    _input.ReadExactly(new byte[4], 0, 4); // Skip length
+                    // Skip length header (4 bytes)
+                    int headerBytesRead = 0;
+                    var lenBuf = new byte[4];
+                    while (headerBytesRead < 4)
+                    {
+                        int read = _input.Read(lenBuf, headerBytesRead, 4 - headerBytesRead);
+                        if (read == 0) break;
+                        headerBytesRead += read;
+                    }
                     _headerRead = true;
                 }
 

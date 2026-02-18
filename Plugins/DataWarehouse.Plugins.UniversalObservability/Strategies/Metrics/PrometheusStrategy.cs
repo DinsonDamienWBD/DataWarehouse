@@ -21,6 +21,10 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     private readonly HttpClient _httpClient;
     private string _pushGatewayUrl = "http://localhost:9091";
     private string _jobName = "datawarehouse";
+    private int _circuitBreakerFailures = 0;
+    private const int CircuitBreakerThreshold = 5;
+    private bool _circuitOpen = false;
+    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
 
     /// <inheritdoc/>
     public override string StrategyId => "prometheus";
@@ -129,15 +133,47 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
 
     private async Task PushMetricsAsync(string metricsText, CancellationToken ct)
     {
-        try
+        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+            return; // Circuit open
+
+        await SendWithRetryAsync(async () =>
         {
             var content = new StringContent(metricsText, Encoding.UTF8, "text/plain");
             var url = $"{_pushGatewayUrl}/metrics/job/{_jobName}";
-            await _httpClient.PostAsync(url, content, ct);
-        }
-        catch (HttpRequestException)
+            var response = await _httpClient.PostAsync(url, content, ct);
+            response.EnsureSuccessStatusCode();
+        }, ct);
+    }
+
+    private async Task SendWithRetryAsync(Func<Task> action, CancellationToken ct)
+    {
+        var maxRetries = 3;
+        var baseDelay = TimeSpan.FromMilliseconds(100);
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            // PushGateway unavailable - metrics stored locally
+            try
+            {
+                await action();
+                _circuitBreakerFailures = 0;
+                _circuitOpen = false;
+                return;
+            }
+            catch (HttpRequestException) when (attempt < maxRetries - 1)
+            {
+                var delay = baseDelay * Math.Pow(2, attempt);
+                await Task.Delay(delay, ct);
+            }
+            catch (HttpRequestException)
+            {
+                _circuitBreakerFailures++;
+                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                {
+                    _circuitOpen = true;
+                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                }
+                // Swallow - metrics stored locally in dictionaries
+            }
         }
     }
 

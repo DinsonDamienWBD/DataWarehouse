@@ -732,6 +732,9 @@ public sealed class SecurityEvent
     public required string SourceId { get; init; }
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
     public Dictionary<string, object> Properties { get; init; } = new();
+    public string? ResourceId { get; init; }
+    public string Severity { get; init; } = "Medium";
+    public string? Message { get; init; }
 }
 
 public sealed class ThreatIndicator
@@ -759,6 +762,314 @@ public sealed class ThreatAnalysisResult
     public required string EventId { get; init; }
     public List<DetectedThreat> Threats { get; init; } = new();
     public DateTimeOffset AnalyzedAt { get; init; }
+}
+
+/// <summary>
+/// SIEM integration for centralized security event monitoring.
+/// </summary>
+public sealed class SiemIntegrationStrategy : MultiCloudStrategyBase
+{
+    private readonly ConcurrentQueue<SecurityEvent> _eventQueue = new();
+    private readonly ConcurrentDictionary<string, SiemEndpoint> _endpoints = new();
+    private readonly ConcurrentDictionary<string, long> _eventCounts = new();
+
+    public override string StrategyId => "security-siem-integration";
+    public override string StrategyName => "SIEM Integration";
+    public override string Category => "Security";
+
+    public override MultiCloudCharacteristics Characteristics => new()
+    {
+        StrategyName = StrategyName,
+        Description = "Integrates with SIEM systems (Splunk, ELK, Azure Sentinel, etc.) for centralized security monitoring",
+        Category = Category,
+        SupportsDataSovereignty = true,
+        TypicalLatencyOverheadMs = 10.0,
+        MemoryFootprint = "Medium"
+    };
+
+    /// <summary>Registers a SIEM endpoint.</summary>
+    public void RegisterSiemEndpoint(string endpointId, SiemType siemType, string url, Dictionary<string, string> credentials)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(endpointId);
+        ArgumentException.ThrowIfNullOrEmpty(url);
+        ArgumentNullException.ThrowIfNull(credentials);
+
+        _endpoints[endpointId] = new SiemEndpoint
+        {
+            EndpointId = endpointId,
+            SiemType = siemType,
+            Url = url,
+            Credentials = credentials,
+            RegisteredAt = DateTimeOffset.UtcNow,
+            IsActive = true
+        };
+
+        RecordSuccess();
+    }
+
+    /// <summary>Sends security event to SIEM.</summary>
+    public async Task<SiemSendResult> SendEventAsync(SecurityEvent evt, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _eventQueue.Enqueue(evt);
+        _eventCounts.AddOrUpdate(evt.ProviderId, 1, (_, count) => count + 1);
+
+        var results = new List<(string endpointId, bool success)>();
+
+        foreach (var endpoint in _endpoints.Values.Where(e => e.IsActive))
+        {
+            try
+            {
+                var success = await SendToSiemAsync(endpoint, evt, ct);
+                results.Add((endpoint.EndpointId, success));
+            }
+            catch
+            {
+                results.Add((endpoint.EndpointId, false));
+            }
+        }
+
+        var allSucceeded = results.All(r => r.success);
+        if (allSucceeded) RecordSuccess(); else RecordFailure();
+
+        return new SiemSendResult
+        {
+            EventId = evt.EventId,
+            SentAt = DateTimeOffset.UtcNow,
+            EndpointResults = results.ToDictionary(r => r.endpointId, r => r.success)
+        };
+    }
+
+    /// <summary>Sends batch of events to SIEM.</summary>
+    public async Task<BatchSiemSendResult> SendBatchAsync(IEnumerable<SecurityEvent> events, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+
+        var eventList = events.ToList();
+        var results = new List<SiemSendResult>();
+
+        foreach (var evt in eventList)
+        {
+            var result = await SendEventAsync(evt, ct);
+            results.Add(result);
+        }
+
+        var successCount = results.Count(r => r.EndpointResults.Values.Any(v => v));
+
+        return new BatchSiemSendResult
+        {
+            TotalEvents = eventList.Count,
+            SuccessfulEvents = successCount,
+            FailedEvents = eventList.Count - successCount,
+            Results = results
+        };
+    }
+
+    /// <summary>Queries SIEM for events matching criteria.</summary>
+    public async Task<SiemQueryResult> QueryAsync(string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(query);
+
+        var matches = _eventQueue
+            .Where(e => e.Timestamp >= from && e.Timestamp <= to)
+            .Where(e => MatchesQuery(e, query))
+            .ToList();
+
+        await Task.CompletedTask; // Simulate async query
+
+        return new SiemQueryResult
+        {
+            Query = query,
+            From = from,
+            To = to,
+            MatchCount = matches.Count,
+            Events = matches.Take(1000).ToList()
+        };
+    }
+
+    /// <summary>Gets event statistics by provider.</summary>
+    public IReadOnlyDictionary<string, long> GetEventStatistics() => _eventCounts;
+
+    private static async Task<bool> SendToSiemAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Simulate SIEM send based on type
+        await Task.Delay(5, ct);
+
+        return endpoint.SiemType switch
+        {
+            SiemType.Splunk => await SendToSplunkAsync(endpoint, evt, ct),
+            SiemType.ElasticStack => await SendToElasticAsync(endpoint, evt, ct),
+            SiemType.AzureSentinel => await SendToSentinelAsync(endpoint, evt, ct),
+            SiemType.Datadog => await SendToDatadogAsync(endpoint, evt, ct),
+            SiemType.SumoLogic => await SendToSumoLogicAsync(endpoint, evt, ct),
+            SiemType.QRadar => await SendToQRadarAsync(endpoint, evt, ct),
+            _ => true
+        };
+    }
+
+    private static async Task<bool> SendToSplunkAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Splunk HEC (HTTP Event Collector) format
+        var payload = new
+        {
+            time = evt.Timestamp.ToUnixTimeSeconds(),
+            host = evt.ResourceId,
+            source = evt.ProviderId,
+            sourcetype = evt.EventType,
+            evt.EventId,
+            evt.Severity,
+            evt.Message
+        };
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static async Task<bool> SendToElasticAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Elasticsearch JSON format
+        var payload = new
+        {
+            timestamp = evt.Timestamp,
+            event_id = evt.EventId,
+            event_type = evt.EventType,
+            provider = evt.ProviderId,
+            resource = evt.ResourceId,
+            severity = evt.Severity,
+            message = evt.Message
+        };
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static async Task<bool> SendToSentinelAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Azure Sentinel (Log Analytics) format
+        var payload = new
+        {
+            TimeGenerated = evt.Timestamp,
+            EventId = evt.EventId,
+            EventType = evt.EventType,
+            Provider = evt.ProviderId,
+            Resource = evt.ResourceId,
+            Severity = evt.Severity,
+            Message = evt.Message
+        };
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static async Task<bool> SendToDatadogAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Datadog logs API format
+        var payload = new
+        {
+            ddsource = evt.ProviderId,
+            ddtags = $"provider:{evt.ProviderId},severity:{evt.Severity}",
+            hostname = evt.ResourceId,
+            message = evt.Message,
+            service = "multicloud-security"
+        };
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static async Task<bool> SendToSumoLogicAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // Sumo Logic HTTP Source format
+        var payload = new
+        {
+            timestamp = evt.Timestamp.ToUnixTimeMilliseconds(),
+            event_id = evt.EventId,
+            provider = evt.ProviderId,
+            severity = evt.Severity,
+            message = evt.Message
+        };
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static async Task<bool> SendToQRadarAsync(SiemEndpoint endpoint, SecurityEvent evt, CancellationToken ct)
+    {
+        // IBM QRadar LEEF (Log Event Extended Format)
+        var leef = $"LEEF:2.0|DataWarehouse|MultiCloud|1.0|{evt.EventType}|" +
+                   $"devTime={evt.Timestamp:yyyy-MM-ddTHH:mm:ss.fffZ}\t" +
+                   $"src={evt.ProviderId}\t" +
+                   $"sev={MapSeverityToQRadar(evt.Severity)}\t" +
+                   $"msg={evt.Message}";
+
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static int MapSeverityToQRadar(string severity) => severity.ToLowerInvariant() switch
+    {
+        "critical" => 10,
+        "high" => 8,
+        "medium" => 5,
+        "low" => 2,
+        _ => 0
+    };
+
+    private static bool MatchesQuery(SecurityEvent evt, string query)
+    {
+        // Simple substring match - production would use proper query language
+        var searchText = $"{evt.EventId} {evt.EventType} {evt.ProviderId} {evt.Message}".ToLowerInvariant();
+        return searchText.Contains(query.ToLowerInvariant());
+    }
+
+    protected override string? GetCurrentState() =>
+        $"Endpoints: {_endpoints.Count}, Queue: {_eventQueue.Count}";
+}
+
+public enum SiemType
+{
+    Splunk,
+    ElasticStack,
+    AzureSentinel,
+    Datadog,
+    SumoLogic,
+    QRadar,
+    Custom
+}
+
+public sealed class SiemEndpoint
+{
+    public required string EndpointId { get; init; }
+    public required SiemType SiemType { get; init; }
+    public required string Url { get; init; }
+    public required Dictionary<string, string> Credentials { get; init; }
+    public DateTimeOffset RegisteredAt { get; init; }
+    public bool IsActive { get; set; }
+}
+
+public sealed class SiemSendResult
+{
+    public required string EventId { get; init; }
+    public DateTimeOffset SentAt { get; init; }
+    public required Dictionary<string, bool> EndpointResults { get; init; }
+}
+
+public sealed class BatchSiemSendResult
+{
+    public int TotalEvents { get; init; }
+    public int SuccessfulEvents { get; init; }
+    public int FailedEvents { get; init; }
+    public required List<SiemSendResult> Results { get; init; }
+}
+
+public sealed class SiemQueryResult
+{
+    public required string Query { get; init; }
+    public DateTimeOffset From { get; init; }
+    public DateTimeOffset To { get; init; }
+    public int MatchCount { get; init; }
+    public required List<SecurityEvent> Events { get; init; }
 }
 
 #endregion

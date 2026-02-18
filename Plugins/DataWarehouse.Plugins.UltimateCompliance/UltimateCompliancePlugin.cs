@@ -268,6 +268,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
                 await _alertService.SendAlertAsync(alert);
             }));
+
+            // Geofence check handler (single check)
+            _subscriptions.Add(MessageBus.Subscribe("compliance.geofence.check", async msg =>
+            {
+                await HandleGeofenceCheckAsync(msg);
+            }));
+
+            // Geofence batch check handler
+            _subscriptions.Add(MessageBus.Subscribe("compliance.geofence.check.batch", async msg =>
+            {
+                await HandleGeofenceBatchCheckAsync(msg);
+            }));
         }
 
         /// <summary>
@@ -641,6 +653,193 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
             message.Payload["Strategies"] = strategies;
             message.Payload["Count"] = strategies.Count;
+        }
+
+        /// <summary>
+        /// Handles geofence compliance check requests from replication features.
+        /// </summary>
+        private async Task HandleGeofenceCheckAsync(PluginMessage message)
+        {
+            var regionId = message.Payload.GetValueOrDefault("regionId")?.ToString();
+            var dataClassification = message.Payload.GetValueOrDefault("dataClassification")?.ToString() ?? "standard";
+            var complianceFrameworks = message.Payload.GetValueOrDefault("complianceFrameworks") as IEnumerable<object>;
+            var operation = message.Payload.GetValueOrDefault("operation")?.ToString();
+            var sourceRegion = message.Payload.GetValueOrDefault("sourceRegion")?.ToString();
+
+            if (string.IsNullOrEmpty(regionId))
+            {
+                // Reject if no region specified
+                await PublishGeofenceResponseAsync(message.CorrelationId ?? string.Empty, false, "No region specified", message.Source ?? string.Empty);
+                return;
+            }
+
+            // Get geofencing strategy
+            var geofenceStrategy = GetStrategy("geofencing");
+            if (geofenceStrategy == null)
+            {
+                // No geofencing strategy registered - allow by default (fail-open for availability)
+                await PublishGeofenceResponseAsync(message.CorrelationId ?? string.Empty, true, null, message.Source ?? string.Empty);
+                return;
+            }
+
+            // Build compliance context with all properties in initializer
+            var context = new ComplianceContext
+            {
+                OperationType = operation ?? "data-write",
+                DataClassification = dataClassification,
+                DestinationLocation = regionId,
+                SourceLocation = sourceRegion ?? string.Empty,
+                ResourceId = message.Payload.GetValueOrDefault("resourceId")?.ToString()
+            };
+
+            // Check compliance
+            var result = await geofenceStrategy.CheckComplianceAsync(context);
+
+            // Respond
+            var compliant = result.IsCompliant;
+            var reason = compliant ? null : BuildViolationSummary(result.Violations);
+
+            await PublishGeofenceResponseAsync(message.CorrelationId ?? string.Empty, compliant, reason, message.Source ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Handles batch geofence compliance checks.
+        /// </summary>
+        private async Task HandleGeofenceBatchCheckAsync(PluginMessage message)
+        {
+            var checks = message.Payload.GetValueOrDefault("checks") as IEnumerable<object>;
+            if (checks == null)
+            {
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync("compliance.geofence.check.batch.response", new PluginMessage
+                    {
+                        Type = "compliance.geofence.check.batch.response",
+                        CorrelationId = message.CorrelationId ?? string.Empty,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = false,
+                            ["reason"] = "No checks specified"
+                        }
+                    });
+                }
+                return;
+            }
+
+            if (MessageBus == null)
+            {
+                return;
+            }
+
+            var geofenceStrategy = GetStrategy("geofencing");
+            var results = new List<Dictionary<string, object>>();
+
+            foreach (var checkObj in checks)
+            {
+                if (checkObj is not Dictionary<string, object> check)
+                    continue;
+
+                var regionId = check.GetValueOrDefault("regionId")?.ToString();
+                var dataClassification = check.GetValueOrDefault("dataClassification")?.ToString() ?? "standard";
+
+                if (string.IsNullOrEmpty(regionId))
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        ["regionId"] = regionId ?? "unknown",
+                        ["compliant"] = false,
+                        ["reason"] = "No region specified"
+                    });
+                    continue;
+                }
+
+                if (geofenceStrategy == null)
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        ["regionId"] = regionId,
+                        ["compliant"] = true,
+                        ["reason"] = string.Empty
+                    });
+                    continue;
+                }
+
+                var context = new ComplianceContext
+                {
+                    OperationType = check.GetValueOrDefault("operation")?.ToString() ?? "data-write",
+                    DataClassification = dataClassification,
+                    DestinationLocation = regionId,
+                    SourceLocation = check.GetValueOrDefault("sourceRegion")?.ToString() ?? string.Empty,
+                    ResourceId = check.GetValueOrDefault("resourceId")?.ToString()
+                };
+
+                var result = await geofenceStrategy.CheckComplianceAsync(context);
+
+                var violationSummary = result.IsCompliant ? string.Empty : BuildViolationSummary(result.Violations);
+                results.Add(new Dictionary<string, object>
+                {
+                    ["regionId"] = regionId,
+                    ["compliant"] = result.IsCompliant,
+                    ["reason"] = violationSummary
+                });
+            }
+
+            await MessageBus.PublishAsync("compliance.geofence.check.batch.response", new PluginMessage
+            {
+                Type = "compliance.geofence.check.batch.response",
+                CorrelationId = message.CorrelationId ?? string.Empty,
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["success"] = true,
+                    ["results"] = results
+                }
+            });
+        }
+
+        /// <summary>
+        /// Publishes a geofence check response.
+        /// </summary>
+        private async Task PublishGeofenceResponseAsync(string correlationId, bool compliant, string? reason, string? originalSource)
+        {
+            if (MessageBus == null) return;
+
+            await MessageBus.PublishAsync("compliance.geofence.check.response", new PluginMessage
+            {
+                Type = "compliance.geofence.check.response",
+                CorrelationId = correlationId,
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["compliant"] = compliant,
+                    ["reason"] = reason ?? "",
+                    ["checkedBy"] = Id,
+                    ["checkedAt"] = DateTime.UtcNow.ToString("O")
+                }
+            });
+        }
+
+        /// <summary>
+        /// Builds a concise violation summary for geofence rejection reasons.
+        /// </summary>
+        private static string BuildViolationSummary(IReadOnlyList<ComplianceViolation> violations)
+        {
+            if (violations.Count == 0)
+                return "Compliance check failed";
+
+            if (violations.Count == 1)
+                return violations[0].Description;
+
+            var critical = violations.Where(v => v.Severity == ViolationSeverity.Critical).ToList();
+            if (critical.Any())
+                return critical[0].Description;
+
+            var high = violations.Where(v => v.Severity == ViolationSeverity.High).ToList();
+            if (high.Any())
+                return high[0].Description;
+
+            return $"{violations.Count} compliance violations detected";
         }
 
         /// <inheritdoc/>

@@ -78,13 +78,40 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        // Input validation
+        if (inputStream == null || !inputStream.CanRead)
+        {
+            throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
+        }
+
         var outputStream = new MemoryStream(1024 * 1024);
 
+        // Extract segment duration from options (default 6 seconds)
         var segmentDuration = DefaultSegmentDurationSeconds;
+        if (options.CustomMetadata != null &&
+            options.CustomMetadata.TryGetValue("hls_segment_duration", out var segDurStr) &&
+            int.TryParse(segDurStr, out var segDur) &&
+            segDur >= 1 && segDur <= 30)
+        {
+            segmentDuration = segDur;
+        }
+
         var targetResolution = options.TargetResolution ?? Resolution.FullHD;
         var targetBitrateKbps = options.TargetBitrate.HasValue
             ? (int)(options.TargetBitrate.Value.BitsPerSecond / 1000)
             : 5000;
+
+        // Validate resolution
+        if (targetResolution.Width < 64 || targetResolution.Height < 64)
+        {
+            throw new ArgumentException("Target resolution must be at least 64x64 pixels.");
+        }
+
+        // Validate bitrate
+        if (targetBitrateKbps < 100 || targetBitrateKbps > 100_000)
+        {
+            throw new ArgumentException("Target bitrate must be between 100 kbps and 100 Mbps.");
+        }
 
         // Read source bytes for FFmpeg pipe input
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);

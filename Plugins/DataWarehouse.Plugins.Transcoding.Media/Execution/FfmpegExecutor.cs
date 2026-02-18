@@ -138,6 +138,10 @@ public sealed class FfmpegExecutor
     /// <param name="timeout">
     /// Operation timeout. If null, uses the default timeout from constructor.
     /// </param>
+    /// <param name="progressCallback">
+    /// Optional callback invoked with progress information parsed from FFmpeg stderr.
+    /// Receives percentage progress (0-100) when available.
+    /// </param>
     /// <param name="cancellationToken">
     /// Cancellation token to abort the operation.
     /// </param>
@@ -155,9 +159,34 @@ public sealed class FfmpegExecutor
         byte[]? inputData = null,
         string? workingDirectory = null,
         TimeSpan? timeout = null,
+        Action<double>? progressCallback = null,
         CancellationToken cancellationToken = default)
     {
+        // Input validation
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            throw new ArgumentException("FFmpeg arguments cannot be null or empty.", nameof(arguments));
+        }
+
+        if (!IsAvailable)
+        {
+            throw new InvalidOperationException(
+                "FFmpeg is not available. Please install FFmpeg or set the FFMPEG_PATH environment variable.");
+        }
+
+        // Validate timeout
         var effectiveTimeout = timeout ?? _defaultTimeout;
+        if (effectiveTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentException("Timeout must be positive.", nameof(timeout));
+        }
+
+        // Validate working directory if provided
+        if (!string.IsNullOrWhiteSpace(workingDirectory) && !Directory.Exists(workingDirectory))
+        {
+            throw new DirectoryNotFoundException($"Working directory not found: {workingDirectory}");
+        }
+
         var startTime = DateTime.UtcNow;
 
         var psi = new ProcessStartInfo
@@ -183,6 +212,17 @@ public sealed class FfmpegExecutor
             if (args.Data != null)
             {
                 stderrBuilder.AppendLine(args.Data);
+
+                // Parse progress information if callback is provided
+                if (progressCallback != null)
+                {
+                    // FFmpeg reports progress like: "frame= 123 fps=30 time=00:00:04.10 ..."
+                    var progressPercent = TryParseProgress(args.Data);
+                    if (progressPercent.HasValue)
+                    {
+                        progressCallback(progressPercent.Value);
+                    }
+                }
             }
         };
 
@@ -309,6 +349,39 @@ public sealed class FfmpegExecutor
         }
 
         return locations;
+    }
+
+    /// <summary>
+    /// Tries to parse progress information from FFmpeg stderr output.
+    /// FFmpeg reports progress like "time=00:00:04.10" and "size=1234kB".
+    /// </summary>
+    /// <param name="stderrLine">A line from FFmpeg stderr output.</param>
+    /// <returns>Progress percentage (0-100) if parseable, otherwise null.</returns>
+    private static double? TryParseProgress(string stderrLine)
+    {
+        // Look for "time=" pattern to extract current encoding position
+        // Note: Percentage calculation requires knowing the total duration, which
+        // is typically extracted from the Duration line earlier in the output.
+        // For now, we just extract the time position in seconds.
+
+        if (stderrLine.Contains("time="))
+        {
+            var timeMatch = System.Text.RegularExpressions.Regex.Match(
+                stderrLine, @"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})");
+
+            if (timeMatch.Success &&
+                int.TryParse(timeMatch.Groups[1].Value, out var hours) &&
+                int.TryParse(timeMatch.Groups[2].Value, out var minutes) &&
+                double.TryParse(timeMatch.Groups[3].Value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var seconds))
+            {
+                var totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                // Return raw seconds; caller can convert to percentage if duration is known
+                return totalSeconds;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

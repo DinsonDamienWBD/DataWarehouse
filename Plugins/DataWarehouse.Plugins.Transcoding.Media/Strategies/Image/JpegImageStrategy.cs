@@ -92,18 +92,65 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        // Input validation
+        if (inputStream == null || !inputStream.CanRead)
+        {
+            throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
+        }
+
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
+
+        // Validate source data
+        if (sourceBytes.Length == 0)
+        {
+            throw new ArgumentException("Input stream is empty.");
+        }
+
+        if (sourceBytes.Length > 500_000_000) // 500 MB limit for in-memory processing
+        {
+            throw new ArgumentException("Input file is too large for in-memory processing (limit 500 MB). Use streaming mode.");
+        }
+
         var outputStream = new MemoryStream(1024 * 1024);
 
         var quality = DetermineQuality(options);
+
+        // Validate quality range
+        if (quality < MinQuality || quality > MaxQuality)
+        {
+            throw new ArgumentException($"JPEG quality must be between {MinQuality} and {MaxQuality}.");
+        }
         var progressive = options.VideoCodec?.Equals("progressive-jpeg", StringComparison.OrdinalIgnoreCase) ?? false;
 
         // Extract EXIF data from source for preservation
         var exifData = ExtractExifSegment(sourceBytes);
 
-        // Determine target dimensions
+        // Determine target dimensions and operations
         var targetWidth = options.TargetResolution?.Width ?? 0;
         var targetHeight = options.TargetResolution?.Height ?? 0;
+
+        // Extract image manipulation parameters
+        var rotationAngle = 0;
+        var cropRectangle = "";
+        var interpolationMode = "bicubic";
+
+        if (options.CustomMetadata != null)
+        {
+            if (options.CustomMetadata.TryGetValue("rotation", out var rotStr) && int.TryParse(rotStr, out var angle))
+            {
+                rotationAngle = angle % 360;
+            }
+
+            if (options.CustomMetadata.TryGetValue("crop", out var cropStr))
+            {
+                cropRectangle = cropStr; // Format: "x,y,width,height"
+            }
+
+            if (options.CustomMetadata.TryGetValue("interpolation", out var interpStr))
+            {
+                interpolationMode = interpStr; // nearest, bilinear, bicubic, lanczos
+            }
+        }
 
         // Build ImageSharp-compatible processing package
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
@@ -129,10 +176,12 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
         WriteQuantizationTable(writer, 0, luminanceTable);
         WriteQuantizationTable(writer, 1, chrominanceTable);
 
-        // Image processing parameters
-        var paramsBytes = Encoding.UTF8.GetBytes(
-            $"quality={quality};progressive={progressive};resize={targetWidth}x{targetHeight};" +
-            $"subsampling=4:2:0;optimize=true");
+        // Image processing parameters with comprehensive transformations
+        var paramsStr = $"quality={quality};progressive={progressive};resize={targetWidth}x{targetHeight};" +
+                        $"interpolation={interpolationMode};rotation={rotationAngle};crop={cropRectangle};" +
+                        $"subsampling=4:2:0;optimize=true";
+
+        var paramsBytes = Encoding.UTF8.GetBytes(paramsStr);
         writer.Write((byte)0xFF);
         writer.Write((byte)0xFE); // COM marker
         writer.Write((byte)((paramsBytes.Length + 2) >> 8));

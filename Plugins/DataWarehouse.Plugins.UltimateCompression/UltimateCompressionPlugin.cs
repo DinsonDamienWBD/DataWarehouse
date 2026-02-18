@@ -230,9 +230,11 @@ namespace DataWarehouse.Plugins.UltimateCompression
                         _strategies[strategy.Characteristics.AlgorithmName] = strategy;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Strategy failed to instantiate, skip
+                    // Strategy failed to instantiate, log and skip
+                    // Common causes: missing dependencies, abstract classes, invalid constructors
+                    System.Diagnostics.Debug.WriteLine($"Failed to instantiate compression strategy {strategyType.Name}: {ex.Message}");
                 }
             }
         }
