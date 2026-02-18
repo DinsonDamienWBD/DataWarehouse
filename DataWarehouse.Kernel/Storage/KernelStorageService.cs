@@ -108,7 +108,9 @@ public sealed class KernelStorageService : IKernelStorageService
 
         using (stream)
         {
-            using var ms = new MemoryStream();
+            // Pre-allocate capacity if stream length is known
+            var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await stream.CopyToAsync(ms, ct);
             return ms.ToArray();
         }

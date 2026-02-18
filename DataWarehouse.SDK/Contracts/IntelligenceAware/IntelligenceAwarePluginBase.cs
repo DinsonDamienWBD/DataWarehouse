@@ -293,7 +293,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             // Unsubscribe from Intelligence topics
             foreach (var subscription in _intelligenceSubscriptions)
             {
-                try { subscription.Dispose(); } catch { }
+                try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
             }
             _intelligenceSubscriptions.Clear();
 
@@ -392,7 +392,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             }
             catch
             {
-                // Graceful degradation
+                // Graceful degradation - Intelligence subscription failures are non-fatal
             }
         }
 
@@ -1453,7 +1453,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 }
                 catch
                 {
-                    // Fire-and-forget: swallow exceptions to prevent bus disruption
+                    // Fire-and-forget notification: swallow exceptions to prevent bus disruption
                 }
             };
 
@@ -1543,13 +1543,13 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 foreach (var subscription in _intelligenceSubscriptions)
                 {
-                    try { subscription.Dispose(); } catch { }
+                    try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
                 }
                 _intelligenceSubscriptions.Clear();
 
                 foreach (var subscription in _typedHandlerSubscriptions)
                 {
-                    try { subscription.Dispose(); } catch { }
+                    try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }
                 }
                 _typedHandlerSubscriptions.Clear();
                 _pendingHandlers.Clear();

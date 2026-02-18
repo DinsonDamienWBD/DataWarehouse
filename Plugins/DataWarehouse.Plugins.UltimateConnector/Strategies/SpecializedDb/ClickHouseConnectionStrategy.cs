@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch { /* Connection test failed - return false */ return false; }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -105,11 +105,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                         var row = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(line);
                         if (row != null) results.Add(row);
                     }
-                    catch { }
+                    catch { /* Best-effort JSON parsing */ }
                 }
                 return results;
             }
-            catch { return new List<Dictionary<string, object?>>(); }
+            catch { /* Query execution failed - return empty result */ return new List<Dictionary<string, object?>>(); }
         }
 
         public override async Task<int> ExecuteNonQueryAsync(
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var response = await _httpClient.PostAsync("/", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
-            catch { return 0; }
+            catch { /* Non-query execution failed - return 0 */ return 0; }
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
@@ -148,11 +148,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                         if (!tableColumns.ContainsKey(key)) tableColumns[key] = new List<DataSchemaField>();
                         tableColumns[key].Add(new DataSchemaField(col ?? "col", typ ?? "String", true, null, null));
                     }
-                    catch { }
+                    catch { /* Best-effort JSON parsing */ }
                 }
                 return tableColumns.Select(kv => new DataSchema(kv.Key, kv.Value.ToArray(), kv.Value.Count > 0 ? new[] { kv.Value[0].Name } : Array.Empty<string>(), new Dictionary<string, object> { ["engine"] = "MergeTree" })).ToList();
             }
-            catch { return new List<DataSchema>(); }
+            catch { /* Schema discovery failed - return empty list */ return new List<DataSchema>(); }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

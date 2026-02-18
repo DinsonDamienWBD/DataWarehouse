@@ -224,8 +224,10 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
 
         if (doc.IsGridFs && doc.GridFsFileId.HasValue)
         {
-            // Retrieve from GridFS
-            using var ms = new MemoryStream();
+            // Retrieve from GridFS - pre-allocate based on file size
+            var fileInfo = await _gridFsBucket!.Find(Builders<GridFSFileInfo>.Filter.Eq("_id", doc.GridFsFileId.Value)).FirstOrDefaultAsync(ct);
+            var capacity = fileInfo != null ? (int)Math.Min(fileInfo.Length, int.MaxValue) : 0;
+            using var ms = new MemoryStream(capacity);
             await _gridFsBucket!.DownloadToStreamAsync(doc.GridFsFileId.Value, ms, cancellationToken: ct);
             return ms.ToArray();
         }

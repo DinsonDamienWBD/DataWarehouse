@@ -178,7 +178,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 // Close active connection
                 if (_activeConnections.TryRemove(peerId, out var connection))
                 {
-                    try { connection.Close(); } catch { }
+                    try { connection.Close(); } catch { /* Best-effort cleanup */ }
                     connection.Dispose();
                 }
 
@@ -269,7 +269,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 }
                 catch
                 {
-                    // Log and continue accepting
+                    // Best-effort accept - log and continue accepting connections
                 }
             }
         }
@@ -324,11 +324,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
             catch
             {
-                // Log and close connection
+                // Connection handling failed - log and close connection
             }
             finally
             {
-                try { client.Close(); } catch { }
+                try { client.Close(); } catch { /* Best-effort cleanup */ }
                 client.Dispose();
             }
         }
@@ -477,12 +477,12 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             _shutdownCts.Cancel();
 
             // Close listener
-            try { _listener?.Stop(); } catch { }
+            try { _listener?.Stop(); } catch { /* Best-effort cleanup */ }
 
             // Close all active connections
             foreach (var connection in _activeConnections.Values)
             {
-                try { connection.Close(); } catch { }
+                try { connection.Close(); } catch { /* Best-effort cleanup */ }
                 connection.Dispose();
             }
 

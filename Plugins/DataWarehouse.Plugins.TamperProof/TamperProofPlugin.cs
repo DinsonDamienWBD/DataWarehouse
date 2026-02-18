@@ -1070,7 +1070,8 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
     public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
         // Delegate to IntegrityProvider which handles all hashing
-        using var ms = new MemoryStream();
+        var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
+        using var ms = new MemoryStream(capacity);
         await data.CopyToAsync(ms, ct);
         var bytes = ms.ToArray();
         var hash = await _integrity.ComputeHashAsync(bytes, _config.HashAlgorithm, ct);

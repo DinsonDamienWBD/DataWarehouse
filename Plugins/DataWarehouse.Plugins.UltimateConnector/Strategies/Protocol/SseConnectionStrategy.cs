@@ -14,6 +14,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
     /// </summary>
     public class SseConnectionStrategy : ConnectionStrategyBase
     {
+        private static readonly HttpClient _sharedTestClient = new HttpClient();
+
         /// <inheritdoc/>
         public override string StrategyId => "sse";
 
@@ -73,8 +75,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         {
             var client = handle.GetConnection<HttpClient>();
             var baseUri = client.BaseAddress?.ToString() ?? string.Empty;
-            using var testClient = new HttpClient();
-            var response = await testClient.GetAsync(baseUri, ct);
+            var response = await _sharedTestClient.GetAsync(baseUri, ct);
             return response.IsSuccessStatusCode;
         }
 

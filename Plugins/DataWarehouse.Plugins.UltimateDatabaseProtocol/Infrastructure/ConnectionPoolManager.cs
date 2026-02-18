@@ -627,7 +627,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             if (_disposed) return;
             _disposed = true;
 
-            ClearAsync().GetAwaiter().GetResult();
+            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            Task.Run(() => ClearAsync()).GetAwaiter().GetResult();
             _acquireSemaphore.Dispose();
             _createLock.Dispose();
         }
