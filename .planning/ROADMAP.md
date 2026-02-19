@@ -1244,3 +1244,28 @@ Plans:
   6. RansomwareVaccinationService orchestrating time-locks + integrity + PQC signatures + blockchain anchoring
   7. Full solution builds with 0 errors, all tests pass
   8. Existing ML-KEM, hybrid strategies unchanged in behavior (metadata-only updates)
+
+#### Phase 60: Semantic Sync Protocol
+**Goal**: Build AI-driven edge-cloud synchronization that understands data MEANING. Local inference decides what to sync, when, and at what fidelity. Summary-vs-raw routing for bandwidth optimization. Semantic conflict resolution based on meaning, not timestamps.
+**Depends on**: Existing UltimateEdgeComputing (federated learning), AdaptiveTransport (bandwidth monitoring), UltimateReplication (conflict resolution base), SDK AI contracts (IAIProvider)
+**Plans**: 8 plans in 4 waves
+
+Plans:
+- [ ] 60-01-PLAN.md — SDK contracts: ISemanticClassifier, ISyncFidelityController, ISummaryRouter, ISemanticConflictResolver, models, strategy base
+- [ ] 60-02-PLAN.md — SemanticSync plugin project and plugin shell class
+- [ ] 60-03-PLAN.md — Semantic classification engine: embedding, rule-based, and hybrid classifiers
+- [ ] 60-04-PLAN.md — Summary-vs-raw router: bandwidth-aware routing, summary generation, fidelity downsampling
+- [ ] 60-05-PLAN.md — Semantic conflict resolution: embedding similarity detection, classification engine, semantic merge resolver
+- [ ] 60-06-PLAN.md — Bandwidth-aware fidelity controller: adaptive fidelity, budget tracking, policy enforcement
+- [ ] 60-07-PLAN.md — Edge inference integration: local model manager, inference coordinator, federated sync learner
+- [ ] 60-08-PLAN.md — Plugin wiring: orchestration pipeline, message bus integration, full strategy registration
+
+**Success Criteria**:
+  1. SemanticSync plugin compiles and registers with kernel
+  2. 3 classifiers (embedding, rule-based, hybrid) produce SemanticClassification with importance and confidence
+  3. Summary router makes deterministic decisions across 20 importance x bandwidth combinations
+  4. Semantic conflict resolver handles 5 conflict types with real JSON merge logic
+  5. Adaptive fidelity controller enforces policy minimums for critical/compliance data
+  6. Edge inference works offline with local models, improves via federated learning
+  7. End-to-end pipeline processes classify -> fidelity -> route -> sync -> conflict-resolve
+  8. Full solution builds with 0 errors
