@@ -1086,7 +1086,7 @@ Plans:
 - [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
 - [ ] **Phase 62: Carbon-Aware Lifecycle Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting. **Plans:** 6 plans in 4 waves
-- [ ] **Phase 63: Universal Fabric + S3 Server** (P4) — dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring
+- [ ] **Phase 63: Universal Fabric + S3 Server** (P4) � dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring. **Plans:** 15 plans in 5 waves
 - [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, verify cross-feature interactions
 - [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
 - [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing
@@ -1316,3 +1316,36 @@ Plans:
   6. Cold data auto-migrates to lowest-carbon backend during low-carbon windows
   7. GHG Protocol Scope 2+3 reports generate with correct emission factors
   8. Full solution builds with 0 errors, all carbon-aware tests pass
+
+#### Phase 63: Universal Fabric + S3 Server
+**Goal**: Create the dw:// namespace exposing all 130+ storage backends through a unified addressing scheme, PLUS an S3-compatible server endpoint making DataWarehouse a drop-in MinIO/S3 replacement. Add cross-language client SDKs (Python, Go, Rust, Java). Wire real cloud SDK NuGet dependencies.
+**Depends on**: Existing StorageAddress (Phase 32), IObjectStorageCore, IStorageStrategy, UltimateStorage 130+ strategies
+**Plans**: 15 plans in 5 waves
+
+Plans:
+- [ ] 63-01-PLAN.md — dw:// namespace StorageAddress variants and parser
+- [ ] 63-02-PLAN.md — SDK fabric contracts: IStorageFabric, IBackendRegistry, BackendDescriptor
+- [ ] 63-03-PLAN.md — SDK S3 server contracts: IS3CompatibleServer, S3Types, IS3AuthProvider
+- [ ] 63-04-PLAN.md — UniversalFabric plugin: backend registry, address router, IStorageFabric impl
+- [ ] 63-05-PLAN.md — Automatic Placement Optimizer: rules, scoring, tag-based selection
+- [ ] 63-06-PLAN.md — S3-compatible HTTP server: request parser, response writer, full dispatch
+- [ ] 63-07-PLAN.md — S3 auth (AWS Signature V4) and bucket manager
+- [ ] 63-08-PLAN.md — Backend Abstraction Layer: retry, fallback, error normalization, circuit breaker
+- [ ] 63-09-PLAN.md — Live Backend Migration engine: streaming, pause/resume, verification
+- [ ] 63-10-PLAN.md — Real cloud SDK wiring: AWSSDK.S3, Azure.Storage.Blobs, Google.Cloud.Storage.V1
+- [ ] 63-11-PLAN.md — Python client SDK (dw:// + S3-compatible via boto3)
+- [ ] 63-12-PLAN.md — Go client SDK (dw:// + S3-compatible via aws-sdk-go-v2)
+- [ ] 63-13-PLAN.md — Rust client SDK (dw:// + S3-compatible via aws-sdk-s3)
+- [ ] 63-14-PLAN.md — Java client SDK (dw:// + S3-compatible via AWS SDK v2)
+- [ ] 63-15-PLAN.md — Solution integration and full build verification
+
+**Success Criteria**:
+  1. dw:// URIs parse into typed StorageAddress variants (bucket, node, cluster)
+  2. UniversalFabric plugin routes dw:// addresses to correct backends
+  3. S3-compatible server handles ListBuckets, Get/Put/Delete/Head/ListObjects, multipart, presigned URLs
+  4. AWS Signature V4 authentication verified with constant-time comparison
+  5. Placement optimizer selects backends by tags, tier, region, capacity, cost
+  6. Live migration streams data between backends without downtime
+  7. AWSSDK.S3, Azure.Storage.Blobs, Google.Cloud.Storage.V1 are real NuGet deps
+  8. Python, Go, Rust, Java clients connect and operate via S3 protocol
+  9. Full solution builds with 0 errors
