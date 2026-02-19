@@ -1086,9 +1086,9 @@ Plans:
 - [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
 - [ ] **Phase 62: Carbon-Aware Lifecycle Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting. **Plans:** 6 plans in 4 waves
-- [ ] **Phase 63: Universal Fabric + S3 Server** (P4) � dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring. **Plans:** 15 plans in 5 waves
+- [ ] **Phase 63: Universal Fabric + S3 Server** (P4) � dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring. **Plans:** 15 plans in 5 waves
 - [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, cross-moonshot orchestration pipeline, unified dashboard, health probes, configuration hierarchy. **Plans:** 7 plans in 4 waves
-- [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
+- [ ] **Phase 65: Infrastructure** (P5) -- SQL query engine (parser/planner/columnar/federated), performance engineering (12 Phase 46 fixes), security 91->100 (SIEM/SBOM/SLSA/cloud KMS), GPU completeness (10 APIs), dynamic API gen (gRPC/GraphQL/OpenAPI), web console (Blazor), test coverage 80%+, user configurability. **Plans:** 18 plans in 3 waves
 - [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full independent audit, hostile certification, competitive re-analysis, benchmarks, 20+ E2E flow traces. **Plans:** 7 plans in 4 waves
 
@@ -1414,6 +1414,47 @@ Wave 4 (Verification — depends on all):
   7. Cross-moonshot event wiring: consciousness->tags, sovereignty->compliance, carbon->placement, compliance->timelocks, chaos->sovereignty, placement->fabric
   8. 30+ integration tests pass covering pipeline, config, health, and wiring
   9. Full solution builds with 0 errors, all tests pass
+
+#### Phase 65: Infrastructure -- Query Engine, Performance, Tests, Security, GPU, Dynamic Capability, UI
+**Goal**: Build supporting infrastructure: SQL query engine, performance engineering, test coverage expansion, security posture completion (91->100), GPU/accelerator completeness, dynamic capability wiring, web management console, user configurability.
+**Depends on**: Phases 52-64 (all v5.0 feature implementation complete)
+**Plans**: 18 plans in 3 waves
+
+Wave 1 (Independent work -- all parallel, 12 plans):
+- [ ] 65-01-PLAN.md -- SQL parser: tokenizer + recursive-descent parser + AST node hierarchy
+- [ ] 65-06-PLAN.md -- Performance batch 1: Brotli Q6, SWIM caching, connection pooling, UDP congestion
+- [ ] 65-07-PLAN.md -- Performance batch 2: PNG compression, VDE concurrency, Raft persistence, Multi-Raft
+- [ ] 65-08-PLAN.md -- Performance batch 3: ORSet GC, CRDT source-gen, Raft lock reduction, production auto-scaler
+- [ ] 65-09-PLAN.md -- Security: SIEM transport bridge + incident response containment actions
+- [ ] 65-10-PLAN.md -- Security: SBOM generation (CycloneDX/SPDX) + dependency vulnerability scanning
+- [ ] 65-12-PLAN.md -- GPU batch 1: OpenCL, SYCL, Triton, CANN interop
+- [ ] 65-13-PLAN.md -- GPU batch 2: Vulkan, Metal, WebGPU, WASI-NN interop
+- [ ] 65-14-PLAN.md -- Dynamic API gen: OpenAPI, gRPC .proto, GraphQL SDL, WebSocket channels
+- [ ] 65-16-PLAN.md -- Test coverage: SDK base classes, distributed, security (180+ tests)
+- [ ] 65-18-PLAN.md -- User configurability: Instance/Tenant/User hierarchy, feature toggles
+
+Wave 2 (Depends on Wave 1, 5 plans):
+- [ ] 65-02-PLAN.md -- Cost-based query planner (depends on 65-01 parser)
+- [ ] 65-03-PLAN.md -- Columnar storage engine + Parquet writer (depends on 65-01)
+- [ ] 65-11-PLAN.md -- Cloud KMS (GCP ADC + AWS) + SLSA Level 3 (depends on 65-09, 65-10)
+- [ ] 65-15-PLAN.md -- Web console: 5 Blazor pages (depends on 65-14 API gen)
+- [ ] 65-17-PLAN.md -- Plugin smoke tests + integration tests (depends on 65-16)
+
+Wave 3 (Depends on Waves 1-2, 2 plans):
+- [ ] 65-04-PLAN.md -- Query execution engine + tag-aware queries + SqlOverObject integration (depends on 65-01, 65-02, 65-03)
+- [ ] 65-05-PLAN.md -- Federated query engine (depends on 65-01, 65-02)
+
+**Success Criteria**:
+  1. SQL queries execute end-to-end: parse -> plan -> optimize -> columnar execute -> results
+  2. Federated queries span multiple storage backends with cost-based routing
+  3. All 12 Phase 46 performance findings resolved
+  4. Security score reaches 100/100 (SIEM, SBOM, SLSA, cloud KMS)
+  5. 10 GPU/accelerator APIs supported (CUDA, ROCm, OpenCL, SYCL, Triton, CANN, Vulkan, Metal, WebGPU, WASI-NN)
+  6. Dynamic API generation produces OpenAPI/gRPC/GraphQL/WebSocket from plugin capabilities
+  7. Web console has 5 functional Blazor pages
+  8. Test count exceeds 1500 (from 1062 baseline)
+  9. User configuration hierarchy (Instance/Tenant/User) with AllowUserToOverride
+  10. Full solution builds with 0 errors, all tests pass
 
 #### Phase 67: v5.0 Final Audit & Certification
 **Goal**: Full independent audit of the complete v5.0 codebase. Hostile certification. Competitive re-analysis. Published auditable results. First target: CERTIFIED (zero conditions). Second target: Find valid reasons for NOT certifying.
