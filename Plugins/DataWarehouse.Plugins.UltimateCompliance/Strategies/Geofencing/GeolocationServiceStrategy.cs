@@ -220,6 +220,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("geolocation_service.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -411,7 +412,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             public required GeolocationResult Location { get; init; }
             public required DateTime ExpiresAt { get; init; }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("geolocation_service.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("geolocation_service.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Result of a geolocation lookup.

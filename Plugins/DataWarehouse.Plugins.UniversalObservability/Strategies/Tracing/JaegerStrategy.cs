@@ -38,6 +38,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("jaeger.traces_sent");
         // Build Jaeger Thrift format batch
         var batch = new
         {
@@ -119,6 +120,31 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["collectorUrl"] = _collectorUrl, ["serviceName"] = _serviceName });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Jaeger health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_collectorUrl) || (!_collectorUrl.StartsWith("http://") && !_collectorUrl.StartsWith("https://")))
+            throw new InvalidOperationException("JaegerStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("jaeger.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("jaeger.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

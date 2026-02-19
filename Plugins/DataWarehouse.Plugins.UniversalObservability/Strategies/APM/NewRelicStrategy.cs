@@ -44,6 +44,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("new_relic.metrics_sent");
         var metricPayload = new[]
         {
             new
@@ -67,6 +68,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("new_relic.traces_sent");
         var tracePayload = new[]
         {
             new
@@ -96,6 +98,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("new_relic.logs_sent");
         var logPayload = new[]
         {
             new
@@ -131,6 +134,30 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["region"] = _region, ["accountId"] = _accountId });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"New Relic health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("new_relic.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("new_relic.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

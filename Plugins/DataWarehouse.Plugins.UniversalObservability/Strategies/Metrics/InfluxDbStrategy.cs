@@ -61,6 +61,7 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("influx_db.metrics_sent");
         var lineProtocol = new StringBuilder();
 
         foreach (var metric in metrics)
@@ -216,6 +217,31 @@ from(bucket: ""{_bucket}"")
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_url) || (!_url.StartsWith("http://") && !_url.StartsWith("https://")))
+            throw new InvalidOperationException("InfluxDbStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("influx_db.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("influx_db.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

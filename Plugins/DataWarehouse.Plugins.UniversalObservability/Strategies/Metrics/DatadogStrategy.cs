@@ -62,6 +62,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("datadog.metrics_sent");
         var series = new List<object>();
 
         foreach (var metric in metrics)
@@ -102,6 +103,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("datadog.traces_sent");
         var traces = new List<List<object>>();
         var traceGroups = spans.GroupBy(s => s.TraceId);
 
@@ -151,6 +153,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("datadog.logs_sent");
         var logs = new List<object>();
 
         foreach (var entry in logEntries)
@@ -242,6 +245,30 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("datadog.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("datadog.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

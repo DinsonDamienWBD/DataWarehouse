@@ -59,6 +59,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("policy_enforcement.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
             var enforcedPolicies = new List<string>();
@@ -345,7 +346,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             public required DateTime Timestamp { get; init; }
             public required EnforcementMode EnforcementMode { get; init; }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("policy_enforcement.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("policy_enforcement.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Enforcement mode for policy automation.

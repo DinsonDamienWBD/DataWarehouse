@@ -60,6 +60,7 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("prometheus.metrics_sent");
         var metricsText = new StringBuilder();
 
         foreach (var metric in metrics)
@@ -260,6 +261,31 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_pushGatewayUrl) || (!_pushGatewayUrl.StartsWith("http://") && !_pushGatewayUrl.StartsWith("https://")))
+            throw new InvalidOperationException("PrometheusStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("prometheus.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("prometheus.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

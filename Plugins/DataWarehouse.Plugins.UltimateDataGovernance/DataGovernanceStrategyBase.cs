@@ -52,15 +52,76 @@ public interface IDataGovernanceStrategy
 
 /// <summary>
 /// Base class for data governance strategies.
+/// Provides production infrastructure: lifecycle management, health checks, counters, graceful shutdown.
 /// </summary>
 public abstract class DataGovernanceStrategyBase : IDataGovernanceStrategy
 {
+    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private bool _initialized;
+    private bool _disposed;
+    private DateTime? _healthCacheExpiry;
+    private HealthStatus? _cachedHealth;
+
     public abstract string StrategyId { get; }
     public abstract string DisplayName { get; }
     public abstract GovernanceCategory Category { get; }
     public abstract DataGovernanceCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
+
+    /// <summary>Gets whether this strategy has been initialized.</summary>
+    public bool IsInitialized => _initialized;
+
+    /// <summary>Initializes the strategy. Idempotent.</summary>
+    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        if (_initialized) return Task.CompletedTask;
+        _initialized = true;
+        IncrementCounter("initialized");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Shuts down the strategy gracefully.</summary>
+    public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_initialized) return Task.CompletedTask;
+        _initialized = false;
+        IncrementCounter("shutdown");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Gets a cached health status, refreshing every 60 seconds.</summary>
+    public HealthStatus GetHealth()
+    {
+        if (_cachedHealth.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+            return _cachedHealth.Value;
+
+        _cachedHealth = _initialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
+        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
+        return _cachedHealth.Value;
+    }
+
+    /// <summary>Increments a named counter. Thread-safe.</summary>
+    protected void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+    }
+
+    /// <summary>Gets all counter values.</summary>
+    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
+}
+
+/// <summary>Health status for governance strategies.</summary>
+public enum HealthStatus
+{
+    /// <summary>Strategy is healthy and operational.</summary>
+    Healthy,
+    /// <summary>Strategy has not been initialized.</summary>
+    NotInitialized,
+    /// <summary>Strategy is degraded.</summary>
+    Degraded,
+    /// <summary>Strategy is unhealthy.</summary>
+    Unhealthy
 }
 
 /// <summary>

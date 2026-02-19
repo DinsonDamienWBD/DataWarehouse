@@ -43,6 +43,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("open_telemetry.metrics_sent");
         var otlpMetrics = new
         {
             resourceMetrics = new[]
@@ -95,6 +96,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("open_telemetry.traces_sent");
         var otlpTraces = new
         {
             resourceSpans = new[]
@@ -138,6 +140,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("open_telemetry.logs_sent");
         var otlpLogs = new
         {
             resourceLogs = new[]
@@ -211,6 +214,31 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["endpoint"] = _otlpEndpoint, ["service"] = _serviceName });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"OpenTelemetry health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_otlpEndpoint) || (!_otlpEndpoint.StartsWith("http://") && !_otlpEndpoint.StartsWith("https://")))
+            throw new InvalidOperationException("OpenTelemetryStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("open_telemetry.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("open_telemetry.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

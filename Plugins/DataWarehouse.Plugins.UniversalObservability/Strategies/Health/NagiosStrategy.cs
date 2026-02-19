@@ -89,6 +89,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("nagios.metrics_sent");
         foreach (var metric in metrics)
         {
             var status = DetermineStatus(metric);
@@ -112,6 +113,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("nagios.logs_sent");
         foreach (var entry in logEntries.Where(e => e.Level >= LogLevel.Warning))
         {
             var status = entry.Level switch
@@ -136,6 +138,31 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["url"] = _nagiosUrl, ["hostname"] = _hostname });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Nagios health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_nagiosUrl) || (!_nagiosUrl.StartsWith("http://") && !_nagiosUrl.StartsWith("https://")))
+            throw new InvalidOperationException("NagiosStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("nagios.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("nagios.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

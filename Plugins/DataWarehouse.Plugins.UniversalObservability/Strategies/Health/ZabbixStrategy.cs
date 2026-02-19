@@ -153,6 +153,7 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("zabbix.metrics_sent");
         var items = metrics.Select(m =>
         {
             var key = $"datawarehouse.{m.Name.Replace(".", "_").Replace("-", "_")}";
@@ -167,6 +168,7 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("zabbix.logs_sent");
         var items = logEntries.Where(e => e.Level >= LogLevel.Warning).Select(e =>
         {
             var severity = e.Level switch
@@ -195,6 +197,31 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["url"] = _apiUrl, ["version"] = version ?? "unknown" });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Zabbix health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_apiUrl) || (!_apiUrl.StartsWith("http://") && !_apiUrl.StartsWith("https://")))
+            throw new InvalidOperationException("ZabbixStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("zabbix.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("zabbix.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

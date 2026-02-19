@@ -176,6 +176,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("data_anonymization.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -591,7 +592,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             var cities = new[] { "Anytown", "Springfield", "Riverside" };
             return $"{Random.Shared.Next(100, 999)} {streets[Random.Shared.Next(streets.Length)]}, {cities[Random.Shared.Next(cities.Length)]}";
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_anonymization.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_anonymization.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     #region Types
 

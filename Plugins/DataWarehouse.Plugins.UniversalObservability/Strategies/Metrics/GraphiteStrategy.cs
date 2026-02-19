@@ -56,6 +56,7 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("graphite.metrics_sent");
         await EnsureConnectedAsync(cancellationToken);
 
         var sb = new StringBuilder();
@@ -178,6 +179,23 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("graphite.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("graphite.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

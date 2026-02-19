@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("sec17a4_worm.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify non-rewritable storage
@@ -181,5 +182,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
             return recommendations;
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("sec17a4_worm.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("sec17a4_worm.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 }

@@ -53,6 +53,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("victoria_metrics.metrics_sent");
         // Victoria Metrics supports multiple import formats
         // Using Prometheus exposition format for compatibility
         await ImportPrometheusFormatAsync(metrics, cancellationToken);
@@ -237,6 +238,31 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_url) || (!_url.StartsWith("http://") && !_url.StartsWith("https://")))
+            throw new InvalidOperationException("VictoriaMetricsStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("victoria_metrics.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("victoria_metrics.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

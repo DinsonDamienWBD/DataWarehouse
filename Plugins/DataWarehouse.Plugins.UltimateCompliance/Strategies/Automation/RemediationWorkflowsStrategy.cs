@@ -60,6 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("remediation_workflows.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -406,7 +407,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private bool HasAccessControl(ComplianceContext context) =>
             context.Attributes.ContainsKey("AccessControl");
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("remediation_workflows.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("remediation_workflows.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Represents a remediation workflow.

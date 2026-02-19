@@ -223,6 +223,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("region_registry.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -575,7 +576,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 return null;
             }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("region_registry.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("region_registry.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Defines a geographic or regulatory region.

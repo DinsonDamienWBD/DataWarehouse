@@ -109,6 +109,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("alert_manager.logs_sent");
         var alerts = logEntries.Where(e => e.Level >= LogLevel.Error).Select(e => new Alert
         {
             AlertName = "datawarehouse_error",
@@ -131,6 +132,31 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["url"] = _url });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"AlertManager health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_url) || (!_url.StartsWith("http://") && !_url.StartsWith("https://")))
+            throw new InvalidOperationException("AlertManagerStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("alert_manager.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("alert_manager.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

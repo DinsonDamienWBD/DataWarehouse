@@ -41,6 +41,7 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("graylog.logs_sent");
         foreach (var entry in logEntries)
         {
             var gelfMessage = new Dictionary<string, object>
@@ -124,6 +125,31 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["url"] = _gelfHttpUrl });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Graylog health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_gelfHttpUrl) || (!_gelfHttpUrl.StartsWith("http://") && !_gelfHttpUrl.StartsWith("https://")))
+            throw new InvalidOperationException("GraylogStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("graylog.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("graylog.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

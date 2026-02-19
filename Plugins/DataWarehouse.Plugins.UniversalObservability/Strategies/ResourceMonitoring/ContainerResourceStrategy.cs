@@ -470,6 +470,7 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("container_resource.metrics_sent");
         // Combine with container-collected metrics
         var containerMetrics = await CollectContainerMetricsAsync(cancellationToken);
         // Both sets of metrics would be forwarded to configured backend
@@ -485,6 +486,7 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("container_resource.logs_sent");
         // Could log resource alerts
         return Task.CompletedTask;
     }
@@ -516,6 +518,31 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_kubeletUrl) || (!_kubeletUrl.StartsWith("http://") && !_kubeletUrl.StartsWith("https://")))
+            throw new InvalidOperationException("ContainerResourceStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("container_resource.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("container_resource.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

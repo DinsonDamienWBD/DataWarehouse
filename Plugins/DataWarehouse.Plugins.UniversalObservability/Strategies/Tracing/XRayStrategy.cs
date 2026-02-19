@@ -39,6 +39,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("x_ray.traces_sent");
         var segments = new List<string>();
 
         foreach (var span in spans)
@@ -152,6 +153,30 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
         return Task.FromResult(new HealthCheckResult(!string.IsNullOrEmpty(_accessKeyId),
             !string.IsNullOrEmpty(_accessKeyId) ? "X-Ray configured" : "X-Ray not configured",
             new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName }));
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("x_ray.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("x_ray.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

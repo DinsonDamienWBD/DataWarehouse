@@ -17,6 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("privacy_preserving_audit.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -72,5 +73,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 Recommendations = recommendations
             });
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("privacy_preserving_audit.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("privacy_preserving_audit.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 }

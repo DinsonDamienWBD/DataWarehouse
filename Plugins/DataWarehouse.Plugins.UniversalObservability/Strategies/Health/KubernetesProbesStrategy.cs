@@ -174,6 +174,7 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
 
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken ct)
     {
+        IncrementCounter("kubernetes_probes.metrics_sent");
         // Update health checks based on metrics
         foreach (var metric in metrics.Where(m => m.Name.Contains("health", StringComparison.OrdinalIgnoreCase)))
         {
@@ -187,6 +188,7 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
 
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("kubernetes_probes.logs_sent");
         // If critical errors, set liveness to false
         if (logEntries.Any(e => e.Level == LogLevel.Critical))
         {
@@ -212,6 +214,23 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
                 ["started"] = _isStarted,
                 ["checksCount"] = _healthChecks.Count
             }));
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("kubernetes_probes.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("kubernetes_probes.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing)

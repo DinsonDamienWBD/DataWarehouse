@@ -63,6 +63,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("elastic_apm.metrics_sent");
         var metricsets = new List<object>();
 
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000; // microseconds
@@ -93,6 +94,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("elastic_apm.traces_sent");
         var events = new List<object>();
 
         // Group spans by trace to create transactions and spans
@@ -217,6 +219,31 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_serverUrl) || (!_serverUrl.StartsWith("http://") && !_serverUrl.StartsWith("https://")))
+            throw new InvalidOperationException("ElasticApmStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("elastic_apm.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("elastic_apm.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

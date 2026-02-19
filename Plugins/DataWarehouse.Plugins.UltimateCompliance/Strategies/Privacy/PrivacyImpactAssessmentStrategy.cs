@@ -607,6 +607,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("privacy_impact_assessment.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -801,7 +802,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             _riskCategories["discrimination"] = new RiskCategory { CategoryId = "discrimination", Name = "Discrimination", Description = "Risk of discriminatory outcomes" };
             _riskCategories["surveillance"] = new RiskCategory { CategoryId = "surveillance", Name = "Surveillance", Description = "Risk of intrusive monitoring" };
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("privacy_impact_assessment.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("privacy_impact_assessment.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     #region Types
 

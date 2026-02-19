@@ -61,6 +61,7 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("azure_monitor.metrics_sent");
         // Send metrics to Application Insights if configured
         if (!string.IsNullOrEmpty(_instrumentationKey))
         {
@@ -134,6 +135,7 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("azure_monitor.traces_sent");
         if (string.IsNullOrEmpty(_instrumentationKey))
             throw new InvalidOperationException("Application Insights instrumentation key required for tracing");
 
@@ -212,6 +214,7 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("azure_monitor.logs_sent");
         var logs = logEntries.Select(entry => new Dictionary<string, object>
         {
             ["TimeGenerated"] = entry.Timestamp.ToString("o"),
@@ -298,6 +301,30 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("azure_monitor.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("azure_monitor.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

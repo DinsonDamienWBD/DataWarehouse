@@ -56,6 +56,7 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("sentry.metrics_sent");
         // Convert metrics to Sentry measurements
         var measurements = metrics.ToDictionary(
             m => m.Name,
@@ -77,6 +78,7 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("sentry.traces_sent");
         foreach (var span in spans)
         {
             var transaction = new
@@ -109,6 +111,7 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("sentry.logs_sent");
         foreach (var log in logEntries)
         {
             // Only send errors and critical logs to Sentry
@@ -262,6 +265,30 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("sentry.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("sentry.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

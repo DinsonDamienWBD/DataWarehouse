@@ -204,7 +204,10 @@ public abstract class LineageStrategyBase : ILineageStrategy
     protected readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
     protected readonly ConcurrentDictionary<string, LineageEdge> _edges = new();
     protected readonly ConcurrentDictionary<string, List<ProvenanceRecord>> _provenance = new();
+    private readonly ConcurrentDictionary<string, long> _counters = new();
     private bool _initialized;
+    private DateTime? _healthCacheExpiry;
+    private bool? _cachedHealthy;
 
     /// <inheritdoc/>
     public abstract string StrategyId { get; }
@@ -228,6 +231,7 @@ public abstract class LineageStrategyBase : ILineageStrategy
         if (_initialized) return;
         await InitializeCoreAsync(ct);
         _initialized = true;
+        IncrementCounter("initialized");
     }
 
     /// <inheritdoc/>
@@ -356,6 +360,25 @@ public abstract class LineageStrategyBase : ILineageStrategy
             ImpactScore = Math.Min(score, 100)
         });
     }
+
+    /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
+    public bool IsHealthy()
+    {
+        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+            return _cachedHealthy.Value;
+        _cachedHealthy = _initialized;
+        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
+        return _cachedHealthy.Value;
+    }
+
+    /// <summary>Increments a named counter. Thread-safe.</summary>
+    protected void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+    }
+
+    /// <summary>Gets all counter values.</summary>
+    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
 
     /// <summary>Adds a node to the lineage graph.</summary>
     protected void AddNode(LineageNode node) => _nodes[node.NodeId] = node;

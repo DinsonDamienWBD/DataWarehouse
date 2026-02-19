@@ -301,6 +301,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("linkerd.metrics_sent");
         var proxyMetrics = await CollectProxyMetricsAsync(cancellationToken);
         // Both sets would be forwarded
         await Task.CompletedTask;
@@ -309,6 +310,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("linkerd.traces_sent");
         // Linkerd automatically propagates trace headers via proxy
         return Task.CompletedTask;
     }
@@ -316,6 +318,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("linkerd.logs_sent");
         // Log entries are forwarded; mesh context added by proxy
         return Task.CompletedTask;
     }
@@ -346,6 +349,31 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_vizUrl) || (!_vizUrl.StartsWith("http://") && !_vizUrl.StartsWith("https://")))
+            throw new InvalidOperationException("LinkerdStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("linkerd.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("linkerd.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

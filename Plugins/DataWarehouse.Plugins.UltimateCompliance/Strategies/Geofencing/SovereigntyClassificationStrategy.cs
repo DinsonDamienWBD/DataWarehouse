@@ -193,6 +193,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             ComplianceContext context,
             CancellationToken cancellationToken)
         {
+        IncrementCounter("sovereignty_classification.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -562,7 +563,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             public required SovereigntyClassification Classification { get; init; }
             public required DateTime ExpiresAt { get; init; }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("sovereignty_classification.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("sovereignty_classification.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Input for sovereignty classification.

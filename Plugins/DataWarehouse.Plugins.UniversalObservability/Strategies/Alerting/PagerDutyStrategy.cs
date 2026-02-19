@@ -93,6 +93,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("pager_duty.logs_sent");
         // Convert error/critical logs to alerts
         foreach (var entry in logEntries.Where(e => e.Level >= LogLevel.Error))
         {
@@ -132,6 +133,30 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["hasRoutingKey"] = !string.IsNullOrEmpty(_routingKey) });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"PagerDuty health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("pager_duty.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("pager_duty.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

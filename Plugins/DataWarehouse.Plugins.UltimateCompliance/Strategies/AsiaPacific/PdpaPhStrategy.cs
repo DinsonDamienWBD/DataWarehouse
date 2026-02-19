@@ -17,6 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("pdpa_ph.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -88,5 +89,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
                 Recommendations = recommendations
             });
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("pdpa_ph.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("pdpa_ph.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 }

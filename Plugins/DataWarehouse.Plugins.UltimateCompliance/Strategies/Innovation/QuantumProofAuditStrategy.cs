@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("quantum_proof_audit.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify post-quantum signature algorithm
@@ -182,5 +183,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             return recommendations;
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("quantum_proof_audit.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("quantum_proof_audit.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 }

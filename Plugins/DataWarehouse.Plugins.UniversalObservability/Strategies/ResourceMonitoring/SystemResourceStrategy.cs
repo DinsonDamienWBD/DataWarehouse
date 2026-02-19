@@ -286,6 +286,7 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("system_resource.metrics_sent");
         // Store externally provided metrics alongside collected ones
         lock (_metricsLock)
         {
@@ -303,6 +304,7 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("system_resource.logs_sent");
         // Log threshold violations
         var violations = CheckThresholds();
         // Violations would be logged to configured logging backend
@@ -331,6 +333,23 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("system_resource.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("system_resource.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

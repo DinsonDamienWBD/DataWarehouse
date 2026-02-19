@@ -56,6 +56,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("sumo_logic.metrics_sent");
         // Sumo Logic accepts metrics as log events with specific format
         var metricLogs = metrics.Select(m => new
         {
@@ -81,6 +82,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("sumo_logic.logs_sent");
         var logs = logEntries.Select(log => new
         {
             timestamp = log.Timestamp.ToUnixTimeMilliseconds(),
@@ -199,6 +201,31 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_collectorUrl) || (!_collectorUrl.StartsWith("http://") && !_collectorUrl.StartsWith("https://")))
+            throw new InvalidOperationException("SumoLogicStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("sumo_logic.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("sumo_logic.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

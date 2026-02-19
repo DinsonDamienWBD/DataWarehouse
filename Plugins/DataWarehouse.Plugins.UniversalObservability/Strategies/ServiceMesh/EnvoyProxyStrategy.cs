@@ -327,6 +327,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("envoy_proxy.metrics_sent");
         var envoyMetrics = await CollectMetricsAsync(cancellationToken);
         // Combine and forward
         await Task.CompletedTask;
@@ -335,6 +336,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("envoy_proxy.traces_sent");
         // Envoy handles trace header propagation
         return Task.CompletedTask;
     }
@@ -342,6 +344,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("envoy_proxy.logs_sent");
         // Envoy access logs are typically configured separately
         return Task.CompletedTask;
     }
@@ -371,6 +374,31 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_adminUrl) || (!_adminUrl.StartsWith("http://") && !_adminUrl.StartsWith("https://")))
+            throw new InvalidOperationException("EnvoyProxyStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("envoy_proxy.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("envoy_proxy.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

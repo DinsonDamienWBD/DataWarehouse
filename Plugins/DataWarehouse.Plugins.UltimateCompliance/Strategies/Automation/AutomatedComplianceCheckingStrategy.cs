@@ -73,6 +73,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("automated_compliance_checking.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
             var checkedFrameworks = new HashSet<string>();
@@ -345,7 +346,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             public string? Remediation { get; init; }
             public List<string>? Recommendations { get; init; }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("automated_compliance_checking.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("automated_compliance_checking.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Represents a compliance rule for automated checking.

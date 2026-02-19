@@ -66,6 +66,7 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("app_dynamics.metrics_sent");
         await EnsureAuthenticatedAsync(cancellationToken);
 
         foreach (var metric in metrics)
@@ -87,6 +88,7 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("app_dynamics.traces_sent");
         await EnsureAuthenticatedAsync(cancellationToken);
 
         // AppDynamics uses its own agent for tracing, but we can report custom events
@@ -129,6 +131,31 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["controllerUrl"] = _controllerUrl, ["application"] = _applicationName });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"AppDynamics health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_controllerUrl) || (!_controllerUrl.StartsWith("http://") && !_controllerUrl.StartsWith("https://")))
+            throw new InvalidOperationException("AppDynamicsStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("app_dynamics.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("app_dynamics.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

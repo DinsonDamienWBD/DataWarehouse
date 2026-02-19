@@ -103,6 +103,7 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("ops_genie.logs_sent");
         foreach (var entry in logEntries.Where(e => e.Level >= LogLevel.Error))
         {
             var priority = entry.Level == LogLevel.Critical ? "P1" : entry.Level == LogLevel.Error ? "P2" : "P3";
@@ -127,6 +128,30 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["region"] = _region });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"OpsGenie health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Configuration validated via Configure method
+        IncrementCounter("ops_genie.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("ops_genie.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

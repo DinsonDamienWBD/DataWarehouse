@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("worm_storage.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify write-once constraint
@@ -165,5 +166,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
             return recommendations;
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("worm_storage.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("worm_storage.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 }

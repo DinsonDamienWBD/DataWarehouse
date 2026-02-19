@@ -306,6 +306,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("istio.metrics_sent");
         var envoyMetrics = await CollectEnvoyMetricsAsync(cancellationToken);
         // Both sets would be forwarded to configured backend
         await Task.CompletedTask;
@@ -314,6 +315,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("istio.traces_sent");
         // Istio automatically propagates tracing headers via Envoy sidecar
         // Application-level spans are passed through without modification
         return Task.CompletedTask;
@@ -322,6 +324,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("istio.logs_sent");
         // Log entries are forwarded; mesh context is added by sidecar
         return Task.CompletedTask;
     }
@@ -348,6 +351,33 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_pilotUrl) || (!_pilotUrl.StartsWith("http://") && !_pilotUrl.StartsWith("https://")))
+            throw new InvalidOperationException("IstioStrategy: Invalid endpoint URL configured.");
+        if (string.IsNullOrWhiteSpace(_kialiUrl) || (!_kialiUrl.StartsWith("http://") && !_kialiUrl.StartsWith("https://")))
+            throw new InvalidOperationException("IstioStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("istio.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("istio.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

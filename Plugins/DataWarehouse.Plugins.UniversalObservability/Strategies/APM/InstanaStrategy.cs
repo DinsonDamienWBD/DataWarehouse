@@ -56,6 +56,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("instana.metrics_sent");
         var metricsList = new List<object>();
 
         foreach (var metric in metrics)
@@ -80,6 +81,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("instana.traces_sent");
         var tracesList = new List<object>();
 
         foreach (var span in spans)
@@ -164,6 +166,31 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_agentEndpoint) || (!_agentEndpoint.StartsWith("http://") && !_agentEndpoint.StartsWith("https://")))
+            throw new InvalidOperationException("InstanaStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("instana.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("instana.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

@@ -55,6 +55,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("victor_ops.metrics_sent");
         // Convert metrics to alerts when thresholds are exceeded
         var alerts = new List<object>();
 
@@ -96,6 +97,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("victor_ops.logs_sent");
         // Convert error/critical logs to incidents
         var incidents = new List<object>();
 
@@ -218,6 +220,31 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_restEndpoint) || (!_restEndpoint.StartsWith("http://") && !_restEndpoint.StartsWith("https://")))
+            throw new InvalidOperationException("VictorOpsStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("victor_ops.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("victor_ops.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

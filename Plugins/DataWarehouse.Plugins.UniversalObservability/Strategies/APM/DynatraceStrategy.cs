@@ -38,6 +38,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("dynatrace.metrics_sent");
         // Dynatrace Metrics Ingest API (MINT protocol)
         var lines = new StringBuilder();
 
@@ -62,6 +63,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("dynatrace.traces_sent");
         // Dynatrace OpenTelemetry Protocol compatible endpoint
         var traceData = new
         {
@@ -108,6 +110,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("dynatrace.logs_sent");
         // Dynatrace Log Ingest API
         var logs = logEntries.Select(e => new
         {
@@ -143,6 +146,31 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["environmentUrl"] = _environmentUrl });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Dynatrace health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_environmentUrl) || (!_environmentUrl.StartsWith("http://") && !_environmentUrl.StartsWith("https://")))
+            throw new InvalidOperationException("DynatraceStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("dynatrace.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("dynatrace.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

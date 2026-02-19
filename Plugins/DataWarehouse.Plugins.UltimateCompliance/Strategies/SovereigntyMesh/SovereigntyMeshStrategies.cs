@@ -56,6 +56,7 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
+        IncrementCounter("jurisdictional_ai.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -342,6 +343,20 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
             IsAdequate = true
         };
     }
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("jurisdictional_ai.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("jurisdictional_ai.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
 }
 
 /// <summary>
@@ -433,6 +448,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
+        IncrementCounter("data_embassy.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -610,6 +626,20 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 
         return await Task.FromResult(result);
     }
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_embassy.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_embassy.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
 }
 
 /// <summary>
@@ -704,6 +734,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
+        IncrementCounter("data_residency_enforcement.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -877,6 +908,20 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
             IsBackup = context.Attributes.TryGetValue("IsBackup", out var b) && b is true
         };
     }
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_residency_enforcement.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("data_residency_enforcement.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
 }
 
 /// <summary>
@@ -943,6 +988,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
+        IncrementCounter("cross_border_transfer_control.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -1039,6 +1085,20 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
             AgreementId = agreement.AgreementId,
             Timestamp = DateTimeOffset.UtcNow
         };
+    }
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("cross_border_transfer_control.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("cross_border_transfer_control.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 }
 

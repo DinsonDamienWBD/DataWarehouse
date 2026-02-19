@@ -82,6 +82,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
+        IncrementCounter("continuous_compliance_monitoring.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -408,7 +409,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             public required long ViolationCount { get; init; }
             public required long CompliantCount { get; init; }
         }
+    
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("continuous_compliance_monitoring.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("continuous_compliance_monitoring.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+}
 
     /// <summary>
     /// Monitoring configuration settings.

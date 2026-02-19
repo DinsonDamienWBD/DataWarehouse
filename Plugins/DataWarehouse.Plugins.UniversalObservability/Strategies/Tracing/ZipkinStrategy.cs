@@ -34,6 +34,7 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        IncrementCounter("zipkin.traces_sent");
         var zipkinSpans = spans.Select(span => new
         {
             traceId = span.TraceId.Length > 16 ? span.TraceId : span.TraceId.PadLeft(32, '0'),
@@ -94,6 +95,31 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
                 new Dictionary<string, object> { ["url"] = _url, ["serviceName"] = _serviceName });
         }
         catch (Exception ex) { return new HealthCheckResult(false, $"Zipkin health check failed: {ex.Message}", null); }
+    }
+
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_url) || (!_url.StartsWith("http://") && !_url.StartsWith("https://")))
+            throw new InvalidOperationException("ZipkinStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("zipkin.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("zipkin.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

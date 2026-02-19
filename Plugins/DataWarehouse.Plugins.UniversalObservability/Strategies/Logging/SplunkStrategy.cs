@@ -66,6 +66,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
+        IncrementCounter("splunk.logs_sent");
         var events = new StringBuilder();
 
         foreach (var entry in logEntries)
@@ -102,6 +103,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        IncrementCounter("splunk.metrics_sent");
         // Splunk HEC supports metrics via the /services/collector endpoint
         var metricEvents = new StringBuilder();
 
@@ -191,6 +193,31 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
+
+    /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_hecUrl) || (!_hecUrl.StartsWith("http://") && !_hecUrl.StartsWith("https://")))
+            throw new InvalidOperationException("SplunkStrategy: Invalid endpoint URL configured.");
+        IncrementCounter("splunk.initialized");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        IncrementCounter("splunk.shutdown");
+        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
