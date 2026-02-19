@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 {
@@ -38,6 +39,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         private string _relyingPartyName = "DataWarehouse";
         private string _origin = "https://localhost";
         private TimeSpan _challengeTimeout = TimeSpan.FromMinutes(5);
+        private string _attestationMode = "none"; // none, indirect, direct
 
         public override string StrategyId => "identity-fido2";
         public override string StrategyName => "FIDO2/WebAuthn";
@@ -67,7 +69,81 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (configuration.TryGetValue("ChallengeTimeoutMinutes", out var timeout) && timeout is int timeoutInt)
                 _challengeTimeout = TimeSpan.FromMinutes(timeoutInt);
 
+            if (configuration.TryGetValue("AttestationMode", out var mode) && mode is string modeStr)
+                _attestationMode = modeStr;
+
             return base.InitializeAsync(configuration, cancellationToken);
+        }
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate relying party ID (must be valid domain)
+            if (string.IsNullOrWhiteSpace(_relyingPartyId))
+            {
+                throw new ArgumentException("Relying party ID cannot be empty");
+            }
+
+            // Validate origin (must be valid HTTPS URL, except localhost)
+            if (!Uri.TryCreate(_origin, UriKind.Absolute, out var originUri))
+            {
+                throw new ArgumentException($"Invalid origin URL: {_origin}");
+            }
+
+            if (originUri.Scheme != "https" && !originUri.Host.Contains("localhost"))
+            {
+                throw new ArgumentException($"Origin must use HTTPS except for localhost, got: {_origin}");
+            }
+
+            // Validate attestation mode
+            var validModes = new[] { "none", "indirect", "direct" };
+            if (!validModes.Contains(_attestationMode.ToLowerInvariant()))
+            {
+                throw new ArgumentException(
+                    $"Attestation mode must be one of: {string.Join(", ", validModes)}, got: {_attestationMode}");
+            }
+
+            // Validate challenge timeout (1-120 minutes)
+            if (_challengeTimeout.TotalMinutes < 1 || _challengeTimeout.TotalMinutes > 120)
+            {
+                throw new ArgumentException(
+                    $"Challenge timeout must be between 1 and 120 minutes, got: {_challengeTimeout.TotalMinutes} minutes");
+            }
+
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Clear challenge caches (security: prevent replay)
+            _challenges.Clear();
+
+            // Do NOT clear credentials (persistent state)
+            // In production, credentials would be persisted to storage
+
+            await base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the health status of the FIDO2 strategy with caching.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> GetHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                await Task.CompletedTask;
+
+                return new StrategyHealthCheckResult(
+                    IsHealthy: true,
+                    Message: "FIDO2 strategy configured and ready",
+                    Details: new Dictionary<string, object>
+                    {
+                        ["relyingPartyId"] = _relyingPartyId,
+                        ["origin"] = _origin,
+                        ["attestationMode"] = _attestationMode,
+                        ["registeredCredentials"] = _credentials.Count,
+                        ["activeChallenges"] = _challenges.Count
+                    });
+            }, TimeSpan.FromSeconds(60), ct);
         }
 
         public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -207,6 +283,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
                 _credentials[credentialId] = credential;
                 _challenges.TryRemove(challengeId, out _);
+
+                IncrementCounter("u2f.register");
 
                 return new Fido2RegistrationResult
                 {
@@ -399,6 +477,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 _credentials[credentialId] = credential;
 
                 _challenges.TryRemove(challengeId, out _);
+
+                IncrementCounter("u2f.authenticate");
 
                 return new Fido2AuthenticationResult
                 {

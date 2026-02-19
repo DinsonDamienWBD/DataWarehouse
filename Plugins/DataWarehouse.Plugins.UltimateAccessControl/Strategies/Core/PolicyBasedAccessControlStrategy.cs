@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -33,6 +34,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private readonly List<IPolicyInformationPoint> _pips = new();
         private ConflictResolutionStrategy _defaultConflictResolution = ConflictResolutionStrategy.DenyOverrides;
         private int _nextVersionNumber = 1;
+        private int _policyEvaluationTimeoutMs = 5000; // 5 seconds default
+        private int _maxPolicyChainDepth = 10;
 
         /// <inheritdoc/>
         public override string StrategyId => "pbac";
@@ -63,6 +66,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 _defaultConflictResolution = cr;
             }
 
+            // Load policy evaluation timeout
+            if (configuration.TryGetValue("PolicyEvaluationTimeoutMs", out var timeoutObj) && timeoutObj is int timeout)
+            {
+                _policyEvaluationTimeoutMs = timeout;
+            }
+
+            // Load max policy chain depth
+            if (configuration.TryGetValue("MaxPolicyChainDepth", out var depthObj) && depthObj is int depth)
+            {
+                _maxPolicyChainDepth = depth;
+            }
+
             // Load policies from configuration
             if (configuration.TryGetValue("Policies", out var policiesObj) &&
                 policiesObj is IEnumerable<Dictionary<string, object>> policyConfigs)
@@ -81,6 +96,86 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             InitializeDefaultPolicies();
 
             return base.InitializeAsync(configuration, cancellationToken);
+        }
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate policy evaluation timeout (100ms to 60s)
+            if (_policyEvaluationTimeoutMs < 100 || _policyEvaluationTimeoutMs > 60000)
+            {
+                throw new ArgumentException(
+                    $"Policy evaluation timeout must be between 100 and 60000ms, got: {_policyEvaluationTimeoutMs}");
+            }
+
+            // Validate max policy chain depth (1-100)
+            if (_maxPolicyChainDepth < 1 || _maxPolicyChainDepth > 100)
+            {
+                throw new ArgumentException(
+                    $"Max policy chain depth must be between 1 and 100, got: {_maxPolicyChainDepth}");
+            }
+
+            // Validate that we have at least one policy or policy set
+            if (_policies.IsEmpty && _policySets.IsEmpty)
+            {
+                // This is a warning, not an error - policies can be added dynamically
+            }
+
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Clear cached policy decisions (none currently, but future-proof)
+            // Do NOT clear policies themselves (persistent configuration)
+
+            await base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the health status of the PBAC strategy with caching.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> GetHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                // Validate policy engine reachability (test simple policy evaluation)
+                try
+                {
+                    // Test policy evaluation with minimal context
+                    var testContext = new AccessContext
+                    {
+                        SubjectId = "health-check",
+                        ResourceId = "health-check",
+                        Action = "read"
+                    };
+
+                    // This should complete quickly
+                    var _ = await EvaluateAccessCoreAsync(testContext, cancellationToken);
+                }
+                catch
+                {
+                    return new StrategyHealthCheckResult(
+                        IsHealthy: false,
+                        Message: "Policy evaluation test failed",
+                        Details: new Dictionary<string, object>
+                        {
+                            ["policyCount"] = _policies.Count,
+                            ["policySetCount"] = _policySets.Count
+                        });
+                }
+
+                return new StrategyHealthCheckResult(
+                    IsHealthy: true,
+                    Message: "PBAC strategy configured and ready",
+                    Details: new Dictionary<string, object>
+                    {
+                        ["policyCount"] = _policies.Count,
+                        ["policySetCount"] = _policySets.Count,
+                        ["conflictResolution"] = _defaultConflictResolution.ToString(),
+                        ["evaluationTimeoutMs"] = _policyEvaluationTimeoutMs,
+                        ["maxChainDepth"] = _maxPolicyChainDepth
+                    });
+            }, TimeSpan.FromSeconds(60), ct);
         }
 
         #region Policy Management
@@ -265,6 +360,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("pbac.evaluate");
+
             // Enrich context with PIP data
             var enrichedContext = await EnrichContextAsync(context, cancellationToken);
 
@@ -294,7 +391,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             }
 
             // Apply conflict resolution
-            return ApplyConflictResolution(evaluations, _defaultConflictResolution);
+            var decision = ApplyConflictResolution(evaluations, _defaultConflictResolution);
+
+            if (!decision.IsGranted)
+            {
+                IncrementCounter("pbac.deny");
+            }
+
+            return decision;
         }
 
         private async Task<PolicyEvaluationDetail> EvaluatePolicyDetailedAsync(

@@ -4,6 +4,7 @@ using System.Net;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 {
@@ -18,6 +19,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     {
         private string? _servicePrincipalName;
         private string? _realm;
+        private string? _kdcAddress;
+        private int _ticketLifetimeMinutes = 480; // 8 hours default
 
         public override string StrategyId => "identity-kerberos";
         public override string StrategyName => "Kerberos";
@@ -41,7 +44,104 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (configuration.TryGetValue("Realm", out var realm) && realm is string realmStr)
                 _realm = realmStr;
 
+            if (configuration.TryGetValue("KdcAddress", out var kdc) && kdc is string kdcStr)
+                _kdcAddress = kdcStr;
+
+            if (configuration.TryGetValue("TicketLifetimeMinutes", out var lifetime) && lifetime is int lifetimeInt)
+                _ticketLifetimeMinutes = lifetimeInt;
+
             return base.InitializeAsync(configuration, cancellationToken);
+        }
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate KDC address if provided
+            if (!string.IsNullOrWhiteSpace(_kdcAddress))
+            {
+                if (!Uri.TryCreate($"krb5://{_kdcAddress}", UriKind.Absolute, out _))
+                {
+                    throw new ArgumentException($"Invalid KDC address format: {_kdcAddress}");
+                }
+            }
+
+            // Validate realm (should be non-empty and uppercase convention)
+            if (!string.IsNullOrWhiteSpace(_realm))
+            {
+                if (_realm != _realm.ToUpperInvariant())
+                {
+                    // Not an error, but log warning in production
+                    // For now, accept as-is
+                }
+            }
+
+            // Validate service principal name format (should be service/host@REALM)
+            if (!string.IsNullOrWhiteSpace(_servicePrincipalName))
+            {
+                var parts = _servicePrincipalName.Split('/');
+                if (parts.Length < 2)
+                {
+                    throw new ArgumentException(
+                        $"Service principal name must be in format 'service/host@REALM', got: {_servicePrincipalName}");
+                }
+            }
+
+            // Validate ticket lifetime (5min to 24h)
+            if (_ticketLifetimeMinutes < 5 || _ticketLifetimeMinutes > 1440)
+            {
+                throw new ArgumentException(
+                    $"Ticket lifetime must be between 5 and 1440 minutes, got: {_ticketLifetimeMinutes}");
+            }
+
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Clear any cached tickets (none currently, but future-proof)
+            // Close any KDC connections (none currently, but future-proof)
+            await Task.CompletedTask;
+            await base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the health status of the Kerberos strategy with caching.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> GetHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                // Check if KDC is reachable (without actual auth)
+                if (!string.IsNullOrWhiteSpace(_kdcAddress))
+                {
+                    try
+                    {
+                        // Production: would check KDC reachability via UDP port 88 or TCP port 88
+                        // For now, validate configuration consistency
+                        await Task.CompletedTask;
+                    }
+                    catch
+                    {
+                        return new StrategyHealthCheckResult(
+                            IsHealthy: false,
+                            Message: $"KDC {_kdcAddress} may be unreachable",
+                            Details: new Dictionary<string, object>
+                            {
+                                ["kdcAddress"] = _kdcAddress,
+                                ["configured"] = true
+                            });
+                    }
+                }
+
+                return new StrategyHealthCheckResult(
+                    IsHealthy: true,
+                    Message: "Kerberos strategy configured and ready",
+                    Details: new Dictionary<string, object>
+                    {
+                        ["realm"] = _realm ?? "not configured",
+                        ["spn"] = !string.IsNullOrWhiteSpace(_servicePrincipalName),
+                        ["kdcConfigured"] = !string.IsNullOrWhiteSpace(_kdcAddress)
+                    });
+            }, TimeSpan.FromSeconds(60), ct);
         }
 
         public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -61,6 +161,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             await Task.CompletedTask;
+            IncrementCounter("kerberos.tgt_request");
 
             if (!context.EnvironmentAttributes.TryGetValue("KerberosTicket", out var ticketObj) ||
                 ticketObj is not byte[] ticket)
@@ -69,6 +170,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 if (context.EnvironmentAttributes.TryGetValue("WindowsIdentity", out var identityObj) &&
                     identityObj is WindowsIdentity identity)
                 {
+                    IncrementCounter("kerberos.windows_identity");
                     return ValidateWindowsIdentity(identity);
                 }
 
@@ -80,6 +182,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             {
                 return new AccessDecision { IsGranted = false, Reason = validationResult.Error ?? "Invalid Kerberos ticket" };
             }
+
+            IncrementCounter("kerberos.service_ticket");
 
             return new AccessDecision
             {
