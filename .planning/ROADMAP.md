@@ -521,10 +521,19 @@ Phase 42 (Feature Verification) ──► Phase 43 (Automated Scan) ──► Ph
 **Output**: `BENCHMARK-BASELINE.md`
 
 #### Phase 47: Full Penetration Test Cycle
-**Goal**: Systematic security testing across all attack surfaces.
+**Goal**: Adversarial penetration testing across all attack surfaces with ethical hacker mindset ($500 bounty per finding).
 **Depends on**: Phase 44
-**Plans**: 5 plans (OWASP Top 10, crypto, network+AEDS, data security, infrastructure)
-**Output**: `PENTEST-FINDINGS.md`
+**Plans**: 12 plans -- v4.3 original (5: OWASP, crypto, network+AEDS, data, infrastructure) + v4.5 adversarial (7: recon, auth bypass, bus poisoning, data path exploitation, distributed attacks, network/transport, supply chain + consolidated report)
+**Output**: `47-v4.5-PENTEST-REPORT.md`
+
+Plans (v4.5 adversarial iteration):
+- [ ] 47-v4.5-01-PLAN.md -- Attack surface mapping and reconnaissance
+- [ ] 47-v4.5-02-PLAN.md -- Authentication bypass and privilege escalation
+- [ ] 47-v4.5-03-PLAN.md -- Message bus poisoning and plugin isolation escape
+- [ ] 47-v4.5-04-PLAN.md -- Data path exploitation and cryptographic attacks
+- [ ] 47-v4.5-05-PLAN.md -- Distributed system and consensus attacks
+- [ ] 47-v4.5-06-PLAN.md -- Network and transport layer attacks
+- [ ] 47-v4.5-07-PLAN.md -- Supply chain, infrastructure, and chained exploitation
 
 #### Phase 48: Comprehensive Test Suite
 **Goal**: Fill test coverage gaps. Every plugin has tests, every strategy verified, 80%+ SDK coverage.
