@@ -27,6 +27,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly CancellationTokenSource _probeCts = new();
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly ConcurrentQueue<SwimMembershipUpdate> _recentUpdates = new();
+        private readonly ConcurrentDictionary<string, int> _deadReportCounts = new();
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastStateChangePerNode = new();
         private string? _leaderId;
         private Task? _probeLoopTask;
         private Task? _suspicionCheckTask;
@@ -133,7 +135,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 }
             };
 
-            await _network.BroadcastAsync(joinMessage.Serialize(), ct).ConfigureAwait(false);
+            await _network.BroadcastAsync(joinMessage.Serialize(_config.ClusterSecret), ct).ConfigureAwait(false);
 
             // Start the probe loop for failure detection
             StartProbeLoop();
@@ -169,7 +171,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 IncarnationNumber = GetSelfIncarnation()
             };
 
-            await _network.BroadcastAsync(leaveMessage.Serialize(), ct).ConfigureAwait(false);
+            await _network.BroadcastAsync(leaveMessage.Serialize(_config.ClusterSecret), ct).ConfigureAwait(false);
 
             // Stop probe loop
             StopProbeLoop();
@@ -303,10 +305,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
                 var response = await _network.RequestFromPeerAsync(
                     target.Node.NodeId,
-                    pingMessage.Serialize(),
+                    pingMessage.Serialize(_config.ClusterSecret),
                     timeoutCts.Token).ConfigureAwait(false);
 
-                var ackMessage = SwimMessage.Deserialize(response);
+                var ackMessage = SwimMessage.Deserialize(response, _config.ClusterSecret);
                 if (ackMessage?.Type == SwimMessageType.Ack)
                 {
                     target.LastPingAt = DateTimeOffset.UtcNow;
@@ -376,10 +378,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             {
                 var response = await _network.RequestFromPeerAsync(
                     prober.Node.NodeId,
-                    pingReqMessage.Serialize(),
+                    pingReqMessage.Serialize(_config.ClusterSecret),
                     ct).ConfigureAwait(false);
 
-                var ackMessage = SwimMessage.Deserialize(response);
+                var ackMessage = SwimMessage.Deserialize(response, _config.ClusterSecret);
                 return ackMessage?.Type == SwimMessageType.Ack;
             }
             catch
@@ -479,7 +481,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 IncarnationNumber = GetSelfIncarnation()
             };
 
-            await _network.BroadcastAsync(aliveMessage.Serialize(), ct).ConfigureAwait(false);
+            await _network.BroadcastAsync(aliveMessage.Serialize(_config.ClusterSecret), ct).ConfigureAwait(false);
         }
 
         private void HandleAlive(string nodeId, int incarnation)
@@ -516,11 +518,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         {
             try
             {
-                var swimMessage = SwimMessage.Deserialize(gossipMessage.Payload);
+                // DIST-03: Verify HMAC before processing any SWIM message
+                var swimMessage = SwimMessage.Deserialize(gossipMessage.Payload, _config.ClusterSecret);
                 if (swimMessage != null)
                 {
                     ProcessSwimMessage(swimMessage);
                 }
+                // null return means HMAC verification failed or invalid message -- silently reject
             }
             catch
             {
@@ -620,13 +624,65 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         {
             string targetNodeId = message.TargetNodeId;
 
+            // DIST-03: Rate-limit state changes per node
+            if (!IsStateChangeAllowed(targetNodeId))
+            {
+                return; // Throttled -- ignore rapid state changes
+            }
+
             if (_members.TryGetValue(targetNodeId, out var member)
                 && member.Status != ClusterNodeStatus.Dead)
             {
+                // DIST-03: Require quorum of independent Dead reports before marking as dead.
+                // A single Dead message should not immediately evict a node -- prevents poisoning attacks.
+                int reportCount = _deadReportCounts.AddOrUpdate(targetNodeId, 1, (_, c) => c + 1);
+                if (reportCount < _config.DeadNodeQuorum)
+                {
+                    // Not enough reports yet -- mark as suspected first if not already
+                    if (member.Status == ClusterNodeStatus.Active)
+                    {
+                        member.Status = ClusterNodeStatus.Suspected;
+                        member.SuspectedAt = DateTimeOffset.UtcNow;
+                        member.Node = member.Node with { Status = ClusterNodeStatus.Suspected };
+                        RecordStateChange(targetNodeId);
+                        FireMembershipEvent(ClusterMembershipEventType.NodeSuspected, member.Node,
+                            $"Dead report {reportCount}/{_config.DeadNodeQuorum} -- awaiting quorum");
+                    }
+                    return;
+                }
+
                 member.Status = ClusterNodeStatus.Dead;
                 member.Node = member.Node with { Status = ClusterNodeStatus.Dead };
-                FireMembershipEvent(ClusterMembershipEventType.NodeDead, member.Node, "Reported dead");
+                _deadReportCounts.TryRemove(targetNodeId, out _);
+                RecordStateChange(targetNodeId);
+                FireMembershipEvent(ClusterMembershipEventType.NodeDead, member.Node,
+                    $"Dead quorum reached ({reportCount} reports)");
             }
+        }
+
+        /// <summary>
+        /// Checks whether a state change is allowed for the given node (rate limiting, DIST-03).
+        /// </summary>
+        private bool IsStateChangeAllowed(string nodeId)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (_lastStateChangePerNode.TryGetValue(nodeId, out var lastChange))
+            {
+                var elapsed = (now - lastChange).TotalSeconds;
+                if (elapsed < 1.0 / _config.MaxStateChangesPerNodePerSecond)
+                {
+                    return false; // Rate limited
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Records that a state change occurred for the given node (for rate limiting).
+        /// </summary>
+        private void RecordStateChange(string nodeId)
+        {
+            _lastStateChangePerNode[nodeId] = DateTimeOffset.UtcNow;
         }
 
         private void ProcessMembershipUpdates(List<SwimMembershipUpdate> updates)

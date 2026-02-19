@@ -198,6 +198,12 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     internal sealed class SdkLWWRegister : ICrdtType
     {
         /// <summary>
+        /// Maximum allowed clock skew for incoming timestamps. Timestamps more than this amount
+        /// in the future are rejected to prevent DateTimeOffset.MaxValue poisoning attacks (DIST-08 mitigation).
+        /// </summary>
+        private static readonly TimeSpan MaxTimestampSkew = TimeSpan.FromHours(1);
+
+        /// <summary>
         /// The current register value.
         /// </summary>
         public byte[] Value { get; private set; } = Array.Empty<byte>();
@@ -224,11 +230,18 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         /// <summary>
         /// Merges two LWW registers. Higher timestamp wins; equal timestamps use NodeId comparison.
+        /// DIST-08: Rejects timestamps more than 1 hour in the future to prevent MaxValue poisoning.
         /// </summary>
         public ICrdtType Merge(ICrdtType other)
         {
             if (other is not SdkLWWRegister otherRegister)
                 throw new ArgumentException("Cannot merge with non-LWWRegister type.", nameof(other));
+
+            // DIST-08: Reject timestamps too far in the future (prevents DateTimeOffset.MaxValue poisoning)
+            if (otherRegister.Timestamp > DateTimeOffset.UtcNow + MaxTimestampSkew)
+            {
+                return this; // Keep current value -- incoming timestamp is suspicious
+            }
 
             if (otherRegister.Timestamp > Timestamp)
             {

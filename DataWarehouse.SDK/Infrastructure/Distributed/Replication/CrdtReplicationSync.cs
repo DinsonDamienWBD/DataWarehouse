@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -42,6 +43,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Interval in milliseconds for background gossip propagation.
         /// </summary>
         public int GossipPropagationIntervalMs { get; init; } = 1000;
+
+        /// <summary>
+        /// Shared secret for HMAC-SHA256 authentication of CRDT gossip messages.
+        /// When set, all outgoing CRDT messages are signed and incoming messages are verified.
+        /// Messages with invalid or missing HMAC are rejected. (DIST-04 mitigation)
+        /// </summary>
+        public byte[]? ClusterSecret { get; init; }
     }
 
     /// <summary>
@@ -311,6 +319,39 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         {
             try
             {
+                // DIST-04: Validate that the sender is a known cluster member before merging state
+                if (!string.IsNullOrEmpty(gossipMessage.OriginNodeId))
+                {
+                    var knownMembers = _membership.GetMembers();
+                    bool isMember = false;
+                    foreach (var m in knownMembers)
+                    {
+                        if (string.Equals(m.NodeId, gossipMessage.OriginNodeId, StringComparison.Ordinal))
+                        {
+                            isMember = true;
+                            break;
+                        }
+                    }
+                    if (!isMember)
+                    {
+                        // Reject CRDT updates from unknown nodes
+                        FireSyncEvent(SyncEventType.SyncFailed, gossipMessage.OriginNodeId,
+                            $"Rejected CRDT update from unknown node: {gossipMessage.OriginNodeId}");
+                        return;
+                    }
+                }
+
+                // DIST-04: Verify HMAC authentication if cluster secret is configured
+                if (_config.ClusterSecret != null && _config.ClusterSecret.Length > 0)
+                {
+                    if (!VerifyCrdtGossipHmac(gossipMessage))
+                    {
+                        FireSyncEvent(SyncEventType.SyncFailed, gossipMessage.OriginNodeId ?? "unknown",
+                            "Rejected CRDT gossip: HMAC verification failed");
+                        return;
+                    }
+                }
+
                 var items = DeserializeBatch(gossipMessage.Payload);
                 if (items == null) return;
 
@@ -325,10 +366,47 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
+        /// <summary>
+        /// Verifies the HMAC-SHA256 signature of a CRDT gossip message (DIST-04 mitigation).
+        /// The HMAC is computed over the payload bytes using the cluster secret.
+        /// </summary>
+        private bool VerifyCrdtGossipHmac(GossipMessage message)
+        {
+            if (_config.ClusterSecret == null || _config.ClusterSecret.Length == 0)
+                return true; // No secret configured, skip verification
+
+            if (message.Payload == null || message.Payload.Length < 32)
+                return false; // Too short to contain HMAC
+
+            // HMAC is the last 32 bytes of the payload
+            int dataLength = message.Payload.Length - 32;
+            var data = message.Payload.AsSpan(0, dataLength);
+            var receivedHmac = message.Payload.AsSpan(dataLength, 32);
+
+            using var hmac = new HMACSHA256(_config.ClusterSecret);
+            var expectedHmac = hmac.ComputeHash(data.ToArray());
+
+            return CryptographicOperations.FixedTimeEquals(receivedHmac, expectedHmac);
+        }
+
+        /// <summary>
+        /// Maximum allowed clock skew for incoming CRDT timestamps.
+        /// Timestamps more than this amount in the future are rejected (DIST-08 mitigation).
+        /// </summary>
+        private static readonly TimeSpan MaxTimestampSkew = TimeSpan.FromHours(1);
+
         private void ProcessRemoteItem(CrdtSyncItem remoteItem)
         {
             try
             {
+                // DIST-08: Reject items with timestamps too far in the future
+                if (remoteItem.LastModified > DateTimeOffset.UtcNow + MaxTimestampSkew)
+                {
+                    FireSyncEvent(SyncEventType.SyncFailed, remoteItem.Key,
+                        $"Rejected CRDT item with suspicious future timestamp: {remoteItem.LastModified}");
+                    return;
+                }
+
                 var remoteCrdt = _registry.Deserialize(remoteItem.Key, remoteItem.Value);
                 var remoteClock = new DataWarehouse.SDK.Replication.VectorClock(
                     remoteItem.ClockEntries ?? new Dictionary<string, long>());
@@ -455,14 +533,36 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 LastModified = item.LastModified
             }).ToList();
 
-            return JsonSerializer.SerializeToUtf8Bytes(syncItems);
+            var data = JsonSerializer.SerializeToUtf8Bytes(syncItems);
+
+            // DIST-04: Append HMAC-SHA256 when cluster secret is configured
+            if (_config.ClusterSecret != null && _config.ClusterSecret.Length > 0)
+            {
+                using var hmac = new HMACSHA256(_config.ClusterSecret);
+                var mac = hmac.ComputeHash(data);
+                var authenticated = new byte[data.Length + mac.Length];
+                Buffer.BlockCopy(data, 0, authenticated, 0, data.Length);
+                Buffer.BlockCopy(mac, 0, authenticated, data.Length, mac.Length);
+                return authenticated;
+            }
+
+            return data;
         }
 
         private List<CrdtSyncItem>? DeserializeBatch(byte[] data)
         {
             try
             {
-                return JsonSerializer.Deserialize<List<CrdtSyncItem>>(data);
+                // If cluster secret is configured, strip HMAC (last 32 bytes) before deserializing.
+                // HMAC verification was already done in HandleGossipReceived.
+                byte[] jsonData = data;
+                if (_config.ClusterSecret != null && _config.ClusterSecret.Length > 0 && data.Length > 32)
+                {
+                    jsonData = new byte[data.Length - 32];
+                    Buffer.BlockCopy(data, 0, jsonData, 0, jsonData.Length);
+                }
+
+                return JsonSerializer.Deserialize<List<CrdtSyncItem>>(jsonData);
             }
             catch
             {
