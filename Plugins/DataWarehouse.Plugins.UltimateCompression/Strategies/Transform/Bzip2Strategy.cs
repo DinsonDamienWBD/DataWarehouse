@@ -4,6 +4,10 @@ using DataWarehouse.SDK.Contracts.Compression;
 using SharpCompress.Compressors.BZip2;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
 
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
 {
     /// <summary>
@@ -20,6 +24,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
     /// </remarks>
     public sealed class Bzip2Strategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Bzip2Strategy"/> class
         /// with the default compression level.
@@ -45,9 +51,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             OptimalBlockSize = 900 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "BZip2 strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("bzip2.compress"),
+                            ["DecompressOperations"] = GetCounter("bzip2.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("bzip2.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for BZip2");
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
 
@@ -62,6 +125,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("bzip2.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for BZip2");
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
 

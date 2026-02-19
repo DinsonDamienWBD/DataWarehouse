@@ -4,6 +4,10 @@ using DataWarehouse.SDK.Contracts.Compression;
 using K4os.Compression.LZ4;
 using K4os.Compression.LZ4.Streams;
 
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 {
     /// <summary>
@@ -18,6 +22,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
     /// </remarks>
     public sealed class Lz4Strategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Lz4Strategy"/> class
         /// with the default compression level.
@@ -43,15 +49,79 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             OptimalBlockSize = 64 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZ4 strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("lz4.compress"),
+                            ["DecompressOperations"] = GetCounter("lz4.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("lz4.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZ4");
             return LZ4Pickler.Pickle(input, LZ4Level.L00_FAST);
         }
 
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("lz4.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZ4");
             return LZ4Pickler.Unpickle(input);
         }
 

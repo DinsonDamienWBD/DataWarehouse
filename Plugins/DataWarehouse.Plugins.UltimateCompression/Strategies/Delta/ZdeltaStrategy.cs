@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.IO;
 using DataWarehouse.SDK.Contracts.Compression;
 
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
 {
     /// <summary>
@@ -32,6 +35,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
     /// </remarks>
     public sealed class ZdeltaStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         private static readonly byte[] Magic = { 0x5A, 0x44, 0x4C, 0x54 }; // "ZDLT"
         private const int WindowSize = 32768;
         private const int MinMatchLength = 4;
@@ -65,9 +70,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             OptimalBlockSize = 1024 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "Zdelta strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("zdelta.compress"),
+                            ["DecompressOperations"] = GetCounter("zdelta.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("zdelta.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zdelta");
             using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
@@ -189,6 +251,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("zdelta.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zdelta");
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];

@@ -4,6 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Compression;
 
+using System.Collections.Generic;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
 {
     /// <summary>
@@ -13,6 +15,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
     /// </summary>
     public sealed class AdaptiveTransitStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         private readonly ICompressionStrategy _zstdStrategy;
         private readonly ICompressionStrategy _lz4Strategy;
         private readonly ICompressionStrategy _brotliStrategy;
@@ -58,9 +62,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
             OptimalBlockSize = 64 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "Adaptive-Transit strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("adaptive-transit.compress"),
+                            ["DecompressOperations"] = GetCounter("adaptive-transit.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("adaptive-transit.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
             var strategy = SelectStrategy(input);
             return strategy.Compress(input);
         }
@@ -68,6 +129,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("adaptive-transit.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
             // Detect which algorithm was used (would need header in real implementation)
             // For now, default to Zstd as it's most common
             return _zstdStrategy.Decompress(input);

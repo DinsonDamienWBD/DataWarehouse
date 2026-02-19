@@ -4,6 +4,10 @@ using System.IO.Compression;
 using DataWarehouse.SDK.Contracts.Compression;
 using SharpCompress.Compressors.LZMA;
 
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 {
     /// <summary>
@@ -19,6 +23,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
     /// </remarks>
     public sealed class LzmaStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         /// <summary>
         /// Initializes a new instance of the <see cref="LzmaStrategy"/> class
         /// with the default compression level.
@@ -44,9 +50,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             OptimalBlockSize = 256 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZMA strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("lzma.compress"),
+                            ["DecompressOperations"] = GetCounter("lzma.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("lzma.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZMA");
             using var outputStream = new MemoryStream(input.Length + 256);
 
             // LZMA header: magic bytes + uncompressed size
@@ -80,6 +143,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("lzma.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZMA");
             if (input.Length < 12) // 4 magic + 8 size bytes
                 throw new InvalidDataException("LZMA compressed data is too short.");
 

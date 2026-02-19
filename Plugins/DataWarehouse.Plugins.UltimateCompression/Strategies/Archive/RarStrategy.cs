@@ -6,6 +6,10 @@ using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionL
 using SysCompressionLevel = System.IO.Compression.CompressionLevel;
 using SysCompressionMode = System.IO.Compression.CompressionMode;
 
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 {
     /// <summary>
@@ -25,6 +29,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     /// </remarks>
     public sealed class RarStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         private const uint MagicHeader = 0x52617221; // 'Rar!'
         private const byte MarkHead = 0x72;
 
@@ -53,9 +59,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             OptimalBlockSize = 32768
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "RAR-Compatible strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("rar-compatible.compress"),
+                            ["DecompressOperations"] = GetCounter("rar-compatible.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("rar-compatible.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for RAR-Compatible");
             using var output = new MemoryStream(input.Length + 256); // Estimate: input size + header overhead
             using var writer = new BinaryWriter(output);
 
@@ -82,6 +145,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("rar-compatible.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for RAR-Compatible");
             using var stream = new MemoryStream(input);
             using var reader = new BinaryReader(stream);
 

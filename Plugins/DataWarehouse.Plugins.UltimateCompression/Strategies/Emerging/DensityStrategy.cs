@@ -4,6 +4,9 @@ using System.IO;
 using DataWarehouse.SDK.Contracts.Compression;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
 
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 {
     /// <summary>
@@ -22,6 +25,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
     /// </remarks>
     public sealed class DensityStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         private const uint MagicHeader = 0x44454E53; // 'DENS'
         private const int ChameleonDictSize = 16 * 1024;
         private const int CheetahDictSize = 64 * 1024;
@@ -61,9 +66,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             OptimalBlockSize = 8192
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "Density strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("density.compress"),
+                            ["DecompressOperations"] = GetCounter("density.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("density.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Density");
             using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
@@ -222,6 +284,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("density.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Density");
             using var stream = new MemoryStream(input);
             using var reader = new BinaryReader(stream);
 

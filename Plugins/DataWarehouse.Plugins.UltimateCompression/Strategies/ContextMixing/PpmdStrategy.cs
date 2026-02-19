@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.IO;
 using DataWarehouse.SDK.Contracts.Compression;
 
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
 {
     /// <summary>
@@ -29,6 +32,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
     /// </remarks>
     public sealed class PpmdStrategy : CompressionStrategyBase
     {
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
         private static readonly byte[] Magic = { 0x50, 0x50, 0x4D, 0x44 }; // "PPMD"
         private const int MaxOrder = 6;
         private const int NumSeeBins = 16;
@@ -58,9 +63,66 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             OptimalBlockSize = 2 * 1024 * 1024
         };
 
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "PPMd strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["CompressOperations"] = GetCounter("ppmd.compress"),
+                            ["DecompressOperations"] = GetCounter("ppmd.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            return base.DisposeAsyncCore();
+        }
+
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("ppmd.compress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for PPMd");
             using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
@@ -86,6 +148,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("ppmd.decompress");
+
+            if (input == null || input.Length == 0)
+                return input ?? Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for PPMd");
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];
