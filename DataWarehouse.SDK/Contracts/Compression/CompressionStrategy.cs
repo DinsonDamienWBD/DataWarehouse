@@ -440,14 +440,32 @@ namespace DataWarehouse.SDK.Contracts.Compression
             TotalDecompressionTimeMs > 0 ? (TotalBytesOut / TotalDecompressionTimeMs) * 1000.0 : 0;
 
         /// <summary>
+        /// Backing field for compression failures, enabling Interlocked operations.
+        /// </summary>
+        internal long _compressionFailures;
+
+        /// <summary>
         /// Gets or sets the number of compression failures.
         /// </summary>
-        public long CompressionFailures { get; set; }
+        public long CompressionFailures
+        {
+            get => Interlocked.Read(ref _compressionFailures);
+            set => Interlocked.Exchange(ref _compressionFailures, value);
+        }
+
+        /// <summary>
+        /// Backing field for decompression failures, enabling Interlocked operations.
+        /// </summary>
+        internal long _decompressionFailures;
 
         /// <summary>
         /// Gets or sets the number of decompression failures.
         /// </summary>
-        public long DecompressionFailures { get; set; }
+        public long DecompressionFailures
+        {
+            get => Interlocked.Read(ref _decompressionFailures);
+            set => Interlocked.Exchange(ref _decompressionFailures, value);
+        }
     }
 
     /// <summary>
@@ -977,25 +995,19 @@ namespace DataWarehouse.SDK.Contracts.Compression
         }
 
         /// <summary>
-        /// Increments compression failure counter atomically.
+        /// Increments compression failure counter atomically using Interlocked (no lock needed for single counter).
         /// </summary>
         private void IncrementCompressionFailures()
         {
-            lock (_statsLock)
-            {
-                _statistics.CompressionFailures++;
-            }
+            Interlocked.Increment(ref _statistics._compressionFailures);
         }
 
         /// <summary>
-        /// Increments decompression failure counter atomically.
+        /// Increments decompression failure counter atomically using Interlocked (no lock needed for single counter).
         /// </summary>
         private void IncrementDecompressionFailures()
         {
-            lock (_statsLock)
-            {
-                _statistics.DecompressionFailures++;
-            }
+            Interlocked.Increment(ref _statistics._decompressionFailures);
         }
 
         #region Intelligence Helper Methods

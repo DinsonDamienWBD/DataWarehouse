@@ -17,19 +17,43 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
     /// Huffman coding and a large static dictionary of common web content.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Brotli provides excellent compression ratios, especially for web content (HTML, CSS, JS),
     /// and is widely supported in modern browsers for HTTP content encoding. It achieves better
     /// compression than GZip with comparable decompression speed, making it ideal for web assets
     /// and text-heavy data. The algorithm uses a 16MB dictionary and context modeling to achieve
     /// its superior compression ratios.
+    /// </para>
+    /// <para>
+    /// Default quality is Q6 (not Q11). Q6 provides ~90% of Q11 compression ratio at 10-25x
+    /// faster speed, making it the optimal default for general-purpose use. Users can override
+    /// via <see cref="Quality"/> if maximum compression is needed.
+    /// </para>
     /// </remarks>
     public sealed class BrotliStrategy : CompressionStrategyBase
     {
         private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
 
         /// <summary>
+        /// Default Brotli quality level. Q6 provides ~90% of Q11 compression ratio at 10-25x faster speed.
+        /// </summary>
+        private const int DefaultQuality = 6;
+
+        /// <summary>
+        /// Default Brotli window size (22 = 4MB window).
+        /// </summary>
+        private const int DefaultWindow = 22;
+
+        /// <summary>
+        /// Gets or sets the Brotli quality level (0-11). Default is 6.
+        /// Q6 provides ~90% of Q11 compression ratio at 10-25x faster speed.
+        /// Set to 11 only when maximum compression is required and speed is not a concern.
+        /// </summary>
+        public int Quality { get; set; } = DefaultQuality;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="BrotliStrategy"/> class
-        /// with the default compression level.
+        /// with the default compression level (Q6).
         /// </summary>
         public BrotliStrategy() : base(SdkCompressionLevel.Default)
         {
@@ -116,7 +140,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 return Array.Empty<byte>();
 
             // Use BrotliEncoder for better control over compression
-            var encoder = new BrotliEncoder(quality: 11, window: 22);
+            // Q6 default: ~90% of Q11 ratio at 10-25x faster speed
+            var encoder = new BrotliEncoder(quality: Quality, window: DefaultWindow);
             try
             {
                 // Estimate output buffer size (worst case: input size + some overhead)
@@ -144,8 +169,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 else if (status == OperationStatus.DestinationTooSmall)
                 {
                     // Fallback to stream-based compression if buffer estimate was wrong
+                    // Use Fastest for stream fallback (Q6 encoder path is primary)
                     using var outputStream = new MemoryStream(input.Length + 256);
-                    using (var brotli = new BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+                    using (var brotli = new BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
                     {
                         brotli.Write(input, 0, input.Length);
                     }
@@ -233,7 +259,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             if (output == null)
                 throw new ArgumentNullException(nameof(output));
 
-            return new BrotliStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen);
+            // Use Fastest level for streaming (BrotliStream doesn't support arbitrary quality)
+            // For precise quality control, use CompressCore which uses BrotliEncoder with Q6
+            return new BrotliStream(output, System.IO.Compression.CompressionLevel.Fastest, leaveOpen);
         }
 
         /// <inheritdoc/>

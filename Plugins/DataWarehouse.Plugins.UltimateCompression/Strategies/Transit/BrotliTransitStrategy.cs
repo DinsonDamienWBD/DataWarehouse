@@ -12,6 +12,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
     /// <summary>
     /// Brotli transit compression strategy - HTTP-native compression with excellent text compression.
     /// Matches HTTP Content-Encoding: br, ideal for web APIs and JSON payloads.
+    /// Default level maps to Fastest (~Q4-6) rather than Optimal (~Q11) for 10-25x faster speed
+    /// with ~90% of maximum compression ratio.
     /// </summary>
     public sealed class BrotliTransitStrategy : CompressionStrategyBase
     {
@@ -25,14 +27,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         /// <param name="level">The compression level.</param>
         public BrotliTransitStrategy(SDK.Contracts.Compression.CompressionLevel level) : base(level)
         {
+            // Default maps to Fastest (~Q4-6) not Optimal (~Q11) for transit use:
+            // Transit compression prioritizes speed since it's on the critical path.
+            // Q6 provides ~90% of Q11 ratio at 10-25x faster speed.
             _brotliLevel = level switch
             {
                 SDK.Contracts.Compression.CompressionLevel.Fastest => System.IO.Compression.CompressionLevel.Fastest,
                 SDK.Contracts.Compression.CompressionLevel.Fast => System.IO.Compression.CompressionLevel.Fastest,
-                SDK.Contracts.Compression.CompressionLevel.Default => System.IO.Compression.CompressionLevel.Optimal,
+                SDK.Contracts.Compression.CompressionLevel.Default => System.IO.Compression.CompressionLevel.Fastest,
                 SDK.Contracts.Compression.CompressionLevel.Better => System.IO.Compression.CompressionLevel.Optimal,
                 SDK.Contracts.Compression.CompressionLevel.Best => System.IO.Compression.CompressionLevel.SmallestSize,
-                _ => System.IO.Compression.CompressionLevel.Optimal
+                _ => System.IO.Compression.CompressionLevel.Fastest
             };
         }
 

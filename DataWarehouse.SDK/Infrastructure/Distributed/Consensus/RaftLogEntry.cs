@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// Each entry contains a command and its associated term and index for ordering and consistency.
     /// </summary>
     [SdkCompatibility("2.0.0", Notes = "Phase 29: Raft consensus log entry")]
-    internal sealed class RaftLogEntry
+    public sealed class RaftLogEntry
     {
         /// <summary>
         /// Position of this entry in the log (1-indexed).

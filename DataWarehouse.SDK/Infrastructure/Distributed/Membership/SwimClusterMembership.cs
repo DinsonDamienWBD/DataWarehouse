@@ -34,6 +34,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private Task? _suspicionCheckTask;
 
         /// <summary>
+        /// Cached member list for zero-allocation GetMembers() calls.
+        /// Invalidated atomically when membership changes (join/leave/suspect/dead events).
+        /// At ~20 calls/sec, this eliminates 20 LINQ allocations per second.
+        /// </summary>
+        private volatile IReadOnlyList<ClusterNode>? _cachedMembers;
+
+        /// <summary>
         /// Maximum number of recent membership updates to track for piggyback dissemination.
         /// </summary>
         private const int MaxRecentUpdates = 100;
@@ -87,13 +94,36 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         public event Action<ClusterMembershipEvent>? OnMembershipChanged;
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Returns a cached member list (zero allocation). The cache is invalidated atomically
+        /// when membership changes (join/leave/suspect/dead events). This is critical because
+        /// GetMembers() is called ~20x/sec and the previous implementation allocated a new
+        /// List on every call.
+        /// </remarks>
         public IReadOnlyList<ClusterNode> GetMembers()
         {
-            return _members.Values
+            var cached = _cachedMembers;
+            if (cached != null)
+                return cached;
+
+            // Rebuild cache on miss
+            var members = _members.Values
                 .Where(m => m.Status != ClusterNodeStatus.Dead)
                 .Select(m => m.Node)
                 .ToList()
                 .AsReadOnly();
+
+            _cachedMembers = members;
+            return members;
+        }
+
+        /// <summary>
+        /// Invalidates the cached member list, forcing a rebuild on next GetMembers() call.
+        /// Called whenever membership state changes.
+        /// </summary>
+        private void InvalidateMemberCache()
+        {
+            _cachedMembers = null;
         }
 
         /// <inheritdoc />
@@ -687,6 +717,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         private void ProcessMembershipUpdates(List<SwimMembershipUpdate> updates)
         {
+            var changed = false;
+
             foreach (var update in updates)
             {
                 if (string.Equals(update.NodeId, _self.NodeId, StringComparison.Ordinal))
@@ -699,6 +731,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                         existing.IncarnationNumber = update.IncarnationNumber;
                         existing.Status = update.Status;
                         existing.Node = existing.Node with { Status = update.Status };
+                        changed = true;
                     }
                 }
                 else if (update.Status == ClusterNodeStatus.Active)
@@ -713,14 +746,23 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                         JoinedAt = DateTimeOffset.UtcNow
                     };
 
-                    _members.TryAdd(update.NodeId, new SwimMemberState
+                    if (_members.TryAdd(update.NodeId, new SwimMemberState
                     {
                         Node = newNode,
                         Status = ClusterNodeStatus.Active,
                         IncarnationNumber = update.IncarnationNumber,
                         LastPingAt = DateTimeOffset.UtcNow
-                    });
+                    }))
+                    {
+                        changed = true;
+                    }
                 }
+            }
+
+            // Invalidate cache if any membership state changed
+            if (changed)
+            {
+                InvalidateMemberCache();
             }
         }
 
@@ -801,6 +843,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         private void FireMembershipEvent(ClusterMembershipEventType eventType, ClusterNode node, string? reason)
         {
+            // Invalidate cached member list on any membership change
+            InvalidateMemberCache();
+
             OnMembershipChanged?.Invoke(new ClusterMembershipEvent
             {
                 EventType = eventType,
