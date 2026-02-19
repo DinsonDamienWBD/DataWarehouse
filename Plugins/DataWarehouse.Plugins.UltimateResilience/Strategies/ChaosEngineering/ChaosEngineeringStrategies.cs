@@ -25,6 +25,8 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
 
     public FaultInjectionStrategy(double faultRate, Type[] exceptionTypes, string[]? faultMessages = null)
     {
+        if (faultRate < 0 || faultRate > 1.0) throw new ArgumentOutOfRangeException(nameof(faultRate), "Fault rate must be between 0 and 1.");
+        ArgumentNullException.ThrowIfNull(exceptionTypes);
         _faultRate = faultRate;
         _exceptionTypes = exceptionTypes.Length > 0 ? exceptionTypes : new[] { typeof(Exception) };
         _faultMessages = faultMessages;
@@ -149,6 +151,9 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
 
     public LatencyInjectionStrategy(double injectionRate, TimeSpan minLatency, TimeSpan maxLatency)
     {
+        if (injectionRate < 0 || injectionRate > 1.0) throw new ArgumentOutOfRangeException(nameof(injectionRate), "Injection rate must be between 0 and 1.");
+        if (minLatency < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(minLatency), "Min latency must be non-negative.");
+        if (maxLatency < minLatency) throw new ArgumentOutOfRangeException(nameof(maxLatency), "Max latency must be >= min latency.");
         _injectionRate = injectionRate;
         _minLatency = minLatency;
         _maxLatency = maxLatency;
@@ -258,6 +263,7 @@ public sealed class ProcessTerminationStrategy : ResilienceStrategyBase
 
     public ProcessTerminationStrategy(double terminationRate, Action? onTermination = null)
     {
+        if (terminationRate < 0 || terminationRate > 1.0) throw new ArgumentOutOfRangeException(nameof(terminationRate), "Termination rate must be between 0 and 1.");
         _terminationRate = terminationRate;
         _onTermination = onTermination;
     }
@@ -358,6 +364,9 @@ public sealed class ResourceExhaustionStrategy : ResilienceStrategyBase
 
     public ResourceExhaustionStrategy(double exhaustionRate, string[] resourceTypes)
     {
+        if (exhaustionRate < 0 || exhaustionRate > 1.0) throw new ArgumentOutOfRangeException(nameof(exhaustionRate), "Exhaustion rate must be between 0 and 1.");
+        ArgumentNullException.ThrowIfNull(resourceTypes);
+        if (resourceTypes.Length == 0) throw new ArgumentException("At least one resource type must be specified.", nameof(resourceTypes));
         _exhaustionRate = exhaustionRate;
         _resourceTypes = resourceTypes;
     }
@@ -468,6 +477,8 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
 
     public NetworkPartitionStrategy(double partitionRate, TimeSpan partitionDuration)
     {
+        if (partitionRate < 0 || partitionRate > 1.0) throw new ArgumentOutOfRangeException(nameof(partitionRate), "Partition rate must be between 0 and 1.");
+        if (partitionDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(partitionDuration), "Partition duration must be positive.");
         _partitionRate = partitionRate;
         _partitionDuration = partitionDuration;
     }
@@ -614,6 +625,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
 
     public ChaosMonkeyStrategy(double overallRate)
     {
+        if (overallRate < 0 || overallRate > 1.0) throw new ArgumentOutOfRangeException(nameof(overallRate), "Overall rate must be between 0 and 1.");
         _overallRate = overallRate;
 
         // Add default chaos strategies with weights

@@ -24,6 +24,10 @@ public sealed class ExponentialBackoffRetryStrategy : ResilienceStrategyBase
 
     public ExponentialBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, params Type[] retryableExceptions)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        ArgumentOutOfRangeException.ThrowIfLessThan(multiplier, 1.0);
+        if (initialDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(initialDelay), "Initial delay must be positive.");
+        if (maxDelay < initialDelay) throw new ArgumentOutOfRangeException(nameof(maxDelay), "Max delay must be >= initial delay.");
         _maxRetries = maxRetries;
         _initialDelay = initialDelay;
         _maxDelay = maxDelay;
@@ -135,6 +139,11 @@ public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
 
     public JitteredExponentialBackoffStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, double jitterFactor)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        ArgumentOutOfRangeException.ThrowIfLessThan(multiplier, 1.0);
+        if (jitterFactor < 0 || jitterFactor > 1.0) throw new ArgumentOutOfRangeException(nameof(jitterFactor), "Jitter factor must be between 0 and 1.");
+        if (initialDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(initialDelay), "Initial delay must be positive.");
+        if (maxDelay < initialDelay) throw new ArgumentOutOfRangeException(nameof(maxDelay), "Max delay must be >= initial delay.");
         _maxRetries = maxRetries;
         _initialDelay = initialDelay;
         _maxDelay = maxDelay;
@@ -229,6 +238,8 @@ public sealed class FixedDelayRetryStrategy : ResilienceStrategyBase
 
     public FixedDelayRetryStrategy(int maxRetries, TimeSpan delay)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        if (delay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(delay), "Delay must be positive.");
         _maxRetries = maxRetries;
         _delay = delay;
     }
@@ -310,6 +321,7 @@ public sealed class ImmediateRetryStrategy : ResilienceStrategyBase
 
     public ImmediateRetryStrategy(int maxRetries)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
         _maxRetries = maxRetries;
     }
 
@@ -387,9 +399,11 @@ public sealed class RetryWithFallbackStrategy<TResult> : ResilienceStrategyBase
 
     public RetryWithFallbackStrategy(int maxRetries, TimeSpan delay, Func<CancellationToken, Task<TResult>> fallback)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        if (delay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(delay), "Delay must be positive.");
         _maxRetries = maxRetries;
         _delay = delay;
-        _fallback = fallback;
+        _fallback = fallback ?? throw new ArgumentNullException(nameof(fallback));
     }
 
     public override string StrategyId => "retry-with-fallback";
@@ -496,6 +510,10 @@ public sealed class LinearBackoffRetryStrategy : ResilienceStrategyBase
 
     public LinearBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan delayIncrement, TimeSpan maxDelay)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        if (initialDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(initialDelay), "Initial delay must be positive.");
+        if (delayIncrement <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(delayIncrement), "Delay increment must be positive.");
+        if (maxDelay < initialDelay) throw new ArgumentOutOfRangeException(nameof(maxDelay), "Max delay must be >= initial delay.");
         _maxRetries = maxRetries;
         _initialDelay = initialDelay;
         _delayIncrement = delayIncrement;
@@ -590,6 +608,9 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
 
     public DecorrelatedJitterRetryStrategy(int maxRetries, TimeSpan baseDelay, TimeSpan maxDelay)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries);
+        if (baseDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(baseDelay), "Base delay must be positive.");
+        if (maxDelay < baseDelay) throw new ArgumentOutOfRangeException(nameof(maxDelay), "Max delay must be >= base delay.");
         _maxRetries = maxRetries;
         _baseDelay = baseDelay;
         _maxDelay = maxDelay;
@@ -692,6 +713,9 @@ public sealed class AdaptiveRetryStrategy : ResilienceStrategyBase
 
     public AdaptiveRetryStrategy(int baseMaxRetries, TimeSpan baseDelay, TimeSpan maxDelay)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(baseMaxRetries);
+        if (baseDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(baseDelay), "Base delay must be positive.");
+        if (maxDelay < baseDelay) throw new ArgumentOutOfRangeException(nameof(maxDelay), "Max delay must be >= base delay.");
         _baseMaxRetries = baseMaxRetries;
         _baseDelay = baseDelay;
         _maxDelay = maxDelay;

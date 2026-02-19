@@ -26,6 +26,9 @@ public sealed class TokenBucketRateLimitingStrategy : ResilienceStrategyBase
 
     public TokenBucketRateLimitingStrategy(double bucketCapacity, double refillRate, TimeSpan refillInterval)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bucketCapacity);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(refillRate);
+        if (refillInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(refillInterval), "Refill interval must be positive.");
         _bucketCapacity = bucketCapacity;
         _refillRate = refillRate;
         _refillInterval = refillInterval;
@@ -172,6 +175,8 @@ public sealed class LeakyBucketRateLimitingStrategy : ResilienceStrategyBase
 
     public LeakyBucketRateLimitingStrategy(int bucketCapacity, TimeSpan leakInterval)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bucketCapacity);
+        if (leakInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(leakInterval), "Leak interval must be positive.");
         _bucketCapacity = bucketCapacity;
         _leakInterval = leakInterval;
         _leakTimer = new Timer(ProcessQueue, null, _leakInterval, _leakInterval);
@@ -308,6 +313,8 @@ public sealed class SlidingWindowRateLimitingStrategy : ResilienceStrategyBase
 
     public SlidingWindowRateLimitingStrategy(int maxRequests, TimeSpan windowDuration)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRequests);
+        if (windowDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(windowDuration), "Window duration must be positive.");
         _maxRequests = maxRequests;
         _windowDuration = windowDuration;
     }
@@ -446,6 +453,8 @@ public sealed class FixedWindowRateLimitingStrategy : ResilienceStrategyBase
 
     public FixedWindowRateLimitingStrategy(int maxRequests, TimeSpan windowDuration)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRequests);
+        if (windowDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(windowDuration), "Window duration must be positive.");
         _maxRequests = maxRequests;
         _windowDuration = windowDuration;
         _windowStart = DateTimeOffset.UtcNow;
@@ -742,6 +751,7 @@ public sealed class ConcurrencyLimiterStrategy : ResilienceStrategyBase
 
     public ConcurrencyLimiterStrategy(int maxConcurrency)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConcurrency);
         _maxConcurrency = maxConcurrency;
         _semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
     }

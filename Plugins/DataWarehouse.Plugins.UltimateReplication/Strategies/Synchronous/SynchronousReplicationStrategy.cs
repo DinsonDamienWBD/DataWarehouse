@@ -51,6 +51,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Synchronous
         /// <param name="syncTimeout">Timeout for synchronous writes.</param>
         public SynchronousReplicationStrategy(int writeQuorum, TimeSpan? syncTimeout = null)
         {
+            if (writeQuorum < -1 || writeQuorum == 0) throw new ArgumentOutOfRangeException(nameof(writeQuorum), "Write quorum must be -1 (all) or a positive integer.");
+            if (syncTimeout.HasValue && syncTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(syncTimeout), "Sync timeout must be positive.");
             _writeQuorum = writeQuorum;
             _syncTimeout = syncTimeout ?? TimeSpan.FromSeconds(30);
         }

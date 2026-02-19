@@ -66,6 +66,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Asynchronous
         /// <param name="replicationInterval">Background replication interval.</param>
         public AsynchronousReplicationStrategy(int maxQueueSize, TimeSpan replicationInterval)
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxQueueSize);
+            if (replicationInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(replicationInterval), "Replication interval must be positive.");
             _maxQueueSize = maxQueueSize;
             _replicationInterval = replicationInterval;
             StartBackgroundReplication();

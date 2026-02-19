@@ -22,8 +22,9 @@ public sealed class CacheFallbackStrategy<TResult> : ResilienceStrategyBase
 
     public CacheFallbackStrategy(TimeSpan cacheTtl, Func<ResilienceContext?, string> keySelector)
     {
+        if (cacheTtl <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(cacheTtl), "Cache TTL must be positive.");
         _cacheTtl = cacheTtl;
-        _keySelector = keySelector;
+        _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
     }
 
     public override string StrategyId => "fallback-cache";

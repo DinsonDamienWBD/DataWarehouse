@@ -99,6 +99,8 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
 
     public GeoReplicationFailoverStrategy(TimeSpan healthCheckInterval, int failureThreshold)
     {
+        if (healthCheckInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(healthCheckInterval), "Health check interval must be positive.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(failureThreshold);
         _healthCheckInterval = healthCheckInterval;
         _failureThreshold = failureThreshold;
     }
@@ -381,6 +383,8 @@ public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
 
     public PointInTimeRecoveryStrategy(int maxRecoveryPoints, TimeSpan retentionPeriod)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRecoveryPoints);
+        if (retentionPeriod <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(retentionPeriod), "Retention period must be positive.");
         _maxRecoveryPoints = maxRecoveryPoints;
         _retentionPeriod = retentionPeriod;
     }
@@ -1109,6 +1113,7 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
 
     public DataCenterFailoverStrategy(TimeSpan failoverTimeout)
     {
+        if (failoverTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(failoverTimeout), "Failover timeout must be positive.");
         _failoverTimeout = failoverTimeout;
     }
 
@@ -1348,6 +1353,8 @@ public sealed class BackupCoordinationStrategy : ResilienceStrategyBase
 
     public BackupCoordinationStrategy(TimeSpan backupInterval, int retainBackups)
     {
+        if (backupInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(backupInterval), "Backup interval must be positive.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(retainBackups);
         _backupInterval = backupInterval;
         _retainBackups = retainBackups;
     }

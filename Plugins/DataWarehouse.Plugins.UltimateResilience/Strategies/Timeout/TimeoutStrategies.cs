@@ -21,6 +21,7 @@ public sealed class SimpleTimeoutStrategy : ResilienceStrategyBase
 
     public SimpleTimeoutStrategy(TimeSpan timeout)
     {
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive.");
         _timeout = timeout;
     }
 
@@ -104,6 +105,10 @@ public sealed class CascadingTimeoutStrategy : ResilienceStrategyBase
 
     public CascadingTimeoutStrategy(TimeSpan outerTimeout, TimeSpan innerTimeout, TimeSpan perStepTimeout)
     {
+        if (outerTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(outerTimeout), "Outer timeout must be positive.");
+        if (innerTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(innerTimeout), "Inner timeout must be positive.");
+        if (perStepTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(perStepTimeout), "Per-step timeout must be positive.");
+        if (innerTimeout > outerTimeout) throw new ArgumentOutOfRangeException(nameof(innerTimeout), "Inner timeout must be <= outer timeout.");
         _outerTimeout = outerTimeout;
         _innerTimeout = innerTimeout;
         _perStepTimeout = perStepTimeout;
@@ -240,6 +245,11 @@ public sealed class AdaptiveTimeoutStrategy : ResilienceStrategyBase
         TimeSpan baseTimeout, TimeSpan minTimeout, TimeSpan maxTimeout,
         double percentile, double multiplier)
     {
+        if (baseTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(baseTimeout), "Base timeout must be positive.");
+        if (minTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(minTimeout), "Min timeout must be positive.");
+        if (maxTimeout < minTimeout) throw new ArgumentOutOfRangeException(nameof(maxTimeout), "Max timeout must be >= min timeout.");
+        if (percentile <= 0 || percentile > 1.0) throw new ArgumentOutOfRangeException(nameof(percentile), "Percentile must be between 0 and 1.");
+        ArgumentOutOfRangeException.ThrowIfLessThan(multiplier, 1.0);
         _baseTimeout = baseTimeout;
         _minTimeout = minTimeout;
         _maxTimeout = maxTimeout;
@@ -389,6 +399,7 @@ public sealed class PessimisticTimeoutStrategy : ResilienceStrategyBase
 
     public PessimisticTimeoutStrategy(TimeSpan timeout)
     {
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive.");
         _timeout = timeout;
     }
 
@@ -484,6 +495,9 @@ public sealed class OptimisticTimeoutStrategy : ResilienceStrategyBase
 
     public OptimisticTimeoutStrategy(TimeSpan hardTimeout, TimeSpan softTimeout)
     {
+        if (hardTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(hardTimeout), "Hard timeout must be positive.");
+        if (softTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(softTimeout), "Soft timeout must be positive.");
+        if (softTimeout > hardTimeout) throw new ArgumentOutOfRangeException(nameof(softTimeout), "Soft timeout must be <= hard timeout.");
         _hardTimeout = hardTimeout;
         _softTimeout = softTimeout;
     }
@@ -590,6 +604,9 @@ public sealed class PerAttemptTimeoutStrategy : ResilienceStrategyBase
 
     public PerAttemptTimeoutStrategy(TimeSpan attemptTimeout, TimeSpan totalTimeout)
     {
+        if (attemptTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(attemptTimeout), "Attempt timeout must be positive.");
+        if (totalTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(totalTimeout), "Total timeout must be positive.");
+        if (attemptTimeout > totalTimeout) throw new ArgumentOutOfRangeException(nameof(attemptTimeout), "Attempt timeout must be <= total timeout.");
         _attemptTimeout = attemptTimeout;
         _totalTimeout = totalTimeout;
     }

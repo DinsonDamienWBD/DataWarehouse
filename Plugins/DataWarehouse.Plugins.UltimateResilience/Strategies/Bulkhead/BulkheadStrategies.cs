@@ -9,12 +9,13 @@ namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Bulkhead;
 /// <summary>
 /// Thread pool isolation bulkhead strategy.
 /// </summary>
-public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
+public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDisposable
 {
     private readonly SemaphoreSlim _executionSemaphore;
     private readonly SemaphoreSlim _queueSemaphore;
     private int _activeExecutions;
     private int _queuedItems;
+    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly int _maxQueueLength;
@@ -26,10 +27,21 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
 
     public ThreadPoolBulkheadStrategy(int maxParallelism, int maxQueueLength)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxParallelism);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxQueueLength);
         _maxParallelism = maxParallelism;
         _maxQueueLength = maxQueueLength;
         _executionSemaphore = new SemaphoreSlim(maxParallelism, maxParallelism);
         _queueSemaphore = new SemaphoreSlim(maxQueueLength, maxQueueLength);
+    }
+
+    /// <summary>Releases semaphore resources.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _executionSemaphore.Dispose();
+        _queueSemaphore.Dispose();
     }
 
     public override string StrategyId => "bulkhead-thread-pool";
@@ -153,10 +165,11 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
 /// <summary>
 /// Semaphore-based bulkhead strategy for simple concurrency limiting.
 /// </summary>
-public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase
+public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposable
 {
     private readonly SemaphoreSlim _semaphore;
     private int _activeExecutions;
+    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly TimeSpan _waitTimeout;
@@ -168,9 +181,19 @@ public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase
 
     public SemaphoreBulkheadStrategy(int maxParallelism, TimeSpan waitTimeout)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxParallelism);
+        if (waitTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(waitTimeout), "Wait timeout must be positive.");
         _maxParallelism = maxParallelism;
         _waitTimeout = waitTimeout;
         _semaphore = new SemaphoreSlim(maxParallelism, maxParallelism);
+    }
+
+    /// <summary>Releases semaphore resources.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _semaphore.Dispose();
     }
 
     public override string StrategyId => "bulkhead-semaphore";
@@ -288,6 +311,8 @@ public sealed class PartitionBulkheadStrategy : ResilienceStrategyBase
 
     public PartitionBulkheadStrategy(int defaultPartitionSize, Dictionary<string, int> partitionSizes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(defaultPartitionSize);
+        ArgumentNullException.ThrowIfNull(partitionSizes);
         _defaultPartitionSize = defaultPartitionSize;
         _partitionSizes = new Dictionary<string, int>(partitionSizes);
     }
@@ -429,6 +454,9 @@ public sealed class PriorityBulkheadStrategy : ResilienceStrategyBase
 
     public PriorityBulkheadStrategy(int highPrioritySlots, int normalSlots, int priorityThreshold)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(highPrioritySlots);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(normalSlots);
+        ArgumentOutOfRangeException.ThrowIfNegative(priorityThreshold);
         _highPrioritySlots = highPrioritySlots;
         _normalSlots = normalSlots;
         _priorityThreshold = priorityThreshold;
@@ -557,6 +585,12 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
 
     public AdaptiveBulkheadStrategy(int minCapacity, int maxCapacity, int baseCapacity, TimeSpan targetLatency, TimeSpan adaptationInterval)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minCapacity);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapacity);
+        if (baseCapacity < minCapacity || baseCapacity > maxCapacity) throw new ArgumentOutOfRangeException(nameof(baseCapacity), "Base capacity must be between min and max.");
+        if (minCapacity > maxCapacity) throw new ArgumentOutOfRangeException(nameof(minCapacity), "Min capacity must be <= max capacity.");
+        if (targetLatency <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(targetLatency), "Target latency must be positive.");
+        if (adaptationInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(adaptationInterval), "Adaptation interval must be positive.");
         _minCapacity = minCapacity;
         _maxCapacity = maxCapacity;
         _baseCapacity = baseCapacity;

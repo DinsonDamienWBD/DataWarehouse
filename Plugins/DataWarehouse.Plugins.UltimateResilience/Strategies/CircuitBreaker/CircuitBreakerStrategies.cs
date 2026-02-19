@@ -42,6 +42,9 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
 
     public StandardCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, int halfOpenSuccessThreshold)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(failureThreshold);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(halfOpenSuccessThreshold);
+        if (openDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(openDuration), "Open duration must be positive.");
         _failureThreshold = failureThreshold;
         _openDuration = openDuration;
         _halfOpenSuccessThreshold = halfOpenSuccessThreshold;
@@ -226,6 +229,10 @@ public sealed class SlidingWindowCircuitBreakerStrategy : ResilienceStrategyBase
 
     public SlidingWindowCircuitBreakerStrategy(TimeSpan windowDuration, double failureRateThreshold, int minimumRequests, TimeSpan openDuration)
     {
+        if (windowDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(windowDuration), "Window duration must be positive.");
+        if (failureRateThreshold <= 0 || failureRateThreshold > 1.0) throw new ArgumentOutOfRangeException(nameof(failureRateThreshold), "Failure rate threshold must be between 0 and 1.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumRequests);
+        if (openDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(openDuration), "Open duration must be positive.");
         _windowDuration = windowDuration;
         _failureRateThreshold = failureRateThreshold;
         _minimumRequests = minimumRequests;
@@ -403,6 +410,9 @@ public sealed class CountBasedCircuitBreakerStrategy : ResilienceStrategyBase
 
     public CountBasedCircuitBreakerStrategy(int failureThreshold, int successThreshold, TimeSpan openDuration)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(failureThreshold);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(successThreshold);
+        if (openDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(openDuration), "Open duration must be positive.");
         _failureThreshold = failureThreshold;
         _successThreshold = successThreshold;
         _openDuration = openDuration;
@@ -543,6 +553,11 @@ public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
 
     public TimeBasedCircuitBreakerStrategy(TimeSpan bucketDuration, int bucketsToTrack, double failureRateThreshold, int minimumRequests, TimeSpan openDuration)
     {
+        if (bucketDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(bucketDuration), "Bucket duration must be positive.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bucketsToTrack);
+        if (failureRateThreshold <= 0 || failureRateThreshold > 1.0) throw new ArgumentOutOfRangeException(nameof(failureRateThreshold), "Failure rate threshold must be between 0 and 1.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumRequests);
+        if (openDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(openDuration), "Open duration must be positive.");
         _bucketDuration = bucketDuration;
         _bucketsToTrack = bucketsToTrack;
         _failureRateThreshold = failureRateThreshold;
@@ -734,6 +749,11 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
 
     public GradualRecoveryCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, double initialPermitRate, double permitRateIncrement, int successesPerIncrement)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(failureThreshold);
+        if (openDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(openDuration), "Open duration must be positive.");
+        if (initialPermitRate <= 0 || initialPermitRate > 1.0) throw new ArgumentOutOfRangeException(nameof(initialPermitRate), "Initial permit rate must be between 0 and 1.");
+        if (permitRateIncrement <= 0 || permitRateIncrement > 1.0) throw new ArgumentOutOfRangeException(nameof(permitRateIncrement), "Permit rate increment must be between 0 and 1.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(successesPerIncrement);
         _failureThreshold = failureThreshold;
         _openDuration = openDuration;
         _initialPermitRate = initialPermitRate;

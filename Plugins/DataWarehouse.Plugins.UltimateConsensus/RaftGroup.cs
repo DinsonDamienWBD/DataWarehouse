@@ -99,9 +99,13 @@ public sealed class RaftGroup
     /// <param name="voterIds">List of voter node IDs (3-5 recommended).</param>
     public RaftGroup(int groupId, string localNodeId, IEnumerable<string> voterIds)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(groupId);
+        ArgumentNullException.ThrowIfNull(localNodeId);
+        ArgumentNullException.ThrowIfNull(voterIds);
         GroupId = groupId;
         _localNodeId = localNodeId;
         VoterIds.AddRange(voterIds);
+        if (VoterIds.Count == 0) throw new ArgumentException("At least one voter ID is required.", nameof(voterIds));
     }
 
     /// <summary>

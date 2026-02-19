@@ -609,6 +609,7 @@ public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrate
 
     public ConsistentHashingLoadBalancingStrategy(int virtualNodes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(virtualNodes);
         _virtualNodes = virtualNodes;
     }
 

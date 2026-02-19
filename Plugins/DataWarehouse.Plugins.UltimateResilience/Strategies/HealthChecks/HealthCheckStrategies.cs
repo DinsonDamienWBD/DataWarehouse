@@ -599,6 +599,7 @@ public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
 
     public DeepHealthCheckStrategy(TimeSpan cacheValidity)
     {
+        if (cacheValidity <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(cacheValidity), "Cache validity must be positive.");
         _cacheValidity = cacheValidity;
     }
 
