@@ -311,6 +311,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     {
         private readonly ConcurrentDictionary<string, HashSet<string>> _addSet = new();
         private readonly ConcurrentDictionary<string, HashSet<string>> _removeSet = new();
+        internal readonly ConcurrentDictionary<string, DateTimeOffset> _removeTimestamps = new();
 
         /// <summary>
         /// Gets the currently-observed elements (those with add tags not in remove set).
@@ -354,6 +355,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             if (_addSet.TryGetValue(element, out var addTags))
             {
                 var removedTags = _removeSet.GetOrAdd(element, _ => new HashSet<string>());
+                var now = DateTimeOffset.UtcNow;
                 lock (addTags)
                 {
                     lock (removedTags)
@@ -361,6 +363,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                         foreach (var tag in addTags)
                         {
                             removedTags.Add(tag);
+                            var key = $"{element}:{tag}";
+                            _removeTimestamps.TryAdd(key, now);
                         }
                     }
                 }
@@ -385,6 +389,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             MergeSets(_removeSet, result._removeSet);
             MergeSets(otherSet._removeSet, result._removeSet);
 
+            // Merge remove timestamps (earliest known removal wins -- conservative)
+            MergeTimestamps(_removeTimestamps, result._removeTimestamps);
+            MergeTimestamps(otherSet._removeTimestamps, result._removeTimestamps);
+
             return result;
         }
 
@@ -405,19 +413,165 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
+        private static void MergeTimestamps(
+            ConcurrentDictionary<string, DateTimeOffset> source,
+            ConcurrentDictionary<string, DateTimeOffset> target)
+        {
+            foreach (var (key, timestamp) in source)
+            {
+                target.AddOrUpdate(key, timestamp, (_, existing) =>
+                    timestamp < existing ? timestamp : existing);
+            }
+        }
+
+        /// <summary>
+        /// Gets the total count of all tags across all elements in the remove-set (tombstone count).
+        /// </summary>
+        internal int TombstoneCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (var (_, tags) in _removeSet)
+                {
+                    lock (tags)
+                    {
+                        count += tags.Count;
+                    }
+                }
+                return count;
+            }
+        }
+
+        /// <summary>
+        /// Removes an element entirely from both add-set and remove-set, cleaning up timestamps.
+        /// Used by <see cref="OrSetPruner"/> for fully-removed elements whose tombstones are causally stable.
+        /// </summary>
+        internal void PruneElement(string element)
+        {
+            if (_addSet.TryRemove(element, out var addTags))
+            {
+                lock (addTags)
+                {
+                    foreach (var tag in addTags)
+                    {
+                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                    }
+                }
+            }
+
+            if (_removeSet.TryRemove(element, out var removeTags))
+            {
+                lock (removeTags)
+                {
+                    foreach (var tag in removeTags)
+                    {
+                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Compacts an element's add-set to a single surviving tag and clears its remove-set.
+        /// Used by <see cref="OrSetPruner"/> to reduce per-element tag count from O(writes) to O(1).
+        /// </summary>
+        internal void CompactElement(string element, string survivingTag)
+        {
+            // Replace the add-set with just the surviving tag
+            if (_addSet.TryGetValue(element, out var addTags))
+            {
+                lock (addTags)
+                {
+                    addTags.Clear();
+                    addTags.Add(survivingTag);
+                }
+            }
+
+            // Clear the remove-set for this element
+            if (_removeSet.TryRemove(element, out var removeTags))
+            {
+                lock (removeTags)
+                {
+                    foreach (var tag in removeTags)
+                    {
+                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets all elements that have entries in either the add-set or remove-set.
+        /// Used by <see cref="OrSetPruner"/> to enumerate elements for pruning.
+        /// </summary>
+        internal IReadOnlyCollection<string> GetAllElements()
+        {
+            var elements = new HashSet<string>(_addSet.Keys);
+            foreach (var key in _removeSet.Keys)
+            {
+                elements.Add(key);
+            }
+            return elements;
+        }
+
+        /// <summary>
+        /// Gets the add-set tags for a specific element. Returns null if element has no add-set entries.
+        /// </summary>
+        internal IReadOnlyCollection<string>? GetAddTags(string element)
+        {
+            if (_addSet.TryGetValue(element, out var tags))
+            {
+                lock (tags)
+                {
+                    return tags.ToList();
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the remove-set tags for a specific element. Returns null if element has no remove-set entries.
+        /// </summary>
+        internal IReadOnlyCollection<string>? GetRemoveTags(string element)
+        {
+            if (_removeSet.TryGetValue(element, out var tags))
+            {
+                lock (tags)
+                {
+                    return tags.ToList();
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the timestamp when a specific tag was added to the remove-set for an element.
+        /// Returns <see cref="DateTimeOffset.MinValue"/> if no timestamp is recorded (backward compatibility).
+        /// </summary>
+        internal DateTimeOffset GetRemoveTimestamp(string element, string tag)
+        {
+            return _removeTimestamps.TryGetValue($"{element}:{tag}", out var timestamp)
+                ? timestamp
+                : DateTimeOffset.MinValue;
+        }
+
         /// <inheritdoc />
         public byte[] Serialize()
         {
             var wrapper = new ORSetData
             {
                 AddSet = SerializeTagSets(_addSet),
-                RemoveSet = SerializeTagSets(_removeSet)
+                RemoveSet = SerializeTagSets(_removeSet),
+                RemoveTimestamps = SerializeTimestamps(_removeTimestamps)
             };
             return JsonSerializer.SerializeToUtf8Bytes(wrapper);
         }
 
         /// <summary>
         /// Deserializes an OR-Set from a byte array.
+        /// Backward compatible: if removeTimestamps field is missing, all tombstones are
+        /// treated as having <see cref="DateTimeOffset.MinValue"/> (always eligible for pruning).
         /// </summary>
         public static SdkORSet Deserialize(byte[] data)
         {
@@ -426,6 +580,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             var result = new SdkORSet();
             DeserializeTagSets(wrapper.AddSet, result._addSet);
             DeserializeTagSets(wrapper.RemoveSet, result._removeSet);
+            DeserializeTimestamps(wrapper.RemoveTimestamps, result._removeTimestamps);
             return result;
         }
 
@@ -454,6 +609,32 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
+        private static Dictionary<string, string>? SerializeTimestamps(
+            ConcurrentDictionary<string, DateTimeOffset> timestamps)
+        {
+            if (timestamps.IsEmpty) return null;
+            var dict = new Dictionary<string, string>();
+            foreach (var (key, value) in timestamps)
+            {
+                dict[key] = value.ToString("O");
+            }
+            return dict;
+        }
+
+        private static void DeserializeTimestamps(
+            Dictionary<string, string>? source,
+            ConcurrentDictionary<string, DateTimeOffset> target)
+        {
+            if (source == null) return;
+            foreach (var (key, value) in source)
+            {
+                if (DateTimeOffset.TryParse(value, out var timestamp))
+                {
+                    target[key] = timestamp;
+                }
+            }
+        }
+
         private sealed class ORSetData
         {
             [JsonPropertyName("addSet")]
@@ -461,6 +642,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
             [JsonPropertyName("removeSet")]
             public Dictionary<string, List<string>>? RemoveSet { get; set; }
+
+            [JsonPropertyName("removeTimestamps")]
+            public Dictionary<string, string>? RemoveTimestamps { get; set; }
         }
     }
 }
