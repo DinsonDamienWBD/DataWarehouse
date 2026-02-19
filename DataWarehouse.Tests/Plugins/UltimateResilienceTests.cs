@@ -1,4 +1,6 @@
 using Xunit;
+using DataWarehouse.Plugins.UltimateResilience;
+using DataWarehouse.SDK.Primitives;
 
 namespace DataWarehouse.Tests.Plugins;
 
@@ -6,8 +8,55 @@ namespace DataWarehouse.Tests.Plugins;
 public class UltimateResilienceTests
 {
     [Fact]
-    public void UltimateResiliencePlugin_BasicValidation()
+    public void Plugin_HasCorrectIdentity()
     {
-        Assert.True(true); // Placeholder
+        using var plugin = new UltimateResiliencePlugin();
+
+        Assert.Equal("com.datawarehouse.resilience.ultimate", plugin.Id);
+        Assert.Equal("Ultimate Resilience", plugin.Name);
+        Assert.Equal("1.0.0", plugin.Version);
+        Assert.Equal(PluginCategory.InfrastructureProvider, plugin.Category);
+    }
+
+    [Fact]
+    public void Registry_AutoDiscoversStrategies()
+    {
+        using var plugin = new UltimateResiliencePlugin();
+
+        var strategies = plugin.Registry.GetAllStrategies();
+        Assert.NotEmpty(strategies);
+        Assert.True(strategies.Count > 10, "Should discover many resilience strategies");
+    }
+
+    [Fact]
+    public void Registry_HasMultipleCategories()
+    {
+        using var plugin = new UltimateResiliencePlugin();
+
+        var circuitBreakers = plugin.Registry.GetStrategiesByCategory("CircuitBreaker");
+        var retries = plugin.Registry.GetStrategiesByCategory("Retry");
+
+        Assert.NotEmpty(circuitBreakers);
+        Assert.NotEmpty(retries);
+    }
+
+    [Fact]
+    public void GetStrategy_ReturnsNullForUnknown()
+    {
+        using var plugin = new UltimateResiliencePlugin();
+
+        var strategy = plugin.Registry.GetStrategy("non-existent");
+        Assert.Null(strategy);
+    }
+
+    [Fact]
+    public async Task GetResilienceHealth_ReturnsHealthInfo()
+    {
+        using var plugin = new UltimateResiliencePlugin();
+
+        var health = await plugin.GetResilienceHealthAsync(CancellationToken.None);
+
+        Assert.NotNull(health);
+        Assert.True(health.TotalPolicies > 0);
     }
 }

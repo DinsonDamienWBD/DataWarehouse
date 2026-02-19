@@ -84,6 +84,22 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataQuality\DataWarehouse.Plugins.UltimateDataQuality.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataTransit\DataWarehouse.Plugins.UltimateDataTransit.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataGovernance\DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDeployment\DataWarehouse.Plugins.UltimateDeployment.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDocGen\DataWarehouse.Plugins.UltimateDocGen.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateEdgeComputing\DataWarehouse.Plugins.UltimateEdgeComputing.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIoTIntegration\DataWarehouse.Plugins.UltimateIoTIntegration.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateMicroservices\DataWarehouse.Plugins.UltimateMicroservices.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateMultiCloud\DataWarehouse.Plugins.UltimateMultiCloud.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateResilience\DataWarehouse.Plugins.UltimateResilience.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateResourceManager\DataWarehouse.Plugins.UltimateResourceManager.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRTOSBridge\DataWarehouse.Plugins.UltimateRTOSBridge.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateServerless\DataWarehouse.Plugins.UltimateServerless.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateSDKPorts\DataWarehouse.Plugins.UltimateSDKPorts.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorageProcessing\DataWarehouse.Plugins.UltimateStorageProcessing.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStreamingData\DataWarehouse.Plugins.UltimateStreamingData.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateSustainability\DataWarehouse.Plugins.UltimateSustainability.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateWorkflow\DataWarehouse.Plugins.UltimateWorkflow.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Virtualization.SqlOverObject\DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
   </ItemGroup>
 
 </Project>
