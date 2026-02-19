@@ -194,13 +194,13 @@ public class PluginDiscoveryServiceTests
     }
 
     [Fact]
-    public async Task RefreshPluginsAsync_Completes()
+    public async Task RefreshPluginsAsync_Completes_WithoutException()
     {
         // Act
-        await _service.RefreshPluginsAsync();
+        var exception = await Record.ExceptionAsync(() => _service.RefreshPluginsAsync());
 
-        // Assert - should not throw
-        Assert.True(true);
+        // Assert
+        exception.Should().BeNull();
     }
 }
 

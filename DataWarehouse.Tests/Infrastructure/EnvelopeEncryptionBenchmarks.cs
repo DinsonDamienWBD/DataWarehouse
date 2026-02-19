@@ -266,7 +266,6 @@ namespace DataWarehouse.Tests.Infrastructure
             }
 
             _output.WriteLine("PASS: Direct mode encryption benchmark complete.");
-            Assert.True(true); // Test completed successfully
         }
 
         [Fact]
@@ -301,7 +300,15 @@ namespace DataWarehouse.Tests.Infrastructure
             }
 
             _output.WriteLine("PASS: Envelope mode encryption benchmark complete.");
-            Assert.True(true); // Test completed successfully
+
+            // Verify envelope encryption produces correct results
+            var verifyData = RandomNumberGenerator.GetBytes(1024);
+            var verifyDek = strategy.GenerateKey();
+            var verifyWrapped = await envelopeStore.WrapKeyAsync(kekId, verifyDek, context);
+            var verifyEncrypted = await strategy.EncryptAsync(verifyData, verifyDek);
+            var verifyUnwrapped = await envelopeStore.UnwrapKeyAsync(kekId, verifyWrapped, context);
+            var verifyDecrypted = await strategy.DecryptAsync(verifyEncrypted, verifyUnwrapped);
+            Assert.Equal(verifyData, verifyDecrypted);
         }
 
         [Fact]

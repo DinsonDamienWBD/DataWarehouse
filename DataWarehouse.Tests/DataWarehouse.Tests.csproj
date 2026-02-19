@@ -55,6 +55,35 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateFilesystem\DataWarehouse.Plugins.UltimateFilesystem.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalObservability\DataWarehouse.Plugins.UniversalObservability.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalDashboards\DataWarehouse.Plugins.UniversalDashboards.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AdaptiveTransport\DataWarehouse.Plugins.AdaptiveTransport.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AedsCore\DataWarehouse.Plugins.AedsCore.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AirGapBridge\DataWarehouse.Plugins.AirGapBridge.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AppPlatform\DataWarehouse.Plugins.AppPlatform.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compute.Wasm\DataWarehouse.Plugins.Compute.Wasm.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.DataMarketplace\DataWarehouse.Plugins.DataMarketplace.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.FuseDriver\DataWarehouse.Plugins.FuseDriver.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.KubernetesCsi\DataWarehouse.Plugins.KubernetesCsi.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.PluginMarketplace\DataWarehouse.Plugins.PluginMarketplace.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.SelfEmulatingObjects\DataWarehouse.Plugins.SelfEmulatingObjects.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateBlockchain\DataWarehouse.Plugins.UltimateBlockchain.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompute\DataWarehouse.Plugins.UltimateCompute.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateConnector\DataWarehouse.Plugins.UltimateConnector.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDatabaseProtocol\DataWarehouse.Plugins.UltimateDatabaseProtocol.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDatabaseStorage\DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataCatalog\DataWarehouse.Plugins.UltimateDataCatalog.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataFabric\DataWarehouse.Plugins.UltimateDataFabric.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataFormat\DataWarehouse.Plugins.UltimateDataFormat.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataIntegration\DataWarehouse.Plugins.UltimateDataIntegration.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataIntegrity\DataWarehouse.Plugins.UltimateDataIntegrity.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataLake\DataWarehouse.Plugins.UltimateDataLake.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataLineage\DataWarehouse.Plugins.UltimateDataLineage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataManagement\DataWarehouse.Plugins.UltimateDataManagement.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataMesh\DataWarehouse.Plugins.UltimateDataMesh.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataPrivacy\DataWarehouse.Plugins.UltimateDataPrivacy.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataProtection\DataWarehouse.Plugins.UltimateDataProtection.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataQuality\DataWarehouse.Plugins.UltimateDataQuality.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataTransit\DataWarehouse.Plugins.UltimateDataTransit.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataGovernance\DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
   </ItemGroup>
 
 </Project>

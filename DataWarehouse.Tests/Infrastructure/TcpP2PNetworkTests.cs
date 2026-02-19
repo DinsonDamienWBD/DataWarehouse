@@ -219,10 +219,9 @@ namespace DataWarehouse.Tests.Infrastructure
             using var network = new TcpP2PNetwork(config);
 
             // Should not throw even with no peers
-            await network.BroadcastAsync(new byte[] { 1, 2, 3 });
+            var exception = await Record.ExceptionAsync(() => network.BroadcastAsync(new byte[] { 1, 2, 3 }));
 
-            // Verify no exception was thrown
-            Assert.True(true);
+            Assert.Null(exception);
         }
 
         [Fact]
@@ -322,10 +321,10 @@ namespace DataWarehouse.Tests.Infrastructure
             var network = new TcpP2PNetwork(config);
 
             network.Dispose();
-            network.Dispose(); // Should not throw
 
-            // Verify no exception was thrown
-            Assert.True(true);
+            var exception = Record.Exception(() => network.Dispose());
+
+            Assert.Null(exception);
         }
 
         #endregion

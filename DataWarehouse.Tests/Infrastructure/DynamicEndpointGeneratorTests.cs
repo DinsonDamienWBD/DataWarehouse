@@ -413,10 +413,10 @@ namespace DataWarehouse.Tests.Infrastructure
             var generator = new DynamicEndpointGenerator(mockRegistry.Object);
 
             generator.Dispose();
-            generator.Dispose(); // Should not throw
 
-            // Verify no exception was thrown
-            Assert.True(true);
+            var exception = Record.Exception(() => generator.Dispose());
+
+            Assert.Null(exception);
         }
 
         #endregion
