@@ -820,8 +820,8 @@ namespace DataWarehouse.Tests.Security
             // Act
             var script = _strategy.GetAntiScreenshotScript(result.Share.Id);
 
-            // Assert - Method completes successfully (script may be null if not implemented)
-            Assert.True(true);
+            // Assert - Method completes and returns a script or null without throwing
+            result.Share.Should().NotBeNull("share must exist to request anti-screenshot script");
         }
 
         [Fact]
