@@ -536,8 +536,8 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             args["storageStrategy"] = strategyId;
         }
 
-        // Return empty stream (data is now in backend)
-        return new MemoryStream(0);
+        // Return empty stream (data is now persisted in storage backend)
+        return new MemoryStream();
     }
 
     /// <summary>Read data via pipeline transform.</summary>
