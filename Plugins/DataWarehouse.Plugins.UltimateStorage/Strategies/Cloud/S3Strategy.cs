@@ -1,3 +1,7 @@
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.S3.Transfer;
+using Amazon.Runtime;
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
@@ -15,19 +19,27 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 {
     /// <summary>
     /// AWS S3 storage strategy with full production features:
-    /// - Multi-part uploads for large files (>100MB)
+    /// - Official AWSSDK.S3 client with automatic retry, credential management
+    /// - Manual HTTP fallback for air-gapped/embedded environments without NuGet
+    /// - Multi-part uploads for large files (>100MB) via TransferUtility
     /// - Server-side encryption (SSE-S3, SSE-KMS, SSE-C)
     /// - Storage class management (Standard, IA, Glacier, Deep Archive)
     /// - Presigned URLs for temporary access
     /// - Versioning support
     /// - Transfer acceleration
     /// - S3-compatible endpoint support (MinIO, Wasabi, DigitalOcean Spaces)
-    /// - Automatic retry with exponential backoff
     /// - Concurrent multipart upload optimization
     /// </summary>
     public class S3Strategy : UltimateStorageStrategyBase
     {
+        // SDK client (primary path)
+        private IAmazonS3? _s3Client;
+        private TransferUtility? _transferUtility;
+
+        // Manual HTTP fallback client
         private HttpClient? _httpClient;
+
+        // Configuration
         private string _endpoint = "https://s3.amazonaws.com";
         private string _region = "us-east-1";
         private string _bucket = string.Empty;
@@ -46,7 +58,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private int _maxConcurrentParts = 5;
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
-        private bool _useSignatureV4 = true; // Use AWS Signature V4 by default (V2 deprecated)
+
+        /// <summary>
+        /// When true, uses the official AWSSDK.S3 client.
+        /// When false, falls back to manual HTTP with Signature V4 (for air-gapped/embedded).
+        /// </summary>
+        private bool _useNativeClient = true;
 
         // Cached health check state
         private StorageHealthInfo? _cachedHealthInfo = null;
@@ -151,7 +168,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 throw new ArgumentException($"Multipart chunk size must be at least 5MB. Current: {_multipartChunkSizeBytes} bytes.");
             }
-            // Note: Maximum part size is 5GB but int max is ~2GB, so practically limited to int.MaxValue
 
             _maxConcurrentParts = GetConfiguration<int>("MaxConcurrentParts", 5);
             if (_maxConcurrentParts < 1 || _maxConcurrentParts > 100)
@@ -166,21 +182,81 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
 
             _retryDelayMs = GetConfiguration<int>("RetryDelayMs", 1000);
-            _useSignatureV4 = GetConfiguration<bool>("UseSignatureV4", true);
 
+            // Determine client mode
+            _useNativeClient = GetConfiguration<bool>("UseNativeClient", true);
+
+            if (_useNativeClient)
+            {
+                InitializeNativeClient();
+            }
+            else
+            {
+                InitializeManualHttpClient();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Initializes the official AWSSDK.S3 client (primary path).
+        /// </summary>
+        private void InitializeNativeClient()
+        {
+            var credentials = new BasicAWSCredentials(_accessKey, _secretKey);
+
+            var config = new AmazonS3Config
+            {
+                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_region),
+                ForcePathStyle = _usePathStyle,
+                UseAccelerateEndpoint = _enableTransferAcceleration,
+                Timeout = TimeSpan.FromSeconds(_timeoutSeconds),
+                MaxErrorRetry = _maxRetries
+            };
+
+            // Support custom endpoints (MinIO, Wasabi, DigitalOcean Spaces, etc.)
+            if (_endpoint != "https://s3.amazonaws.com")
+            {
+                config.ServiceURL = _endpoint;
+                // When using custom endpoints, ForcePathStyle is typically required
+                if (!_usePathStyle)
+                {
+                    config.ForcePathStyle = true;
+                }
+            }
+
+            // Adjust for transfer acceleration
+            if (_enableTransferAcceleration)
+            {
+                config.UseAccelerateEndpoint = true;
+            }
+
+            _s3Client = new AmazonS3Client(credentials, config);
+
+            // Initialize TransferUtility for multipart uploads
+            var transferConfig = new TransferUtilityConfig
+            {
+                ConcurrentServiceRequests = _maxConcurrentParts,
+                MinSizeBeforePartUpload = _multipartThresholdBytes
+            };
+            _transferUtility = new TransferUtility(_s3Client, transferConfig);
+        }
+
+        /// <summary>
+        /// Initializes the manual HTTP client (fallback for air-gapped/embedded environments).
+        /// </summary>
+        private void InitializeManualHttpClient()
+        {
             // Adjust endpoint for transfer acceleration
             if (_enableTransferAcceleration)
             {
                 _endpoint = _endpoint.Replace("s3.", "s3-accelerate.");
             }
 
-            // Create HTTP client
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
             };
-
-            return Task.CompletedTask;
         }
 
         #region Core Storage Operations
@@ -190,7 +266,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             ValidateKey(key);
             ValidateStream(data);
 
-            // Edge case guards
             if (string.IsNullOrEmpty(key))
             {
                 throw new ArgumentException("Key cannot be null or empty", nameof(key));
@@ -202,6 +277,484 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 throw new ArgumentException($"Object size {data.Length} bytes exceeds S3 maximum of 5TB", nameof(data));
             }
 
+            if (_useNativeClient)
+            {
+                return await StoreWithSdkAsync(key, data, metadata, ct);
+            }
+            else
+            {
+                return await StoreWithManualHttpAsync(key, data, metadata, ct);
+            }
+        }
+
+        /// <summary>
+        /// Store using AWSSDK.S3 (primary path).
+        /// Uses TransferUtility which automatically handles multipart for large objects.
+        /// </summary>
+        private async Task<StorageObjectMetadata> StoreWithSdkAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        {
+            var request = new TransferUtilityUploadRequest
+            {
+                BucketName = _bucket,
+                Key = key,
+                InputStream = data,
+                ContentType = GetContentType(key),
+                StorageClass = MapToS3StorageClass(_defaultStorageClass),
+                PartSize = _multipartChunkSizeBytes,
+                AutoCloseStream = false
+            };
+
+            // Add server-side encryption
+            if (_enableServerSideEncryption)
+            {
+                request.ServerSideEncryptionMethod = _sseAlgorithm switch
+                {
+                    "AES256" => ServerSideEncryptionMethod.AES256,
+                    "aws:kms" => ServerSideEncryptionMethod.AWSKMS,
+                    _ => ServerSideEncryptionMethod.AES256
+                };
+
+                if (_sseAlgorithm == "aws:kms" && !string.IsNullOrEmpty(_kmsKeyId))
+                {
+                    request.ServerSideEncryptionKeyManagementServiceKeyId = _kmsKeyId;
+                }
+            }
+
+            // Add custom metadata
+            if (metadata != null)
+            {
+                foreach (var kvp in metadata)
+                {
+                    request.Metadata.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            // TransferUtility handles multipart automatically based on size
+            await _transferUtility!.UploadAsync(request, ct);
+
+            // Get the metadata of the uploaded object to return accurate info
+            var getMetaRequest = new GetObjectMetadataRequest
+            {
+                BucketName = _bucket,
+                Key = key
+            };
+
+            var metaResponse = await _s3Client!.GetObjectMetadataAsync(getMetaRequest, ct);
+
+            var size = metaResponse.ContentLength;
+            IncrementBytesStored(size);
+            IncrementOperationCounter(StorageOperationType.Store);
+
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = size,
+                Created = metaResponse.LastModified ?? DateTime.UtcNow,
+                Modified = metaResponse.LastModified ?? DateTime.UtcNow,
+                ETag = metaResponse.ETag?.Trim('"') ?? string.Empty,
+                ContentType = metaResponse.Headers.ContentType ?? GetContentType(key),
+                CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
+                Tier = MapStorageClassToTier(_defaultStorageClass)
+            };
+        }
+
+        protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
+        {
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                return await RetrieveWithSdkAsync(key, ct);
+            }
+            else
+            {
+                return await RetrieveWithManualHttpAsync(key, ct);
+            }
+        }
+
+        /// <summary>
+        /// Retrieve using AWSSDK.S3 (primary path).
+        /// </summary>
+        private async Task<Stream> RetrieveWithSdkAsync(string key, CancellationToken ct)
+        {
+            var request = new GetObjectRequest
+            {
+                BucketName = _bucket,
+                Key = key
+            };
+
+            var response = await _s3Client!.GetObjectAsync(request, ct);
+
+            // Copy to MemoryStream so we can track size and the response can be disposed
+            var ms = new MemoryStream();
+            await response.ResponseStream.CopyToAsync(ms, 81920, ct);
+            ms.Position = 0;
+
+            IncrementBytesRetrieved(ms.Length);
+            IncrementOperationCounter(StorageOperationType.Retrieve);
+
+            return ms;
+        }
+
+        protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
+        {
+            ValidateKey(key);
+
+            // Get size before deletion for statistics
+            long size = 0;
+            try
+            {
+                var meta = await GetMetadataAsyncCore(key, ct);
+                size = meta.Size;
+            }
+            catch
+            {
+                // Ignore if metadata retrieval fails
+            }
+
+            if (_useNativeClient)
+            {
+                var request = new DeleteObjectRequest
+                {
+                    BucketName = _bucket,
+                    Key = key
+                };
+
+                await _s3Client!.DeleteObjectAsync(request, ct);
+            }
+            else
+            {
+                await DeleteWithManualHttpAsync(key, ct);
+            }
+
+            if (size > 0)
+            {
+                IncrementBytesDeleted(size);
+            }
+            IncrementOperationCounter(StorageOperationType.Delete);
+        }
+
+        protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
+        {
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                try
+                {
+                    var request = new GetObjectMetadataRequest
+                    {
+                        BucketName = _bucket,
+                        Key = key
+                    };
+
+                    await _s3Client!.GetObjectMetadataAsync(request, ct);
+                    IncrementOperationCounter(StorageOperationType.Exists);
+                    return true;
+                }
+                catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    IncrementOperationCounter(StorageOperationType.Exists);
+                    return false;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return await ExistsWithManualHttpAsync(key, ct);
+            }
+        }
+
+        protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        {
+            IncrementOperationCounter(StorageOperationType.List);
+
+            if (_useNativeClient)
+            {
+                await foreach (var item in ListWithSdkAsync(prefix, ct))
+                {
+                    yield return item;
+                }
+            }
+            else
+            {
+                await foreach (var item in ListWithManualHttpAsync(prefix, ct))
+                {
+                    yield return item;
+                }
+            }
+        }
+
+        /// <summary>
+        /// List objects using AWSSDK.S3 with ContinuationToken pagination.
+        /// </summary>
+        private async IAsyncEnumerable<StorageObjectMetadata> ListWithSdkAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        {
+            string? continuationToken = null;
+
+            do
+            {
+                var request = new ListObjectsV2Request
+                {
+                    BucketName = _bucket,
+                    Prefix = prefix,
+                    ContinuationToken = continuationToken
+                };
+
+                var response = await _s3Client!.ListObjectsV2Async(request, ct);
+
+                foreach (var obj in response.S3Objects)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    yield return new StorageObjectMetadata
+                    {
+                        Key = obj.Key,
+                        Size = obj.Size ?? 0L,
+                        Created = obj.LastModified ?? DateTime.UtcNow,
+                        Modified = obj.LastModified ?? DateTime.UtcNow,
+                        ETag = obj.ETag?.Trim('"') ?? string.Empty,
+                        ContentType = GetContentType(obj.Key),
+                        CustomMetadata = null,
+                        Tier = MapStorageClassToTier(obj.StorageClass?.Value ?? "STANDARD")
+                    };
+
+                    await Task.Yield();
+                }
+
+                continuationToken = (response.IsTruncated ?? false) ? response.NextContinuationToken : null;
+
+            } while (continuationToken != null);
+        }
+
+        protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
+        {
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                return await GetMetadataWithSdkAsync(key, ct);
+            }
+            else
+            {
+                return await GetMetadataWithManualHttpAsync(key, ct);
+            }
+        }
+
+        /// <summary>
+        /// Get metadata using AWSSDK.S3 GetObjectMetadata.
+        /// </summary>
+        private async Task<StorageObjectMetadata> GetMetadataWithSdkAsync(string key, CancellationToken ct)
+        {
+            var request = new GetObjectMetadataRequest
+            {
+                BucketName = _bucket,
+                Key = key
+            };
+
+            var response = await _s3Client!.GetObjectMetadataAsync(request, ct);
+
+            // Extract custom metadata from response
+            var customMetadata = new Dictionary<string, string>();
+            foreach (var metaKey in response.Metadata.Keys)
+            {
+                customMetadata[metaKey] = response.Metadata[metaKey];
+            }
+
+            // Extract storage class from headers
+            var storageClass = response.StorageClass?.Value ?? "STANDARD";
+
+            IncrementOperationCounter(StorageOperationType.GetMetadata);
+
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = response.ContentLength,
+                Created = response.LastModified ?? DateTime.UtcNow,
+                Modified = response.LastModified ?? DateTime.UtcNow,
+                ETag = response.ETag?.Trim('"') ?? string.Empty,
+                ContentType = response.Headers.ContentType ?? "application/octet-stream",
+                CustomMetadata = customMetadata.Count > 0 ? customMetadata : null,
+                Tier = MapStorageClassToTier(storageClass)
+            };
+        }
+
+        protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
+        {
+            // Return cached health info if within cache duration
+            if (_cachedHealthInfo != null && (DateTime.UtcNow - _lastHealthCheck) < _healthCacheDuration)
+            {
+                return _cachedHealthInfo;
+            }
+
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                StorageHealthInfo healthInfo;
+
+                if (_useNativeClient)
+                {
+                    // Use ListBuckets as a health check via the SDK
+                    await _s3Client!.ListBucketsAsync(ct);
+                    sw.Stop();
+
+                    healthInfo = new StorageHealthInfo
+                    {
+                        Status = HealthStatus.Healthy,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = $"S3 bucket '{_bucket}' is accessible at {_endpoint}",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    healthInfo = await GetHealthWithManualHttpAsync(ct, sw);
+                }
+
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                var healthInfo = new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    Message = $"S3 bucket '{_bucket}' access denied (403). Check credentials and bucket permissions.",
+                    CheckedAt = DateTime.UtcNow
+                };
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var healthInfo = new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    Message = $"S3 bucket '{_bucket}' not found (404). Verify bucket name and region.",
+                    CheckedAt = DateTime.UtcNow
+                };
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
+            }
+            catch (Exception ex)
+            {
+                var healthInfo = new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    Message = $"Failed to access S3 bucket '{_bucket}': {ex.Message}",
+                    CheckedAt = DateTime.UtcNow
+                };
+                _cachedHealthInfo = healthInfo;
+                _lastHealthCheck = DateTime.UtcNow;
+                return healthInfo;
+            }
+        }
+
+        protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
+        {
+            // S3 has no practical capacity limit
+            return Task.FromResult<long?>(null);
+        }
+
+        #endregion
+
+        #region S3-Specific Operations
+
+        /// <summary>
+        /// Generates a presigned URL for temporary access to an object using AWSSDK.S3.
+        /// Falls back to manual signing when not using native client.
+        /// </summary>
+        public string GeneratePresignedUrl(string key, TimeSpan expiresIn)
+        {
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                var request = new GetPreSignedUrlRequest
+                {
+                    BucketName = _bucket,
+                    Key = key,
+                    Expires = DateTime.UtcNow.Add(expiresIn),
+                    Verb = HttpVerb.GET
+                };
+
+                return _s3Client!.GetPreSignedURL(request);
+            }
+            else
+            {
+                return GeneratePresignedUrlV4Manual(key, expiresIn);
+            }
+        }
+
+        /// <summary>
+        /// Copies an object within S3 using AWSSDK.S3.
+        /// </summary>
+        public async Task CopyObjectAsync(string sourceKey, string destinationKey, CancellationToken ct = default)
+        {
+            ValidateKey(sourceKey);
+            ValidateKey(destinationKey);
+
+            if (_useNativeClient)
+            {
+                var request = new CopyObjectRequest
+                {
+                    SourceBucket = _bucket,
+                    SourceKey = sourceKey,
+                    DestinationBucket = _bucket,
+                    DestinationKey = destinationKey
+                };
+
+                await _s3Client!.CopyObjectAsync(request, ct);
+            }
+            else
+            {
+                await CopyObjectManualHttpAsync(sourceKey, destinationKey, ct);
+            }
+        }
+
+        /// <summary>
+        /// Changes the storage class of an object (tiering) using AWSSDK.S3.
+        /// </summary>
+        public async Task ChangeStorageClassAsync(string key, string storageClass, CancellationToken ct = default)
+        {
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                var request = new CopyObjectRequest
+                {
+                    SourceBucket = _bucket,
+                    SourceKey = key,
+                    DestinationBucket = _bucket,
+                    DestinationKey = key,
+                    StorageClass = MapToS3StorageClass(storageClass),
+                    MetadataDirective = S3MetadataDirective.COPY
+                };
+
+                await _s3Client!.CopyObjectAsync(request, ct);
+            }
+            else
+            {
+                await ChangeStorageClassManualHttpAsync(key, storageClass, ct);
+            }
+        }
+
+        #endregion
+
+        #region Manual HTTP Fallback Methods
+
+        /// <summary>
+        /// Store using manual HTTP with Signature V4 (fallback path).
+        /// </summary>
+        private async Task<StorageObjectMetadata> StoreWithManualHttpAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        {
             // Determine if multipart upload is needed
             var useMultipart = false;
             long dataLength = 0;
@@ -214,19 +767,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             if (useMultipart)
             {
-                return await StoreMultipartAsync(key, data, dataLength, metadata, ct);
+                return await StoreMultipartManualAsync(key, data, dataLength, metadata, ct);
             }
             else
             {
-                return await StoreSinglePartAsync(key, data, metadata, ct);
+                return await StoreSinglePartManualAsync(key, data, metadata, ct);
             }
         }
 
-        private async Task<StorageObjectMetadata> StoreSinglePartAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        private async Task<StorageObjectMetadata> StoreSinglePartManualAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             var endpoint = GetEndpointUrl(key);
 
-            // Read data into memory
             using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
@@ -235,13 +787,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             request.Content = new ByteArrayContent(content);
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetContentType(key));
 
-            // Add storage class header
             if (!string.IsNullOrEmpty(_defaultStorageClass))
             {
                 request.Headers.TryAddWithoutValidation("x-amz-storage-class", _defaultStorageClass);
             }
 
-            // Add server-side encryption
             if (_enableServerSideEncryption)
             {
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption", _sseAlgorithm);
@@ -251,7 +801,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             }
 
-            // Add custom metadata
             if (metadata != null)
             {
                 foreach (var kvp in metadata)
@@ -260,17 +809,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             }
 
-            // Sign and send request with retry
             await SignRequestAsync(request, content, ct);
             var response = await SendWithRetryAsync(request, ct);
 
-            // Extract ETag from response
             var etag = response.Headers.ETag?.Tag?.Trim('"') ?? string.Empty;
 
-            // Update statistics with strategy-specific tracking
             IncrementBytesStored(content.Length);
             IncrementOperationCounter(StorageOperationType.Store);
-            // Note: S3-specific operation counters tracked via base class IncrementOperationCounter
 
             return new StorageObjectMetadata
             {
@@ -285,19 +830,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             };
         }
 
-        private async Task<StorageObjectMetadata> StoreMultipartAsync(string key, Stream data, long dataLength, IDictionary<string, string>? metadata, CancellationToken ct)
+        private async Task<StorageObjectMetadata> StoreMultipartManualAsync(string key, Stream data, long dataLength, IDictionary<string, string>? metadata, CancellationToken ct)
         {
-            // Step 1: Initialize multipart upload
             var uploadId = await InitiateMultipartUploadAsync(key, metadata, ct);
 
             try
             {
-                // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
-                var completedParts = new List<CompletedPart>();
+                var completedParts = new List<ManualCompletedPart>();
                 var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
-
-                var uploadTasks = new List<Task<CompletedPart>>();
+                var uploadTasks = new List<Task<ManualCompletedPart>>();
 
                 for (int partNumber = 1; partNumber <= partCount; partNumber++)
                 {
@@ -318,7 +860,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     {
                         try
                         {
-                            return await UploadPartAsync(key, uploadId, currentPartNumber, partData, ct);
+                            return await UploadPartManualAsync(key, uploadId, currentPartNumber, partData, ct);
                         }
                         finally
                         {
@@ -332,10 +874,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 completedParts = (await Task.WhenAll(uploadTasks)).ToList();
                 completedParts = completedParts.OrderBy(p => p.PartNumber).ToList();
 
-                // Step 3: Complete multipart upload
                 var etag = await CompleteMultipartUploadAsync(key, uploadId, completedParts, ct);
 
-                // Update statistics
                 IncrementBytesStored(dataLength);
                 IncrementOperationCounter(StorageOperationType.Store);
 
@@ -353,7 +893,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             catch (Exception)
             {
-                // Abort multipart upload on failure
                 try
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
@@ -366,10 +905,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
         }
 
-        protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
+        private async Task<Stream> RetrieveWithManualHttpAsync(string key, CancellationToken ct)
         {
-            ValidateKey(key);
-
             var endpoint = GetEndpointUrl(key);
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
@@ -380,47 +917,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
-            // Update statistics
             IncrementBytesRetrieved(ms.Length);
             IncrementOperationCounter(StorageOperationType.Retrieve);
 
             return ms;
         }
 
-        protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
+        private async Task DeleteWithManualHttpAsync(string key, CancellationToken ct)
         {
-            ValidateKey(key);
-
-            // Get size before deletion for statistics
-            long size = 0;
-            try
-            {
-                var metadata = await GetMetadataAsyncCore(key, ct);
-                size = metadata.Size;
-            }
-            catch
-            {
-                // Ignore if metadata retrieval fails
-            }
-
             var endpoint = GetEndpointUrl(key);
             var request = new HttpRequestMessage(HttpMethod.Delete, endpoint);
 
             await SignRequestAsync(request, null, ct);
             await SendWithRetryAsync(request, ct);
-
-            // Update statistics
-            if (size > 0)
-            {
-                IncrementBytesDeleted(size);
-            }
-            IncrementOperationCounter(StorageOperationType.Delete);
         }
 
-        protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
+        private async Task<bool> ExistsWithManualHttpAsync(string key, CancellationToken ct)
         {
-            ValidateKey(key);
-
             try
             {
                 var endpoint = GetEndpointUrl(key);
@@ -430,7 +943,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var response = await _httpClient!.SendAsync(request, ct);
 
                 IncrementOperationCounter(StorageOperationType.Exists);
-
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -439,10 +951,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
         }
 
-        protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageObjectMetadata> ListWithManualHttpAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
-            IncrementOperationCounter(StorageOperationType.List);
-
             string? continuationToken = null;
 
             do
@@ -463,7 +973,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var response = await SendWithRetryAsync(request, ct);
                 var xml = await response.Content.ReadAsStringAsync(ct);
 
-                // Parse XML response
                 var doc = XDocument.Parse(xml);
                 var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
 
@@ -472,8 +981,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var key = content.Element(ns + "Key")?.Value;
-                    if (string.IsNullOrEmpty(key))
+                    var itemKey = content.Element(ns + "Key")?.Value;
+                    if (string.IsNullOrEmpty(itemKey))
                         continue;
 
                     var sizeStr = content.Element(ns + "Size")?.Value;
@@ -487,12 +996,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                     yield return new StorageObjectMetadata
                     {
-                        Key = key,
+                        Key = itemKey,
                         Size = size,
                         Created = lastModified,
                         Modified = lastModified,
                         ETag = etag,
-                        ContentType = GetContentType(key),
+                        ContentType = GetContentType(itemKey),
                         CustomMetadata = null,
                         Tier = MapStorageClassToTier(storageClass)
                     };
@@ -500,16 +1009,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     await Task.Yield();
                 }
 
-                // Extract continuation token
                 continuationToken = doc.Descendants(ns + "NextContinuationToken").FirstOrDefault()?.Value;
 
             } while (continuationToken != null);
         }
 
-        protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
+        private async Task<StorageObjectMetadata> GetMetadataWithManualHttpAsync(string key, CancellationToken ct)
         {
-            ValidateKey(key);
-
             var endpoint = GetEndpointUrl(key);
             var request = new HttpRequestMessage(HttpMethod.Head, endpoint);
 
@@ -521,14 +1027,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var lastModified = response.Content.Headers.LastModified?.UtcDateTime ?? DateTime.UtcNow;
             var etag = response.Headers.ETag?.Tag?.Trim('"') ?? string.Empty;
 
-            // Extract storage class
             var storageClass = "STANDARD";
             if (response.Headers.TryGetValues("x-amz-storage-class", out var storageClassValues))
             {
                 storageClass = storageClassValues.FirstOrDefault() ?? "STANDARD";
             }
 
-            // Extract custom metadata
             var customMetadata = new Dictionary<string, string>();
             foreach (var header in response.Headers.Where(h => h.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase)))
             {
@@ -542,7 +1046,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 Key = key,
                 Size = size,
-                Created = lastModified, // S3 doesn't expose creation time separately
+                Created = lastModified,
                 Modified = lastModified,
                 ETag = etag,
                 ContentType = contentType,
@@ -551,208 +1055,69 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             };
         }
 
-        protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
+        private async Task<StorageHealthInfo> GetHealthWithManualHttpAsync(CancellationToken ct, System.Diagnostics.Stopwatch sw)
         {
-            // Return cached health info if within cache duration
-            if (_cachedHealthInfo != null && (DateTime.UtcNow - _lastHealthCheck) < _healthCacheDuration)
+            var endpoint = $"{_endpoint}/{_bucket}?list-type=2&max-keys=1";
+            var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            await SignRequestAsync(request, null, ct);
+
+            var response = await _httpClient!.SendAsync(request, ct);
+            sw.Stop();
+
+            if (response.IsSuccessStatusCode)
             {
-                return _cachedHealthInfo;
-            }
-
-            try
-            {
-                // Try to list objects with max-keys=1 as a health check (HEAD bucket)
-                var endpoint = $"{_endpoint}/{_bucket}?list-type=2&max-keys=1";
-                var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                await SignRequestAsync(request, null, ct);
-
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await _httpClient!.SendAsync(request, ct);
-                sw.Stop();
-
-                StorageHealthInfo healthInfo;
-                if (response.IsSuccessStatusCode)
+                return new StorageHealthInfo
                 {
-                    healthInfo = new StorageHealthInfo
-                    {
-                        Status = HealthStatus.Healthy,
-                        LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 bucket '{_bucket}' is accessible at {_endpoint}",
-                        CheckedAt = DateTime.UtcNow
-                    };
-                }
-                else if ((int)response.StatusCode == 403)
-                {
-                    // 403 Forbidden - credentials or permissions issue
-                    healthInfo = new StorageHealthInfo
-                    {
-                        Status = HealthStatus.Unhealthy,
-                        LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 bucket '{_bucket}' access denied (403). Check credentials and bucket permissions.",
-                        CheckedAt = DateTime.UtcNow
-                    };
-                }
-                else if ((int)response.StatusCode == 404)
-                {
-                    // 404 Not Found - bucket doesn't exist
-                    healthInfo = new StorageHealthInfo
-                    {
-                        Status = HealthStatus.Unhealthy,
-                        LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 bucket '{_bucket}' not found (404). Verify bucket name and region.",
-                        CheckedAt = DateTime.UtcNow
-                    };
-                }
-                else if ((int)response.StatusCode == 503)
-                {
-                    // 503 Service Unavailable - temporary issue
-                    healthInfo = new StorageHealthInfo
-                    {
-                        Status = HealthStatus.Degraded,
-                        LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 service temporarily unavailable (503) for bucket '{_bucket}'",
-                        CheckedAt = DateTime.UtcNow
-                    };
-                }
-                else
-                {
-                    healthInfo = new StorageHealthInfo
-                    {
-                        Status = HealthStatus.Unhealthy,
-                        LatencyMs = sw.ElapsedMilliseconds,
-                        Message = $"S3 bucket '{_bucket}' returned status code {response.StatusCode}",
-                        CheckedAt = DateTime.UtcNow
-                    };
-                }
-
-                // Cache the result
-                _cachedHealthInfo = healthInfo;
-                _lastHealthCheck = DateTime.UtcNow;
-                return healthInfo;
-            }
-            catch (Exception ex)
-            {
-                var healthInfo = new StorageHealthInfo
-                {
-                    Status = HealthStatus.Unhealthy,
-                    Message = $"Failed to access S3 bucket '{_bucket}': {ex.Message}",
+                    Status = HealthStatus.Healthy,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Message = $"S3 bucket '{_bucket}' is accessible at {_endpoint}",
                     CheckedAt = DateTime.UtcNow
                 };
-
-                // Cache the failure result (shorter duration for failures)
-                _cachedHealthInfo = healthInfo;
-                _lastHealthCheck = DateTime.UtcNow;
-                return healthInfo;
             }
-        }
-
-        protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
-        {
-            // S3 has no practical capacity limit
-            return Task.FromResult<long?>(null);
-        }
-
-        #endregion
-
-        #region S3-Specific Operations
-
-        /// <summary>
-        /// Generates a presigned URL for temporary access to an object.
-        /// </summary>
-        public string GeneratePresignedUrl(string key, TimeSpan expiresIn)
-        {
-            ValidateKey(key);
-
-            if (_useSignatureV4)
+            else if ((int)response.StatusCode == 403)
             {
-                return GeneratePresignedUrlV4(key, expiresIn);
+                return new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Message = $"S3 bucket '{_bucket}' access denied (403). Check credentials and bucket permissions.",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            else if ((int)response.StatusCode == 404)
+            {
+                return new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Message = $"S3 bucket '{_bucket}' not found (404). Verify bucket name and region.",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            else if ((int)response.StatusCode == 503)
+            {
+                return new StorageHealthInfo
+                {
+                    Status = HealthStatus.Degraded,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Message = $"S3 service temporarily unavailable (503) for bucket '{_bucket}'",
+                    CheckedAt = DateTime.UtcNow
+                };
             }
             else
             {
-                // Log deprecation warning
-                System.Diagnostics.Debug.WriteLine("WARNING: AWS Signature Version 2 is deprecated. Consider migrating to Signature Version 4 by setting 'UseSignatureV4' to true.");
-                return GeneratePresignedUrlV2(key, expiresIn);
+                return new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Message = $"S3 bucket '{_bucket}' returned status code {response.StatusCode}",
+                    CheckedAt = DateTime.UtcNow
+                };
             }
         }
 
-        /// <summary>
-        /// Generates a presigned URL using AWS Signature Version 4.
-        /// </summary>
-        private string GeneratePresignedUrlV4(string key, TimeSpan expiresIn)
+        private async Task CopyObjectManualHttpAsync(string sourceKey, string destinationKey, CancellationToken ct)
         {
-            var now = DateTime.UtcNow;
-            var dateStamp = now.ToString("yyyyMMdd");
-            var amzDate = now.ToString("yyyyMMddTHHmmssZ");
-            var expiresInSeconds = (int)expiresIn.TotalSeconds;
-
-            var endpoint = GetEndpointUrl(key);
-            var uri = new Uri(endpoint);
-
-            // Build credential scope
-            var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
-            var credential = $"{_accessKey}/{credentialScope}";
-
-            // Build canonical query string
-            var queryParams = new SortedDictionary<string, string>
-            {
-                { "X-Amz-Algorithm", "AWS4-HMAC-SHA256" },
-                { "X-Amz-Credential", credential },
-                { "X-Amz-Date", amzDate },
-                { "X-Amz-Expires", expiresInSeconds.ToString() },
-                { "X-Amz-SignedHeaders", "host" }
-            };
-
-            var canonicalQueryString = string.Join("&", queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
-
-            // Build canonical request
-            var canonicalUri = uri.AbsolutePath;
-            var canonicalHeaders = $"host:{uri.Host}\n";
-            var signedHeaders = "host";
-            var payloadHash = "UNSIGNED-PAYLOAD";
-
-            var canonicalRequest = $"GET\n{canonicalUri}\n{canonicalQueryString}\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
-            var canonicalRequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower();
-
-            // Build string to sign
-            var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalRequestHash}";
-
-            // Calculate signature
-            var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + _secretKey), dateStamp);
-            var kRegion = HmacSha256(kDate, _region);
-            var kService = HmacSha256(kRegion, "s3");
-            var kSigning = HmacSha256(kService, "aws4_request");
-            var signature = Convert.ToHexString(HmacSha256(kSigning, stringToSign)).ToLower();
-
-            // Build final URL
-            return $"{endpoint}?{canonicalQueryString}&X-Amz-Signature={signature}";
-        }
-
-        /// <summary>
-        /// Generates a presigned URL using AWS Signature Version 2 (deprecated).
-        /// </summary>
-        [Obsolete("AWS Signature Version 2 is deprecated. Use Signature Version 4 instead.")]
-        private string GeneratePresignedUrlV2(string key, TimeSpan expiresIn)
-        {
-            var expires = DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds();
-            var endpoint = GetEndpointUrl(key);
-
-            // AWS Signature Version 2 (simplified for presigned URLs)
-            var stringToSign = $"GET\n\n\n{expires}\n/{_bucket}/{key}";
-
-            using var hmac = new HMACSHA1(Encoding.UTF8.GetBytes(_secretKey));
-            var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
-
-            return $"{endpoint}?AWSAccessKeyId={_accessKey}&Expires={expires}&Signature={Uri.EscapeDataString(signature)}";
-        }
-
-        /// <summary>
-        /// Copies an object within S3.
-        /// </summary>
-        public async Task CopyObjectAsync(string sourceKey, string destinationKey, CancellationToken ct = default)
-        {
-            ValidateKey(sourceKey);
-            ValidateKey(destinationKey);
-
             var endpoint = GetEndpointUrl(destinationKey);
             var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
             request.Headers.TryAddWithoutValidation("x-amz-copy-source", $"/{_bucket}/{sourceKey}");
@@ -761,14 +1126,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             await SendWithRetryAsync(request, ct);
         }
 
-        /// <summary>
-        /// Changes the storage class of an object (tiering).
-        /// </summary>
-        public async Task ChangeStorageClassAsync(string key, string storageClass, CancellationToken ct = default)
+        private async Task ChangeStorageClassManualHttpAsync(string key, string storageClass, CancellationToken ct)
         {
-            ValidateKey(key);
-
-            // Use copy-in-place to change storage class
             var endpoint = GetEndpointUrl(key);
             var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
             request.Headers.TryAddWithoutValidation("x-amz-copy-source", $"/{_bucket}/{key}");
@@ -784,7 +1143,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var endpoint = $"{GetEndpointUrl(key)}?uploads";
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
 
-            // Add storage class and encryption headers
             if (!string.IsNullOrEmpty(_defaultStorageClass))
             {
                 request.Headers.TryAddWithoutValidation("x-amz-storage-class", _defaultStorageClass);
@@ -799,7 +1157,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             }
 
-            // Add custom metadata
             if (metadata != null)
             {
                 foreach (var kvp in metadata)
@@ -824,7 +1181,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             return uploadId;
         }
 
-        private async Task<CompletedPart> UploadPartAsync(string key, string uploadId, int partNumber, byte[] partData, CancellationToken ct)
+        private async Task<ManualCompletedPart> UploadPartManualAsync(string key, string uploadId, int partNumber, byte[] partData, CancellationToken ct)
         {
             var endpoint = $"{GetEndpointUrl(key)}?partNumber={partNumber}&uploadId={Uri.EscapeDataString(uploadId)}";
             var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
@@ -835,18 +1192,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             var etag = response.Headers.ETag?.Tag?.Trim('"') ?? string.Empty;
 
-            return new CompletedPart
+            return new ManualCompletedPart
             {
                 PartNumber = partNumber,
                 ETag = etag
             };
         }
 
-        private async Task<string> CompleteMultipartUploadAsync(string key, string uploadId, List<CompletedPart> parts, CancellationToken ct)
+        private async Task<string> CompleteMultipartUploadAsync(string key, string uploadId, List<ManualCompletedPart> parts, CancellationToken ct)
         {
             var endpoint = $"{GetEndpointUrl(key)}?uploadId={Uri.EscapeDataString(uploadId)}";
 
-            // Build XML body
             var xmlBody = new XElement("CompleteMultipartUpload",
                 parts.Select(p => new XElement("Part",
                     new XElement("PartNumber", p.PartNumber),
@@ -881,6 +1237,52 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             await _httpClient!.SendAsync(request, ct);
         }
 
+        /// <summary>
+        /// Generates a presigned URL using manual AWS Signature Version 4.
+        /// </summary>
+        private string GeneratePresignedUrlV4Manual(string key, TimeSpan expiresIn)
+        {
+            var now = DateTime.UtcNow;
+            var dateStamp = now.ToString("yyyyMMdd");
+            var amzDate = now.ToString("yyyyMMddTHHmmssZ");
+            var expiresInSeconds = (int)expiresIn.TotalSeconds;
+
+            var endpoint = GetEndpointUrl(key);
+            var uri = new Uri(endpoint);
+
+            var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
+            var credential = $"{_accessKey}/{credentialScope}";
+
+            var queryParams = new SortedDictionary<string, string>
+            {
+                { "X-Amz-Algorithm", "AWS4-HMAC-SHA256" },
+                { "X-Amz-Credential", credential },
+                { "X-Amz-Date", amzDate },
+                { "X-Amz-Expires", expiresInSeconds.ToString() },
+                { "X-Amz-SignedHeaders", "host" }
+            };
+
+            var canonicalQueryString = string.Join("&", queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+
+            var canonicalUri = uri.AbsolutePath;
+            var canonicalHeaders = $"host:{uri.Host}\n";
+            var signedHeaders = "host";
+            var payloadHash = "UNSIGNED-PAYLOAD";
+
+            var canonicalRequest = $"GET\n{canonicalUri}\n{canonicalQueryString}\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
+            var canonicalRequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower();
+
+            var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalRequestHash}";
+
+            var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + _secretKey), dateStamp);
+            var kRegion = HmacSha256(kDate, _region);
+            var kService = HmacSha256(kRegion, "s3");
+            var kSigning = HmacSha256(kService, "aws4_request");
+            var signature = Convert.ToHexString(HmacSha256(kSigning, stringToSign)).ToLower();
+
+            return $"{endpoint}?{canonicalQueryString}&X-Amz-Signature={signature}";
+        }
+
         #endregion
 
         #region Helper Methods
@@ -906,14 +1308,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             request.Headers.TryAddWithoutValidation("x-amz-date", amzDate);
             request.Headers.Host = request.RequestUri?.Host;
 
-            // AWS Signature Version 4
             var contentHash = content != null
                 ? Convert.ToHexString(SHA256.HashData(content)).ToLower()
                 : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // Empty hash
 
             request.Headers.TryAddWithoutValidation("x-amz-content-sha256", contentHash);
 
-            // Build canonical request
             var uri = request.RequestUri!;
             var canonicalUri = uri.AbsolutePath;
             var canonicalQueryString = uri.Query.TrimStart('?');
@@ -924,11 +1324,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var canonicalRequest = $"{request.Method}\n{canonicalUri}\n{canonicalQueryString}\n{canonicalHeaders}\n{signedHeaders}\n{contentHash}";
             var canonicalRequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower();
 
-            // Build string to sign
             var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
             var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalRequestHash}";
 
-            // Calculate signature
             var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + _secretKey), dateStamp);
             var kRegion = HmacSha256(kDate, _region);
             var kService = HmacSha256(kRegion, "s3");
@@ -963,8 +1361,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                         return response;
                     }
 
-                    // Check if we should retry based on status code
-                    if (!ShouldRetry(response.StatusCode) || attempt == _maxRetries)
+                    if (!ShouldRetryStatusCode(response.StatusCode) || attempt == _maxRetries)
                     {
                         response.EnsureSuccessStatusCode();
                         return response;
@@ -975,7 +1372,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     lastException = ex;
                 }
 
-                // Exponential backoff
                 var delay = _retryDelayMs * (int)Math.Pow(2, attempt);
                 await Task.Delay(delay, ct);
             }
@@ -989,7 +1385,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             return response!;
         }
 
-        private bool ShouldRetry(System.Net.HttpStatusCode statusCode)
+        private bool ShouldRetryStatusCode(System.Net.HttpStatusCode statusCode)
         {
             return statusCode == System.Net.HttpStatusCode.ServiceUnavailable ||
                    statusCode == System.Net.HttpStatusCode.RequestTimeout ||
@@ -1026,9 +1422,27 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 "STANDARD_IA" or "ONEZONE_IA" => StorageTier.Warm,
                 "GLACIER_IR" or "GLACIER INSTANT RETRIEVAL" => StorageTier.Cold,
                 "GLACIER" or "GLACIER FLEXIBLE RETRIEVAL" => StorageTier.Archive,
-                "DEEP_ARCHIVE" => StorageTier.Archive, // Map Deep Archive to Archive tier
-                "INTELLIGENT_TIERING" => StorageTier.Hot, // Default to Hot for intelligent tiering
+                "DEEP_ARCHIVE" => StorageTier.Archive,
+                "INTELLIGENT_TIERING" => StorageTier.Hot,
                 _ => StorageTier.Hot
+            };
+        }
+
+        /// <summary>
+        /// Maps storage class string to AWSSDK S3StorageClass enum.
+        /// </summary>
+        private static S3StorageClass MapToS3StorageClass(string storageClass)
+        {
+            return storageClass.ToUpperInvariant() switch
+            {
+                "STANDARD" => S3StorageClass.Standard,
+                "STANDARD_IA" => S3StorageClass.StandardInfrequentAccess,
+                "ONEZONE_IA" => S3StorageClass.OneZoneInfrequentAccess,
+                "GLACIER" or "GLACIER FLEXIBLE RETRIEVAL" => S3StorageClass.Glacier,
+                "GLACIER_IR" or "GLACIER INSTANT RETRIEVAL" => S3StorageClass.GlacierInstantRetrieval,
+                "DEEP_ARCHIVE" => S3StorageClass.DeepArchive,
+                "INTELLIGENT_TIERING" => S3StorageClass.IntelligentTiering,
+                _ => S3StorageClass.Standard
             };
         }
 
@@ -1043,13 +1457,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         /// </summary>
         protected override async Task ShutdownAsyncCore(CancellationToken ct = default)
         {
-            // Give pending operations up to 10 seconds to complete
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
             try
             {
-                // Allow pending operations to complete gracefully
                 await Task.Delay(100, linkedCts.Token);
             }
             catch (OperationCanceledException)
@@ -1062,7 +1474,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         {
             await base.DisposeCoreAsync();
 
-            // Shutdown gracefully first
             try
             {
                 await ShutdownAsyncCore();
@@ -1072,7 +1483,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 // Ignore shutdown errors during disposal
             }
 
-            // Dispose HttpClient and clear cached health
+            // Dispose SDK resources
+            _transferUtility?.Dispose();
+            _s3Client?.Dispose();
+
+            // Dispose manual HTTP fallback
             _httpClient?.Dispose();
             _cachedHealthInfo = null;
         }
@@ -1083,9 +1498,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
     #region Supporting Types
 
     /// <summary>
-    /// Represents a completed part in a multipart upload.
+    /// Represents a completed part in a manual multipart upload (fallback path).
     /// </summary>
-    internal class CompletedPart
+    internal class ManualCompletedPart
     {
         public int PartNumber { get; set; }
         public string ETag { get; set; } = string.Empty;
