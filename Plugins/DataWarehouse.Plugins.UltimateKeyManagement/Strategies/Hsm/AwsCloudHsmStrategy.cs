@@ -215,20 +215,26 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         private bool ValidateHsmCertificate(HttpRequestMessage request, X509Certificate2? cert, X509Chain? chain, SslPolicyErrors errors)
         {
-            // In production, validate against the customer CA certificate
+            // No errors -- certificate is valid via system trust store
+            if (errors == SslPolicyErrors.None)
+                return true;
+
+            // If a customer CA cert is explicitly provided, validate against it
             if (!string.IsNullOrEmpty(_config.CustomerCaCertPath) && File.Exists(_config.CustomerCaCertPath))
             {
-                // Load customer CA and validate
-                using var customerCa = X509CertificateLoader.LoadCertificateFromFile(_config.CustomerCaCertPath);
-                // Perform proper certificate chain validation
-                return chain?.ChainElements
-                    .Cast<X509ChainElement>()
-                    .Any(e => e.Certificate.Thumbprint == customerCa.Thumbprint) ?? false;
+                // Only accept chain errors when we have a custom CA to validate against
+                if (errors == SslPolicyErrors.RemoteCertificateChainErrors)
+                {
+                    using var customerCa = X509CertificateLoader.LoadCertificateFromFile(_config.CustomerCaCertPath);
+                    return chain?.ChainElements
+                        .Cast<X509ChainElement>()
+                        .Any(e => e.Certificate.Thumbprint == customerCa.Thumbprint) ?? false;
+                }
             }
 
-            // For development/testing, accept if no errors other than untrusted root
-            return errors == SslPolicyErrors.None ||
-                   errors == SslPolicyErrors.RemoteCertificateChainErrors;
+            // Without a custom CA, do NOT fall back to accepting chain errors
+            // This ensures proper certificate validation by default
+            return false;
         }
 
         public override Task<string> GetCurrentKeyIdAsync()

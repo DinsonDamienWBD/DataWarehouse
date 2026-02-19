@@ -103,9 +103,24 @@ public class GrpcControlPlanePlugin : ControlPlaneTransportPluginBase
             try
             {
                 _channel?.Dispose();
+
+                // Use TLS credentials for HTTPS endpoints (secure default)
+                var isHttps = config.ServerUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                var credentials = isHttps
+                    ? Grpc.Core.ChannelCredentials.SecureSsl
+                    : Grpc.Core.ChannelCredentials.Insecure;
+
+                if (!isHttps)
+                {
+                    _logger.LogWarning(
+                        "gRPC control plane connecting without TLS to {ServerUrl}. " +
+                        "Use https:// in production for encrypted communication.",
+                        config.ServerUrl);
+                }
+
                 _channel = GrpcChannel.ForAddress(config.ServerUrl, new GrpcChannelOptions
                 {
-                    Credentials = Grpc.Core.ChannelCredentials.Insecure,
+                    Credentials = credentials,
                     MaxReceiveMessageSize = 10 * 1024 * 1024,
                     MaxSendMessageSize = 10 * 1024 * 1024
                 });

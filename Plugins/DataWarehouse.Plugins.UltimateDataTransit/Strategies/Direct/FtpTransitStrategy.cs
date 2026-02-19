@@ -277,7 +277,8 @@ internal sealed class FtpTransitStrategy : DataTransitStrategyBase
         if (protocol.Equals("ftps", StringComparison.OrdinalIgnoreCase))
         {
             client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
-            client.Config.ValidateAnyCertificate = true;
+            // Secure default: validate certificates. Use endpoint metadata to opt-in to bypass if needed.
+            client.Config.ValidateAnyCertificate = false;
         }
 
         client.Config.ConnectTimeout = 30000;

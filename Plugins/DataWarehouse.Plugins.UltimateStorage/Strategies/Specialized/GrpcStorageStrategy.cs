@@ -33,11 +33,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         private StorageService.StorageServiceClient? _client;
         private string _endpoint = string.Empty;
         private bool _useTls = true;
+        private bool _validateCertificate = true;
         private string? _certificatePath = null;
         private string? _clientCertificatePath = null;
         private string? _clientCertificateKeyPath = null;
-        private int _maxReceiveMessageSize = 100 * 1024 * 1024; // 100MB
-        private int _maxSendMessageSize = 100 * 1024 * 1024; // 100MB
+        private int _maxReceiveMessageSize = 10 * 1024 * 1024; // 10MB (NET-09: reduced from 100MB)
+        private int _maxSendMessageSize = 10 * 1024 * 1024; // 10MB (NET-09: reduced from 100MB)
         private int _chunkSizeBytes = 4 * 1024 * 1024; // 4MB chunks for streaming
         private int _streamingThresholdBytes = 10 * 1024 * 1024; // 10MB
         private int _maxRetries = 3;
@@ -84,11 +85,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     ?? throw new InvalidOperationException("gRPC Endpoint is required (e.g., https://storage.example.com:443)");
 
                 _useTls = GetConfiguration("UseTls", true);
+                _validateCertificate = GetConfiguration("ValidateCertificate", true);
                 _certificatePath = GetConfiguration<string?>("CertificatePath", null);
                 _clientCertificatePath = GetConfiguration<string?>("ClientCertificatePath", null);
                 _clientCertificateKeyPath = GetConfiguration<string?>("ClientCertificateKeyPath", null);
-                _maxReceiveMessageSize = GetConfiguration("MaxReceiveMessageSize", 100 * 1024 * 1024);
-                _maxSendMessageSize = GetConfiguration("MaxSendMessageSize", 100 * 1024 * 1024);
+                _maxReceiveMessageSize = GetConfiguration("MaxReceiveMessageSize", 10 * 1024 * 1024);
+                _maxSendMessageSize = GetConfiguration("MaxSendMessageSize", 10 * 1024 * 1024);
                 _chunkSizeBytes = GetConfiguration("ChunkSizeBytes", 4 * 1024 * 1024);
                 _streamingThresholdBytes = GetConfiguration("StreamingThresholdBytes", 10 * 1024 * 1024);
                 _maxRetries = GetConfiguration("MaxRetries", 3);
@@ -153,16 +155,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             };
 
             // Configure TLS/SSL if needed
-            if (_useTls && !string.IsNullOrEmpty(_certificatePath))
+            if (_useTls)
             {
-                handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+                handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions();
+
+                if (!_validateCertificate)
                 {
-                    RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
+                    // Explicit opt-in bypass for development/testing only
+                    handler.SslOptions.RemoteCertificateValidationCallback = (sender, certificate, chain, errors) => true;
+                }
+                // When _validateCertificate is true (default), no callback is set,
+                // so .NET uses its default certificate validation which is secure.
+
+                // Load custom CA certificate if provided
+                if (!string.IsNullOrEmpty(_certificatePath))
+                {
+                    var caCert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(_certificatePath);
+                    handler.SslOptions.RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
                     {
-                        // In production, implement proper certificate validation
-                        return true;
-                    }
-                };
+                        if (errors == System.Net.Security.SslPolicyErrors.None)
+                            return true;
+                        if (!_validateCertificate)
+                            return true;
+                        // Validate against custom CA
+                        return chain?.ChainElements
+                            .Cast<System.Security.Cryptography.X509Certificates.X509ChainElement>()
+                            .Any(e => e.Certificate.Thumbprint == caCert.Thumbprint) ?? false;
+                    };
+                }
 
                 // Load client certificate if provided
                 if (!string.IsNullOrEmpty(_clientCertificatePath))
