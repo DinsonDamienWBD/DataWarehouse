@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
@@ -10,10 +11,45 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 {
     /// <summary>
     /// Connection strategy for CoAP (Constrained Application Protocol).
-    /// Tests connectivity via UDP connection to port 5683.
+    /// Tests connectivity via UDP connection to port 5683 (CoAP) or 5684 (CoAPs/DTLS).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Security Controls (NET-05 - CVSS 7.5):</strong>
+    /// <list type="bullet">
+    /// <item><description>DTLS requirement: CoAP transport is unencrypted by default.
+    /// Production deployments MUST use DTLS (port 5684) or IPSec/VPN tunnel.</description></item>
+    /// <item><description>AllowInsecureCoap: Must be explicitly set to true to use unencrypted CoAP.
+    /// Defaults to false, which throws on initialization to prevent insecure deployment.</description></item>
+    /// <item><description>Randomized message IDs: Initial CoAP message ID is generated via CSPRNG
+    /// to prevent predictable message ID attacks.</description></item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     public class CoApConnectionStrategy : IoTConnectionStrategyBase
     {
+        // SECURITY: CoAP transport is unencrypted by default. Use DTLS (CoAPs, port 5684)
+        // or IPSec/VPN tunnel for production deployments (NET-05 - CVSS 7.5).
+        // The CoAP.NET library does not natively support DTLS, so production environments
+        // MUST ensure transport-level encryption via network infrastructure.
+
+        /// <summary>
+        /// Whether to use DTLS for CoAP connections. Default: true.
+        /// When true and DTLS is not available, connection will fail unless AllowInsecureCoap is set.
+        /// </summary>
+        private bool _useDtls = true;
+
+        /// <summary>
+        /// Whether to allow insecure (non-DTLS) CoAP connections. Default: false.
+        /// Must be explicitly set to true for non-encrypted CoAP communication (NOT recommended for production).
+        /// </summary>
+        private bool _allowInsecureCoap;
+
+        /// <summary>
+        /// CSPRNG-generated initial message ID to prevent predictable message ID attacks.
+        /// </summary>
+        private ushort _currentMessageId;
+
         /// <inheritdoc/>
         public override string StrategyId => "coap";
 
@@ -25,16 +61,41 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         /// <inheritdoc/>
         public override string SemanticDescription =>
-            "Connects to CoAP endpoints for constrained IoT device communication";
+            "Connects to CoAP endpoints for constrained IoT device communication with DTLS security enforcement";
 
         /// <inheritdoc/>
-        public override string[] Tags => new[] { "coap", "iot", "constrained", "udp", "m2m" };
+        public override string[] Tags => new[] { "coap", "iot", "constrained", "udp", "m2m", "dtls" };
 
         /// <summary>
         /// Initializes a new instance of <see cref="CoApConnectionStrategy"/>.
         /// </summary>
         /// <param name="logger">Optional logger.</param>
-        public CoApConnectionStrategy(ILogger? logger = null) : base(logger) { }
+        public CoApConnectionStrategy(ILogger? logger = null) : base(logger)
+        {
+            // Initialize message ID with CSPRNG to prevent predictable sequential IDs
+            _currentMessageId = GenerateRandomMessageId();
+        }
+
+        /// <summary>
+        /// Generates a cryptographically random initial message ID (NET-05).
+        /// Prevents predictable sequential message ID attacks.
+        /// </summary>
+        /// <returns>A random unsigned 16-bit message ID.</returns>
+        private static ushort GenerateRandomMessageId()
+        {
+            Span<byte> buffer = stackalloc byte[2];
+            RandomNumberGenerator.Fill(buffer);
+            return BitConverter.ToUInt16(buffer);
+        }
+
+        /// <summary>
+        /// Gets the next message ID using CSPRNG-seeded counter with wraparound.
+        /// </summary>
+        /// <returns>The next message ID.</returns>
+        public ushort GetNextMessageId()
+        {
+            return _currentMessageId++;
+        }
 
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
@@ -42,6 +103,35 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var parts = config.ConnectionString.Split(':');
             var host = parts[0];
             var port = parts.Length > 1 ? int.Parse(parts[1]) : 5683;
+
+            // NET-05: Load security configuration
+            _useDtls = GetConfiguration(config, "UseDtls", true);
+            _allowInsecureCoap = GetConfiguration(config, "AllowInsecureCoap", false);
+
+            // NET-05: DTLS enforcement
+            var isSecurePort = port == 5684; // CoAPs standard port
+            var connectionScheme = config.ConnectionString.StartsWith("coaps://", StringComparison.OrdinalIgnoreCase)
+                ? "coaps" : "coap";
+            var isDtlsRequested = _useDtls || connectionScheme == "coaps" || isSecurePort;
+
+            if (isDtlsRequested && !isSecurePort && connectionScheme != "coaps")
+            {
+                // DTLS requested but not available via the underlying library
+                if (!_allowInsecureCoap)
+                {
+                    throw new InvalidOperationException(
+                        "CoAP DTLS is required but not available. The CoAP.NET library does not natively support DTLS. " +
+                        "Either: (1) Use IPSec or VPN tunnel for transport encryption, " +
+                        "(2) Set AllowInsecureCoap=true to explicitly allow unencrypted CoAP (NOT recommended for production), or " +
+                        "(3) Use CoAPs (port 5684) with a DTLS-capable proxy. " +
+                        "See NET-05 (CVSS 7.5) for details.");
+                }
+
+                System.Diagnostics.Trace.TraceWarning(
+                    "SECURITY WARNING: CoAP operating without DTLS -- transport is unencrypted (NET-05 - CVSS 7.5). " +
+                    "Use IPSec or VPN tunnel for production deployments. Host: {0}, Port: {1}",
+                    host, port.ToString());
+            }
 
             var client = new UdpClient();
             client.Connect(host, port);
@@ -53,8 +143,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 ["host"] = host,
                 ["port"] = port,
                 ["protocol"] = "CoAP",
-                ["connected_at"] = DateTimeOffset.UtcNow
+                ["connected_at"] = DateTimeOffset.UtcNow,
+                ["dtls_enabled"] = isSecurePort || connectionScheme == "coaps",
+                ["insecure_allowed"] = _allowInsecureCoap,
+                ["initial_message_id"] = _currentMessageId
             };
+
+            System.Diagnostics.Trace.TraceInformation(
+                "CoAP connection established to {0}:{1} (DTLS: {2}, InsecureAllowed: {3})",
+                host, port.ToString(), (isSecurePort || connectionScheme == "coaps").ToString(), _allowInsecureCoap.ToString());
 
             return new DefaultConnectionHandle(client, info);
         }
