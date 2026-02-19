@@ -40,20 +40,107 @@ public sealed class AesGcmStrategy : EncryptionStrategyBase
     };
 
     /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Validate crypto parameters
+        if (NonceSize != 12)
+            throw new ArgumentException("AES-GCM requires 12-byte nonce");
+
+        if (TagSize != 16)
+            throw new ArgumentException("AES-GCM requires 16-byte authentication tag");
+
+        if (KeySize != 32)
+            throw new ArgumentException("AES-256-GCM requires 32-byte key (256 bits)");
+
+        // Verify AesGcm is available on this platform
+        try
+        {
+            var testKey = new byte[KeySize];
+            using var testGcm = new AesGcm(testKey, TagSize);
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            throw new InvalidOperationException("AES-GCM is not supported on this platform", ex);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Checks AES-GCM availability via encrypt+decrypt round-trip test.
+    /// </summary>
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return await GetCachedHealthAsync(async _ =>
+        {
+            try
+            {
+                // Test encrypt+decrypt round-trip
+                var testKey = RandomNumberGenerator.GetBytes(KeySize);
+                var testPlaintext = new byte[] { 1, 2, 3, 4, 5 };
+                var testNonce = RandomNumberGenerator.GetBytes(NonceSize);
+                var testCiphertext = new byte[testPlaintext.Length];
+                var testTag = new byte[TagSize];
+                var testDecrypted = new byte[testPlaintext.Length];
+
+                using var aesGcm = new AesGcm(testKey, TagSize);
+                aesGcm.Encrypt(testNonce, testPlaintext, testCiphertext, testTag);
+                aesGcm.Decrypt(testNonce, testCiphertext, testTag, testDecrypted);
+
+                var success = testPlaintext.SequenceEqual(testDecrypted);
+
+                return new StrategyHealthCheckResult(
+                    success,
+                    success ? "AES-256-GCM operational" : "Round-trip test failed");
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return new StrategyHealthCheckResult(false, "AES-GCM not available on this platform");
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        // No persistent resources to clean up
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override ValueTask DisposeAsyncCore()
+    {
+        // No async disposal needed
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     protected override Task<byte[]> EncryptCoreAsync(
         byte[] plaintext,
         byte[] key,
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        var nonce = GenerateIv();
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[TagSize];
+        try
+        {
+            var nonce = GenerateIv();
+            var ciphertext = new byte[plaintext.Length];
+            var tag = new byte[TagSize];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
 
-        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+            IncrementCounter("aesgcm.encrypt");
+            return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-256-GCM encryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -63,13 +150,21 @@ public sealed class AesGcmStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
-        var plaintext = new byte[encryptedData.Length];
+        try
+        {
+            var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
+            var plaintext = new byte[encryptedData.Length];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
 
-        return Task.FromResult(plaintext);
+            IncrementCounter("aesgcm.decrypt");
+            return Task.FromResult(plaintext);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-256-GCM decryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 }
 
@@ -101,28 +196,128 @@ public sealed class Aes128GcmStrategy : EncryptionStrategyBase
     };
 
     /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (NonceSize != 12)
+            throw new ArgumentException("AES-GCM requires 12-byte nonce");
+
+        if (TagSize != 16)
+            throw new ArgumentException("AES-GCM requires 16-byte authentication tag");
+
+        if (KeySize != 16)
+            throw new ArgumentException("AES-128-GCM requires 16-byte key (128 bits)");
+
+        try
+        {
+            var testKey = new byte[KeySize];
+            using var testGcm = new AesGcm(testKey, TagSize);
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            throw new InvalidOperationException("AES-GCM is not supported on this platform", ex);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return await GetCachedHealthAsync(async _ =>
+        {
+            try
+            {
+                var testKey = RandomNumberGenerator.GetBytes(KeySize);
+                var testPlaintext = new byte[] { 1, 2, 3, 4, 5 };
+                var testNonce = RandomNumberGenerator.GetBytes(NonceSize);
+                var testCiphertext = new byte[testPlaintext.Length];
+                var testTag = new byte[TagSize];
+                var testDecrypted = new byte[testPlaintext.Length];
+
+                using var aesGcm = new AesGcm(testKey, TagSize);
+                aesGcm.Encrypt(testNonce, testPlaintext, testCiphertext, testTag);
+                aesGcm.Decrypt(testNonce, testCiphertext, testTag, testDecrypted);
+
+                var success = testPlaintext.SequenceEqual(testDecrypted);
+
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = success,
+                    Message = success ? "AES-128-GCM operational" : "Round-trip test failed",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = false,
+                    Message = "AES-GCM not available on this platform",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = false,
+                    Message = $"Health check failed: {ex.Message}",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override ValueTask DisposeAsyncCore()
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var nonce = GenerateIv();
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[TagSize];
+        try
+        {
+            var nonce = GenerateIv();
+            var ciphertext = new byte[plaintext.Length];
+            var tag = new byte[TagSize];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
 
-        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+            IncrementCounter("aesgcm.encrypt");
+            return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-128-GCM encryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 
     /// <inheritdoc/>
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
-        var plaintext = new byte[encryptedData.Length];
+        try
+        {
+            var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
+            var plaintext = new byte[encryptedData.Length];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
 
-        return Task.FromResult(plaintext);
+            IncrementCounter("aesgcm.decrypt");
+            return Task.FromResult(plaintext);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-128-GCM decryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 }
 
@@ -154,27 +349,127 @@ public sealed class Aes192GcmStrategy : EncryptionStrategyBase
     };
 
     /// <inheritdoc/>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        if (NonceSize != 12)
+            throw new ArgumentException("AES-GCM requires 12-byte nonce");
+
+        if (TagSize != 16)
+            throw new ArgumentException("AES-GCM requires 16-byte authentication tag");
+
+        if (KeySize != 24)
+            throw new ArgumentException("AES-192-GCM requires 24-byte key (192 bits)");
+
+        try
+        {
+            var testKey = new byte[KeySize];
+            using var testGcm = new AesGcm(testKey, TagSize);
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            throw new InvalidOperationException("AES-GCM is not supported on this platform", ex);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return await GetCachedHealthAsync(async _ =>
+        {
+            try
+            {
+                var testKey = RandomNumberGenerator.GetBytes(KeySize);
+                var testPlaintext = new byte[] { 1, 2, 3, 4, 5 };
+                var testNonce = RandomNumberGenerator.GetBytes(NonceSize);
+                var testCiphertext = new byte[testPlaintext.Length];
+                var testTag = new byte[TagSize];
+                var testDecrypted = new byte[testPlaintext.Length];
+
+                using var aesGcm = new AesGcm(testKey, TagSize);
+                aesGcm.Encrypt(testNonce, testPlaintext, testCiphertext, testTag);
+                aesGcm.Decrypt(testNonce, testCiphertext, testTag, testDecrypted);
+
+                var success = testPlaintext.SequenceEqual(testDecrypted);
+
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = success,
+                    Message = success ? "AES-192-GCM operational" : "Round-trip test failed",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = false,
+                    Message = "AES-GCM not available on this platform",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult
+                {
+                    IsHealthy = false,
+                    Message = $"Health check failed: {ex.Message}",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
+    /// <inheritdoc/>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override ValueTask DisposeAsyncCore()
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var nonce = GenerateIv();
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[TagSize];
+        try
+        {
+            var nonce = GenerateIv();
+            var ciphertext = new byte[plaintext.Length];
+            var tag = new byte[TagSize];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
 
-        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+            IncrementCounter("aesgcm.encrypt");
+            return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-192-GCM encryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 
     /// <inheritdoc/>
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
-        var plaintext = new byte[encryptedData.Length];
+        try
+        {
+            var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
+            var plaintext = new byte[encryptedData.Length];
 
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Decrypt(nonce, encryptedData, tag!, plaintext, associatedData);
 
-        return Task.FromResult(plaintext);
+            IncrementCounter("aesgcm.decrypt");
+            return Task.FromResult(plaintext);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new CryptographicException($"AES-192-GCM decryption failed (key size: {key.Length} bytes)", ex);
+        }
     }
 }
