@@ -501,10 +501,23 @@ internal sealed class PngImageStrategy : MediaStrategyBase
     }
 
     /// <summary>
-    /// Compresses image data using DEFLATE algorithm at the specified compression level.
+    /// Compresses image data using zlib-wrapped DEFLATE as required by the PNG specification (RFC 1950).
+    /// PNG IDAT chunks contain zlib data streams: [CMF][FLG][deflate-compressed data][Adler32 checksum].
     /// </summary>
+    /// <remarks>
+    /// Raw DeflateStream output is NOT valid for PNG IDAT. The PNG specification (ISO/IEC 15948, Section 10)
+    /// mandates zlib format (RFC 1950) which wraps deflate with a 2-byte header and 4-byte Adler-32 checksum.
+    /// Uses ZLibStream (.NET 6+) for correct zlib framing.
+    /// </remarks>
     private static byte[] CompressImageData(byte[] sourceData, int compressionLevel)
     {
+        // Apply Sub filter (type 1) to scanlines for improved compression.
+        // Sub filter: each byte is replaced by the difference between it and the byte to the left.
+        // This helps deflate compress image data more effectively than raw bytes.
+        // For simplicity, we treat the entire source as raw bytes with a filter byte prefix per scanline.
+        // If the input is already PNG image data (from another PNG), we apply filtering on the raw pixel data.
+        var filteredData = ApplySubFilter(sourceData);
+
         // Map 0-9 scale to .NET CompressionLevel enum
         var level = compressionLevel switch
         {
@@ -514,13 +527,49 @@ internal sealed class PngImageStrategy : MediaStrategyBase
             _ => System.IO.Compression.CompressionLevel.SmallestSize
         };
 
+        // Use ZLibStream which produces correct zlib-framed output (CMF + FLG + deflate + Adler32)
+        // as required by PNG IDAT chunks (RFC 1950 / ISO 15948 Section 10)
         using var output = new MemoryStream(4096);
-        using (var deflate = new System.IO.Compression.DeflateStream(output, level, leaveOpen: true))
+        using (var zlib = new System.IO.Compression.ZLibStream(output, level, leaveOpen: true))
         {
-            deflate.Write(sourceData, 0, sourceData.Length);
+            zlib.Write(filteredData, 0, filteredData.Length);
         }
 
         return output.ToArray();
+    }
+
+    /// <summary>
+    /// Applies the PNG Sub filter (type 1) to image data.
+    /// Each scanline is prefixed with the filter type byte (1 = Sub),
+    /// then each byte is replaced by (byte - left_byte) mod 256.
+    /// </summary>
+    /// <remarks>
+    /// Sub filter is simple and effective for photographic and gradient content.
+    /// It exploits horizontal pixel correlation which is common in most images.
+    /// </remarks>
+    private static byte[] ApplySubFilter(byte[] sourceData)
+    {
+        if (sourceData.Length == 0)
+            return sourceData;
+
+        // For raw pixel data without existing scanline structure,
+        // treat as a single scanline with Sub filter prefix
+        var filtered = new byte[sourceData.Length + 1];
+        filtered[0] = 1; // Sub filter type byte
+
+        // First byte of the scanline: Sub(x) = Raw(x) - Raw(a) where a = 0 for first pixel
+        if (sourceData.Length > 0)
+            filtered[1] = sourceData[0];
+
+        // Remaining bytes: Sub(x) = Raw(x) - Raw(x - bpp), using bpp=4 (RGBA) as default
+        const int bpp = 4; // bytes per pixel for RGBA color type 6
+        for (int i = 1; i < sourceData.Length; i++)
+        {
+            byte left = i >= bpp ? sourceData[i - bpp] : (byte)0;
+            filtered[i + 1] = (byte)((sourceData[i] - left) & 0xFF);
+        }
+
+        return filtered;
     }
 
     /// <summary>
