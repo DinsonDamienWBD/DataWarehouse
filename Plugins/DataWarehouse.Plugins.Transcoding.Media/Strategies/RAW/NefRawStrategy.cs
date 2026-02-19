@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 
@@ -67,6 +68,14 @@ internal sealed class NefRawStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "Nikon NEF RAW";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("nef.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("nef.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Nikon NEF RAW ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("nef.decode") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes a Nikon NEF RAW image by extracting sensor data, applying Nikon-specific

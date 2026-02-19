@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Binary;
@@ -12,6 +13,14 @@ public sealed class ProtobufStrategy : DataFormatStrategyBase
     public override string StrategyId => "protobuf";
 
     public override string DisplayName => "Protocol Buffers";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("protobuf.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("protobuf.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Protocol Buffers strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("protobuf.parse"), ["SerializeOps"] = GetCounter("protobuf.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

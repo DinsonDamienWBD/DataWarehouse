@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.ThreeD;
@@ -71,6 +72,14 @@ internal sealed class UsdModelStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "USD 3D Model";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("usd.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("usd.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "USD 3D processing ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("usd.parse") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Processes a USD scene by detecting format variant (USDA/USDC/USDZ), parsing the

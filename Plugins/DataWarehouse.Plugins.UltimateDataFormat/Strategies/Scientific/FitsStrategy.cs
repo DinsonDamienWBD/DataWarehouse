@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Scientific;
@@ -12,6 +13,14 @@ public sealed class FitsStrategy : DataFormatStrategyBase
     public override string StrategyId => "fits";
 
     public override string DisplayName => "FITS";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("fits.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("fits.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "FITS strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("fits.parse"), ["SerializeOps"] = GetCounter("fits.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

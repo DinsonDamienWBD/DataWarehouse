@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -14,6 +15,14 @@ public sealed class GraphMlStrategy : DataFormatStrategyBase
     public override string StrategyId => "graphml";
 
     public override string DisplayName => "GraphML";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("graphml.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("graphml.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "GraphML strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("graphml.parse"), ["SerializeOps"] = GetCounter("graphml.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

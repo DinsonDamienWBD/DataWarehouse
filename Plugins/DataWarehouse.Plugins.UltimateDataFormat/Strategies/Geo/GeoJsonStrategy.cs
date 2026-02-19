@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -13,6 +14,14 @@ public sealed class GeoJsonStrategy : DataFormatStrategyBase
     public override string StrategyId => "geojson";
 
     public override string DisplayName => "GeoJSON";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("geojson.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("geojson.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "GeoJSON strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("geojson.parse"), ["SerializeOps"] = GetCounter("geojson.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

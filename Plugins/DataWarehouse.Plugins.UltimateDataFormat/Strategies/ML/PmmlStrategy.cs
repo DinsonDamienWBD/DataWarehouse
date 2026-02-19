@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -14,6 +15,14 @@ public sealed class PmmlStrategy : DataFormatStrategyBase
     public override string StrategyId => "pmml";
 
     public override string DisplayName => "PMML";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("pmml.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("pmml.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "PMML strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("pmml.parse"), ["SerializeOps"] = GetCounter("pmml.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

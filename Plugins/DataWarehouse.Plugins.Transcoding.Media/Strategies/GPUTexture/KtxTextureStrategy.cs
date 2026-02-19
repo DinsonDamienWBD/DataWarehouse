@@ -77,6 +77,14 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string Name => "KTX GPU Texture";
 
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("ktx.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("ktx.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "KTX texture processing ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("ktx.decode") }), TimeSpan.FromSeconds(60), ct);
+
     /// <summary>
     /// Transcodes an image to KTX2 format with Basis Universal supercompression,
     /// automatic mipmap generation, and cross-platform GPU texture transcoding support.

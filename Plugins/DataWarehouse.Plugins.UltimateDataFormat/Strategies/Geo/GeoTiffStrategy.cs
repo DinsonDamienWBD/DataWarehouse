@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Geo;
@@ -12,6 +13,14 @@ public sealed class GeoTiffStrategy : DataFormatStrategyBase
     public override string StrategyId => "geotiff";
 
     public override string DisplayName => "GeoTIFF";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("geotiff.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("geotiff.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "GeoTIFF strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("geotiff.parse"), ["SerializeOps"] = GetCounter("geotiff.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

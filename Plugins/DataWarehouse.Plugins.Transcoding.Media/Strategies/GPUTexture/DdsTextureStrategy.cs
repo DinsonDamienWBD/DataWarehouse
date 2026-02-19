@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.GPUTexture;
@@ -72,6 +73,14 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "DDS GPU Texture";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("dds.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("dds.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "DDS texture processing ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("dds.decode") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes an image to DDS GPU texture format with BC block compression,

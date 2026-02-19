@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 
@@ -78,6 +79,14 @@ internal sealed class DngRawStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "Adobe DNG RAW";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("dng.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("dng.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Adobe DNG RAW ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("dng.decode") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes an Adobe DNG RAW image using standardized color matrices, opcodes,

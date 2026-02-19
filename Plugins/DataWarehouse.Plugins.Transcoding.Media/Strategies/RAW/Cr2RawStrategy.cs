@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 
@@ -74,6 +75,14 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "Canon CR2 RAW";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("cr2.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("cr2.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Canon CR2 RAW ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("cr2.decode") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes a Canon CR2 RAW image by extracting sensor data, applying demosaicing

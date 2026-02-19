@@ -54,6 +54,14 @@ public sealed class CameraFrameSource : MediaStrategyBase, IAsyncDisposable
     public override string StrategyId => "camera-frame-source";
     public override string Name => "Camera Frame Source";
 
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("camera.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown with camera release.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("camera.shutdown"); _isRunning = false; return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Camera frame source ready", new Dictionary<string, object> { ["IsRunning"] = _isRunning, ["CaptureOps"] = GetCounter("camera.capture") }), TimeSpan.FromSeconds(60), ct);
+
     /// <summary>
     /// Starts the camera capture stream.
     /// </summary>

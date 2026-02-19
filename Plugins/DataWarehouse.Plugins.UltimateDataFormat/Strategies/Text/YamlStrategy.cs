@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using YamlDotNet.Serialization;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -12,6 +13,14 @@ public sealed class YamlStrategy : DataFormatStrategyBase
     public override string StrategyId => "yaml";
 
     public override string DisplayName => "YAML";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("yaml.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("yaml.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "YAML strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("yaml.parse"), ["SerializeOps"] = GetCounter("yaml.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

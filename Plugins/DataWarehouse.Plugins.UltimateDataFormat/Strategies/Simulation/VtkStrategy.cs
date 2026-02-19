@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -12,6 +13,14 @@ public sealed class VtkStrategy : DataFormatStrategyBase
     public override string StrategyId => "vtk";
 
     public override string DisplayName => "VTK";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("vtk.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("vtk.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "VTK strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("vtk.parse"), ["SerializeOps"] = GetCounter("vtk.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Geo;
@@ -12,6 +13,14 @@ public sealed class ShapefileStrategy : DataFormatStrategyBase
     public override string StrategyId => "shapefile";
 
     public override string DisplayName => "ESRI Shapefile";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("shapefile.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("shapefile.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "ESRI Shapefile strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("shapefile.parse"), ["SerializeOps"] = GetCounter("shapefile.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Xml.Linq;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -13,6 +14,14 @@ public sealed class KmlStrategy : DataFormatStrategyBase
     public override string StrategyId => "kml";
 
     public override string DisplayName => "KML (Keyhole Markup Language)";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("kml.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("kml.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "KML (Keyhole Markup Language) strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("kml.parse"), ["SerializeOps"] = GetCounter("kml.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using MessagePack;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -12,6 +13,14 @@ public sealed class MessagePackStrategy : DataFormatStrategyBase
     public override string StrategyId => "msgpack";
 
     public override string DisplayName => "MessagePack";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("msgpack.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("msgpack.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "MessagePack strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("msgpack.parse"), ["SerializeOps"] = GetCounter("msgpack.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

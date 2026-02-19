@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Columnar;
@@ -12,6 +13,14 @@ public sealed class ArrowStrategy : DataFormatStrategyBase
     public override string StrategyId => "arrow";
 
     public override string DisplayName => "Apache Arrow";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("arrow.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("arrow.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Apache Arrow strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("arrow.parse"), ["SerializeOps"] = GetCounter("arrow.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

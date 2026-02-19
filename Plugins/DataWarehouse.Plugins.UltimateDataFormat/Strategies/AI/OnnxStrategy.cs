@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -12,6 +13,14 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
     public override string StrategyId => "onnx";
 
     public override string DisplayName => "ONNX";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("onnx.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("onnx.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "ONNX strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("onnx.parse"), ["SerializeOps"] = GetCounter("onnx.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

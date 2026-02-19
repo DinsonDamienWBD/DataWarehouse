@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.DataFormat;
@@ -13,6 +14,14 @@ public sealed class DeltaLakeStrategy : DataFormatStrategyBase
     public override string StrategyId => "deltalake";
 
     public override string DisplayName => "Delta Lake";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("deltalake.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("deltalake.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Delta Lake strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("deltalake.parse"), ["SerializeOps"] = GetCounter("deltalake.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

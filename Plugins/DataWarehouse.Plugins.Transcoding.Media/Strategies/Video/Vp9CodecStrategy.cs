@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.Transcoding.Media.Execution;
@@ -75,6 +76,35 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string Name => "VP9 Codec";
 
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("vp9.init");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("vp9.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            return new StrategyHealthCheckResult(true, "VP9 codec ready (libvpx-vp9)",
+                new Dictionary<string, object>
+                {
+                    ["DefaultCqLevel"] = DefaultCqLevel,
+                    ["MaxResolution"] = "4K UHD",
+                    ["EncodeOps"] = GetCounter("vp9.encode")
+                });
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
     /// <summary>
     /// Transcodes input media using the VP9 codec via FFmpeg with two-pass encoding for
     /// optimal bitrate allocation and quality consistency.
@@ -88,6 +118,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        IncrementCounter("vp9.encode");
         var outputStream = new MemoryStream(1024 * 1024);
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 

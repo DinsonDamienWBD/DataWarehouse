@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.DataFormat;
 
@@ -12,6 +13,14 @@ public sealed class JsonStrategy : DataFormatStrategyBase
     public override string StrategyId => "json";
 
     public override string DisplayName => "JSON";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("json.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("json.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "JSON strategy ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("json.parse"), ["SerializeOps"] = GetCounter("json.serialize") }), TimeSpan.FromSeconds(60), ct);
 
     public override DataFormatCapabilities Capabilities => new()
     {

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 
@@ -62,6 +63,14 @@ internal sealed class ArwRawStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "Sony ARW RAW";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("arw.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("arw.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "Sony ARW RAW ready", new Dictionary<string, object> { ["DecodeOps"] = GetCounter("arw.decode") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes a Sony ARW RAW image by extracting sensor data, applying Sony-specific

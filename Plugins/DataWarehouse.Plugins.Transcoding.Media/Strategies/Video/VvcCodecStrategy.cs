@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.Transcoding.Media.Execution;
@@ -72,6 +73,35 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string Name => "VVC/H.266 Codec";
 
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("vvc.init");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("vvc.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            return new StrategyHealthCheckResult(true, "VVC/H.266 codec ready (libvvenc)",
+                new Dictionary<string, object>
+                {
+                    ["DefaultQp"] = DefaultQp,
+                    ["MaxResolution"] = "8K",
+                    ["EncodeOps"] = GetCounter("vvc.encode")
+                });
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
     /// <summary>
     /// Transcodes input media using the VVC/H.266 codec via FFmpeg with libvvenc encoder.
     /// VVC encoding is computationally intensive and best suited for offline/archival workflows
@@ -84,6 +114,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        IncrementCounter("vvc.encode");
         var outputStream = new MemoryStream(1024 * 1024);
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 

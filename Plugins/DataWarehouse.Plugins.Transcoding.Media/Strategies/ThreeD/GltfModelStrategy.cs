@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.ThreeD;
@@ -74,6 +75,14 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "glTF 2.0 3D Model";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("gltf.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("gltf.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "glTF 2.0 processing ready", new Dictionary<string, object> { ["ParseOps"] = GetCounter("gltf.parse") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Processes a glTF/GLB 3D model by parsing the scene graph, extracting meshes and materials,

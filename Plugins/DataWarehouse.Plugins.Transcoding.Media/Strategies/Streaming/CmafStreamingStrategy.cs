@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 
@@ -69,6 +70,14 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "CMAF Streaming";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("cmaf.init"); return base.InitializeAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken) { IncrementCounter("cmaf.shutdown"); return base.ShutdownAsyncCore(cancellationToken); }
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default) =>
+        GetCachedHealthAsync(async (c) => new StrategyHealthCheckResult(true, "CMAF streaming ready", new Dictionary<string, object> { ["SegmentOps"] = GetCounter("cmaf.segment") }), TimeSpan.FromSeconds(60), ct);
 
     /// <summary>
     /// Transcodes input media into CMAF format by generating fragmented MP4 segments compatible

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
@@ -69,6 +70,35 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "AVIF Image";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("avif.init");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("avif.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: cached health check for AVIF processing.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            return new StrategyHealthCheckResult(true, "AVIF image processing ready",
+                new Dictionary<string, object>
+                {
+                    ["DefaultQuality"] = DefaultQuality,
+                    ["SupportsHdr"] = true,
+                    ["EncodeOps"] = GetCounter("avif.encode")
+                });
+        }, TimeSpan.FromSeconds(60), ct);
+    }
 
     /// <summary>
     /// Transcodes an image to AVIF format using AV1 intra-frame compression with

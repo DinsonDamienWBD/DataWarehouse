@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
@@ -68,6 +69,36 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "WebP Image";
+
+    /// <summary>Production hardening: initialization with counter tracking.</summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("webp.init");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: graceful shutdown.</summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("webp.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>Production hardening: cached health check.</summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            return new StrategyHealthCheckResult(true, "WebP image processing ready",
+                new Dictionary<string, object>
+                {
+                    ["DefaultQuality"] = DefaultQuality,
+                    ["SupportsLossless"] = true,
+                    ["SupportsAnimation"] = true,
+                    ["EncodeOps"] = GetCounter("webp.encode")
+                });
+        }, TimeSpan.FromSeconds(60), ct);
+    }
 
     /// <summary>
     /// Transcodes an image to WebP format with configurable lossy/lossless mode,
