@@ -31,6 +31,7 @@ public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("terraform_environment.deploy");
         var state = initialState;
         var workingDir = GetWorkingDir(config);
         var workspace = GetWorkspace(config);
@@ -110,6 +111,7 @@ public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("terraform_environment.deploy");
         var workingDir = currentState.Metadata.TryGetValue("workingDir", out var wd) ? wd?.ToString() : "";
 
         // Restore state from version
@@ -124,6 +126,7 @@ public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> ScaleCoreAsync(
         string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("pulumi_environment.deploy");
         var workingDir = currentState.Metadata.TryGetValue("workingDir", out var wd) ? wd?.ToString() : "";
         await TerraformApplyWithVarAsync(workingDir!, "instance_count", targetInstances.ToString(), ct);
 
@@ -192,6 +195,7 @@ public sealed class PulumiEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("pulumi_environment.deploy");
         var state = initialState;
         var projectDir = GetProjectDir(config);
         var stack = GetStack(config);
@@ -242,6 +246,7 @@ public sealed class PulumiEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("cloud_formation_environment.deploy");
         var projectDir = currentState.Metadata.TryGetValue("projectDir", out var pd) ? pd?.ToString() : "";
         var stack = currentState.Metadata.TryGetValue("stack", out var s) ? s?.ToString() : "";
 
@@ -254,6 +259,7 @@ public sealed class PulumiEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> ScaleCoreAsync(
         string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("azure_arm_environment.deploy");
         var projectDir = currentState.Metadata.TryGetValue("projectDir", out var pd) ? pd?.ToString() : "";
         await PulumiConfigSetAsync(projectDir!, "instanceCount", targetInstances.ToString(), ct);
         await PulumiUpAsync(projectDir!, new DeploymentConfig { Environment = "", Version = "", ArtifactUri = "" }, ct);
@@ -308,6 +314,7 @@ public sealed class CloudFormationEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("cloud_formation_environment.deploy");
         var state = initialState;
         var stackName = GetStackName(config);
         var templateUrl = GetTemplateUrl(config);
@@ -363,6 +370,7 @@ public sealed class CloudFormationEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("gcp_deployment_manager.deploy");
         var stackName = currentState.Metadata.TryGetValue("stackName", out var sn) ? sn?.ToString() : "";
         await RollbackStackAsync(stackName!, targetVersion, ct);
         await WaitForStackCompleteAsync(stackName!, ct);
@@ -373,6 +381,7 @@ public sealed class CloudFormationEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> ScaleCoreAsync(
         string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("crossplane_environment.deploy");
         var stackName = currentState.Metadata.TryGetValue("stackName", out var sn) ? sn?.ToString() : "";
         await UpdateStackParameterAsync(stackName!, "InstanceCount", targetInstances.ToString(), ct);
 
@@ -431,6 +440,7 @@ public sealed class AzureArmEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_arm_environment.deploy");
         var state = initialState;
         var resourceGroup = GetResourceGroup(config);
         var deploymentName = GetDeploymentName(config);
@@ -490,6 +500,7 @@ public sealed class AzureArmEnvironmentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("ephemeral_environment.deploy");
         var resourceGroup = currentState.Metadata.TryGetValue("resourceGroup", out var rg) ? rg?.ToString() : "";
         var deploymentName = currentState.Metadata.TryGetValue("deploymentName", out var dn) ? dn?.ToString() : "";
 
@@ -559,6 +570,7 @@ public sealed class GcpDeploymentManagerStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("gcp_deployment_manager.deploy");
         var state = initialState;
         var project = GetProject(config);
         var deploymentName = GetDeploymentName(config);
@@ -659,6 +671,7 @@ public sealed class CrossplaneEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("crossplane_environment.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var claimName = GetClaimName(config);
@@ -777,6 +790,7 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("ephemeral_environment.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var envName = GetEnvName(config);

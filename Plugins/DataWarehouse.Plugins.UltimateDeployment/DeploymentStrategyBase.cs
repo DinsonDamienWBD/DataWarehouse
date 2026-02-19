@@ -275,12 +275,56 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     private readonly DeploymentStatistics _statistics = new();
     private readonly object _statsLock = new();
     private readonly ConcurrentDictionary<string, DeploymentState> _activeDeployments = new();
+    private readonly ConcurrentDictionary<string, long> _counters = new();
     private readonly HttpClient _httpClient;
+    private bool _initialized;
+    private DateTime? _healthCacheExpiry;
+    private bool? _cachedHealthy;
 
     protected DeploymentStrategyBase()
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     }
+
+    /// <summary>Gets whether this strategy has been initialized.</summary>
+    public bool IsInitialized => _initialized;
+
+    /// <summary>Initializes the strategy. Idempotent.</summary>
+    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        if (_initialized) return Task.CompletedTask;
+        _initialized = true;
+        IncrementCounter("initialized");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Shuts down the strategy gracefully, completing in-flight deployments.</summary>
+    public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_initialized) return Task.CompletedTask;
+        _initialized = false;
+        IncrementCounter("shutdown");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
+    public bool GetStrategyHealthy()
+    {
+        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+            return _cachedHealthy.Value;
+        _cachedHealthy = _initialized && _activeDeployments.Values.All(d => d.Health != DeploymentHealth.Failed);
+        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
+        return _cachedHealthy.Value;
+    }
+
+    /// <summary>Increments a named counter. Thread-safe.</summary>
+    protected void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+    }
+
+    /// <summary>Gets all counter values.</summary>
+    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
 
     /// <inheritdoc/>
     public abstract DeploymentCharacteristics Characteristics { get; }

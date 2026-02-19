@@ -36,6 +36,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("automatic_rollback.deploy");
         var policy = ParseRollbackPolicy(config);
         _policies[initialState.DeploymentId] = policy;
 
@@ -185,6 +186,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("automatic_rollback.deploy");
         // Find the snapshot for target version
         if (!_snapshotHistory.TryGetValue(deploymentId, out var snapshots))
         {
@@ -245,6 +247,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("manual_rollback.deploy");
         await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
 
         return currentState with
@@ -260,6 +263,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("version_pinning.deploy");
         var results = new List<HealthCheckResult>();
 
         for (int i = 0; i < currentState.DeployedInstances; i++)
@@ -291,6 +295,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
     {
+        IncrementCounter("snapshot_restore.deploy");
         return Task.FromResult(new DeploymentState
         {
             DeploymentId = deploymentId,
@@ -419,6 +424,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("manual_rollback.deploy");
         // Track version history for rollback targets
         var history = new DeploymentVersionHistory
         {
@@ -544,6 +550,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         string requestId,
         CancellationToken ct = default)
     {
+        IncrementCounter("automatic_rollback.deploy");
         if (!_pendingRequests.TryGetValue(requestId, out var request))
             throw new InvalidOperationException($"Request {requestId} not found");
 
@@ -601,6 +608,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("immutable_deployment.deploy");
         if (!_versionHistory.TryGetValue(deploymentId, out var history))
         {
             throw new InvalidOperationException($"No version history for deployment {deploymentId}");
@@ -658,6 +666,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("time_based_rollback.deploy");
         AddAuditEntry(deploymentId, new RollbackAuditEntry
         {
             Action = "SCALED",
@@ -917,6 +926,7 @@ public sealed class VersionPinningStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("version_pinning.deploy");
         // Check version pinning before deployment
         if (!IsDeploymentAllowed(initialState.DeploymentId, config.Version))
         {
@@ -1289,6 +1299,7 @@ public sealed class SnapshotRestoreStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("snapshot_restore.deploy");
         // Parse snapshot policy from config
         if (config.StrategyConfig.TryGetValue("snapshotPolicy", out var policyJson))
         {
@@ -1717,6 +1728,7 @@ public sealed class ImmutableDeploymentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("immutable_deployment.deploy");
         // Verify artifact before deployment
         var artifactKey = _artifacts.Keys.FirstOrDefault(k => k.EndsWith($":{config.Version}"));
         if (artifactKey != null)
@@ -2186,6 +2198,7 @@ public sealed class TimeBasedRollbackStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("time_based_rollback.deploy");
         // Check maintenance window before deployment
         if (!IsInMaintenanceWindow(initialState.DeploymentId))
         {

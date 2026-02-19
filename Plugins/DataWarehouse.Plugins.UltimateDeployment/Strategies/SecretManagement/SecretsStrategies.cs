@@ -34,6 +34,7 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("hashi_corp_vault.deploy");
         var state = initialState;
         var vaultAddr = GetVaultAddress(config);
         var secretPath = GetSecretPath(config);
@@ -92,6 +93,7 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("hashi_corp_vault.deploy");
         var vaultAddr = currentState.Metadata.TryGetValue("vaultAddress", out var va) ? va?.ToString() : "";
         var secretPath = currentState.Metadata.TryGetValue("secretPath", out var sp) ? sp?.ToString() : "";
         var mountPath = currentState.Metadata.TryGetValue("mountPath", out var mp) ? mp?.ToString() : "";
@@ -116,6 +118,7 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
     protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(
         string deploymentId, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("aws_secrets_manager.deploy");
         var vaultAddr = currentState.Metadata.TryGetValue("vaultAddress", out var va) ? va?.ToString() : "";
         var isSealed = await CheckVaultSealStatusAsync(vaultAddr!, ct);
 
@@ -209,6 +212,7 @@ public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_secrets_manager.deploy");
         var state = initialState;
         var secretName = GetSecretName(config);
         var region = GetRegion(config);
@@ -250,6 +254,7 @@ public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("azure_key_vault.deploy");
         var secretArn = currentState.Metadata.TryGetValue("secretArn", out var sa) ? sa?.ToString() : "";
         await RestoreSecretVersionAsync(secretArn!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -305,6 +310,7 @@ public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_key_vault.deploy");
         var state = initialState;
         var vaultUrl = GetVaultUrl(config);
 
@@ -344,6 +350,7 @@ public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("gcp_secret_manager.deploy");
         var vaultUrl = currentState.Metadata.TryGetValue("vaultUrl", out var vu) ? vu?.ToString() : "";
         await RestoreSecretVersionsAsync(vaultUrl!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -396,6 +403,7 @@ public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("gcp_secret_manager.deploy");
         var state = initialState;
         var project = GetProject(config);
         var secretId = GetSecretId(config);
@@ -434,6 +442,7 @@ public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("kubernetes_secrets.deploy");
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
         var secretId = currentState.Metadata.TryGetValue("secretId", out var si) ? si?.ToString() : "";
 
@@ -493,6 +502,7 @@ public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("kubernetes_secrets.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var secretName = GetSecretName(config);
@@ -528,6 +538,7 @@ public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("external_secrets_operator.deploy");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var secretName = currentState.Metadata.TryGetValue("secretName", out var sn) ? sn?.ToString() : "";
 
@@ -587,6 +598,7 @@ public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("external_secrets_operator.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var externalSecretName = GetExternalSecretName(config);
@@ -625,6 +637,7 @@ public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("cyber_ark_conjur.deploy");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var externalSecretName = currentState.Metadata.TryGetValue("externalSecretName", out var es) ? es?.ToString() : "";
 
@@ -689,6 +702,7 @@ public sealed class CyberArkConjurStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("cyber_ark_conjur.deploy");
         var state = initialState;
         var conjurUrl = GetConjurUrl(config);
         var account = GetAccount(config);

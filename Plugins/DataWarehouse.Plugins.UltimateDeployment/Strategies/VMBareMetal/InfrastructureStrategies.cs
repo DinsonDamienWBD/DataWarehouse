@@ -26,6 +26,7 @@ public sealed class AnsibleStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("ansible.deploy");
         var state = initialState;
         var playbookPath = GetPlaybookPath(config);
         var inventory = GetInventory(config);
@@ -82,6 +83,7 @@ public sealed class AnsibleStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("ansible.deploy");
         var playbookPath = currentState.Metadata.TryGetValue("playbookPath", out var pp) ? pp?.ToString() : "";
         var inventory = currentState.Metadata.TryGetValue("inventory", out var inv) ? inv?.ToString() : "";
 
@@ -110,6 +112,7 @@ public sealed class AnsibleStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("terraform.deploy");
         // Ansible doesn't handle scaling - would need to update inventory
         return Task.FromResult(currentState);
     }
@@ -119,6 +122,7 @@ public sealed class AnsibleStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("puppet.deploy");
         var hosts = currentState.Metadata.TryGetValue("hosts", out var h) && h is string[] hostArray
             ? hostArray : Array.Empty<string>();
 
@@ -188,6 +192,7 @@ public sealed class TerraformStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("terraform.deploy");
         var state = initialState;
         var workingDir = GetWorkingDir(config);
         var workspace = GetWorkspace(config);
@@ -258,6 +263,7 @@ public sealed class TerraformStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("chef.deploy");
         var workingDir = currentState.Metadata.TryGetValue("workingDir", out var wd) ? wd?.ToString() : "";
 
         // Terraform doesn't have native rollback - need to revert to previous state
@@ -280,6 +286,7 @@ public sealed class TerraformStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("salt_stack.deploy");
         var workingDir = currentState.Metadata.TryGetValue("workingDir", out var wd) ? wd?.ToString() : "";
 
         // Update instance count variable and apply
@@ -297,6 +304,7 @@ public sealed class TerraformStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("packer_ami.deploy");
         return Task.FromResult(new[]
         {
             new HealthCheckResult
@@ -353,6 +361,7 @@ public sealed class PuppetStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("puppet.deploy");
         var state = initialState;
         var environment = GetPuppetEnvironment(config);
         var nodes = GetNodes(config);
@@ -386,6 +395,7 @@ public sealed class PuppetStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("ssh_direct.deploy");
         var environment = currentState.Metadata.TryGetValue("environment", out var e) ? e?.ToString() : "";
         var nodes = currentState.Metadata.TryGetValue("nodes", out var n) && n is string[] ns ? ns : Array.Empty<string>();
 
@@ -440,6 +450,7 @@ public sealed class ChefStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("chef.deploy");
         var state = initialState;
         var environment = GetChefEnvironment(config);
         var nodes = GetNodes(config);
@@ -521,6 +532,7 @@ public sealed class SaltStackStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("salt_stack.deploy");
         var state = initialState;
         var environment = GetSaltEnvironment(config);
         var targets = GetTargets(config);
@@ -595,6 +607,7 @@ public sealed class PackerAmiStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("packer_ami.deploy");
         var state = initialState;
         var packerTemplate = GetPackerTemplate(config);
 
@@ -674,6 +687,7 @@ public sealed class SshDirectStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("ssh_direct.deploy");
         var state = initialState;
         var hosts = GetHosts(config);
         var deployScript = GetDeployScript(config);

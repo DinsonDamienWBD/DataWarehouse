@@ -23,6 +23,7 @@ public sealed class GitHubActionsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("git_hub_actions.deploy");
         var state = initialState;
         var repo = GetRepo(config);
         var workflow = GetWorkflow(config);
@@ -64,6 +65,7 @@ public sealed class GitHubActionsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("git_hub_actions.deploy");
         var repo = currentState.Metadata.TryGetValue("repo", out var r) ? r?.ToString() : "";
         var workflow = currentState.Metadata.TryGetValue("workflow", out var w) ? w?.ToString() : "";
 
@@ -118,6 +120,7 @@ public sealed class GitLabCiStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("git_lab_ci.deploy");
         var state = initialState;
         var projectId = GetProjectId(config);
         var environment = config.Environment;
@@ -152,6 +155,7 @@ public sealed class GitLabCiStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("git_lab_ci.deploy");
         var projectId = currentState.Metadata.TryGetValue("projectId", out var p) ? p?.ToString() : "";
         await RollbackEnvironmentAsync(projectId!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -194,6 +198,7 @@ public sealed class JenkinsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("jenkins.deploy");
         var state = initialState;
         var jobName = GetJobName(config);
         var jenkinsUrl = GetJenkinsUrl(config);
@@ -224,6 +229,7 @@ public sealed class JenkinsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("jenkins.deploy");
         var jenkinsUrl = currentState.Metadata.TryGetValue("jenkinsUrl", out var ju) ? ju?.ToString() : "";
         var jobName = currentState.Metadata.TryGetValue("jobName", out var jn) ? jn?.ToString() : "";
 
@@ -268,6 +274,7 @@ public sealed class AzureDevOpsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("azure_dev_ops.deploy");
         var state = initialState;
         var org = GetOrganization(config);
         var project = GetProject(config);
@@ -299,6 +306,7 @@ public sealed class AzureDevOpsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("azure_dev_ops.deploy");
         var org = currentState.Metadata.TryGetValue("organization", out var o) ? o?.ToString() : "";
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
 
@@ -345,6 +353,7 @@ public sealed class CircleCiStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("circle_ci.deploy");
         var state = initialState;
         var projectSlug = GetProjectSlug(config);
 
@@ -410,6 +419,7 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("circle_ci.deploy");
         var state = initialState;
         var appName = GetAppName(config);
         var repoUrl = GetRepoUrl(config);
@@ -449,6 +459,7 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("argo_cd.deploy");
         var appName = currentState.Metadata.TryGetValue("appName", out var an) ? an?.ToString() : "";
 
         await RollbackApplicationAsync(appName!, targetVersion, ct);
@@ -459,6 +470,7 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("flux_cd.deploy");
         // ArgoCD handles scaling through Git - would need to update manifests
         return currentState with { TargetInstances = targetInstances };
     }
@@ -502,6 +514,7 @@ public sealed class FluxCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("argo_cd.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var kustomizationName = GetKustomizationName(config);
@@ -531,6 +544,7 @@ public sealed class FluxCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("spinnaker.deploy");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var kustomizationName = currentState.Metadata.TryGetValue("kustomizationName", out var kn) ? kn?.ToString() : "";
 
@@ -581,6 +595,7 @@ public sealed class SpinnakerStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("flux_cd.deploy");
         var state = initialState;
         var application = GetApplication(config);
         var pipelineName = GetPipeline(config);

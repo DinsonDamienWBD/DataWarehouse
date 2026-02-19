@@ -34,6 +34,7 @@ public sealed class ConsulConfigStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("consul_config.deploy");
         var state = initialState;
         var consulAddr = GetConsulAddress(config);
         var keyPrefix = GetKeyPrefix(config);
@@ -87,6 +88,7 @@ public sealed class ConsulConfigStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("consul_config.deploy");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         var versionKey = $"{keyPrefix}:{targetVersion}";
 
@@ -112,6 +114,7 @@ public sealed class ConsulConfigStrategy : DeploymentStrategyBase
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(
         string deploymentId, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("etcd_config.deploy");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         return Task.FromResult(new[]
         {
@@ -202,6 +205,7 @@ public sealed class EtcdConfigStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("etcd_config.deploy");
         var state = initialState;
         var etcdEndpoints = GetEtcdEndpoints(config);
         var keyPrefix = GetKeyPrefix(config);
@@ -237,6 +241,7 @@ public sealed class EtcdConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("spring_cloud_config.deploy");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         await RollbackToRevisionAsync(keyPrefix!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -291,6 +296,7 @@ public sealed class SpringCloudConfigStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("spring_cloud_config.deploy");
         var state = initialState;
         var configServerUrl = GetConfigServerUrl(config);
         var application = GetApplication(config);
@@ -327,6 +333,7 @@ public sealed class SpringCloudConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("aws_app_config.deploy");
         var configServerUrl = currentState.Metadata.TryGetValue("configServerUrl", out var cs) ? cs?.ToString() : "";
         var application = currentState.Metadata.TryGetValue("application", out var app) ? app?.ToString() : "";
 
@@ -385,6 +392,7 @@ public sealed class AwsAppConfigStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_app_config.deploy");
         var state = initialState;
         var appId = GetApplicationId(config);
         var envId = GetEnvironmentId(config);
@@ -423,6 +431,7 @@ public sealed class AwsAppConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("azure_app_configuration.deploy");
         var appId = currentState.Metadata.TryGetValue("applicationId", out var ai) ? ai?.ToString() : "";
         var envId = currentState.Metadata.TryGetValue("environmentId", out var ei) ? ei?.ToString() : "";
         var profileId = currentState.Metadata.TryGetValue("configProfileId", out var pi) ? pi?.ToString() : "";
@@ -484,6 +493,7 @@ public sealed class AzureAppConfigurationStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_app_configuration.deploy");
         var state = initialState;
         var configStoreEndpoint = GetConfigStoreEndpoint(config);
         var label = GetLabel(config);
@@ -519,6 +529,7 @@ public sealed class AzureAppConfigurationStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("kubernetes_config_map.deploy");
         var configStoreEndpoint = currentState.Metadata.TryGetValue("configStoreEndpoint", out var cs) ? cs?.ToString() : "";
         await RestoreSnapshotAsync(configStoreEndpoint!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -573,6 +584,7 @@ public sealed class KubernetesConfigMapStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("kubernetes_config_map.deploy");
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var configMapName = GetConfigMapName(config);

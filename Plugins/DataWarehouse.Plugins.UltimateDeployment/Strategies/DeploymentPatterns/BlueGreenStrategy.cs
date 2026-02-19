@@ -29,6 +29,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("blue_green.deploy");
         var state = initialState;
 
         // Phase 1: Identify current environment (blue) and standby (green)
@@ -98,6 +99,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("blue_green.deploy");
         // Blue-green rollback is instant - just switch traffic back
         var activeEnv = currentState.Metadata.TryGetValue("activeEnvironment", out var ae) ? ae?.ToString() : null;
         var standbyEnv = currentState.Metadata.TryGetValue("standbyEnvironment", out var se) ? se?.ToString() : null;

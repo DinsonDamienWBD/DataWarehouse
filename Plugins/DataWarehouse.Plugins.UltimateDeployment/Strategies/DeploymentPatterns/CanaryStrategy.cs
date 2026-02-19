@@ -29,6 +29,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("canary.deploy");
         var state = initialState;
         var canaryState = new CanaryState
         {
@@ -148,6 +149,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("canary.deploy");
         // Route all traffic back to stable version
         await RouteTrafficAsync(deploymentId, 0, ct);
 

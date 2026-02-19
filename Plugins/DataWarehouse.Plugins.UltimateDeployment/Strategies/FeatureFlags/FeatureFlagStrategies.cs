@@ -23,6 +23,7 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("launch_darkly.deploy");
         var state = initialState;
         var projectKey = GetProjectKey(config);
         var flagKey = GetFlagKey(config);
@@ -64,6 +65,7 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("launch_darkly.deploy");
         var projectKey = currentState.Metadata.TryGetValue("projectKey", out var pk) ? pk?.ToString() : "";
         var flagKey = currentState.Metadata.TryGetValue("flagKey", out var fk) ? fk?.ToString() : "";
         var environmentKey = currentState.Metadata.TryGetValue("environmentKey", out var ek) ? ek?.ToString() : "";
@@ -83,6 +85,7 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("split_io.deploy");
         // For feature flags, "scaling" means adjusting rollout percentage
         var projectKey = currentState.Metadata.TryGetValue("projectKey", out var pk) ? pk?.ToString() : "";
         var flagKey = currentState.Metadata.TryGetValue("flagKey", out var fk) ? fk?.ToString() : "";
@@ -99,6 +102,7 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 
     protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("unleash.deploy");
         var projectKey = currentState.Metadata.TryGetValue("projectKey", out var pk) ? pk?.ToString() : "";
         var flagKey = currentState.Metadata.TryGetValue("flagKey", out var fk) ? fk?.ToString() : "";
         var environmentKey = currentState.Metadata.TryGetValue("environmentKey", out var ek) ? ek?.ToString() : "";
@@ -314,6 +318,7 @@ public sealed class SplitIoStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("split_io.deploy");
         var state = initialState;
         var splitName = GetSplitName(config);
         var environment = config.Environment;
@@ -343,6 +348,7 @@ public sealed class SplitIoStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("flagsmith.deploy");
         var splitName = currentState.Metadata.TryGetValue("splitName", out var sn) ? sn?.ToString() : "";
         var environment = currentState.Metadata.TryGetValue("environment", out var env) ? env?.ToString() : "";
 
@@ -353,6 +359,7 @@ public sealed class SplitIoStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("custom_feature_flag.deploy");
         var splitName = currentState.Metadata.TryGetValue("splitName", out var sn) ? sn?.ToString() : "";
         var environment = currentState.Metadata.TryGetValue("environment", out var env) ? env?.ToString() : "";
 
@@ -399,6 +406,7 @@ public sealed class UnleashStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("unleash.deploy");
         var state = initialState;
         var toggleName = GetToggleName(config);
         var project = GetProject(config);
@@ -474,6 +482,7 @@ public sealed class FlagsmithStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("flagsmith.deploy");
         var state = initialState;
         var featureName = GetFeatureName(config);
         var environmentId = GetEnvironmentId(config);
@@ -544,6 +553,7 @@ public sealed class CustomFeatureFlagStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("custom_feature_flag.deploy");
         var state = initialState;
         var flagName = GetFlagName(config);
         var configEndpoint = GetConfigEndpoint(config);

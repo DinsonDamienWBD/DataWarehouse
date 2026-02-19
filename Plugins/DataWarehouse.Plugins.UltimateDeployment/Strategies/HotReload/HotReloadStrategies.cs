@@ -23,6 +23,7 @@ public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("assembly_reload.deploy");
         var state = initialState;
         var assemblyPath = config.ArtifactUri;
         var contextName = GetContextName(config);
@@ -71,6 +72,7 @@ public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("assembly_reload.deploy");
         var contextName = currentState.Metadata.TryGetValue("contextName", out var cn) ? cn?.ToString() : "";
         var previousAssemblyPath = currentState.Metadata.TryGetValue("previousAssemblyPath", out var pap) ? pap?.ToString() : "";
 
@@ -128,6 +130,7 @@ public sealed class ConfigurationReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("configuration_reload.deploy");
         var state = initialState;
         var configSource = GetConfigSource(config);
 
@@ -176,6 +179,7 @@ public sealed class ConfigurationReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("configuration_reload.deploy");
         var configSource = currentState.Metadata.TryGetValue("configSource", out var cs) ? cs?.ToString() : "";
         var backupId = currentState.Metadata.TryGetValue("backupId", out var bi) ? bi?.ToString() : "";
 
@@ -226,6 +230,7 @@ public sealed class PluginHotSwapStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("plugin_hot_swap.deploy");
         var state = initialState;
         var pluginId = GetPluginId(config);
         var pluginPath = config.ArtifactUri;
@@ -273,6 +278,7 @@ public sealed class PluginHotSwapStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("plugin_hot_swap.deploy");
         var pluginId = currentState.Metadata.TryGetValue("pluginId", out var pi) ? pi?.ToString() : "";
 
         await DeactivatePluginAsync(pluginId!, ct);
@@ -325,6 +331,7 @@ public sealed class ModuleFederationStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("module_federation.deploy");
         var state = initialState;
         var remoteName = GetRemoteName(config);
         var remoteUrl = config.ArtifactUri;
@@ -358,6 +365,7 @@ public sealed class ModuleFederationStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("module_federation.deploy");
         var remoteName = currentState.Metadata.TryGetValue("remoteName", out var rn) ? rn?.ToString() : "";
 
         await UpdateRemoteEntryAsync(remoteName!, targetVersion, ct);
@@ -406,6 +414,7 @@ public sealed class LivePatchStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("live_patch.deploy");
         var state = initialState;
         var patchFile = config.ArtifactUri;
         var targetProcess = GetTargetProcess(config);
@@ -445,6 +454,7 @@ public sealed class LivePatchStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("live_patch.deploy");
         var targetProcess = currentState.Metadata.TryGetValue("targetProcess", out var tp) ? tp?.ToString() : "";
 
         await RevertPatchAsync(targetProcess!, ct);

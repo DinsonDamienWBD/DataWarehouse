@@ -185,9 +185,13 @@ public sealed record MicroservicesStrategyCapabilities
 public abstract class MicroservicesStrategyBase
 {
     private readonly ConcurrentDictionary<string, long> _operationCounts = new();
+    private readonly ConcurrentDictionary<string, long> _counters = new();
     private long _totalOperations;
     private long _successfulOperations;
     private long _failedOperations;
+    private bool _initialized;
+    private DateTime? _healthCacheExpiry;
+    private bool? _cachedHealthy;
 
     /// <summary>Strategy unique identifier.</summary>
     public abstract string StrategyId { get; }
@@ -206,6 +210,46 @@ public abstract class MicroservicesStrategyBase
 
     /// <summary>Tags for categorization.</summary>
     public abstract string[] Tags { get; }
+
+    /// <summary>Gets whether this strategy has been initialized.</summary>
+    public bool IsInitialized => _initialized;
+
+    /// <summary>Initializes the strategy. Idempotent.</summary>
+    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        if (_initialized) return Task.CompletedTask;
+        _initialized = true;
+        IncrementCounter("initialized");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Shuts down the strategy gracefully.</summary>
+    public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_initialized) return Task.CompletedTask;
+        _initialized = false;
+        IncrementCounter("shutdown");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
+    public bool IsHealthy()
+    {
+        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+            return _cachedHealthy.Value;
+        _cachedHealthy = _initialized;
+        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
+        return _cachedHealthy.Value;
+    }
+
+    /// <summary>Increments a named counter. Thread-safe.</summary>
+    protected void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+    }
+
+    /// <summary>Gets all counter values.</summary>
+    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
 
     /// <summary>
     /// Records an operation for statistics.

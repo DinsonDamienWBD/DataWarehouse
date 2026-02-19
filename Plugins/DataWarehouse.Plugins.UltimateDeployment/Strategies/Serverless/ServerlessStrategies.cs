@@ -26,6 +26,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_lambda.deploy");
         var state = initialState;
         var functionName = GetFunctionName(config);
         var aliasName = GetAliasName(config);
@@ -78,6 +79,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_lambda.deploy");
         var functionName = currentState.Metadata.TryGetValue("functionName", out var fn) ? fn?.ToString() : "";
         var aliasName = currentState.Metadata.TryGetValue("aliasName", out var an) ? an?.ToString() : "prod";
 
@@ -100,6 +102,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_functions.deploy");
         // Lambda auto-scales - we can only configure concurrency limits
         return Task.FromResult(currentState with
         {
@@ -115,6 +118,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("google_cloud_functions.deploy");
         var functionName = currentState.Metadata.TryGetValue("functionName", out var fn) ? fn?.ToString() : "";
 
         // Invoke function to check health
@@ -139,6 +143,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
     {
+        IncrementCounter("cloudflare_workers.deploy");
         return Task.FromResult(new DeploymentState
         {
             DeploymentId = deploymentId,
@@ -282,6 +287,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_functions.deploy");
         var state = initialState;
         var resourceGroup = GetResourceGroup(config);
         var functionAppName = GetFunctionAppName(config);
@@ -321,6 +327,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_app_runner.deploy");
         var resourceGroup = currentState.Metadata.TryGetValue("resourceGroup", out var rg) ? rg?.ToString() : "";
         var functionAppName = currentState.Metadata.TryGetValue("functionAppName", out var fn) ? fn?.ToString() : "";
         var slotName = currentState.Metadata.TryGetValue("slotName", out var sn) ? sn?.ToString() : "staging";
@@ -343,6 +350,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("google_cloud_run.deploy");
         // Azure Functions auto-scales in consumption plan
         return Task.FromResult(currentState);
     }
@@ -352,6 +360,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("azure_container_apps.deploy");
         var functionAppName = currentState.Metadata.TryGetValue("functionAppName", out var fn) ? fn?.ToString() : "";
         return Task.FromResult(new[]
         {
@@ -393,6 +402,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DurableFunctionDefinition definition,
         CancellationToken ct = default)
     {
+        IncrementCounter("aws_lambda.deploy");
         ArgumentException.ThrowIfNullOrEmpty(resourceGroup);
         ArgumentException.ThrowIfNullOrEmpty(functionAppName);
         ArgumentNullException.ThrowIfNull(definition);
@@ -529,6 +539,7 @@ public sealed class GoogleCloudFunctionsStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("google_cloud_functions.deploy");
         var state = initialState;
         var project = GetProject(config);
         var region = GetRegion(config);
@@ -665,6 +676,7 @@ public sealed class CloudflareWorkersStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("cloudflare_workers.deploy");
         var state = initialState;
         var workerName = GetWorkerName(config);
         var accountId = GetAccountId(config);
@@ -793,6 +805,7 @@ public sealed class AwsAppRunnerStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("aws_app_runner.deploy");
         var state = initialState;
         var serviceName = GetServiceName(config);
 
@@ -871,6 +884,7 @@ public sealed class GoogleCloudRunStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        IncrementCounter("google_cloud_run.deploy");
         var state = initialState;
         var project = GetProject(config);
         var region = GetRegion(config);
@@ -962,6 +976,7 @@ public sealed class AzureContainerAppsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct)
     {
+        IncrementCounter("azure_container_apps.deploy");
         var state = initialState;
         var resourceGroup = GetResourceGroup(config);
         var appName = GetAppName(config);
