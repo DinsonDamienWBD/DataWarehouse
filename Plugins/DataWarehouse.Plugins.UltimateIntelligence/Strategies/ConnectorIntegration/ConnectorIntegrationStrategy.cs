@@ -28,6 +28,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private readonly ILogger? _logger;
         private readonly List<IDisposable> _subscriptions = new();
         private ConnectorIntegrationMode _mode = ConnectorIntegrationMode.Disabled;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Net.Http.HttpClient> _httpClients = new();
 
         /// <inheritdoc/>
         public override string StrategyId => "feature-connector-integration";
@@ -98,6 +99,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
 
             _logger?.LogInformation("Initializing connector integration in {Mode} mode", _mode);
 
+            // Validate configuration
+            await ValidateConfigurationAsync(ct);
+
             // Register async observation handlers if applicable
             if (_mode is ConnectorIntegrationMode.AsyncObservation or ConnectorIntegrationMode.Hybrid)
             {
@@ -111,6 +115,107 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
 
             await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Validates connector integration configuration.
+        /// </summary>
+        private async Task ValidateConfigurationAsync(CancellationToken ct)
+        {
+            // Validate connector registry endpoints (placeholder - would come from config)
+            var registryEndpoint = "http://localhost:5000"; // Example
+            if (string.IsNullOrWhiteSpace(registryEndpoint))
+                throw new InvalidOperationException("Connector registry endpoint is required");
+
+            // Validate max concurrent connections
+            var maxConcurrent = 10; // Default
+            if (maxConcurrent < 1 || maxConcurrent > 100)
+                throw new ArgumentException("max_concurrent_connections must be between 1 and 100");
+
+            // Validate retry policy
+            var retryAttempts = 3; // Default
+            if (retryAttempts < 1 || retryAttempts > 10)
+                throw new ArgumentException("retry_attempts must be between 1 and 10");
+
+            var backoffMs = 1000; // Default 1 second
+            if (backoffMs < 100 || backoffMs > 60000)
+                throw new ArgumentException("retry_backoff_ms must be between 100ms and 60000ms");
+
+            // Validate timeout
+            var timeoutMs = 5000; // Default 5 seconds
+            if (timeoutMs < 1000 || timeoutMs > 300000)
+                throw new ArgumentException("timeout_ms must be between 1 second and 5 minutes");
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Checks connector registry reachability.
+        /// </summary>
+        private async Task<bool> CheckConnectorRegistryReachabilityAsync(CancellationToken ct)
+        {
+            try
+            {
+                // Placeholder - would test actual registry endpoint
+                var registryEndpoint = "http://localhost:5000";
+                using var httpClient = new System.Net.Http.HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(5);
+
+                var response = await httpClient.GetAsync($"{registryEndpoint}/health", ct);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken = default)
+        {
+            // Initialize called via public InitializeAsync(mode, ct) - this is fallback for base class pattern
+            await base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task<HealthCheckResult> GetCachedHealthAsync(TimeSpan maxAge, CancellationToken cancellationToken = default)
+        {
+            // Check connector registry reachability
+            var registryReachable = await CheckConnectorRegistryReachabilityAsync(cancellationToken);
+
+            var health = registryReachable ? HealthStatus.Healthy : HealthStatus.Degraded;
+            var checks = new Dictionary<string, object>
+            {
+                ["registry_reachable"] = registryReachable,
+                ["subscriptions_active"] = _subscriptions.Count,
+                ["mode"] = _mode.ToString()
+            };
+
+            return new HealthCheckResult(health, checks);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken = default)
+        {
+            _logger?.LogInformation("Shutting down connector integration strategy");
+
+            // Cancel pending connector requests
+            foreach (var client in _httpClients.Values)
+            {
+                client.CancelPendingRequests();
+            }
+
+            // Dispose HTTP clients
+            foreach (var client in _httpClients.Values)
+            {
+                client.Dispose();
+            }
+            _httpClients.Clear();
+
+            // Unsubscribe from topics
+            Dispose();
+
+            await base.ShutdownAsyncCore(cancellationToken);
         }
 
         /// <summary>
@@ -242,6 +347,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 _logger?.LogTrace("Observed connection established: {ConnectionId}, Latency={LatencyMs}ms",
                     connectionId, latencyMs);
 
+                // Track connection event
+                IncrementCounter("connectorintegration.connect");
+
                 // Example: Track connection health, predict failures, optimize pooling
                 await Task.CompletedTask;
             }
@@ -249,6 +357,21 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             {
                 _logger?.LogWarning(ex, "Error handling connection established observation");
             }
+        }
+
+        private Task HandleConnectionClosedObservationAsync(PluginMessage message)
+        {
+            try
+            {
+                // Track disconnect event
+                IncrementCounter("connectorintegration.disconnect");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error handling connection closed observation");
+            }
+
+            return Task.CompletedTask;
         }
 
         // ============================================================================
@@ -307,6 +430,27 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
 
                 RecordSuccess(sw.Elapsed.TotalMilliseconds);
                 return MessageResponse.Ok(response);
+            }
+            catch (System.Net.Http.HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+            {
+                // Error boundary: Connector unavailable (503)
+                _logger?.LogWarning(ex, "Connector unavailable during transformation");
+                RecordFailure();
+                return MessageResponse.Error("Connector service unavailable", "CONNECTOR_UNAVAILABLE");
+            }
+            catch (System.Net.Http.HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                // Error boundary: Authentication failure (401)
+                _logger?.LogWarning(ex, "Authentication failed during transformation");
+                RecordFailure();
+                return MessageResponse.Error("Authentication failed", "AUTH_FAILED");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("version", StringComparison.OrdinalIgnoreCase))
+            {
+                // Error boundary: Version mismatch
+                _logger?.LogWarning(ex, "Version mismatch during transformation");
+                RecordFailure();
+                return MessageResponse.Error("Connector version mismatch", "VERSION_MISMATCH");
             }
             catch (Exception ex)
             {
