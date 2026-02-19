@@ -292,13 +292,13 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     /// Generates a streaming manifest URI for HLS adaptive bitrate delivery.
     /// </summary>
     /// <param name="mediaStream">The source media stream to prepare for streaming.</param>
-    /// <param name="targetFormat">Must be <see cref="MediaFormat.HLS"/>.</param>
+    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.HLS"/>.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A URI pointing to the generated m3u8 master playlist.</returns>
     protected override async Task<Uri> StreamAsyncCore(
-        Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken)
     {
-        if (targetFormat != MediaFormat.HLS)
+        if (targetFormat != SDK.Contracts.Media.MediaFormat.HLS)
             throw new NotSupportedException($"HLS strategy only supports HLS format, not {targetFormat}.");
 
         // Generate a unique stream identifier for manifest addressing

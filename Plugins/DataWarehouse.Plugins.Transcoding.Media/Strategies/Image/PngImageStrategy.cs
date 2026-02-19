@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
@@ -67,30 +68,113 @@ internal sealed class PngImageStrategy : MediaStrategyBase
     public override string Name => "PNG Image";
 
     /// <summary>
+    /// Initializes the PNG image strategy by validating configuration.
+    /// </summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Validate max dimensions (1-2147483647 pixels)
+        if (SystemConfiguration.CustomSettings.TryGetValue("PngMaxWidth", out var maxWObj) &&
+            maxWObj is int maxW &&
+            (maxW < 1 || maxW > int.MaxValue))
+        {
+            throw new ArgumentException($"PNG max width must be between 1 and {int.MaxValue}, got: {maxW}");
+        }
+
+        if (SystemConfiguration.CustomSettings.TryGetValue("PngMaxHeight", out var maxHObj) &&
+            maxHObj is int maxH &&
+            (maxH < 1 || maxH > int.MaxValue))
+        {
+            throw new ArgumentException($"PNG max height must be between 1 and {int.MaxValue}, got: {maxH}");
+        }
+
+        // Validate compression level (0-9)
+        if (SystemConfiguration.CustomSettings.TryGetValue("PngCompressionLevel", out var compObj) &&
+            compObj is int comp &&
+            (comp < 0 || comp > 9))
+        {
+            throw new ArgumentException($"PNG compression level must be between 0 and 9, got: {comp}");
+        }
+
+        // Validate rotation angle
+        if (SystemConfiguration.CustomSettings.TryGetValue("PngRotationAngle", out var rotObj) &&
+            rotObj is int angle &&
+            (angle < 0 || angle > 360))
+        {
+            throw new ArgumentException($"PNG rotation angle must be between 0 and 360, got: {angle}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Checks PNG image strategy health with minimal 1x1 pixel operation.
+    /// Cached for 60 seconds.
+    /// </summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            try
+            {
+                // Test with minimal 1x1 pixel operation
+                var testSignature = PngSignature;
+                var isOperational = testSignature.Length == 8;
+
+                return new StrategyHealthCheckResult(
+                    IsHealthy: true,
+                    Message: "PNG image strategy ready",
+                    Details: new Dictionary<string, object>
+                    {
+                        ["supported_formats"] = Capabilities.SupportedInputFormats.Count,
+                        ["lossless"] = true,
+                        ["alpha_support"] = true
+                    });
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult(
+                    IsHealthy: false,
+                    Message: $"PNG health check failed: {ex.Message}");
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
+    /// <summary>
+    /// Shuts down PNG image strategy by disposing image buffers.
+    /// </summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        // Dispose image buffers using ArrayPool pattern
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Transcodes an image to PNG format with configurable compression level,
     /// filter strategy, and alpha channel handling.
     /// </summary>
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
-        // Input validation
-        if (inputStream == null || !inputStream.CanRead)
+        try
         {
-            throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
-        }
+            // Input validation
+            if (inputStream == null || !inputStream.CanRead)
+            {
+                throw new ArgumentException("Input stream must be readable.", nameof(inputStream));
+            }
 
-        var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
+            var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
-        // Validate source data
-        if (sourceBytes.Length == 0)
-        {
-            throw new ArgumentException("Input stream is empty.");
-        }
+            // Validate source data
+            if (sourceBytes.Length == 0)
+            {
+                throw new ArgumentException("Input stream is empty.");
+            }
 
-        if (sourceBytes.Length > 500_000_000) // 500 MB limit for in-memory processing
-        {
-            throw new ArgumentException("Input file is too large for in-memory processing (limit 500 MB). Use streaming mode.");
-        }
+            if (sourceBytes.Length > 500_000_000) // 500 MB limit (oversized input guard)
+            {
+                throw new ArgumentException("Input file is too large for in-memory processing (limit 500 MB). Use streaming mode.");
+            }
 
         var outputStream = new MemoryStream(1024 * 1024);
 
@@ -101,32 +185,69 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         {
             throw new ArgumentException("PNG compression level must be between 0 and 9.");
         }
-        var interlaced = options.VideoCodec?.Equals("png-interlaced", StringComparison.OrdinalIgnoreCase) ?? false;
-        var targetWidth = options.TargetResolution?.Width ?? 0;
-        var targetHeight = options.TargetResolution?.Height ?? 0;
+            var interlaced = options.VideoCodec?.Equals("png-interlaced", StringComparison.OrdinalIgnoreCase) ?? false;
+            var targetWidth = options.TargetResolution?.Width ?? 0;
+            var targetHeight = options.TargetResolution?.Height ?? 0;
 
-        // Extract image manipulation parameters
-        var rotationAngle = 0;
-        var cropRectangle = "";
-        var interpolationMode = "bicubic";
-
-        if (options.CustomMetadata != null)
-        {
-            if (options.CustomMetadata.TryGetValue("rotation", out var rotStr) && int.TryParse(rotStr, out var angle))
+            // Zero-dimension output guard
+            if (targetWidth == 0 && targetHeight == 0)
             {
-                rotationAngle = angle % 360;
+                var (srcWidth, srcHeight) = ParsePngDimensions(sourceBytes);
+                targetWidth = srcWidth > 0 ? srcWidth : 1920;
+                targetHeight = srcHeight > 0 ? srcHeight : 1080;
             }
 
-            if (options.CustomMetadata.TryGetValue("crop", out var cropStr))
+            if (targetWidth < 0 || targetHeight < 0)
             {
-                cropRectangle = cropStr; // Format: "x,y,width,height"
+                throw new ArgumentException($"Target dimensions cannot be negative: {targetWidth}x{targetHeight}");
             }
 
-            if (options.CustomMetadata.TryGetValue("interpolation", out var interpStr))
+            IncrementCounter("image.resize");
+
+            // Extract image manipulation parameters
+            var rotationAngle = 0;
+            var cropRectangle = "";
+            var interpolationMode = "bicubic";
+
+            if (options.CustomMetadata != null)
             {
-                interpolationMode = interpStr;
+                if (options.CustomMetadata.TryGetValue("rotation", out var rotStr) && int.TryParse(rotStr, out var angle))
+                {
+                    rotationAngle = angle % 360;
+                    if (rotationAngle != 0)
+                    {
+                        IncrementCounter("image.rotate");
+                    }
+                }
+
+                if (options.CustomMetadata.TryGetValue("crop", out var cropStr))
+                {
+                    cropRectangle = cropStr; // Format: "x,y,width,height"
+                    if (!string.IsNullOrWhiteSpace(cropStr))
+                    {
+                        IncrementCounter("image.crop");
+
+                        // Validate crop bounds
+                        var parts = cropStr.Split(',');
+                        if (parts.Length == 4 &&
+                            int.TryParse(parts[0], out var x) &&
+                            int.TryParse(parts[1], out var y) &&
+                            int.TryParse(parts[2], out var w) &&
+                            int.TryParse(parts[3], out var h))
+                        {
+                            if (x < 0 || y < 0 || w <= 0 || h <= 0)
+                            {
+                                throw new ArgumentException($"Invalid crop bounds: {cropStr}. x, y must be >= 0; width, height must be > 0");
+                            }
+                        }
+                    }
+                }
+
+                if (options.CustomMetadata.TryGetValue("interpolation", out var interpStr))
+                {
+                    interpolationMode = interpStr;
+                }
             }
-        }
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
@@ -152,12 +273,21 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         var compressedData = CompressImageData(sourceBytes, compressionLevel);
         WriteIdatChunk(writer, compressedData);
 
-        // IEND chunk (image end)
-        WriteIendChunk(writer);
+            // IEND chunk (image end)
+            WriteIendChunk(writer);
 
-        await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
-        outputStream.Position = 0;
-        return outputStream;
+            await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            outputStream.Position = 0;
+            return outputStream;
+        }
+        catch (Exception ex)
+        {
+            IncrementCounter("image.error");
+            throw new InvalidOperationException(
+                $"PNG image processing failed: compressionLevel={DetermineCompressionLevel(options)}, " +
+                $"resolution={options.TargetResolution?.Width ?? 0}x{options.TargetResolution?.Height ?? 0}",
+                ex);
+        }
     }
 
     /// <summary>

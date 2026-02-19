@@ -282,13 +282,13 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     /// Generates a streaming manifest URI for DASH adaptive bitrate delivery.
     /// </summary>
     /// <param name="mediaStream">The source media stream to prepare for streaming.</param>
-    /// <param name="targetFormat">Must be <see cref="MediaFormat.DASH"/>.</param>
+    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.DASH"/>.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A URI pointing to the generated MPD manifest.</returns>
     protected override async Task<Uri> StreamAsyncCore(
-        Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken)
     {
-        if (targetFormat != MediaFormat.DASH)
+        if (targetFormat != SDK.Contracts.Media.MediaFormat.DASH)
             throw new NotSupportedException($"DASH strategy only supports DASH format, not {targetFormat}.");
 
         var sourceBytes = await ReadStreamFullyAsync(mediaStream, cancellationToken).ConfigureAwait(false);
