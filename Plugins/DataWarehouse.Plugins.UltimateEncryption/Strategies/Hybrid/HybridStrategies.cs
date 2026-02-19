@@ -29,10 +29,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Hybrid;
 ///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: ECDH P-384 (NIST Level 3)
-/// PQ Component: NTRU-HPS-2048-677 (NIST Level 3)
+/// PQ Component: NTRU-HPS-2048-677 (NIST Level 3, aligns with FIPS 203 ML-KEM transition path)
 /// Symmetric Cipher: AES-256-GCM
 ///
 /// Use Case: Maximum security for long-term data protection against both classical and quantum threats.
+///
+/// Migration: Consider migrating to <see cref="X25519Kyber768Strategy"/> (hybrid-x25519-kyber768)
+/// for TLS-compatible wire format and standardized FIPS 203 alignment.
 /// </summary>
 public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
 {
@@ -60,7 +63,9 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             ["ClassicalAlgorithm"] = "ECDH-P384",
             ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "AES-256-GCM",
-            ["KDF"] = "HKDF-SHA384"
+            ["KDF"] = "HKDF-SHA384",
+            ["FipsReference"] = "FIPS 203 (PQ component)",
+            ["MigrationTarget"] = "hybrid-x25519-kyber768"
         }
     };
 
@@ -299,14 +304,15 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
 /// Hybrid ChaCha20-Poly1305 + NTRU-HPS-2048-677 encryption strategy.
 ///
 /// Similar to HybridAesKyberStrategy but uses ChaCha20-Poly1305 instead of AES-256-GCM.
-/// Suitable for platforms without AES hardware acceleration.
+/// Suitable for platforms without AES hardware acceleration (AES-NI).
 ///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: ECDH P-384
-/// PQ Component: NTRU-HPS-2048-677
+/// PQ Component: NTRU-HPS-2048-677 (aligns with FIPS 203 ML-KEM transition path)
 /// Symmetric Cipher: ChaCha20-Poly1305
 ///
-/// Use Case: High-performance quantum-safe encryption on ARM and mobile devices.
+/// Use Case: High-performance quantum-safe encryption on ARM and mobile devices
+/// where AES-NI hardware acceleration is unavailable.
 /// </summary>
 public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
 {
@@ -339,7 +345,9 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             ["ClassicalAlgorithm"] = "ECDH-P384",
             ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "ChaCha20-Poly1305",
-            ["KDF"] = "HKDF-SHA384"
+            ["KDF"] = "HKDF-SHA384",
+            ["FipsReference"] = "FIPS 203 (PQ component)",
+            ["Advantage"] = "No AES-NI required, ARM/mobile optimized"
         }
     };
 
@@ -535,12 +543,17 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
 /// Combines X25519 Elliptic Curve Diffie-Hellman with NTRU KEM.
 /// Uses Curve25519 for better performance compared to P-384.
 ///
+/// NOTE: This strategy uses NTRU-HPS-2048-677 as the PQ component, NOT standard
+/// CRYSTALS-Kyber-768. For the dedicated TLS-compatible X25519+Kyber768 hybrid
+/// with FIPS 203 alignment, use <see cref="X25519Kyber768Strategy"/> instead.
+///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: X25519
-/// PQ Component: NTRU-HPS-2048-677
+/// PQ Component: NTRU-HPS-2048-677 (aligns with FIPS 203 ML-KEM transition path)
 /// Symmetric Cipher: AES-256-GCM
 ///
 /// Use Case: High-performance hybrid encryption for modern applications.
+/// Migration target: hybrid-x25519-kyber768 (X25519Kyber768Strategy)
 /// </summary>
 public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
 {
@@ -569,7 +582,10 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
             ["ClassicalAlgorithm"] = "X25519",
             ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "AES-256-GCM",
-            ["KDF"] = "HKDF-SHA256"
+            ["KDF"] = "HKDF-SHA256",
+            ["FipsReference"] = "FIPS 203 (PQ component)",
+            ["TlsCompatible"] = false,
+            ["MigrationTarget"] = "hybrid-x25519-kyber768"
         }
     };
 
