@@ -738,16 +738,27 @@ namespace DataWarehouse.Kernel
                 // Best-effort shutdown notification - ignore failures during disposal
             }
 
-            // Stop all feature plugins
+            // Stop all feature plugins with timeout (ISO-04, CVSS 7.1)
+            // Each plugin gets 30 seconds to shut down gracefully. If a plugin exceeds
+            // the timeout, it is logged as a warning and shutdown continues for other plugins.
+            // This prevents a malicious or buggy plugin from blocking kernel shutdown indefinitely.
             foreach (var feature in _registry.GetPlugins<IFeaturePlugin>())
             {
+                var pluginId = (feature as IPlugin)?.Id ?? "unknown";
                 try
                 {
-                    await feature.StopAsync();
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await feature.StopAsync().WaitAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogWarning(
+                        "Plugin {PluginId} exceeded 30-second shutdown timeout -- forcibly continuing (ISO-04)",
+                        pluginId);
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Error stopping feature plugin");
+                    _logger?.LogError(ex, "Error stopping feature plugin {PluginId}", pluginId);
                 }
             }
 

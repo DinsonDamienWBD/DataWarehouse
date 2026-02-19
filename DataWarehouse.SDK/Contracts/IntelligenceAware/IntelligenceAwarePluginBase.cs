@@ -1366,7 +1366,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Registers a strongly-typed request/response handler that auto-subscribes to the message bus.
         /// The topic is derived from <c>typeof(TRequest).FullName</c>.
         /// If the message bus is not yet injected, the handler is stored and subscribed later
-        /// via <see cref="InjectKernelServices"/>.
+        /// via <see cref="OnKernelServicesInjected"/>.
         /// </summary>
         /// <typeparam name="TRequest">The request DTO type. Its <c>FullName</c> becomes the subscription topic.</typeparam>
         /// <typeparam name="TResponse">The response DTO type, serialized back to the message bus.</typeparam>
@@ -1430,7 +1430,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Registers a strongly-typed fire-and-forget notification handler that auto-subscribes to the message bus.
         /// The topic is derived from <c>typeof(TNotification).FullName</c>.
         /// If the message bus is not yet injected, the handler is stored and subscribed later
-        /// via <see cref="InjectKernelServices"/>.
+        /// via <see cref="OnKernelServicesInjected"/>.
         /// </summary>
         /// <typeparam name="TNotification">The notification DTO type. Its <c>FullName</c> becomes the subscription topic.</typeparam>
         /// <param name="handler">The handler function that processes the notification.</param>
@@ -1470,21 +1470,19 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         }
 
         /// <summary>
-        /// Overrides <see cref="PluginBase.InjectKernelServices"/> to subscribe any pending
+        /// Called after kernel services are injected. Subscribes any pending
         /// typed message handlers that were registered before the message bus was available.
+        /// Uses OnKernelServicesInjected callback since InjectKernelServices is now sealed (ISO-01).
         /// </summary>
-        public override void InjectKernelServices(
-            IMessageBus? messageBus,
-            IPluginCapabilityRegistry? capabilityRegistry,
-            IKnowledgeLake? knowledgeLake)
+        protected override void OnKernelServicesInjected()
         {
-            base.InjectKernelServices(messageBus, capabilityRegistry, knowledgeLake);
+            base.OnKernelServicesInjected();
 
-            if (messageBus != null && _pendingHandlers.Count > 0)
+            if (MessageBus != null && _pendingHandlers.Count > 0)
             {
                 foreach (var pending in _pendingHandlers)
                 {
-                    var sub = messageBus.Subscribe(pending.Topic, pending.Handler);
+                    var sub = MessageBus.Subscribe(pending.Topic, pending.Handler);
                     _typedHandlerSubscriptions.Add(sub);
                 }
                 _pendingHandlers.Clear();

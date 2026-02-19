@@ -832,8 +832,11 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Injects kernel services. Called by kernel during plugin initialization.
+        /// SEALED to prevent plugins from overriding this method and intercepting kernel
+        /// service references via reflection (ISO-01, CVSS 9.4 mitigation).
+        /// Use <see cref="OnKernelServicesInjected"/> for post-injection hooks.
         /// </summary>
-        public virtual void InjectKernelServices(
+        public void InjectKernelServices(
             IMessageBus? messageBus,
             IPluginCapabilityRegistry? capabilityRegistry,
             IKnowledgeLake? knowledgeLake)
@@ -841,6 +844,19 @@ namespace DataWarehouse.SDK.Contracts
             MessageBus = messageBus;
             CapabilityRegistry = capabilityRegistry;
             KnowledgeLake = knowledgeLake;
+
+            // Allow subclasses to react to service injection (e.g., subscribe to bus topics)
+            OnKernelServicesInjected();
+        }
+
+        /// <summary>
+        /// Called after kernel services have been injected. Override to perform post-injection
+        /// setup such as subscribing to message bus topics or registering capabilities.
+        /// This replaces overriding InjectKernelServices which is now sealed for security (ISO-01).
+        /// </summary>
+        protected virtual void OnKernelServicesInjected()
+        {
+            // Default: no-op. Subclasses can override for post-injection initialization.
         }
 
         /// <summary>

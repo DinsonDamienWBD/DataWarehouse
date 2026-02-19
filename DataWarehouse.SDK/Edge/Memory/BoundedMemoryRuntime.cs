@@ -31,6 +31,13 @@ namespace DataWarehouse.SDK.Edge.Memory;
 /// proactive Gen1 collection when above threshold. Prevents sudden Gen2 pauses.
 /// </para>
 /// </remarks>
+// SECURITY NOTE (ISO-03, CVSS 5.9): BoundedMemoryRuntime is a process-wide singleton shared
+// across all plugins. Its _settings and _tracker are mutable shared state. While Lazy<T>
+// ensures thread-safe initialization, concurrent plugin access to Initialize() could race.
+// The singleton pattern is intentional (memory budgets must be global), but callers should
+// be aware that plugins in different AssemblyLoadContexts share this instance. Budget
+// manipulation by a malicious plugin could affect other plugins' memory allocations.
+// Mitigation: Initialize() is called once by the kernel before plugins load.
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Bounded memory runtime (EDGE-06)")]
 public sealed class BoundedMemoryRuntime : IDisposable
 {
