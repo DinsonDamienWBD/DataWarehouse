@@ -23,6 +23,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AedsCore/DataWarehouse.Plugins.AedsCore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AirGapBridge/DataWarehouse.Plugins.AirGapBridge.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AppPlatform/DataWarehouse.Plugins.AppPlatform.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ChaosVaccination/DataWarehouse.Plugins.ChaosVaccination.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compute.Wasm/DataWarehouse.Plugins.Compute.Wasm.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DataMarketplace/DataWarehouse.Plugins.DataMarketplace.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj" />
