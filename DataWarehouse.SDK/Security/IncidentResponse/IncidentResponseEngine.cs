@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using AuditEntry = DataWarehouse.SDK.Contracts.Observability.AuditEntry;
+using ObsAuditEntry = DataWarehouse.SDK.Contracts.Observability.AuditEntry;
 using AuditOutcome = DataWarehouse.SDK.Contracts.Observability.AuditOutcome;
 using IAuditTrail = DataWarehouse.SDK.Contracts.Observability.IAuditTrail;
 
@@ -106,7 +106,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
                 incident.Id, severity, description);
 
             // Fire-and-forget audit entry
-            _ = _auditTrail.RecordAsync(AuditEntry.Create(
+            _ = _auditTrail.RecordAsync(ObsAuditEntry.Create(
                 actor: "IncidentResponseEngine",
                 action: "CreateIncident",
                 resourceType: "Incident",
@@ -168,7 +168,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
                 }
 
                 // Audit BEFORE execution (intent)
-                await _auditTrail.RecordAsync(AuditEntry.Create(
+                await _auditTrail.RecordAsync(ObsAuditEntry.Create(
                     actor: "IncidentResponseEngine",
                     action: $"ExecuteAction:Intent:{actionId}",
                     resourceType: "Incident",
@@ -205,7 +205,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
                 }
 
                 // Audit AFTER execution (result)
-                await _auditTrail.RecordAsync(AuditEntry.Create(
+                await _auditTrail.RecordAsync(ObsAuditEntry.Create(
                     actor: "IncidentResponseEngine",
                     action: $"ExecuteAction:Result:{actionId}",
                     resourceType: "Incident",
@@ -248,7 +248,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
             incident.ResolvedAt = DateTimeOffset.UtcNow;
             incident.Resolution = resolution;
 
-            await _auditTrail.RecordAsync(AuditEntry.Create(
+            await _auditTrail.RecordAsync(ObsAuditEntry.Create(
                 actor: "IncidentResponseEngine",
                 action: "ResolveIncident",
                 resourceType: "Incident",
