@@ -16,16 +16,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 {
     /// <summary>
     /// Google Cloud Storage (GCS) strategy with full production features:
+    /// - Official Google.Cloud.Storage.V1 SDK with StorageClient
     /// - Storage classes: STANDARD, NEARLINE, COLDLINE, ARCHIVE
     /// - Resumable uploads for large files (multipart)
     /// - Customer-managed encryption keys (CMEK)
-    /// - Signed URLs for temporary access
+    /// - Signed URLs for temporary access via UrlSigner
     /// - Object versioning support
     /// - Lifecycle management
     /// - Requester pays support
     /// - Automatic retry with exponential backoff
     /// - Composite objects for parallel upload
     /// - Streaming upload/download optimization
+    ///
+    /// Note: UseNativeClient config flag (default true) is reserved for future manual REST
+    /// fallback support for air-gapped/embedded environments.
     /// </summary>
     public class GcsStrategy : UltimateStorageStrategyBase
     {

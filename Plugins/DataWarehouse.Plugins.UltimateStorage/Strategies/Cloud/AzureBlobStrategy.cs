@@ -1,3 +1,7 @@
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage;
+using Azure.Identity;
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
@@ -16,6 +20,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 {
     /// <summary>
     /// Azure Blob Storage strategy with production-ready features:
+    /// - Official Azure.Storage.Blobs SDK with BlobServiceClient, BlobContainerClient, BlobClient
+    /// - Manual REST fallback for air-gapped/embedded environments
     /// - Block, Append, and Page blob types
     /// - Access tiers (Hot, Cool, Cold, Archive)
     /// - SAS token generation for secure temporary access
@@ -29,10 +35,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
     /// </summary>
     public class AzureBlobStrategy : UltimateStorageStrategyBase
     {
+        // SDK clients (primary path)
+        private BlobServiceClient? _blobServiceClient;
+        private BlobContainerClient? _containerClient;
+
+        // Manual HTTP fallback
         private HttpClient? _httpClient;
+
+        // Configuration
         private string _accountName = string.Empty;
         private string _accountKey = string.Empty;
         private string _containerName = string.Empty;
+        private string? _connectionString;
         private string _defaultAccessTier = "Hot";
         private AzureBlobType _defaultBlobType = AzureBlobType.BlockBlob;
         private int _timeoutSeconds = 300;
@@ -43,7 +57,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private byte[]? _customerProvidedKey;
         private string? _customerProvidedKeySHA256;
         private bool _autoTierTransition = false;
+        private bool _useDefaultAzureCredential = false;
         private readonly SemaphoreSlim _initLock = new(1, 1);
+
+        /// <summary>
+        /// When true, uses the official Azure.Storage.Blobs SDK.
+        /// When false, falls back to manual REST with SharedKey signing.
+        /// </summary>
+        private bool _useNativeClient = true;
 
         public override string StrategyId => "azure-blob";
         public override string Name => "Azure Blob Storage";
@@ -79,6 +100,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 _containerName = GetConfiguration<string>("ContainerName")
                     ?? throw new InvalidOperationException("ContainerName is required");
 
+                _connectionString = GetConfiguration<string?>("ConnectionString", null);
                 _defaultAccessTier = GetConfiguration("DefaultAccessTier", "Hot");
                 _defaultBlobType = GetConfiguration("DefaultBlobType", AzureBlobType.BlockBlob);
                 _timeoutSeconds = GetConfiguration("TimeoutSeconds", 300);
@@ -86,6 +108,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 _enableSoftDelete = GetConfiguration("EnableSoftDelete", false);
                 _softDeleteRetentionDays = GetConfiguration("SoftDeleteRetentionDays", 7);
                 _autoTierTransition = GetConfiguration("AutoTierTransition", false);
+                _useDefaultAzureCredential = GetConfiguration("UseDefaultAzureCredential", false);
+                _useNativeClient = GetConfiguration("UseNativeClient", true);
 
                 // Customer-provided encryption key (optional)
                 var cpekBase64 = GetConfiguration<string?>("CustomerProvidedKey", null);
@@ -96,14 +120,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     _customerProvidedKeySHA256 = Convert.ToBase64String(SHA256.HashData(_customerProvidedKey));
                 }
 
-                // Initialize HTTP client
-                _httpClient = new HttpClient
+                if (_useNativeClient)
                 {
-                    Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
-                };
-
-                // Ensure container exists
-                await EnsureContainerExistsAsync(ct);
+                    await InitializeNativeClientAsync(ct);
+                }
+                else
+                {
+                    InitializeManualHttpClient();
+                    await EnsureContainerExistsManualAsync(ct);
+                }
             }
             finally
             {
@@ -111,11 +136,53 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
         }
 
+        /// <summary>
+        /// Initializes the official Azure.Storage.Blobs SDK client (primary path).
+        /// </summary>
+        private async Task InitializeNativeClientAsync(CancellationToken ct)
+        {
+            if (!string.IsNullOrEmpty(_connectionString))
+            {
+                // Use connection string
+                _blobServiceClient = new BlobServiceClient(_connectionString);
+            }
+            else if (_useDefaultAzureCredential)
+            {
+                // Use DefaultAzureCredential (managed identity, etc.)
+                var serviceUri = new Uri($"https://{_accountName}.blob.core.windows.net");
+                _blobServiceClient = new BlobServiceClient(serviceUri, new DefaultAzureCredential());
+            }
+            else
+            {
+                // Use SharedKey credential
+                var serviceUri = new Uri($"https://{_accountName}.blob.core.windows.net");
+                var credential = new StorageSharedKeyCredential(_accountName, _accountKey);
+                _blobServiceClient = new BlobServiceClient(serviceUri, credential);
+            }
+
+            _containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
+
+            // Ensure container exists
+            await _containerClient.CreateIfNotExistsAsync(cancellationToken: ct);
+        }
+
+        /// <summary>
+        /// Initializes the manual HTTP client (fallback for air-gapped/embedded).
+        /// </summary>
+        private void InitializeManualHttpClient()
+        {
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
+            };
+        }
+
         protected override async ValueTask DisposeCoreAsync()
         {
             await base.DisposeCoreAsync();
             _httpClient?.Dispose();
             _initLock?.Dispose();
+            // BlobServiceClient doesn't implement IDisposable
         }
 
         #endregion
@@ -128,68 +195,56 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             ValidateKey(key);
             ValidateStream(data);
 
-            var blobUrl = GetBlobUrl(key);
-            var startTime = DateTime.UtcNow;
-
-            // Read data into memory for upload
-            using var ms = new MemoryStream(65536);
-            await data.CopyToAsync(ms, ct);
-            var content = ms.ToArray();
-
-            var request = new HttpRequestMessage(HttpMethod.Put, blobUrl);
-            request.Content = new ByteArrayContent(content);
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            request.Content.Headers.ContentLength = content.Length;
-
-            // Set blob type
-            request.Headers.TryAddWithoutValidation("x-ms-blob-type", _defaultBlobType.ToString());
-
-            // Set access tier
-            if (!string.IsNullOrEmpty(_defaultAccessTier))
+            if (_useNativeClient)
             {
-                request.Headers.TryAddWithoutValidation("x-ms-access-tier", _defaultAccessTier);
+                return await StoreWithSdkAsync(key, data, metadata, ct);
             }
-
-            // Add custom metadata
-            if (metadata != null)
+            else
             {
-                foreach (var kvp in metadata)
-                {
-                    var headerName = $"x-ms-meta-{kvp.Key}";
-                    request.Headers.TryAddWithoutValidation(headerName, kvp.Value);
-                }
+                return await StoreWithManualHttpAsync(key, data, metadata, ct);
             }
+        }
 
-            // Add customer-provided encryption key if enabled
+        /// <summary>
+        /// Store using Azure.Storage.Blobs SDK (primary path).
+        /// </summary>
+        private async Task<StorageObjectMetadata> StoreWithSdkAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        {
+            var blobClient = _containerClient!.GetBlobClient(key);
+
+            var uploadOptions = new BlobUploadOptions
+            {
+                AccessTier = MapToAccessTier(_defaultAccessTier),
+                Metadata = metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+            };
+
+            // Customer-provided encryption key is applied at the blob client level via options
+            // when using the SDK. For CPEK, we create a specialized BlobClient.
+            BlobClient effectiveBlobClient = blobClient;
             if (_useCustomerProvidedKey && _customerProvidedKey != null)
             {
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
+                var cpk = new CustomerProvidedKey(_customerProvidedKey);
+                effectiveBlobClient = blobClient.WithCustomerProvidedKey(cpk);
             }
 
-            // Sign request
-            SignRequest(request);
+            var response = await effectiveBlobClient.UploadAsync(data, uploadOptions, ct);
+            var rawResponse = response.GetRawResponse();
 
-            var response = await _httpClient!.SendAsync(request, ct);
-            response.EnsureSuccessStatusCode();
+            // Get properties for accurate metadata
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: ct);
 
-            // Extract ETag from response
-            var etag = response.Headers.ETag?.Tag ?? string.Empty;
-            var lastModified = response.Content.Headers.LastModified?.UtcDateTime ?? DateTime.UtcNow;
-
-            // Update statistics
-            IncrementBytesStored(content.Length);
+            var size = properties.Value.ContentLength;
+            IncrementBytesStored(size);
             IncrementOperationCounter(StorageOperationType.Store);
 
             return new StorageObjectMetadata
             {
                 Key = key,
-                Size = content.Length,
-                Created = DateTime.UtcNow,
-                Modified = lastModified,
-                ETag = etag,
-                ContentType = "application/octet-stream",
+                Size = size,
+                Created = properties.Value.CreatedOn.UtcDateTime,
+                Modified = properties.Value.LastModified.UtcDateTime,
+                ETag = properties.Value.ETag.ToString(),
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
                 CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
             };
@@ -200,30 +255,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             EnsureInitialized();
             ValidateKey(key);
 
-            var blobUrl = GetBlobUrl(key);
-
-            var request = new HttpRequestMessage(HttpMethod.Get, blobUrl);
-
-            // Add customer-provided encryption key if enabled
-            if (_useCustomerProvidedKey && _customerProvidedKey != null)
+            if (_useNativeClient)
             {
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
+                return await RetrieveWithSdkAsync(key, ct);
             }
+            else
+            {
+                return await RetrieveWithManualHttpAsync(key, ct);
+            }
+        }
 
-            SignRequest(request);
+        /// <summary>
+        /// Retrieve using Azure.Storage.Blobs SDK (primary path).
+        /// </summary>
+        private async Task<Stream> RetrieveWithSdkAsync(string key, CancellationToken ct)
+        {
+            var blobClient = _containerClient!.GetBlobClient(key);
 
-            var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            // Get content length for statistics
-            var contentLength = response.Content.Headers.ContentLength ?? 0;
+            var downloadResult = await blobClient.DownloadStreamingAsync(cancellationToken: ct);
+            var contentLength = downloadResult.Value.Details.ContentLength;
 
             // Stream directly without full materialization to avoid OOM on large objects
-            var stream = await response.Content.ReadAsStreamAsync(ct);
-
-            // Wrap in a tracking stream to update statistics when consumed
+            var stream = downloadResult.Value.Content;
             var trackingStream = new StreamWithStatistics(stream, contentLength, this);
 
             // Auto tier transition if enabled
@@ -244,23 +297,33 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             long size = 0;
             try
             {
-                var props = await GetBlobPropertiesInternalAsync(key, ct);
-                size = props.TryGetValue("ContentLength", out var sizeObj) && sizeObj is long l ? l : 0;
+                if (_useNativeClient)
+                {
+                    var blobClient = _containerClient!.GetBlobClient(key);
+                    var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
+                    size = props.Value.ContentLength;
+                }
+                else
+                {
+                    var props = await GetBlobPropertiesManualAsync(key, ct);
+                    size = props.TryGetValue("ContentLength", out var sizeObj) && sizeObj is long l ? l : 0;
+                }
             }
             catch
             {
                 // Ignore errors getting properties
             }
 
-            var blobUrl = GetBlobUrl(key);
+            if (_useNativeClient)
+            {
+                var blobClient = _containerClient!.GetBlobClient(key);
+                await blobClient.DeleteIfExistsAsync(cancellationToken: ct);
+            }
+            else
+            {
+                await DeleteWithManualHttpAsync(key, ct);
+            }
 
-            var request = new HttpRequestMessage(HttpMethod.Delete, blobUrl);
-            SignRequest(request);
-
-            var response = await _httpClient!.SendAsync(request, ct);
-            response.EnsureSuccessStatusCode();
-
-            // Update statistics
             IncrementBytesDeleted(size);
             IncrementOperationCounter(StorageOperationType.Delete);
         }
@@ -270,9 +333,434 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             EnsureInitialized();
             ValidateKey(key);
 
+            if (_useNativeClient)
+            {
+                try
+                {
+                    var blobClient = _containerClient!.GetBlobClient(key);
+                    var response = await blobClient.ExistsAsync(ct);
+                    IncrementOperationCounter(StorageOperationType.Exists);
+                    return response.Value;
+                }
+                catch
+                {
+                    IncrementOperationCounter(StorageOperationType.Exists);
+                    return false;
+                }
+            }
+            else
+            {
+                return await ExistsWithManualHttpAsync(key, ct);
+            }
+        }
+
+        protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        {
+            EnsureInitialized();
+            IncrementOperationCounter(StorageOperationType.List);
+
+            if (_useNativeClient)
+            {
+                await foreach (var item in ListWithSdkAsync(prefix, ct))
+                {
+                    yield return item;
+                }
+            }
+            else
+            {
+                await foreach (var item in ListWithManualHttpAsync(prefix, ct))
+                {
+                    yield return item;
+                }
+            }
+        }
+
+        /// <summary>
+        /// List blobs using Azure.Storage.Blobs SDK with prefix filtering.
+        /// </summary>
+        private async IAsyncEnumerable<StorageObjectMetadata> ListWithSdkAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        {
+            await foreach (var blobItem in _containerClient!.GetBlobsAsync(
+                traits: BlobTraits.Metadata,
+                states: BlobStates.None,
+                prefix: prefix,
+                cancellationToken: ct))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                yield return new StorageObjectMetadata
+                {
+                    Key = blobItem.Name,
+                    Size = blobItem.Properties.ContentLength ?? 0L,
+                    Created = blobItem.Properties.CreatedOn?.UtcDateTime ?? DateTime.UtcNow,
+                    Modified = blobItem.Properties.LastModified?.UtcDateTime ?? DateTime.UtcNow,
+                    ETag = blobItem.Properties.ETag?.ToString() ?? string.Empty,
+                    ContentType = blobItem.Properties.ContentType ?? "application/octet-stream",
+                    CustomMetadata = blobItem.Metadata?.Count > 0
+                        ? blobItem.Metadata as IReadOnlyDictionary<string, string>
+                        : null,
+                    Tier = blobItem.Properties.AccessTier.HasValue
+                        ? ParseAccessTierToStorageTier(blobItem.Properties.AccessTier.Value.ToString())
+                        : Tier
+                };
+            }
+        }
+
+        protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
+        {
+            EnsureInitialized();
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                return await GetMetadataWithSdkAsync(key, ct);
+            }
+            else
+            {
+                return await GetMetadataWithManualHttpAsync(key, ct);
+            }
+        }
+
+        /// <summary>
+        /// Get metadata using Azure.Storage.Blobs SDK GetPropertiesAsync.
+        /// </summary>
+        private async Task<StorageObjectMetadata> GetMetadataWithSdkAsync(string key, CancellationToken ct)
+        {
+            var blobClient = _containerClient!.GetBlobClient(key);
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: ct);
+
+            IncrementOperationCounter(StorageOperationType.GetMetadata);
+
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = properties.Value.ContentLength,
+                Created = properties.Value.CreatedOn.UtcDateTime,
+                Modified = properties.Value.LastModified.UtcDateTime,
+                ETag = properties.Value.ETag.ToString(),
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
+                CustomMetadata = properties.Value.Metadata?.Count > 0
+                    ? properties.Value.Metadata as IReadOnlyDictionary<string, string>
+                    : null,
+                Tier = ParseAccessTierToStorageTier(properties.Value.AccessTier ?? "Hot")
+            };
+        }
+
+        protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
+        {
             try
             {
-                await GetBlobPropertiesInternalAsync(key, ct);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                if (_useNativeClient)
+                {
+                    // Use GetAccountInfo as a health check via the SDK
+                    await _blobServiceClient!.GetAccountInfoAsync(ct);
+                    sw.Stop();
+
+                    return new StorageHealthInfo
+                    {
+                        Status = HealthStatus.Healthy,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = $"Azure Blob Storage account '{_accountName}' is healthy",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    sw.Stop();
+                    var status = _httpClient != null && !string.IsNullOrEmpty(_accountName)
+                        ? HealthStatus.Healthy
+                        : HealthStatus.Unhealthy;
+
+                    return new StorageHealthInfo
+                    {
+                        Status = status,
+                        LatencyMs = sw.ElapsedMilliseconds,
+                        Message = status == HealthStatus.Healthy
+                            ? $"Azure Blob Storage account '{_accountName}' is healthy"
+                            : "Azure Blob Storage is not properly configured",
+                        CheckedAt = DateTime.UtcNow
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new StorageHealthInfo
+                {
+                    Status = HealthStatus.Unhealthy,
+                    Message = $"Failed to check health: {ex.Message}",
+                    CheckedAt = DateTime.UtcNow
+                };
+            }
+        }
+
+        protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
+        {
+            // Azure Blob Storage has virtually unlimited capacity
+            return Task.FromResult<long?>(null);
+        }
+
+        #endregion
+
+        #region Azure-Specific Operations
+
+        /// <summary>
+        /// Move blob to a different access tier using SDK or manual REST.
+        /// </summary>
+        public async Task SetAccessTierAsync(string key, string accessTier, CancellationToken ct = default)
+        {
+            EnsureInitialized();
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                var blobClient = _containerClient!.GetBlobClient(key);
+                var tier = MapToAccessTier(accessTier);
+                if (tier.HasValue)
+                {
+                    await blobClient.SetAccessTierAsync(tier.Value, cancellationToken: ct);
+                }
+            }
+            else
+            {
+                await SetAccessTierManualAsync(key, accessTier, ct);
+            }
+        }
+
+        /// <summary>
+        /// Generate SAS URL for temporary access.
+        /// </summary>
+        public string GenerateSasUrl(string key, TimeSpan expiresIn, string permissions = "r")
+        {
+            EnsureInitialized();
+
+            if (_useNativeClient)
+            {
+                var blobClient = _containerClient!.GetBlobClient(key);
+
+                // Build SAS using the SDK
+                var sasBuilder = new Azure.Storage.Sas.BlobSasBuilder
+                {
+                    BlobContainerName = _containerName,
+                    BlobName = key,
+                    Resource = "b", // blob
+                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
+                    ExpiresOn = DateTimeOffset.UtcNow.Add(expiresIn)
+                };
+
+                // Parse permissions
+                sasBuilder.SetPermissions(Azure.Storage.Sas.BlobSasPermissions.Read);
+                if (permissions.Contains('w'))
+                    sasBuilder.SetPermissions(Azure.Storage.Sas.BlobSasPermissions.Read | Azure.Storage.Sas.BlobSasPermissions.Write);
+                if (permissions.Contains('d'))
+                    sasBuilder.SetPermissions(Azure.Storage.Sas.BlobSasPermissions.Read | Azure.Storage.Sas.BlobSasPermissions.Delete);
+
+                var credential = new StorageSharedKeyCredential(_accountName, _accountKey);
+                var sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
+
+                return $"{blobClient.Uri}?{sasToken}";
+            }
+            else
+            {
+                return GenerateSasUrlManual(key, expiresIn, permissions);
+            }
+        }
+
+        /// <summary>
+        /// Create a snapshot of a blob.
+        /// </summary>
+        public async Task<string> CreateSnapshotAsync(string key, CancellationToken ct = default)
+        {
+            EnsureInitialized();
+            ValidateKey(key);
+
+            if (_useNativeClient)
+            {
+                var blobClient = _containerClient!.GetBlobClient(key);
+                var snapshotResponse = await blobClient.CreateSnapshotAsync(cancellationToken: ct);
+                return snapshotResponse.Value.Snapshot ?? DateTime.UtcNow.ToString("o");
+            }
+            else
+            {
+                return await CreateSnapshotManualAsync(key, ct);
+            }
+        }
+
+        /// <summary>
+        /// Copy a blob within the same container.
+        /// </summary>
+        public async Task CopyBlobAsync(string sourceKey, string destKey, CancellationToken ct = default)
+        {
+            EnsureInitialized();
+            ValidateKey(sourceKey);
+            ValidateKey(destKey);
+
+            if (_useNativeClient)
+            {
+                var sourceClient = _containerClient!.GetBlobClient(sourceKey);
+                var destClient = _containerClient!.GetBlobClient(destKey);
+
+                await destClient.StartCopyFromUriAsync(sourceClient.Uri, cancellationToken: ct);
+            }
+            else
+            {
+                await CopyBlobManualAsync(sourceKey, destKey, ct);
+            }
+        }
+
+        /// <summary>
+        /// Automatically transition blob to cooler tier based on access patterns.
+        /// </summary>
+        private async Task AutoTransitionTierAsync(string key, CancellationToken ct)
+        {
+            try
+            {
+                string currentTier;
+                DateTime lastModified;
+
+                if (_useNativeClient)
+                {
+                    var blobClient = _containerClient!.GetBlobClient(key);
+                    var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
+                    currentTier = props.Value.AccessTier ?? "Hot";
+                    lastModified = props.Value.LastModified.UtcDateTime;
+                }
+                else
+                {
+                    var properties = await GetBlobPropertiesManualAsync(key, ct);
+                    currentTier = properties.TryGetValue("AccessTier", out var tierObj) ? tierObj.ToString() ?? "Hot" : "Hot";
+                    lastModified = properties.TryGetValue("LastModified", out var modObj) && modObj is DateTime mod ? mod : DateTime.UtcNow;
+                }
+
+                var age = DateTime.UtcNow - lastModified;
+
+                if (currentTier == "Hot" && age.TotalDays > 30)
+                {
+                    await SetAccessTierAsync(key, "Cool", ct);
+                }
+                else if (currentTier == "Cool" && age.TotalDays > 90)
+                {
+                    await SetAccessTierAsync(key, "Cold", ct);
+                }
+                else if (currentTier == "Cold" && age.TotalDays > 180)
+                {
+                    await SetAccessTierAsync(key, "Archive", ct);
+                }
+            }
+            catch
+            {
+                // Ignore transition errors
+            }
+        }
+
+        #endregion
+
+        #region Manual HTTP Fallback Methods
+
+        private async Task<StorageObjectMetadata> StoreWithManualHttpAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        {
+            var blobUrl = GetBlobUrl(key);
+
+            using var ms = new MemoryStream(65536);
+            await data.CopyToAsync(ms, ct);
+            var content = ms.ToArray();
+
+            var request = new HttpRequestMessage(HttpMethod.Put, blobUrl);
+            request.Content = new ByteArrayContent(content);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            request.Content.Headers.ContentLength = content.Length;
+
+            request.Headers.TryAddWithoutValidation("x-ms-blob-type", _defaultBlobType.ToString());
+
+            if (!string.IsNullOrEmpty(_defaultAccessTier))
+            {
+                request.Headers.TryAddWithoutValidation("x-ms-access-tier", _defaultAccessTier);
+            }
+
+            if (metadata != null)
+            {
+                foreach (var kvp in metadata)
+                {
+                    request.Headers.TryAddWithoutValidation($"x-ms-meta-{kvp.Key}", kvp.Value);
+                }
+            }
+
+            if (_useCustomerProvidedKey && _customerProvidedKey != null)
+            {
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
+            }
+
+            SignRequest(request);
+
+            var response = await _httpClient!.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
+            var etag = response.Headers.ETag?.Tag ?? string.Empty;
+            var lastModified = response.Content.Headers.LastModified?.UtcDateTime ?? DateTime.UtcNow;
+
+            IncrementBytesStored(content.Length);
+            IncrementOperationCounter(StorageOperationType.Store);
+
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = content.Length,
+                Created = DateTime.UtcNow,
+                Modified = lastModified,
+                ETag = etag,
+                ContentType = "application/octet-stream",
+                CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
+                Tier = Tier
+            };
+        }
+
+        private async Task<Stream> RetrieveWithManualHttpAsync(string key, CancellationToken ct)
+        {
+            var blobUrl = GetBlobUrl(key);
+            var request = new HttpRequestMessage(HttpMethod.Get, blobUrl);
+
+            if (_useCustomerProvidedKey && _customerProvidedKey != null)
+            {
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
+            }
+
+            SignRequest(request);
+
+            var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            var contentLength = response.Content.Headers.ContentLength ?? 0;
+            var stream = await response.Content.ReadAsStreamAsync(ct);
+            var trackingStream = new StreamWithStatistics(stream, contentLength, this);
+
+            if (_autoTierTransition)
+            {
+                _ = AutoTransitionTierAsync(key, ct);
+            }
+
+            return trackingStream;
+        }
+
+        private async Task DeleteWithManualHttpAsync(string key, CancellationToken ct)
+        {
+            var blobUrl = GetBlobUrl(key);
+            var request = new HttpRequestMessage(HttpMethod.Delete, blobUrl);
+            SignRequest(request);
+
+            var response = await _httpClient!.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+        }
+
+        private async Task<bool> ExistsWithManualHttpAsync(string key, CancellationToken ct)
+        {
+            try
+            {
+                await GetBlobPropertiesManualAsync(key, ct);
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return true;
             }
@@ -283,11 +771,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
         }
 
-        protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageObjectMetadata> ListWithManualHttpAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
-            EnsureInitialized();
-            IncrementOperationCounter(StorageOperationType.List);
-
             string? marker = null;
 
             do
@@ -310,7 +795,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 var xml = await response.Content.ReadAsStringAsync(ct);
 
-                // Parse XML response (simplified)
                 var lines = xml.Split('\n');
                 foreach (var line in lines)
                 {
@@ -321,7 +805,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     {
                         var name = ExtractXmlValue(line, "Name");
 
-                        // Find associated metadata
                         var sizeLine = Array.Find(lines, l => l.Contains("<Content-Length>"));
                         var size = sizeLine != null && long.TryParse(ExtractXmlValue(sizeLine, "Content-Length"), out var s) ? s : 0L;
 
@@ -346,7 +829,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     }
                 }
 
-                // Check for continuation marker
                 marker = xml.Contains("<NextMarker>") && !xml.Contains("<NextMarker/>")
                     ? ExtractXmlValue(xml, "NextMarker")
                     : null;
@@ -354,12 +836,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             } while (marker != null && !ct.IsCancellationRequested);
         }
 
-        protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
+        private async Task<StorageObjectMetadata> GetMetadataWithManualHttpAsync(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
-            var properties = await GetBlobPropertiesInternalAsync(key, ct);
+            var properties = await GetBlobPropertiesManualAsync(key, ct);
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
@@ -369,60 +848,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 Size = properties.TryGetValue("ContentLength", out var sizeObj) && sizeObj is long size ? size : 0,
                 Created = DateTime.UtcNow,
                 Modified = properties.TryGetValue("LastModified", out var modObj) && modObj is DateTime mod ? mod : DateTime.UtcNow,
-                ETag = properties.TryGetValue("ETag", out var etagObj) ? etagObj.ToString() : string.Empty,
-                ContentType = properties.TryGetValue("ContentType", out var ctObj) ? ctObj.ToString() : "application/octet-stream",
+                ETag = properties.TryGetValue("ETag", out var etagObj) ? etagObj.ToString() ?? string.Empty : string.Empty,
+                ContentType = properties.TryGetValue("ContentType", out var ctObj) ? ctObj.ToString() ?? "application/octet-stream" : "application/octet-stream",
                 Tier = properties.TryGetValue("AccessTier", out var tierObj) ? ParseAccessTierToStorageTier(tierObj.ToString() ?? "Hot") : Tier
             };
         }
 
-        protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
-        {
-            try
-            {
-                var status = _httpClient != null && !string.IsNullOrEmpty(_accountName)
-                    ? HealthStatus.Healthy
-                    : HealthStatus.Unhealthy;
-
-                return Task.FromResult(new StorageHealthInfo
-                {
-                    Status = status,
-                    LatencyMs = 0, // Will be populated by base class
-                    Message = status == HealthStatus.Healthy
-                        ? $"Azure Blob Storage account '{_accountName}' is healthy"
-                        : "Azure Blob Storage is not properly configured",
-                    CheckedAt = DateTime.UtcNow
-                });
-            }
-            catch (Exception ex)
-            {
-                return Task.FromResult(new StorageHealthInfo
-                {
-                    Status = HealthStatus.Unknown,
-                    Message = $"Failed to check health: {ex.Message}",
-                    CheckedAt = DateTime.UtcNow
-                });
-            }
-        }
-
-        protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
-        {
-            // Azure Blob Storage has virtually unlimited capacity
-            return Task.FromResult<long?>(null);
-        }
-
-        #endregion
-
-        #region Azure-Specific Operations
-
-        /// <summary>
-        /// Get blob properties including access tier, blob type, etc.
-        /// </summary>
-        private async Task<Dictionary<string, object>> GetBlobPropertiesInternalAsync(string key, CancellationToken ct)
+        private async Task<Dictionary<string, object>> GetBlobPropertiesManualAsync(string key, CancellationToken ct)
         {
             var blobUrl = GetBlobUrl(key);
             var request = new HttpRequestMessage(HttpMethod.Head, blobUrl);
 
-            // Add customer-provided encryption key if enabled
             if (_useCustomerProvidedKey && _customerProvidedKey != null)
             {
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
@@ -455,14 +891,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             return properties;
         }
 
-        /// <summary>
-        /// Move blob to a different access tier.
-        /// </summary>
-        public async Task SetAccessTierAsync(string key, string accessTier, CancellationToken ct = default)
+        private async Task SetAccessTierManualAsync(string key, string accessTier, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
             var blobUrl = $"{GetBlobUrl(key)}?comp=tier";
             var request = new HttpRequestMessage(HttpMethod.Put, blobUrl);
             request.Headers.TryAddWithoutValidation("x-ms-access-tier", accessTier);
@@ -472,13 +902,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             response.EnsureSuccessStatusCode();
         }
 
-        /// <summary>
-        /// Generate SAS URL for temporary access.
-        /// </summary>
-        public string GenerateSasUrl(string key, TimeSpan expiresIn, string permissions = "r")
+        private string GenerateSasUrlManual(string key, TimeSpan expiresIn, string permissions)
         {
-            EnsureInitialized();
-
             var start = DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm:ssZ");
             var expiry = DateTime.UtcNow.Add(expiresIn).ToString("yyyy-MM-ddTHH:mm:ssZ");
 
@@ -493,14 +918,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             return $"{GetBlobUrl(key)}?{sasToken}";
         }
 
-        /// <summary>
-        /// Create a snapshot of a blob.
-        /// </summary>
-        public async Task<string> CreateSnapshotAsync(string key, CancellationToken ct = default)
+        private async Task<string> CreateSnapshotManualAsync(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
             var blobUrl = $"{GetBlobUrl(key)}?comp=snapshot";
             var request = new HttpRequestMessage(HttpMethod.Put, blobUrl);
             SignRequest(request);
@@ -514,15 +933,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             return DateTime.UtcNow.ToString("o");
         }
 
-        /// <summary>
-        /// Copy a blob within the same container.
-        /// </summary>
-        public async Task CopyBlobAsync(string sourceKey, string destKey, CancellationToken ct = default)
+        private async Task CopyBlobManualAsync(string sourceKey, string destKey, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(sourceKey);
-            ValidateKey(destKey);
-
             var sourceUrl = GetBlobUrl(sourceKey);
             var destUrl = GetBlobUrl(destKey);
 
@@ -534,43 +946,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             response.EnsureSuccessStatusCode();
         }
 
-        /// <summary>
-        /// Automatically transition blob to cooler tier based on access patterns.
-        /// </summary>
-        private async Task AutoTransitionTierAsync(string key, CancellationToken ct)
-        {
-            try
-            {
-                var properties = await GetBlobPropertiesInternalAsync(key, ct);
-                var currentTier = properties.TryGetValue("AccessTier", out var tierObj) ? tierObj.ToString() : "Hot";
-                var lastModified = properties.TryGetValue("LastModified", out var modObj) && modObj is DateTime mod ? mod : DateTime.UtcNow;
-
-                // Transition logic: Hot -> Cool after 30 days, Cool -> Cold after 90 days, Cold -> Archive after 180 days
-                var age = DateTime.UtcNow - lastModified;
-
-                if (currentTier == "Hot" && age.TotalDays > 30)
-                {
-                    await SetAccessTierAsync(key, "Cool", ct);
-                }
-                else if (currentTier == "Cool" && age.TotalDays > 90)
-                {
-                    await SetAccessTierAsync(key, "Cold", ct);
-                }
-                else if (currentTier == "Cold" && age.TotalDays > 180)
-                {
-                    await SetAccessTierAsync(key, "Archive", ct);
-                }
-            }
-            catch
-            {
-                // Ignore transition errors
-            }
-        }
-
-        /// <summary>
-        /// Ensure the container exists.
-        /// </summary>
-        private async Task EnsureContainerExistsAsync(CancellationToken ct)
+        private async Task EnsureContainerExistsManualAsync(CancellationToken ct)
         {
             try
             {
@@ -580,7 +956,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 var response = await _httpClient!.SendAsync(request, ct);
 
-                // 201 = created, 409 = already exists (both are OK)
                 if (response.StatusCode != System.Net.HttpStatusCode.Created &&
                     response.StatusCode != System.Net.HttpStatusCode.Conflict)
                 {
@@ -613,7 +988,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             request.Headers.TryAddWithoutValidation("x-ms-date", now);
             request.Headers.TryAddWithoutValidation("x-ms-version", "2021-06-08");
 
-            // Build canonical headers
             var canonicalHeaders = new StringBuilder();
             canonicalHeaders.Append($"x-ms-date:{now}\n");
             canonicalHeaders.Append("x-ms-version:2021-06-08\n");
@@ -624,7 +998,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 canonicalHeaders.Append($"{header.Key}:{string.Join(",", header.Value)}\n");
             }
 
-            // Build canonical resource
             var uri = request.RequestUri!;
             var canonicalResource = $"/{_accountName}{uri.AbsolutePath}";
             if (!string.IsNullOrEmpty(uri.Query))
@@ -676,13 +1049,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             };
         }
 
+        /// <summary>
+        /// Maps access tier string to Azure SDK AccessTier.
+        /// </summary>
+        private static AccessTier? MapToAccessTier(string accessTier)
+        {
+            return accessTier?.ToLowerInvariant() switch
+            {
+                "hot" => AccessTier.Hot,
+                "cool" => AccessTier.Cool,
+                "cold" => AccessTier.Cold,
+                "archive" => AccessTier.Archive,
+                _ => AccessTier.Hot
+            };
+        }
+
         protected override int GetMaxKeyLength() => 1024; // Azure Blob Storage max key length
 
         /// <summary>
         /// Stream wrapper that updates statistics when data is read.
         /// Prevents OOM by streaming large objects without full materialization.
         /// </summary>
-        private class StreamWithStatistics : Stream
+        internal class StreamWithStatistics : Stream
         {
             private readonly Stream _innerStream;
             private readonly long _expectedLength;
