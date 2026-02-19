@@ -1,7 +1,10 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,6 +15,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
     /// </summary>
     public class PostgresImportStrategy : UltimateStorageStrategyBase
     {
+        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+
         public override string StrategyId => "postgres-import";
         public override string Name => "PostgreSQL Bulk Import";
         public override StorageTier Tier => StorageTier.Warm;
@@ -36,35 +41,42 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
             return Task.CompletedTask;
         }
 
-        protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Store);
-            IncrementBytesStored(data.Length);
+            using var ms = new MemoryStream();
+            await data.CopyToAsync(ms, ct);
+            var bytes = ms.ToArray();
+            _store[key] = bytes;
+            IncrementBytesStored(bytes.Length);
 
-            return Task.FromResult(new StorageObjectMetadata
+            return new StorageObjectMetadata
             {
                 Key = key,
-                Size = data.Length,
+                Size = bytes.Length,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
                 ETag = $"\"{HashCode.Combine(key):x}\"",
                 ContentType = "application/octet-stream",
                 Tier = Tier
-            });
+            };
         }
 
         protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Retrieve);
-            return Task.FromResult<Stream>(new MemoryStream(0));
+            if (!_store.TryGetValue(key, out var data))
+                throw new KeyNotFoundException($"Key '{key}' not found in {StrategyId} store");
+            return Task.FromResult<Stream>(new MemoryStream(data));
         }
 
         protected override Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Delete);
+            _store.TryRemove(key, out _);
             return Task.CompletedTask;
         }
 
@@ -72,21 +84,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Exists);
-            return Task.FromResult(true);
+            return Task.FromResult(_store.ContainsKey(key));
         }
 
-        protected override IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, CancellationToken ct)
+        protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.List);
-            return AsyncEnumerable.Empty<StorageObjectMetadata>();
+            foreach (var kvp in _store)
+            {
+                if (prefix == null || kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+                    yield return new StorageObjectMetadata { Key = kvp.Key, Size = kvp.Value.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier };
+            }
+            await Task.CompletedTask;
         }
 
         protected override Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.GetMetadata);
-            return Task.FromResult(new StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier });
+            if (!_store.TryGetValue(key, out var data))
+                throw new KeyNotFoundException($"Key '{key}' not found in {StrategyId} store");
+            return Task.FromResult(new StorageObjectMetadata { Key = key, Size = data.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier });
         }
 
         protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)
