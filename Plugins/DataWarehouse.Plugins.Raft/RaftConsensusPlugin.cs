@@ -3,8 +3,11 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 
@@ -1195,6 +1198,18 @@ namespace DataWarehouse.Plugins.Raft
         {
             try
             {
+                // Security: Warn when mTLS is disabled (AUTH-06)
+                if (!_config.UseMutualTls)
+                {
+                    Console.WriteLine($"[Raft-SECURITY-WARNING] mTLS is DISABLED for Raft TCP listener. " +
+                        $"Inter-node communication is NOT authenticated. Node: {_nodeId}");
+                }
+                if (_config.AllowSelfSignedCertificates)
+                {
+                    Console.WriteLine($"[Raft-SECURITY-WARNING] Self-signed certificates are ALLOWED. " +
+                        $"CA validation bypassed. Node: {_nodeId}");
+                }
+
                 // Use configured base port (0 = OS-assigned)
                 _listener = new TcpListener(IPAddress.Any, _config.BasePort);
                 _listener.Start();
@@ -1260,10 +1275,44 @@ namespace DataWarehouse.Plugins.Raft
             try
             {
                 using (client)
-                using (var stream = client.GetStream())
-                using (var reader = new StreamReader(stream, Encoding.UTF8))
-                using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
                 {
+                    Stream baseStream = client.GetStream();
+
+                    // Security: Upgrade to mTLS if enabled (AUTH-06)
+                    if (_config.UseMutualTls && _config.ServerCertificate != null)
+                    {
+                        var sslStream = new SslStream(
+                            baseStream,
+                            leaveInnerStreamOpen: false,
+                            userCertificateValidationCallback: ValidateRaftClientCertificate);
+
+                        await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+                        {
+                            ServerCertificate = _config.ServerCertificate,
+                            ClientCertificateRequired = true,
+                            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                            CertificateRevocationCheckMode = X509RevocationMode.Online,
+                            RemoteCertificateValidationCallback = ValidateRaftClientCertificate
+                        }, ct);
+
+                        if (!sslStream.IsMutuallyAuthenticated)
+                        {
+                            Console.WriteLine($"[Raft-SECURITY] Rejected connection: mTLS handshake failed - Node: {_nodeId}");
+                            return;
+                        }
+
+                        baseStream = sslStream;
+                    }
+                    else if (_config.UseMutualTls)
+                    {
+                        // mTLS enabled but no certificate configured -- reject connection
+                        Console.WriteLine($"[Raft-SECURITY] Rejected connection: mTLS enabled but ServerCertificate not configured - Node: {_nodeId}");
+                        return;
+                    }
+
+                    using var reader = new StreamReader(baseStream, Encoding.UTF8);
+                    using var writer = new StreamWriter(baseStream, Encoding.UTF8) { AutoFlush = true };
+
                     var requestLine = await reader.ReadLineAsync(ct);
                     if (string.IsNullOrEmpty(requestLine)) return;
 
@@ -1290,11 +1339,68 @@ namespace DataWarehouse.Plugins.Raft
                     await writer.WriteLineAsync(JsonSerializer.Serialize(response));
                 }
             }
+            catch (AuthenticationException ex)
+            {
+                // mTLS authentication failed -- security event
+                Console.WriteLine($"[Raft-SECURITY] mTLS authentication failed - Node: {_nodeId}, Error: {ex.Message}");
+            }
             catch (Exception ex)
             {
                 // Client handling failed - expected during network issues or malformed requests
                 Console.WriteLine($"[Raft] Client request handling failed - Node: {_nodeId}, State: {_state}, Error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Validates a client certificate during Raft mTLS handshake (AUTH-06).
+        /// </summary>
+        private bool ValidateRaftClientCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (certificate == null) return false;
+
+            // Allow self-signed certificates only when explicitly configured (development mode)
+            if (_config.AllowSelfSignedCertificates && sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors)
+            {
+                Console.WriteLine($"[Raft-SECURITY-WARNING] Accepting self-signed certificate - Node: {_nodeId}");
+                return true;
+            }
+
+            return sslPolicyErrors == SslPolicyErrors.None;
+        }
+
+        /// <summary>
+        /// Gets a stream for the given TCP client, upgrading to mTLS if configured (AUTH-06).
+        /// </summary>
+        private async Task<Stream> GetAuthenticatedStreamAsync(TcpClient client, string targetHost)
+        {
+            Stream stream = client.GetStream();
+
+            if (_config.UseMutualTls && _config.ClientCertificate != null)
+            {
+                var sslStream = new SslStream(
+                    stream,
+                    leaveInnerStreamOpen: false,
+                    userCertificateValidationCallback: ValidateRaftClientCertificate);
+
+                var clientCerts = new X509Certificate2Collection(_config.ClientCertificate);
+
+                await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                {
+                    TargetHost = targetHost,
+                    ClientCertificates = clientCerts,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                    CertificateRevocationCheckMode = X509RevocationMode.Online,
+                    RemoteCertificateValidationCallback = ValidateRaftClientCertificate
+                });
+
+                stream = sslStream;
+            }
+            else if (_config.UseMutualTls)
+            {
+                throw new AuthenticationException("mTLS is enabled but ClientCertificate is not configured");
+            }
+
+            return stream;
         }
 
         private async Task<RequestVoteResponse?> SendRequestVoteAsync(RaftPeer peer, RequestVoteRequest request)
@@ -1305,7 +1411,7 @@ namespace DataWarehouse.Plugins.Raft
                 var parts = peer.Endpoint.Split(':');
                 await client.ConnectAsync(parts[0], int.Parse(parts[1]));
 
-                using var stream = client.GetStream();
+                using var stream = await GetAuthenticatedStreamAsync(client, parts[0]);
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
@@ -1347,7 +1453,7 @@ namespace DataWarehouse.Plugins.Raft
                 var parts = peer.Endpoint.Split(':');
                 await client.ConnectAsync(parts[0], int.Parse(parts[1]));
 
-                using var stream = client.GetStream();
+                using var stream = await GetAuthenticatedStreamAsync(client, parts[0]);
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
@@ -1407,7 +1513,7 @@ namespace DataWarehouse.Plugins.Raft
                 var parts = leader.Endpoint.Split(':');
                 await client.ConnectAsync(parts[0], int.Parse(parts[1]));
 
-                using var stream = client.GetStream();
+                using var stream = await GetAuthenticatedStreamAsync(client, parts[0]);
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
@@ -1743,6 +1849,29 @@ namespace DataWarehouse.Plugins.Raft
         /// Example: ["node1.example.com:5000", "node2.example.com:5000"]
         /// </summary>
         public List<string> ClusterEndpoints { get; init; } = new();
+
+        /// <summary>
+        /// Enable mutual TLS for Raft inter-node communication (AUTH-06).
+        /// Default: true. When enabled, all TCP connections use mTLS with client certificate validation.
+        /// Disabling mTLS in production is a critical security risk.
+        /// </summary>
+        public bool UseMutualTls { get; init; } = true;
+
+        /// <summary>
+        /// Server certificate for incoming Raft TCP connections (required when mTLS enabled).
+        /// </summary>
+        public X509Certificate2? ServerCertificate { get; init; }
+
+        /// <summary>
+        /// Client certificate for outgoing Raft TCP connections (required when mTLS enabled).
+        /// </summary>
+        public X509Certificate2? ClientCertificate { get; init; }
+
+        /// <summary>
+        /// Allow self-signed certificates for development/testing only (DIST-05).
+        /// Default: false. Enabling this bypasses CA chain validation.
+        /// </summary>
+        public bool AllowSelfSignedCertificates { get; init; } = false;
     }
 
     #endregion

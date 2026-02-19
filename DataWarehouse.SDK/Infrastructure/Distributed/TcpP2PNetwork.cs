@@ -64,6 +64,20 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
 
+            // Security: Warn when mTLS is disabled (DIST-05, AUTH-06)
+            if (!_config.EnableMutualTls)
+            {
+                Console.WriteLine("[P2P-SECURITY-WARNING] mTLS is DISABLED. Inter-node communication is NOT authenticated. " +
+                    "This should only be used in development/testing environments.");
+            }
+
+            // Security: Warn when self-signed certificates are allowed
+            if (_config.AllowSelfSignedCertificates)
+            {
+                Console.WriteLine("[P2P-SECURITY-WARNING] Self-signed certificates are ALLOWED. " +
+                    "This bypasses CA validation and should only be used in development/testing environments.");
+            }
+
             // Validate mTLS configuration if enabled
             if (_config.EnableMutualTls)
             {
@@ -524,8 +538,17 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         /// <summary>
         /// Enable mutual TLS (both client and server present certificates).
+        /// Default: true. Disabling mTLS in production is a critical security risk (AUTH-06, DIST-05).
+        /// Only set to false for local development or testing environments.
         /// </summary>
         public bool EnableMutualTls { get; init; } = true;
+
+        /// <summary>
+        /// Require mutual TLS -- when true, connections without mTLS are rejected even if
+        /// EnableMutualTls is false. This is an additional safety net for production deployments.
+        /// Default: true.
+        /// </summary>
+        public bool RequireMutualTls { get; init; } = true;
 
         /// <summary>
         /// Server certificate for incoming connections (required if mTLS enabled).
@@ -539,6 +562,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         /// <summary>
         /// Allow self-signed certificates (for development/testing only).
+        /// Default: false. Enabling this bypasses CA validation and is a security risk (DIST-05).
+        /// Only set to true for local development or testing environments.
         /// </summary>
         public bool AllowSelfSignedCertificates { get; init; } = false;
 
