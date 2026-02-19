@@ -11,6 +11,8 @@ using DataWarehouse.SDK.Primitives;
 using HierarchyEncryptionPluginBase = DataWarehouse.SDK.Contracts.Hierarchy.EncryptionPluginBase;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateEncryption.CryptoAgility;
+using DataWarehouse.Plugins.UltimateEncryption.Registration;
 
 namespace DataWarehouse.Plugins.UltimateEncryption;
 
@@ -53,6 +55,9 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     // Hardware acceleration flags
     private readonly bool _aesNiAvailable;
     private readonly bool _avx2Available;
+
+    // Crypto-agility engine for PQC migration orchestration
+    private readonly CryptoAgilityEngine _cryptoAgilityEngine;
 
     // Configuration
     private volatile string _defaultStrategyId = "aes-256-gcm";
@@ -158,7 +163,18 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
         // Auto-discover and register strategies
         DiscoverAndRegisterStrategies();
+
+        // Explicitly register all Phase 59 PQC strategies (idempotent with auto-discovery)
+        PqcStrategyRegistration.RegisterAllPqcStrategies(_registry);
+
+        // Instantiate crypto-agility engine for PQC migration orchestration
+        _cryptoAgilityEngine = new CryptoAgilityEngine();
     }
+
+    /// <summary>
+    /// Gets the crypto-agility engine for orchestrating PQC migration.
+    /// </summary>
+    public CryptoAgilityEngine CryptoAgilityEngine => _cryptoAgilityEngine;
 
     /// <inheritdoc/>
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
@@ -913,6 +929,9 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
                 }
             }, ct);
 
+            // Publish PQC strategy capabilities to the bus for cross-plugin discovery
+            await PqcStrategyRegistration.PublishPqcCapabilities(MessageBus, Id);
+
             // Subscribe to cipher recommendation requests
             SubscribeToCipherRecommendationRequests();
         }
@@ -1024,6 +1043,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         {
             if (_disposed) return;
             _disposed = true;
+            _cryptoAgilityEngine.Dispose();
             _usageStats.Clear();
         }
         base.Dispose(disposing);
