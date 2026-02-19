@@ -1069,10 +1069,21 @@ All executing agents MUST follow these rules:
 - [ ] **Phase 54: Feature Gap Closure** (P3) — Close ALL 3,549 feature gaps: 1,155 quick wins (80-99%), 631 medium (50-79%), 1,763 major (<50%) across 17 domains. Target: 0 features below 100%
 - [ ] **Phase 55: Universal Tag System** (P4) — Tag schema registry, polymorphic values (10 types), per-tag ACL, propagation engine, policy engine, CRDT-based versioning, ORSet pruning (P0-12), inverted index at 1B scale, query API with composable expressions. **Plans:** 11 plans in 6 waves
 - [ ] **Phase 56: Data Consciousness** (P4) — AI value/liability scoring, auto-archive, dark data discovery, lineage BFS wiring. **Plans:** 7 plans in 4 waves
-- [ ] **Phase 57: Compliance Passports & Sovereignty Mesh** (P4) — Per-object certification, sovereignty zones, cross-border protocol
+- [ ] **Phase 57: Compliance Passports & Sovereignty Mesh** (P4) — Per-object certification, sovereignty zones, cross-border protocol. **Plans:** 10 plans in 6 waves
+Plans:
+- [ ] 57-01-PLAN.md — SDK types: CompliancePassport, ISovereigntyMesh, PassportEnums
+- [ ] 57-02-PLAN.md — Passport issuance engine and lifecycle management
+- [ ] 57-03-PLAN.md — Declarative sovereignty zones with 31 pre-configured zones
+- [ ] 57-04-PLAN.md — Zone enforcement and pipeline interceptor
+- [ ] 57-05-PLAN.md — Cross-border transfer protocol and agreement manager
+- [ ] 57-06-PLAN.md — Zero-knowledge passport verification and verification API
+- [ ] 57-07-PLAN.md — Sovereignty mesh orchestrator (ISovereigntyMesh impl)
+- [ ] 57-08-PLAN.md — Audit trail and observability
+- [ ] 57-09-PLAN.md — Tag integration and sovereignty-aware routing
+- [ ] 57-10-PLAN.md — Tests and build validation
 - [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API
 - [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine. **Plans:** 10 plans in 5 waves
-- [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution
+- [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
 - [ ] **Phase 62: Carbon-Aware Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting
 - [ ] **Phase 63: Universal Fabric + S3 Server** (P4) — dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring
@@ -1206,3 +1217,30 @@ Wave 6 (Verification — depends on all):
   9. Query API supports composable AND/OR/NOT expressions with pagination
   10. Full solution builds with 0 errors, all tests pass
   11. ~20 files in DataWarehouse.SDK/Tags/
+
+#### Phase 59: Crypto Time-Locks & PQ Encryption
+**Goal**: Implement ransomware vaccination through per-object time-locks and post-quantum algorithms (CRYSTALS-Kyber, Dilithium, SPHINCS+) with a crypto-agility engine for zero-downtime PQC migration.
+**Depends on**: Phase 53 (Security Wiring), existing UltimateEncryption and TamperProof plugins
+**Plans**: 10 plans in 5 waves
+
+Plans:
+- [ ] 59-01-PLAN.md — SDK contracts: ITimeLockProvider, TimeLock types and enums
+- [ ] 59-02-PLAN.md — Software time-lock provider, policy engine, message bus integration
+- [ ] 59-03-PLAN.md — SDK contracts: ICryptoAgilityEngine, PQC algorithm registry
+- [ ] 59-04-PLAN.md — CRYSTALS-Kyber KEM strategies (FIPS 203) + ML-KEM updates
+- [ ] 59-05-PLAN.md — CRYSTALS-Dilithium (FIPS 204) + SPHINCS+ (FIPS 205) signature strategies
+- [ ] 59-06-PLAN.md — X25519+Kyber768 hybrid strategy + existing hybrid updates
+- [ ] 59-07-PLAN.md — Crypto-agility engine, double-encryption service, migration worker
+- [ ] 59-08-PLAN.md — HSM + Cloud time-lock providers, ransomware vaccination service
+- [ ] 59-09-PLAN.md — Plugin registration wiring (PQC strategies + time-lock providers)
+- [ ] 59-10-PLAN.md — Build verification, regression testing, integration fix-up
+
+**Success Criteria**:
+  1. ITimeLockProvider SDK contract with per-object lock/unlock/status and 3 provider implementations (Software, HSM, Cloud)
+  2. TimeLockPolicyEngine with 6 compliance rules (HIPAA, PCI-DSS, GDPR, SOX, Classified, Default)
+  3. 10 new PQC strategies: 3 CRYSTALS-Kyber KEM (512/768/1024), 3 Dilithium signatures (44/65/87), 3 SPHINCS+ signatures (128f/192f/256f), 1 X25519+Kyber768 hybrid
+  4. All PQC strategies have FIPS 203/204/205 references in CipherInfo.Parameters
+  5. ICryptoAgilityEngine with migration plan lifecycle, double-encryption transition, and rollback
+  6. RansomwareVaccinationService orchestrating time-locks + integrity + PQC signatures + blockchain anchoring
+  7. Full solution builds with 0 errors, all tests pass
+  8. Existing ML-KEM, hybrid strategies unchanged in behavior (metadata-only updates)
