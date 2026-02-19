@@ -419,6 +419,25 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
 
         private void AddDiscoveredService(DiscoveredService service)
         {
+            // DIST-06: Enforce network prefix restrictions
+            if (_config.AllowedNetworkPrefixes.Count > 0)
+            {
+                bool prefixAllowed = false;
+                foreach (var prefix in _config.AllowedNetworkPrefixes)
+                {
+                    if (service.Address.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        prefixAllowed = true;
+                        break;
+                    }
+                }
+                if (!prefixAllowed)
+                {
+                    Console.WriteLine($"[MdnsServiceDiscovery] DIST-06: Rejected node {service.NodeId} at {service.Address} -- address not in allowed prefixes");
+                    return;
+                }
+            }
+
             bool isNew = false;
             lock (_servicesLock)
             {
@@ -429,11 +448,25 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                     {
                         var oldest = _discoveredServices.OrderBy(s => s.DiscoveredAt).First();
                         _discoveredServices.Remove(oldest);
+                        Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service lost (evicted) -- nodeId={oldest.NodeId}");
                         OnServiceLost?.Invoke(oldest.NodeId);
                     }
 
-                    _discoveredServices.Add(service);
+                    // DIST-06: Mark as unverified when RequireClusterVerification is enabled
+                    var serviceToAdd = _config.RequireClusterVerification
+                        ? service with { Verified = false }
+                        : service with { Verified = true };
+
+                    if (!_config.RequireClusterVerification)
+                    {
+                        Console.WriteLine($"[MdnsServiceDiscovery] WARNING: RequireClusterVerification is disabled -- node {service.NodeId} auto-trusted");
+                    }
+
+                    _discoveredServices.Add(serviceToAdd);
                     isNew = true;
+
+                    // DIST-06: Audit trail for join events
+                    Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service discovered -- nodeId={service.NodeId}, address={service.Address}:{service.Port}, verified={serviceToAdd.Verified}");
                 }
             }
 
@@ -441,6 +474,26 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             {
                 OnServiceDiscovered?.Invoke(service);
             }
+        }
+
+        /// <summary>
+        /// Marks a discovered service as verified after cluster credential validation (DIST-06).
+        /// </summary>
+        /// <param name="nodeId">The node ID to mark as verified.</param>
+        /// <returns>True if the service was found and marked as verified.</returns>
+        public bool MarkServiceVerified(string nodeId)
+        {
+            lock (_servicesLock)
+            {
+                var index = _discoveredServices.FindIndex(s => s.NodeId == nodeId);
+                if (index >= 0)
+                {
+                    _discoveredServices[index] = _discoveredServices[index] with { Verified = true };
+                    Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service verified -- nodeId={nodeId}");
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -492,6 +545,21 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// Maximum number of discovered services to track (default 100, MEM-03 compliance).
         /// </summary>
         public int MaxDiscoveredServices { get; init; } = 100;
+
+        /// <summary>
+        /// When true, discovered nodes are added to a pending list and must be verified
+        /// (e.g., via TLS handshake or cluster secret) before being auto-joined.
+        /// When false (legacy mode), discovered nodes are immediately eligible for joining
+        /// with a warning logged. (DIST-06 mitigation, default: true)
+        /// </summary>
+        public bool RequireClusterVerification { get; init; } = true;
+
+        /// <summary>
+        /// Allowed network prefixes for mDNS discovery (e.g., "192.168.1.", "10.0.0.").
+        /// When set, only nodes announcing from addresses matching these prefixes are accepted.
+        /// Empty list means all network addresses are accepted. (DIST-06 mitigation)
+        /// </summary>
+        public List<string> AllowedNetworkPrefixes { get; init; } = new();
     }
 
     /// <summary>
@@ -524,5 +592,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// When this service was discovered.
         /// </summary>
         public required DateTimeOffset DiscoveredAt { get; init; }
+
+        /// <summary>
+        /// Whether this discovered service has been verified (cluster credentials validated).
+        /// Services with Verified=false should not be auto-joined when RequireClusterVerification is true (DIST-06).
+        /// </summary>
+        public bool Verified { get; init; }
     }
 }

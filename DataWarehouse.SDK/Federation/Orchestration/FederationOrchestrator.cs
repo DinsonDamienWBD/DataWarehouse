@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Contracts.Distributed;
 using DataWarehouse.SDK.Federation.Topology;
 using DataWarehouse.SDK.Utilities;
 using System;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,6 +44,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     private readonly PeriodicTimer _healthCheckTimer;
     private readonly CancellationTokenSource _cts;
     private readonly FederationOrchestratorConfiguration _config;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTopologyChange = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FederationOrchestrator"/> class.
@@ -168,20 +170,67 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     /// <inheritdoc />
     public async Task SendHeartbeatAsync(NodeHeartbeat heartbeat, CancellationToken ct = default)
     {
+        // DIST-07: Reject heartbeats from unknown federation nodes
         var node = _topology.GetNode(heartbeat.NodeId);
-        if (node != null)
+        if (node == null)
         {
-            var updated = node with
+            // Unknown node -- reject heartbeat to prevent spoofing
+            var rejectMessage = new PluginMessage
             {
-                FreeBytes = heartbeat.FreeBytes,
-                HealthScore = heartbeat.HealthScore,
-                LastHeartbeat = heartbeat.TimestampUtc
+                Type = "federation.heartbeat.rejected",
+                Payload = new Dictionary<string, object>
+                {
+                    ["nodeId"] = heartbeat.NodeId,
+                    ["reason"] = "Unknown federation node -- heartbeat rejected (DIST-07)"
+                }
             };
-
-            _topology.AddOrUpdateNode(updated);
+            await _messageBus.PublishAsync("federation.heartbeat.rejected", rejectMessage, ct).ConfigureAwait(false);
+            return;
         }
 
+        // DIST-07: Validate heartbeat values (basic sanity checks)
+        if (heartbeat.HealthScore < 0.0 || heartbeat.HealthScore > 1.0)
+        {
+            return; // Invalid health score -- reject silently
+        }
+
+        if (heartbeat.FreeBytes < 0 || heartbeat.TotalBytes < 0 || heartbeat.FreeBytes > heartbeat.TotalBytes)
+        {
+            return; // Invalid capacity values -- reject
+        }
+
+        // DIST-07: Validate timestamp is not too far in the future (1 hour max skew)
+        if (heartbeat.TimestampUtc > DateTimeOffset.UtcNow + TimeSpan.FromHours(1))
+        {
+            return; // Suspicious future timestamp -- reject
+        }
+
+        var updated = node with
+        {
+            FreeBytes = heartbeat.FreeBytes,
+            HealthScore = heartbeat.HealthScore,
+            LastHeartbeat = heartbeat.TimestampUtc
+        };
+
+        _topology.AddOrUpdateNode(updated);
+
         await Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task RegisterNodeAsync(NodeRegistration registration, bool skipTopologyRateLimit, CancellationToken ct = default)
+    {
+        // DIST-07: Rate-limit topology change requests
+        if (!skipTopologyRateLimit && _lastTopologyChange.TryGetValue(registration.NodeId, out var lastChange))
+        {
+            if ((DateTimeOffset.UtcNow - lastChange).TotalSeconds < _config.MinTopologyChangeIntervalSeconds)
+            {
+                return; // Rate limited
+            }
+        }
+
+        _lastTopologyChange[registration.NodeId] = DateTimeOffset.UtcNow;
+        await RegisterNodeAsync(registration, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -289,4 +338,11 @@ public sealed record FederationOrchestratorConfiguration
     /// </summary>
     /// <remarks>Default: 30 seconds.</remarks>
     public int HeartbeatTimeoutSeconds { get; init; } = 30;
+
+    /// <summary>
+    /// Minimum interval (in seconds) between topology change requests for the same node.
+    /// Rate-limits rapid registration/unregistration to prevent abuse. (DIST-07 mitigation)
+    /// </summary>
+    /// <remarks>Default: 5 seconds.</remarks>
+    public int MinTopologyChangeIntervalSeconds { get; init; } = 5;
 }

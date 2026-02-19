@@ -20,6 +20,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         private readonly ZeroConfigOptions _options;
         private readonly SemaphoreSlim _joinLock = new(1, 1);
         private readonly HashSet<string> _pendingJoins = new();
+        private readonly HashSet<string> _pendingVerification = new();
         private readonly object _pendingLock = new();
 
         private CancellationTokenSource? _debounceCts;
@@ -150,6 +151,22 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                 {
                     if (ct.IsCancellationRequested) break;
 
+                    // DIST-06: Require cluster verification before auto-joining
+                    if (_options.RequireClusterVerification && !service.Verified)
+                    {
+                        lock (_pendingLock)
+                        {
+                            _pendingVerification.Add(service.NodeId);
+                        }
+                        Console.WriteLine($"[ZeroConfigClusterBootstrap] DIST-06: Node {service.NodeId} pending verification -- not auto-joining unverified node");
+                        continue;
+                    }
+
+                    if (!_options.RequireClusterVerification)
+                    {
+                        Console.WriteLine($"[ZeroConfigClusterBootstrap] WARNING: RequireClusterVerification disabled -- auto-joining unverified node {service.NodeId}");
+                    }
+
                     // Create join request for the discovered node
                     var joinRequest = new ClusterJoinRequest
                     {
@@ -161,7 +178,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                         {
                             { "discovery", "mdns" },
                             { "version", service.Version },
-                            { "discovered_at", service.DiscoveredAt.ToString("O") }
+                            { "discovered_at", service.DiscoveredAt.ToString("O") },
+                            { "verified", service.Verified.ToString() }
                         }
                     };
 
@@ -173,14 +191,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                         attempt++;
                         try
                         {
-                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Attempting to join node {service.NodeId} (attempt {attempt}/{_options.MaxJoinAttempts})");
+                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Audit: Attempting to join node {service.NodeId} (attempt {attempt}/{_options.MaxJoinAttempts})");
                             await _membership.JoinAsync(joinRequest, ct);
                             success = true;
-                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Successfully joined node {service.NodeId}");
+                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Audit: Successfully joined node {service.NodeId}");
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Failed to join node {service.NodeId} (attempt {attempt}): {ex.Message}");
+                            Console.WriteLine($"[ZeroConfigClusterBootstrap] Audit: Failed to join node {service.NodeId} (attempt {attempt}): {ex.Message}");
 
                             if (attempt < _options.MaxJoinAttempts)
                             {
@@ -192,7 +210,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
 
                     if (!success)
                     {
-                        Console.WriteLine($"[ZeroConfigClusterBootstrap] Failed to join node {service.NodeId} after {_options.MaxJoinAttempts} attempts");
+                        Console.WriteLine($"[ZeroConfigClusterBootstrap] Audit: Failed to join node {service.NodeId} after {_options.MaxJoinAttempts} attempts");
                     }
                 }
             }
@@ -248,5 +266,12 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// Initial retry delay in milliseconds (exponential backoff applied, default 5000ms).
         /// </summary>
         public int JoinRetryDelayMs { get; init; } = 5000;
+
+        /// <summary>
+        /// When true, discovered nodes must be verified (cluster credentials validated) before
+        /// auto-joining. When false (legacy mode), all discovered nodes are auto-joined with a
+        /// warning logged. (DIST-06 mitigation, default: true)
+        /// </summary>
+        public bool RequireClusterVerification { get; init; } = true;
     }
 }
