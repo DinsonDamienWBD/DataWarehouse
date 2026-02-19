@@ -4,6 +4,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.Transcoding.Media.Execution;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -66,84 +67,6 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "H.265/HEVC Codec";
-
-    /// <summary>
-    /// Initializes the H.265 codec strategy by validating configuration parameters.
-    /// </summary>
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
-    {
-        // Validate bit depth (8, 10, or 12-bit)
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265BitDepth", out var bitDepthObj) &&
-            bitDepthObj is int bitDepth &&
-            bitDepth != 8 && bitDepth != 10 && bitDepth != 12)
-        {
-            throw new ArgumentException($"Invalid H.265 bit depth: {bitDepth}. Supported: 8, 10, 12.");
-        }
-
-        // Validate profile (Main, Main10, Main12)
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265Profile", out var profileObj) &&
-            profileObj is string profile)
-        {
-            var validProfiles = new[] { "main", "main10", "main12", "main-intra", "main10-intra", "mainstillpicture" };
-            var profileLower = profile.ToLowerInvariant();
-
-            if (!validProfiles.Contains(profileLower))
-            {
-                throw new ArgumentException($"Invalid H.265 profile: {profile}. Supported: Main, Main10, Main12");
-            }
-
-            // Validate profile supports bit depth
-            var bitDepth = SystemConfiguration.CustomSettings.TryGetValue("H265BitDepth", out var bdObj) &&
-                          bdObj is int bd ? bd : 8;
-
-            if (bitDepth == 10 && !profileLower.Contains("10"))
-            {
-                throw new ArgumentException($"10-bit encoding requires Main10 profile, got: {profile}");
-            }
-
-            if (bitDepth == 12 && !profileLower.Contains("12"))
-            {
-                throw new ArgumentException($"12-bit encoding requires Main12 profile, got: {profile}");
-            }
-        }
-
-        // Validate level
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265Level", out var levelObj) &&
-            levelObj is string level)
-        {
-            var validLevels = new[] { "3.0", "3.1", "4.0", "4.1", "5.0", "5.1", "5.2", "6.0", "6.1", "6.2" };
-            if (!validLevels.Contains(level))
-            {
-                throw new ArgumentException($"Invalid H.265 level: {level}");
-            }
-        }
-
-        // Validate max bitrate (1 Mbps to 100 Mbps)
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265MaxBitrate", out var bitrateObj) &&
-            bitrateObj is long bitrate &&
-            (bitrate < 1_000_000 || bitrate > 100_000_000))
-        {
-            throw new ArgumentException($"H.265 max bitrate must be between 1,000,000 and 100,000,000 bps, got: {bitrate}");
-        }
-
-        // Validate keyframe interval (1-300)
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265KeyframeInterval", out var kfObj) &&
-            kfObj is int kf &&
-            (kf < 1 || kf > 300))
-        {
-            throw new ArgumentException($"H.265 keyframe interval must be between 1 and 300, got: {kf}");
-        }
-
-        // Validate B-frame count (0-16)
-        if (SystemConfiguration.CustomSettings.TryGetValue("H265BFrameCount", out var bfObj) &&
-            bfObj is int bf &&
-            (bf < 0 || bf > 16))
-        {
-            throw new ArgumentException($"H.265 B-frame count must be between 0 and 16, got: {bf}");
-        }
-
-        return Task.CompletedTask;
-    }
 
     /// <summary>
     /// Checks H.265 codec availability. Cached for 60 seconds.

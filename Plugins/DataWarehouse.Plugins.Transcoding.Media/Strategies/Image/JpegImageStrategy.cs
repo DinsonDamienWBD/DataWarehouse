@@ -3,6 +3,7 @@ using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
 
@@ -80,48 +81,6 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
     public override string Name => "JPEG Image";
 
     /// <summary>
-    /// Initializes the JPEG image strategy by validating configuration.
-    /// </summary>
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
-    {
-        // Validate max dimensions (1-65536 pixels)
-        if (SystemConfiguration.CustomSettings.TryGetValue("JpegMaxWidth", out var maxWObj) &&
-            maxWObj is int maxW &&
-            (maxW < 1 || maxW > 65536))
-        {
-            throw new ArgumentException($"JPEG max width must be between 1 and 65536, got: {maxW}");
-        }
-
-        if (SystemConfiguration.CustomSettings.TryGetValue("JpegMaxHeight", out var maxHObj) &&
-            maxHObj is int maxH &&
-            (maxH < 1 || maxH > 65536))
-        {
-            throw new ArgumentException($"JPEG max height must be between 1 and 65536, got: {maxH}");
-        }
-
-        // Validate quality (1-100)
-        if (SystemConfiguration.CustomSettings.TryGetValue("JpegQuality", out var qualObj) &&
-            qualObj is int qual &&
-            (qual < MinQuality || qual > MaxQuality))
-        {
-            throw new ArgumentException($"JPEG quality must be between {MinQuality} and {MaxQuality}, got: {qual}");
-        }
-
-        // Validate rotation angle (0, 90, 180, 270, or arbitrary)
-        if (SystemConfiguration.CustomSettings.TryGetValue("JpegRotationAngle", out var rotObj) &&
-            rotObj is int angle)
-        {
-            var validAngles = new[] { 0, 90, 180, 270 };
-            if (angle < 0 || angle > 360)
-            {
-                throw new ArgumentException($"JPEG rotation angle must be between 0 and 360, got: {angle}");
-            }
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
     /// Checks JPEG image strategy health with minimal 1x1 pixel operation.
     /// Cached for 60 seconds.
     /// </summary>
@@ -141,7 +100,9 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
                     Details: new Dictionary<string, object>
                     {
                         ["supported_formats"] = Capabilities.SupportedInputFormats.Count,
-                        ["max_resolution"] = $"{Capabilities.MaxResolution.Width}x{Capabilities.MaxResolution.Height}"
+                        ["max_resolution"] = Capabilities.MaxResolution.HasValue
+                            ? $"{Capabilities.MaxResolution.Value.Width}x{Capabilities.MaxResolution.Value.Height}"
+                            : "unlimited"
                     });
             }
             catch (Exception ex)

@@ -41,28 +41,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZH configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZH:WindowSize", out var windowSizeObj)
-                && windowSizeObj is int windowSize)
-            {
-                if (windowSize < 4096 || windowSize > 32768)
-                    throw new ArgumentException($"LZH window size must be between 4096 and 32768, got {windowSize}");
-                _configuredWindowSize = windowSize;
-            }
-
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZH:MaxMatchLength", out var maxMatchObj)
-                && maxMatchObj is int maxMatch)
-            {
-                if (maxMatch < 3 || maxMatch > 256)
-                    throw new ArgumentException($"LZH max match length must be between 3 and 256, got {maxMatch}");
-                _configuredMaxMatch = maxMatch;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.

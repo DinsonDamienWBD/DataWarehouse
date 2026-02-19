@@ -3,6 +3,7 @@ using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Streaming;
 
@@ -69,64 +70,6 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     public override string Name => "HLS Streaming";
 
     /// <summary>
-    /// Initializes the HLS streaming strategy by validating configuration.
-    /// </summary>
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
-    {
-        // Validate segment duration (1-30 seconds)
-        if (SystemConfiguration.CustomSettings.TryGetValue("HlsSegmentDuration", out var segObj) &&
-            segObj is int segDur &&
-            (segDur < 1 || segDur > 30))
-        {
-            throw new ArgumentException($"HLS segment duration must be between 1 and 30 seconds, got: {segDur}");
-        }
-
-        // Validate bitrate ladder (ascending order, valid values)
-        if (SystemConfiguration.CustomSettings.TryGetValue("HlsBitrateLadder", out var ladderObj) &&
-            ladderObj is int[] bitrates)
-        {
-            if (bitrates.Length == 0)
-            {
-                throw new ArgumentException("HLS bitrate ladder cannot be empty");
-            }
-
-            for (int i = 0; i < bitrates.Length; i++)
-            {
-                if (bitrates[i] < 100_000 || bitrates[i] > 25_000_000)
-                {
-                    throw new ArgumentException($"HLS bitrate ladder entry {i} out of range (100kbps-25Mbps): {bitrates[i]}");
-                }
-
-                if (i > 0 && bitrates[i] <= bitrates[i - 1])
-                {
-                    throw new ArgumentException($"HLS bitrate ladder must be in ascending order, violation at index {i}");
-                }
-            }
-        }
-
-        // Validate max concurrent encodings (1-32)
-        if (SystemConfiguration.CustomSettings.TryGetValue("HlsMaxConcurrentEncodings", out var maxObj) &&
-            maxObj is int max &&
-            (max < 1 || max > 32))
-        {
-            throw new ArgumentException($"HLS max concurrent encodings must be between 1 and 32, got: {max}");
-        }
-
-        // Validate output format
-        if (SystemConfiguration.CustomSettings.TryGetValue("HlsOutputFormat", out var formatObj) &&
-            formatObj is string format)
-        {
-            var validFormats = new[] { "mpegts", "fmp4" };
-            if (!validFormats.Contains(format.ToLowerInvariant()))
-            {
-                throw new ArgumentException($"Invalid HLS output format: {format}. Supported: mpegts, fmp4");
-            }
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
     /// Checks HLS streaming health by validating segment output directory accessibility.
     /// Cached for 60 seconds.
     /// </summary>
@@ -137,8 +80,7 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
             try
             {
                 // Validate segment output directory is writable
-                var segmentDir = SystemConfiguration.CustomSettings.TryGetValue("HlsSegmentDirectory", out var dirObj) &&
-                                dirObj is string dir ? dir : Path.GetTempPath();
+                var segmentDir = Path.GetTempPath();
 
                 var isAccessible = Directory.Exists(segmentDir) || true; // Production: actual directory check
 

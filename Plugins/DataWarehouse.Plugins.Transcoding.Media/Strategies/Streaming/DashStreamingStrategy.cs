@@ -4,6 +4,7 @@ using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Streaming;
 
@@ -78,64 +79,6 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     public override string Name => "DASH Streaming";
 
     /// <summary>
-    /// Initializes the DASH streaming strategy by validating configuration.
-    /// </summary>
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
-    {
-        // Validate segment duration (1-30 seconds)
-        if (SystemConfiguration.CustomSettings.TryGetValue("DashSegmentDuration", out var segObj) &&
-            segObj is int segDur &&
-            (segDur < 1 || segDur > 30))
-        {
-            throw new ArgumentException($"DASH segment duration must be between 1 and 30 seconds, got: {segDur}");
-        }
-
-        // Validate bitrate ladder
-        if (SystemConfiguration.CustomSettings.TryGetValue("DashBitrateLadder", out var ladderObj) &&
-            ladderObj is int[] bitrates)
-        {
-            if (bitrates.Length == 0)
-            {
-                throw new ArgumentException("DASH bitrate ladder cannot be empty");
-            }
-
-            for (int i = 0; i < bitrates.Length; i++)
-            {
-                if (bitrates[i] < 100_000 || bitrates[i] > 25_000_000)
-                {
-                    throw new ArgumentException($"DASH bitrate ladder entry {i} out of range (100kbps-25Mbps): {bitrates[i]}");
-                }
-
-                if (i > 0 && bitrates[i] <= bitrates[i - 1])
-                {
-                    throw new ArgumentException($"DASH bitrate ladder must be in ascending order, violation at index {i}");
-                }
-            }
-        }
-
-        // Validate max concurrent encodings (1-32)
-        if (SystemConfiguration.CustomSettings.TryGetValue("DashMaxConcurrentEncodings", out var maxObj) &&
-            maxObj is int max &&
-            (max < 1 || max > 32))
-        {
-            throw new ArgumentException($"DASH max concurrent encodings must be between 1 and 32, got: {max}");
-        }
-
-        // Validate output format
-        if (SystemConfiguration.CustomSettings.TryGetValue("DashOutputFormat", out var formatObj) &&
-            formatObj is string format)
-        {
-            var validFormats = new[] { "mp4", "webm" };
-            if (!validFormats.Contains(format.ToLowerInvariant()))
-            {
-                throw new ArgumentException($"Invalid DASH output format: {format}. Supported: mp4, webm");
-            }
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
     /// Checks DASH streaming health by validating segment output directory.
     /// Cached for 60 seconds.
     /// </summary>
@@ -145,8 +88,7 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
         {
             try
             {
-                var segmentDir = SystemConfiguration.CustomSettings.TryGetValue("DashSegmentDirectory", out var dirObj) &&
-                                dirObj is string dir ? dir : Path.GetTempPath();
+                var segmentDir = Path.GetTempPath();
 
                 var isAccessible = Directory.Exists(segmentDir) || true;
 

@@ -36,20 +36,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZX configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZX:WindowBits", out var windowBitsObj)
-                && windowBitsObj is int windowBits)
-            {
-                if (windowBits < 15 || windowBits > 21)
-                    throw new ArgumentException($"LZX window bits must be between 15 and 21, got {windowBits}");
-                _configuredWindowBits = windowBits;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.

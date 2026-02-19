@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
 
@@ -66,45 +67,6 @@ internal sealed class PngImageStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "PNG Image";
-
-    /// <summary>
-    /// Initializes the PNG image strategy by validating configuration.
-    /// </summary>
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
-    {
-        // Validate max dimensions (1-2147483647 pixels)
-        if (SystemConfiguration.CustomSettings.TryGetValue("PngMaxWidth", out var maxWObj) &&
-            maxWObj is int maxW &&
-            (maxW < 1 || maxW > int.MaxValue))
-        {
-            throw new ArgumentException($"PNG max width must be between 1 and {int.MaxValue}, got: {maxW}");
-        }
-
-        if (SystemConfiguration.CustomSettings.TryGetValue("PngMaxHeight", out var maxHObj) &&
-            maxHObj is int maxH &&
-            (maxH < 1 || maxH > int.MaxValue))
-        {
-            throw new ArgumentException($"PNG max height must be between 1 and {int.MaxValue}, got: {maxH}");
-        }
-
-        // Validate compression level (0-9)
-        if (SystemConfiguration.CustomSettings.TryGetValue("PngCompressionLevel", out var compObj) &&
-            compObj is int comp &&
-            (comp < 0 || comp > 9))
-        {
-            throw new ArgumentException($"PNG compression level must be between 0 and 9, got: {comp}");
-        }
-
-        // Validate rotation angle
-        if (SystemConfiguration.CustomSettings.TryGetValue("PngRotationAngle", out var rotObj) &&
-            rotObj is int angle &&
-            (angle < 0 || angle > 360))
-        {
-            throw new ArgumentException($"PNG rotation angle must be between 0 and 360, got: {angle}");
-        }
-
-        return Task.CompletedTask;
-    }
 
     /// <summary>
     /// Checks PNG image strategy health with minimal 1x1 pixel operation.
@@ -255,9 +217,9 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         writer.Write(PngSignature);
 
         // IHDR chunk (image header)
-        var (srcWidth, srcHeight) = ParsePngDimensions(sourceBytes);
-        var width = targetWidth > 0 ? targetWidth : srcWidth;
-        var height = targetHeight > 0 ? targetHeight : srcHeight;
+        var (finalSrcWidth, finalSrcHeight) = ParsePngDimensions(sourceBytes);
+        var width = targetWidth > 0 ? targetWidth : finalSrcWidth;
+        var height = targetHeight > 0 ? targetHeight : finalSrcHeight;
         WriteIhdrChunk(writer, width, height, bitDepth: 8, colorType: 6, interlaced);
 
         // sRGB chunk

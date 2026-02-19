@@ -39,28 +39,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZO configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZO:HashTableSize", out var hashTableSizeObj)
-                && hashTableSizeObj is int hashTableSize)
-            {
-                if (hashTableSize < 256 || hashTableSize > 16384 || (hashTableSize & (hashTableSize - 1)) != 0)
-                    throw new ArgumentException($"LZO hash table size must be a power of 2 between 256 and 16384, got {hashTableSize}");
-                _configuredHashTableSize = hashTableSize;
-            }
-
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZO:MaxMatchLength", out var maxMatchLenObj)
-                && maxMatchLenObj is int maxMatchLen)
-            {
-                if (maxMatchLen < 3 || maxMatchLen > 264)
-                    throw new ArgumentException($"LZO max match length must be between 3 and 264, got {maxMatchLen}");
-                _configuredMaxMatchLen = maxMatchLen;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.

@@ -42,28 +42,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZ77 configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ77:WindowSize", out var windowSizeObj)
-                && windowSizeObj is int windowSize)
-            {
-                if (windowSize < 1024 || windowSize > 65536 || (windowSize & (windowSize - 1)) != 0)
-                    throw new ArgumentException($"LZ77 window size must be a power of 2 between 1024 and 65536, got {windowSize}");
-                _configuredWindowSize = windowSize;
-            }
-
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ77:MaxChainLength", out var maxChainLenObj)
-                && maxChainLenObj is int maxChainLen)
-            {
-                if (maxChainLen < 1 || maxChainLen > 4096)
-                    throw new ArgumentException($"LZ77 max chain length must be between 1 and 4096, got {maxChainLen}");
-                _configuredMaxChainLength = maxChainLen;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.

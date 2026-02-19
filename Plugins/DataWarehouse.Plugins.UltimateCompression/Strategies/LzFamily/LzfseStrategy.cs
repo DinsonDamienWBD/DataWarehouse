@@ -42,20 +42,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZFSE configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZFSE:BlockSize", out var blockSizeObj)
-                && blockSizeObj is int blockSize)
-            {
-                if (blockSize < 4096 || blockSize > 1048576)
-                    throw new ArgumentException($"LZFSE block size must be between 4096 and 1048576, got {blockSize}");
-                _configuredBlockSize = blockSize;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.

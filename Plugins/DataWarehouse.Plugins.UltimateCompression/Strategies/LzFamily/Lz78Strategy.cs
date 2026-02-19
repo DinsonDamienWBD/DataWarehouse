@@ -36,20 +36,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
-        {
-            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-
-            // Load and validate LZ78 configuration
-            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ78:DictionarySize", out var dictSizeObj)
-                && dictSizeObj is int dictSize)
-            {
-                if (dictSize < 256 || dictSize > 65536)
-                    throw new ArgumentException($"LZ78 dictionary size must be between 256 and 65536, got {dictSize}");
-                _configuredDictSize = dictSize;
-            }
-        }
 
         /// <summary>
         /// Performs a health check by executing a small compression round-trip test.
