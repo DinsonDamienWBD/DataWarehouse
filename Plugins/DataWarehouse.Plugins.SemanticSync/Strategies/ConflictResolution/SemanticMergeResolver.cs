@@ -12,9 +12,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.SemanticSync;
-
+using SyncConflictResolution = DataWarehouse.SDK.Contracts.SemanticSync.ConflictResolution;
 using ConflictResolutionResult = DataWarehouse.SDK.Contracts.SemanticSync.ConflictResolutionResult;
-using ConflictResolution = DataWarehouse.SDK.Contracts.SemanticSync.ConflictResolution;
 
 namespace DataWarehouse.Plugins.SemanticSync.Strategies.ConflictResolution;
 
@@ -180,7 +179,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
 
         return new ConflictResolutionResult(
             DataId: conflict.DataId,
-            Strategy: ConflictResolution.AutoResolve,
+            Strategy: SyncConflictResolution.AutoResolve,
             ResolvedData: resolvedData,
             SemanticSimilarity: semanticSimilarity,
             Explanation: $"Semantically equivalent: both changes express the same meaning. " +
@@ -202,7 +201,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
         {
             return new ConflictResolutionResult(
                 DataId: conflict.DataId,
-                Strategy: ConflictResolution.MergeSemanticFields,
+                Strategy: SyncConflictResolution.MergeSemanticFields,
                 ResolvedData: mergedJson.Value,
                 SemanticSimilarity: semanticSimilarity,
                 Explanation: "Partial overlap resolved via JSON deep merge: non-conflicting changes " +
@@ -214,7 +213,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
 
         return new ConflictResolutionResult(
             DataId: conflict.DataId,
-            Strategy: ConflictResolution.PreferHigherFidelity,
+            Strategy: SyncConflictResolution.PreferHigherFidelity,
             ResolvedData: resolvedData,
             SemanticSimilarity: semanticSimilarity,
             Explanation: $"Partial overlap in binary data resolved by preferring {preferredSide} version " +
@@ -234,7 +233,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
         {
             return new ConflictResolutionResult(
                 DataId: conflict.DataId,
-                Strategy: ConflictResolution.MergeSemanticFields,
+                Strategy: SyncConflictResolution.MergeSemanticFields,
                 ResolvedData: unionJson.Value,
                 SemanticSimilarity: semanticSimilarity,
                 Explanation: "Schema evolution resolved by taking the union of all fields. " +
@@ -248,7 +247,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
 
         return new ConflictResolutionResult(
             DataId: conflict.DataId,
-            Strategy: ConflictResolution.PreferNewerMeaning,
+            Strategy: SyncConflictResolution.PreferNewerMeaning,
             ResolvedData: resolvedData,
             SemanticSimilarity: semanticSimilarity,
             Explanation: $"Schema evolution in binary data resolved by preferring {preferredSide} version " +
@@ -285,7 +284,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
 
         return new ConflictResolutionResult(
             DataId: conflict.DataId,
-            Strategy: ConflictResolution.PreferHigherFidelity,
+            Strategy: SyncConflictResolution.PreferHigherFidelity,
             ResolvedData: resolvedData,
             SemanticSimilarity: semanticSimilarity,
             Explanation: $"Semantic divergence resolved by preferring {preferredSide} version based on " +
@@ -301,7 +300,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
     {
         return new ConflictResolutionResult(
             DataId: conflict.DataId,
-            Strategy: ConflictResolution.DeferToUser,
+            Strategy: SyncConflictResolution.DeferToUser,
             ResolvedData: conflict.LocalData, // preserve local until user decides
             SemanticSimilarity: semanticSimilarity,
             Explanation: $"Irreconcilable conflict: both local and remote modified critical fields " +
