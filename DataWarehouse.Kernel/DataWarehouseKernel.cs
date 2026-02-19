@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Services;
+using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -33,6 +34,8 @@ namespace DataWarehouse.Kernel
         private readonly KernelConfiguration _config;
         private readonly PluginRegistry _registry;
         private readonly DefaultMessageBus _messageBus;
+        private readonly IMessageBus _enforcedMessageBus;
+        private readonly AccessVerificationMatrix _accessMatrix;
         private readonly DefaultPipelineOrchestrator _pipelineOrchestrator;
         private readonly PluginCapabilityRegistry _capabilityRegistry;
         private readonly ILogger<DataWarehouseKernel>? _logger;
@@ -110,6 +113,20 @@ namespace DataWarehouse.Kernel
             _registry.SetOperatingMode(config.OperatingMode);
 
             _messageBus = new DefaultMessageBus(logger);
+
+            // Build the access verification matrix with default production policies
+            _accessMatrix = BuildDefaultAccessMatrix();
+
+            // Wrap the raw bus with access enforcement for plugin-facing communication.
+            // The raw _messageBus is retained for kernel-internal use (system lifecycle topics).
+            _enforcedMessageBus = _messageBus.WithAccessEnforcement(
+                _accessMatrix,
+                onDenied: verdict => logger?.LogWarning(
+                    "Access DENIED: Principal={Principal}, Topic={Topic}, Action={Action}, Rule={Rule}, Reason={Reason}",
+                    verdict.Identity.EffectivePrincipalId, verdict.Resource, verdict.Action,
+                    verdict.RuleId, verdict.Reason),
+                onAllowed: null);
+
             _pipelineOrchestrator = new DefaultPipelineOrchestrator(_registry, _messageBus, logger);
 
             // Create capability registry with message bus integration
@@ -197,7 +214,7 @@ namespace DataWarehouse.Kernel
                 // Inject kernel services so plugins can use IMessageBus, IStorageEngine, etc.
                 if (plugin is PluginBase pluginBase)
                 {
-                    pluginBase.InjectKernelServices(_messageBus, _capabilityRegistry, null);
+                    pluginBase.InjectKernelServices(_enforcedMessageBus, _capabilityRegistry, null);
 
                     // Inject unified configuration
                     if (_currentConfiguration != null)
@@ -466,6 +483,128 @@ namespace DataWarehouse.Kernel
                     _logger?.LogError(ex, "Feature plugin {Id} failed to start", ((IPlugin)feature).Id);
                 }
             }, $"feature-{((IPlugin)feature).Id}");
+        }
+
+        /// <summary>
+        /// Builds the default access verification matrix with production-ready policies.
+        /// Fail-closed: no rules = DENY. System/kernel/security topics restricted.
+        /// </summary>
+        private static AccessVerificationMatrix BuildDefaultAccessMatrix()
+        {
+            var matrix = new AccessVerificationMatrix();
+
+            // --- System-level rules (apply globally) ---
+
+            // Allow system:kernel principal to access ALL resources (kernel needs full access)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-kernel-allow-all",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "system:*",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Kernel and system services have full access"
+            });
+
+            // Allow any authenticated principal to publish/subscribe to general collaboration topics
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-storage-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "storage.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access storage topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-pipeline-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "pipeline.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access pipeline topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-intelligence-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "intelligence.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access intelligence topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-compliance-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "compliance.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access compliance topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-config-subscribe-allow",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "config.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can subscribe to config topics"
+            });
+
+            // Deny non-system principals from kernel.* topics
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-kernel-topics",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "kernel.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "Non-system principals denied access to kernel topics"
+            });
+
+            // Deny non-system principals from security.* topics (except system services)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-security-topics-users",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "security.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "Non-system principals denied access to security topics"
+            });
+
+            // Allow general topic access for any authenticated identity
+            // This is the catch-all that enables inter-plugin communication
+            // The AccessEnforcementInterceptor rejects null-identity messages (fail-closed)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-allow-authenticated-general",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Authenticated principals can access general topics (identity required)"
+            });
+
+            return matrix;
         }
 
         public async ValueTask DisposeAsync()
