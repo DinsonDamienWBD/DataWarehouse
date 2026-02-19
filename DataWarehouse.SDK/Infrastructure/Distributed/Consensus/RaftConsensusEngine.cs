@@ -42,6 +42,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private Task? _heartbeatTask;
         private int _currentElectionTimeoutMs;
 
+        // Volatile-accessible copies for lock-free heartbeat reads (reduces from 4 to 0-1 lock acquisitions per heartbeat)
+        private long _volatileCurrentTerm;
+        private long _volatileCommitIndex;
+
         // Security: Membership verification and HMAC authentication (DIST-01, DIST-02, AUTH-06)
         private const long MaxTermJump = 100;
         private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTermChangeByNode = new();
@@ -263,6 +267,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 // Transition to Candidate
                 _role = RaftRole.Candidate;
                 _persistent.CurrentTerm++;
+                Volatile.Write(ref _volatileCurrentTerm, _persistent.CurrentTerm);
                 newTerm = _persistent.CurrentTerm;
                 _persistent.VotedFor = selfId;
                 _lastHeartbeatReceived = DateTimeOffset.UtcNow; // Reset timer
@@ -451,35 +456,44 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 long prevLogIndex = nextIndex - 1;
                 long prevLogTerm = 0;
 
-                await _stateLock.WaitAsync(ct).ConfigureAwait(false);
+                // Use volatile reads for currentTerm and commitIndex (lock-free heartbeat path).
+                // This reduces lock acquisitions from 4 to 0-1 per heartbeat cycle.
+                long currentTerm = Volatile.Read(ref _volatileCurrentTerm);
+                long commitIndex = Volatile.Read(ref _volatileCommitIndex);
+
                 List<RaftLogEntry>? entries;
-                long currentTerm;
-                long commitIndex;
-                try
+
+                // Only acquire the lock when we need to access the log (entries to replicate or prevLogTerm lookup)
+                if (prevLogIndex > 0 || nextIndex <= _persistent.Log.Count)
                 {
-                    currentTerm = _persistent.CurrentTerm;
-                    commitIndex = _volatile.CommitIndex;
+                    await _stateLock.WaitAsync(ct).ConfigureAwait(false);
+                    try
+                    {
+                        if (prevLogIndex > 0 && prevLogIndex <= _persistent.Log.Count)
+                        {
+                            prevLogTerm = _persistent.Log[(int)(prevLogIndex - 1)].Term;
+                        }
 
-                    if (prevLogIndex > 0 && prevLogIndex <= _persistent.Log.Count)
-                    {
-                        prevLogTerm = _persistent.Log[(int)(prevLogIndex - 1)].Term;
+                        // Get entries to send
+                        if (nextIndex <= _persistent.Log.Count)
+                        {
+                            int startIdx = (int)(nextIndex - 1);
+                            int count = Math.Min(_persistent.Log.Count - startIdx, 50); // Batch size
+                            entries = _persistent.Log.GetRange(startIdx, count);
+                        }
+                        else
+                        {
+                            entries = null; // Heartbeat only
+                        }
                     }
-
-                    // Get entries to send
-                    if (nextIndex <= _persistent.Log.Count)
+                    finally
                     {
-                        int startIdx = (int)(nextIndex - 1);
-                        int count = Math.Min(_persistent.Log.Count - startIdx, 50); // Batch size
-                        entries = _persistent.Log.GetRange(startIdx, count);
-                    }
-                    else
-                    {
-                        entries = null; // Heartbeat only
+                        _stateLock.Release();
                     }
                 }
-                finally
+                else
                 {
-                    _stateLock.Release();
+                    entries = null; // Pure heartbeat -- no lock needed
                 }
 
                 var appendEntries = new RaftMessage
@@ -574,6 +588,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     if (replicated >= majority)
                     {
                         _volatile.CommitIndex = n;
+                        Volatile.Write(ref _volatileCommitIndex, n);
                         break;
                     }
                 }
@@ -734,6 +749,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 if (request.Term > _persistent.CurrentTerm)
                 {
                     _persistent.CurrentTerm = request.Term;
+                    Volatile.Write(ref _volatileCurrentTerm, request.Term);
                     _persistent.VotedFor = null;
                     _role = RaftRole.Follower;
                 }
@@ -786,6 +802,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 if (request.Term > _persistent.CurrentTerm)
                 {
                     _persistent.CurrentTerm = request.Term;
+                    Volatile.Write(ref _volatileCurrentTerm, request.Term);
                     _persistent.VotedFor = null;
                     _role = RaftRole.Follower;
                 }
@@ -874,7 +891,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 // Advance commit index
                 if (request.LeaderCommit > _volatile.CommitIndex)
                 {
-                    _volatile.CommitIndex = Math.Min(request.LeaderCommit, _persistent.Log.Count);
+                    var newCommitIndex = Math.Min(request.LeaderCommit, _persistent.Log.Count);
+                    _volatile.CommitIndex = newCommitIndex;
+                    Volatile.Write(ref _volatileCommitIndex, newCommitIndex);
                 }
 
                 // Apply committed entries
@@ -940,6 +959,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             try
             {
                 _persistent.CurrentTerm = newTerm;
+                Volatile.Write(ref _volatileCurrentTerm, newTerm);
                 _persistent.VotedFor = null;
                 _role = RaftRole.Follower;
                 _lastHeartbeatReceived = DateTimeOffset.UtcNow;

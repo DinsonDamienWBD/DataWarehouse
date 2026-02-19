@@ -9,6 +9,21 @@ using System.Text.Json.Serialization;
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
     /// <summary>
+    /// Source-generated JSON context for CRDT type serialization.
+    /// Replaces reflection-based JsonSerializer calls with compile-time generated serializers
+    /// for improved performance (no runtime reflection, reduced allocations).
+    /// </summary>
+    [JsonSerializable(typeof(Dictionary<string, long>))]
+    [JsonSerializable(typeof(SdkPNCounter.PNCounterData))]
+    [JsonSerializable(typeof(SdkLWWRegister.LWWRegisterData))]
+    [JsonSerializable(typeof(SdkORSet.ORSetData))]
+    [JsonSerializable(typeof(List<CrdtSyncItem>))]
+    [JsonSerializable(typeof(CrdtSyncItem))]
+    internal partial class CrdtJsonContext : JsonSerializerContext
+    {
+    }
+
+    /// <summary>
     /// Base interface for Conflict-free Replicated Data Types (CRDTs).
     /// All CRDT merge operations are commutative, associative, and idempotent.
     /// Uses non-generic interface for runtime dispatch from CrdtRegistry.
@@ -80,7 +95,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         public byte[] Serialize()
         {
             var dict = _counts.ToDictionary(kv => kv.Key, kv => kv.Value);
-            return JsonSerializer.SerializeToUtf8Bytes(dict);
+            return JsonSerializer.SerializeToUtf8Bytes(dict, CrdtJsonContext.Default.DictionaryStringInt64);
         }
 
         /// <summary>
@@ -88,7 +103,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public static SdkGCounter Deserialize(byte[] data)
         {
-            var dict = JsonSerializer.Deserialize<Dictionary<string, long>>(data)
+            var dict = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.DictionaryStringInt64)
                 ?? new Dictionary<string, long>();
 
             var counter = new SdkGCounter();
@@ -160,7 +175,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 P = _positive.Serialize(),
                 N = _negative.Serialize()
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.PNCounterData);
         }
 
         /// <summary>
@@ -168,7 +183,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public static SdkPNCounter Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize<PNCounterData>(data) ?? new PNCounterData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.PNCounterData) ?? new PNCounterData();
 
             var result = new SdkPNCounter
             {
@@ -179,7 +194,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             return result;
         }
 
-        private sealed class PNCounterData
+        internal sealed class PNCounterData
         {
             [JsonPropertyName("p")]
             public byte[]? P { get; set; }
@@ -269,7 +284,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 Timestamp = Timestamp,
                 NodeId = NodeId
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.LWWRegisterData);
         }
 
         /// <summary>
@@ -277,7 +292,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public static SdkLWWRegister Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize<LWWRegisterData>(data) ?? new LWWRegisterData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.LWWRegisterData) ?? new LWWRegisterData();
 
             return new SdkLWWRegister
             {
@@ -287,7 +302,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             };
         }
 
-        private sealed class LWWRegisterData
+        internal sealed class LWWRegisterData
         {
             [JsonPropertyName("value")]
             public string? Value { get; set; }
@@ -312,6 +327,18 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly ConcurrentDictionary<string, HashSet<string>> _addSet = new();
         private readonly ConcurrentDictionary<string, HashSet<string>> _removeSet = new();
         internal readonly ConcurrentDictionary<string, DateTimeOffset> _removeTimestamps = new();
+
+        /// <summary>
+        /// Tombstone count threshold for automatic GC after Merge(). Default: 10000.
+        /// When tombstone count exceeds this after a merge, time-based GC is triggered automatically.
+        /// </summary>
+        internal int AutoGcThreshold { get; set; } = 10_000;
+
+        /// <summary>
+        /// Time-based GC retention period. Tombstones older than this are collected.
+        /// Default: 24 hours. Used when vector clock-based causal stability is not available.
+        /// </summary>
+        internal TimeSpan GcRetentionPeriod { get; set; } = TimeSpan.FromHours(24);
 
         /// <summary>
         /// Gets the currently-observed elements (those with add tags not in remove set).
@@ -393,6 +420,12 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             MergeTimestamps(_removeTimestamps, result._removeTimestamps);
             MergeTimestamps(otherSet._removeTimestamps, result._removeTimestamps);
 
+            // Auto-GC: trigger time-based tombstone collection when threshold exceeded
+            if (result.TombstoneCount > result.AutoGcThreshold)
+            {
+                result.GarbageCollect();
+            }
+
             return result;
         }
 
@@ -441,6 +474,23 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 }
                 return count;
             }
+        }
+
+        /// <summary>
+        /// Performs garbage collection on the ORSet by removing tombstones older than
+        /// <see cref="GcRetentionPeriod"/> and compacting elements with a single surviving tag.
+        /// Uses time-based GC strategy (safe without vector clock-based causal stability).
+        /// </summary>
+        /// <returns>The number of tags removed during GC.</returns>
+        internal int GarbageCollect()
+        {
+            var result = OrSetPruner.Prune(this, new OrSetPruneOptions
+            {
+                CausalStabilityThreshold = GcRetentionPeriod,
+                MaxTombstonesBeforePrune = 0, // Always prune when explicitly called
+                CompactAddSet = true
+            });
+            return result.TagsRemoved;
         }
 
         /// <summary>
@@ -565,7 +615,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 RemoveSet = SerializeTagSets(_removeSet),
                 RemoveTimestamps = SerializeTimestamps(_removeTimestamps)
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.ORSetData);
         }
 
         /// <summary>
@@ -575,7 +625,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public static SdkORSet Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize<ORSetData>(data) ?? new ORSetData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.ORSetData) ?? new ORSetData();
 
             var result = new SdkORSet();
             DeserializeTagSets(wrapper.AddSet, result._addSet);
@@ -635,7 +685,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
-        private sealed class ORSetData
+        internal sealed class ORSetData
         {
             [JsonPropertyName("addSet")]
             public Dictionary<string, List<string>>? AddSet { get; set; }

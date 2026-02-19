@@ -533,7 +533,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 LastModified = item.LastModified
             }).ToList();
 
-            var data = JsonSerializer.SerializeToUtf8Bytes(syncItems);
+            var data = JsonSerializer.SerializeToUtf8Bytes(syncItems, CrdtJsonContext.Default.ListCrdtSyncItem);
 
             // DIST-04: Append HMAC-SHA256 when cluster secret is configured
             if (_config.ClusterSecret != null && _config.ClusterSecret.Length > 0)
@@ -562,7 +562,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     Buffer.BlockCopy(data, 0, jsonData, 0, jsonData.Length);
                 }
 
-                return JsonSerializer.Deserialize<List<CrdtSyncItem>>(jsonData);
+                return JsonSerializer.Deserialize(jsonData, CrdtJsonContext.Default.ListCrdtSyncItem);
             }
             catch
             {
