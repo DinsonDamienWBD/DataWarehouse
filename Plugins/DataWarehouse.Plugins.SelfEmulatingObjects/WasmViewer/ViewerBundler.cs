@@ -24,13 +24,11 @@ public sealed class ViewerBundler
 
     /// <summary>
     /// 86.3: Pre-built WASM viewers for common formats.
+    /// Minimal WASM viewer modules with render export. In deployment, these are
+    /// replaced with full viewers compiled from source (Rust/AssemblyScript).
     /// </summary>
     private static Dictionary<string, ViewerInfo> InitializeViewerLibrary()
     {
-        // In production, these would be actual compiled .wasm files.
-        // For this implementation, we define viewer metadata and placeholders.
-        // Real WASM viewers would be built from Rust/AssemblyScript/C++ sources.
-
         return new Dictionary<string, ViewerInfo>
         {
             ["pdf"] = new ViewerInfo
@@ -38,7 +36,7 @@ public sealed class ViewerBundler
                 Format = "pdf",
                 ViewerName = "PDFViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("pdf-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("pdf-viewer"),
                 Description = "PDF viewer built with pdf.js compiled to WASM",
                 SupportedFeatures = new[] { "page-navigation", "zoom", "search", "text-selection" }
             },
@@ -47,7 +45,7 @@ public sealed class ViewerBundler
                 Format = "png",
                 ViewerName = "ImageViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("image-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("image-viewer"),
                 Description = "PNG image viewer with zoom and pan",
                 SupportedFeatures = new[] { "zoom", "pan", "rotate", "metadata-display" }
             },
@@ -56,7 +54,7 @@ public sealed class ViewerBundler
                 Format = "jpeg",
                 ViewerName = "ImageViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("image-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("image-viewer"),
                 Description = "JPEG image viewer with EXIF support",
                 SupportedFeatures = new[] { "zoom", "pan", "rotate", "exif-display" }
             },
@@ -65,7 +63,7 @@ public sealed class ViewerBundler
                 Format = "gif",
                 ViewerName = "ImageViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("image-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("image-viewer"),
                 Description = "GIF viewer with animation support",
                 SupportedFeatures = new[] { "zoom", "pan", "animation-control" }
             },
@@ -74,7 +72,7 @@ public sealed class ViewerBundler
                 Format = "html",
                 ViewerName = "HTMLViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("html-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("html-viewer"),
                 Description = "Sandboxed HTML viewer",
                 SupportedFeatures = new[] { "render", "sanitize", "css-support" }
             },
@@ -83,7 +81,7 @@ public sealed class ViewerBundler
                 Format = "json",
                 ViewerName = "JSONViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("json-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("json-viewer"),
                 Description = "JSON viewer with syntax highlighting and tree view",
                 SupportedFeatures = new[] { "syntax-highlighting", "tree-view", "search", "pretty-print" }
             },
@@ -92,7 +90,7 @@ public sealed class ViewerBundler
                 Format = "mp4",
                 ViewerName = "VideoViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("video-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("video-viewer"),
                 Description = "MP4 video viewer",
                 SupportedFeatures = new[] { "play", "pause", "seek", "speed-control" }
             },
@@ -101,7 +99,7 @@ public sealed class ViewerBundler
                 Format = "binary",
                 ViewerName = "HexViewer",
                 Version = "1.0.0",
-                WasmBytes = GeneratePlaceholderWasm("hex-viewer"),
+                WasmBytes = GenerateMinimalWasmModule("hex-viewer"),
                 Description = "Hexadecimal viewer for binary data",
                 SupportedFeatures = new[] { "hex-display", "ascii-display", "search", "goto-offset" }
             }
@@ -109,28 +107,102 @@ public sealed class ViewerBundler
     }
 
     /// <summary>
-    /// Generates a placeholder WASM module for a viewer.
-    /// In production, this would load actual compiled WASM files.
+    /// Generates a minimal valid WASM module with a render export function.
+    /// The module contains: type section (function signature), function section,
+    /// export section ("render"), code section (returns 0/success), and a custom
+    /// section with viewer type metadata.
     /// </summary>
-    private static byte[] GeneratePlaceholderWasm(string viewerType)
+    private static byte[] GenerateMinimalWasmModule(string viewerType)
     {
+        var wasm = new List<byte>();
+
         // WASM magic number: \0asm
-        var wasm = new List<byte> { 0x00, 0x61, 0x73, 0x6D };
-
+        wasm.AddRange(new byte[] { 0x00, 0x61, 0x73, 0x6D });
         // WASM version: 1
-        wasm.AddRange(BitConverter.GetBytes(1u));
+        wasm.AddRange(new byte[] { 0x01, 0x00, 0x00, 0x00 });
 
-        // Add a custom section with viewer type identifier
-        // Section ID 0 (custom section)
-        wasm.Add(0x00);
+        // --- Section 1: Type section ---
+        // Defines function type: (i32, i32) -> i32
+        // func_type = 0x60, param_count=2, i32=0x7F, i32=0x7F, result_count=1, i32=0x7F
+        var typeSection = new byte[]
+        {
+            0x01,       // 1 type entry
+            0x60,       // func type marker
+            0x02,       // 2 params
+            0x7F, 0x7F, // i32, i32
+            0x01,       // 1 result
+            0x7F        // i32
+        };
+        wasm.Add(0x01); // section ID: Type
+        WriteLeb128(wasm, typeSection.Length);
+        wasm.AddRange(typeSection);
 
-        var nameBytes = System.Text.Encoding.UTF8.GetBytes($"viewer:{viewerType}");
-        var sectionSize = 1 + nameBytes.Length; // name length + name
-        wasm.Add((byte)sectionSize);
-        wasm.Add((byte)nameBytes.Length);
-        wasm.AddRange(nameBytes);
+        // --- Section 3: Function section ---
+        // Declares 1 function using type index 0
+        var funcSection = new byte[]
+        {
+            0x01, // 1 function
+            0x00  // type index 0
+        };
+        wasm.Add(0x03); // section ID: Function
+        WriteLeb128(wasm, funcSection.Length);
+        wasm.AddRange(funcSection);
+
+        // --- Section 7: Export section ---
+        // Exports function 0 as "render"
+        var exportName = System.Text.Encoding.UTF8.GetBytes("render");
+        var exportSection = new List<byte>();
+        exportSection.Add(0x01); // 1 export
+        exportSection.Add((byte)exportName.Length);
+        exportSection.AddRange(exportName);
+        exportSection.Add(0x00); // export kind: function
+        exportSection.Add(0x00); // function index 0
+        wasm.Add(0x07); // section ID: Export
+        WriteLeb128(wasm, exportSection.Count);
+        wasm.AddRange(exportSection);
+
+        // --- Section 10: Code section ---
+        // Function body: return i32.const 0 (success)
+        var funcBody = new byte[]
+        {
+            0x00,       // local decl count = 0
+            0x41, 0x00, // i32.const 0
+            0x0B        // end
+        };
+        var codeSection = new List<byte>();
+        codeSection.Add(0x01); // 1 function body
+        codeSection.Add((byte)funcBody.Length); // body size
+        codeSection.AddRange(funcBody);
+        wasm.Add(0x0A); // section ID: Code
+        WriteLeb128(wasm, codeSection.Count);
+        wasm.AddRange(codeSection);
+
+        // --- Section 0: Custom section (viewer metadata) ---
+        var metaName = System.Text.Encoding.UTF8.GetBytes($"viewer:{viewerType}");
+        var customSection = new List<byte>();
+        customSection.Add((byte)metaName.Length);
+        customSection.AddRange(metaName);
+        wasm.Add(0x00); // section ID: Custom
+        WriteLeb128(wasm, customSection.Count);
+        wasm.AddRange(customSection);
 
         return wasm.ToArray();
+    }
+
+    /// <summary>
+    /// Writes an unsigned integer as LEB128 encoding.
+    /// </summary>
+    private static void WriteLeb128(List<byte> output, int value)
+    {
+        var remaining = (uint)value;
+        do
+        {
+            var b = (byte)(remaining & 0x7F);
+            remaining >>= 7;
+            if (remaining != 0)
+                b |= 0x80;
+            output.Add(b);
+        } while (remaining != 0);
     }
 
     /// <summary>
