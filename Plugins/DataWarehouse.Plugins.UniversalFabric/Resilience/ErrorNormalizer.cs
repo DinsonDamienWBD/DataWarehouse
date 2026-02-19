@@ -38,12 +38,12 @@ public class ErrorNormalizer
     {
         return ex switch
         {
-            // Already normalized -- pass through
-            StorageFabricException => ex,
+            // Already normalized -- pass through (specific subtypes first, then base)
             BackendNotFoundException => ex,
             BackendUnavailableException => ex,
             PlacementFailedException => ex,
             MigrationFailedException => ex,
+            StorageFabricException => ex,
 
             // Network/connectivity -- backend is unreachable
             HttpRequestException httpEx => new BackendUnavailableException(
@@ -68,11 +68,11 @@ public class ErrorNormalizer
             // I/O errors -- disk full is a fabric error, others are unavailable
             IOException ioEx when ioEx.Message.Contains("disk full", StringComparison.OrdinalIgnoreCase) =>
                 new StorageFabricException(
-                    $"Backend '{backendId}' disk full during {operation}", ex),
+                    $"Backend '{backendId}' disk full during {operation}", ioEx),
 
-            IOException => new BackendUnavailableException(
-                $"Backend '{backendId}' I/O error during {operation}: {ex.Message}",
-                backendId, ex),
+            IOException ioEx => new BackendUnavailableException(
+                $"Backend '{backendId}' I/O error during {operation}: {ioEx.Message}",
+                backendId, ioEx),
 
             // Auth errors -- access denied is a fabric-level error
             UnauthorizedAccessException => new StorageFabricException(
