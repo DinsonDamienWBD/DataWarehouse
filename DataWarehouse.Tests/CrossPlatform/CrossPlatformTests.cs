@@ -24,22 +24,11 @@ public class CrossPlatformTests
         // Assert
         probe.Should().NotBeNull();
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            probe.Should().BeOfType<WindowsHardwareProbe>();
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            probe.Should().BeOfType<LinuxHardwareProbe>();
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            probe.Should().BeOfType<MacOsHardwareProbe>();
-        }
-        else
-        {
-            probe.Should().BeOfType<NullHardwareProbe>();
-        }
+        // HardwareProbeFactory now wraps platform probes in ValidatingHardwareProbe (DIST-09 security fix)
+        // The decorator validates and sanitizes hardware probe results
+        probe.Should().BeAssignableTo<IHardwareProbe>();
+        probe.GetType().Name.Should().Be("ValidatingHardwareProbe",
+            "HardwareProbeFactory wraps platform probes in a validating decorator for DIST-09");
 
         probe.Dispose();
     }
