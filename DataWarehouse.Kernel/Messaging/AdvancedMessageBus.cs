@@ -181,6 +181,9 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly Timer _cleanupTimer;
         private readonly object _statsLock = new();
 
+        // BUS-03: Per-publisher rate limiting to prevent flooding DoS
+        private readonly ConcurrentDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new();
+
         // Thread-safe subscription storage - uses ThreadSafeSubscriptionList for atomic operations
         private readonly ConcurrentDictionary<string, ThreadSafeSubscriptionList<Func<PluginMessage, Task>>> _subscriptions = new();
 
@@ -202,6 +205,21 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
+            // BUS-03: Per-publisher rate limiting
+            var publisherId = message.Identity?.ActorId ?? message.Source ?? "anonymous";
+            var limiter = _rateLimiters.GetOrAdd(publisherId,
+                _ => new SlidingWindowRateLimiter(_config.RateLimitPerSecond, TimeSpan.FromSeconds(1)));
+
+            if (!limiter.TryAcquire())
+            {
+                _context.LogWarning($"[MessageBus] Rate limit exceeded for publisher '{publisherId}' on topic '{topic}'");
+                RecordStatistic(s => s.TotalFailed++);
+                throw new InvalidOperationException($"Rate limit exceeded for publisher '{publisherId}'. Max {_config.RateLimitPerSecond} messages/second.");
+            }
+
             if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
                 // Get a snapshot of handlers for thread-safe iteration
@@ -235,6 +253,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
             if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
                 var handler = handlerList.FirstOrDefault();
@@ -257,6 +278,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
             // GetOrAdd with ThreadSafeSubscriptionList is atomic
             var handlerList = _subscriptions.GetOrAdd(topic, _ => new ThreadSafeSubscriptionList<Func<PluginMessage, Task>>());
             handlerList.Add(handler);
@@ -941,6 +965,12 @@ namespace DataWarehouse.Kernel.Messaging
         public TimeSpan MessageRetention { get; set; } = TimeSpan.FromHours(24);
         public int MaxPendingMessages { get; set; } = 100000;
         public int MaxMessageGroups { get; set; } = 1000;
+
+        /// <summary>
+        /// Maximum messages per second per publisher (BUS-03: rate limiting).
+        /// Default: 1000 messages/second.
+        /// </summary>
+        public int RateLimitPerSecond { get; set; } = 1000;
     }
 
     /// <summary>
