@@ -1087,9 +1087,9 @@ Plans:
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
 - [ ] **Phase 62: Carbon-Aware Lifecycle Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting. **Plans:** 6 plans in 4 waves
 - [ ] **Phase 63: Universal Fabric + S3 Server** (P4) � dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring. **Plans:** 15 plans in 5 waves
-- [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, verify cross-feature interactions
+- [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, cross-moonshot orchestration pipeline, unified dashboard, health probes, configuration hierarchy. **Plans:** 7 plans in 4 waves
 - [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
-- [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing
+- [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full audit, benchmarks, competitive re-analysis, first certification target: CERTIFIED (zero conditions), second certification target: Find valid reasons for 'NOT' to certify
 
 ### Phase Details
@@ -1349,3 +1349,37 @@ Plans:
   7. AWSSDK.S3, Azure.Storage.Blobs, Google.Cloud.Storage.V1 are real NuGet deps
   8. Python, Go, Rust, Java clients connect and operate via S3 protocol
   9. Full solution builds with 0 errors
+
+#### Phase 66: Cross-Feature Orchestration & Integration
+**Goal**: Wire everything together — verify all 16 phases (52-65) integrate correctly. End-to-end flows work. Cross-feature orchestration pipeline complete. No orphaned wiring.
+**Depends on**: Phases 52-65 all complete
+**Plans**: 8 plans, 4 waves
+
+Wave 1 (Independent verification):
+- [ ] 66-01-PLAN.md — Build health and plugin isolation verification
+- [ ] 66-02-PLAN.md — Message bus topology audit (all topics connected, no dead letters)
+- [ ] 66-03-PLAN.md — Strategy registry completeness audit
+
+Wave 2 (Depends on Wave 1):
+- [ ] 66-04-PLAN.md — Configuration hierarchy verification (Instance->Tenant->User for all v5.0 features)
+- [ ] 66-05-PLAN.md — Security regression verification (50 pentest findings still resolved)
+
+Wave 3 (Depends on Wave 2):
+- [ ] 66-06-PLAN.md — End-to-end data lifecycle integration tests (ingest->classify->tag->score->passport->place->replicate->sync->monitor->archive)
+- [ ] 66-07-PLAN.md — Cross-feature orchestration tests (Tags->Passports, Carbon->Placement, Sovereignty->Sync, Chaos->TimeLocks)
+
+Wave 4 (Final gate):
+- [ ] 66-08-PLAN.md — Performance regression check and final integration report
+
+**Success Criteria**:
+  1. Full solution builds with 0 errors, 0 warnings across all 70+ projects
+  2. Zero cross-plugin references (SDK-only dependencies)
+  3. All message bus topics have matching publishers and subscribers (no dead letters)
+  4. All ~2,500+ strategies registered and discoverable
+  5. All v5.0 features configurable via Instance->Tenant->User hierarchy
+  6. All 50 pentest findings still resolved after v5.0 feature additions
+  7. End-to-end data lifecycle pipeline works (10 stages, no dead ends)
+  8. Cross-feature interactions verified (Tags->Passports, Carbon->Placement, etc.)
+  9. No performance regressions from v4.5 baseline
+  10. 20+ integration tests passing
+  11. INTEGRATION-FINAL-REPORT.md recommends PROCEED to Phase 67
