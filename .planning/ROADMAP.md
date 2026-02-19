@@ -1081,7 +1081,7 @@ Plans:
 - [ ] 57-08-PLAN.md — Audit trail and observability
 - [ ] 57-09-PLAN.md — Tag integration and sovereignty-aware routing
 - [ ] 57-10-PLAN.md — Tests and build validation
-- [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API
+- [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API. **Plans:** 12 plans in 4 waves
 - [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine. **Plans:** 10 plans in 5 waves
 - [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
