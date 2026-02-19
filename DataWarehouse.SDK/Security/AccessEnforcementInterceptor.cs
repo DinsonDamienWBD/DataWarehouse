@@ -80,13 +80,26 @@ public sealed class AccessEnforcementInterceptor : IMessageBus
     }
 
     public IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
-        => _inner.Subscribe(topic, handler);
+        => _inner.Subscribe(topic, WrapHandlerWithEnforcement(topic, handler));
 
     public IDisposable Subscribe(string topic, Func<PluginMessage, Task<MessageResponse>> handler)
-        => _inner.Subscribe(topic, handler);
+        => _inner.Subscribe(topic, WrapResponseHandlerWithEnforcement(topic, handler));
 
     public IDisposable SubscribePattern(string pattern, Func<PluginMessage, Task> handler)
-        => _inner.SubscribePattern(pattern, handler);
+    {
+        // BUS-05: Restrict overly broad wildcard patterns.
+        // Patterns like "*" or "#" match everything — only permitted for system/kernel identities.
+        // Plugins should subscribe to specific topic prefixes, not global wildcards.
+        if (IsRestrictedPattern(pattern))
+        {
+            throw new UnauthorizedAccessException(
+                $"Access denied: Wildcard subscription pattern '{pattern}' is too broad. " +
+                "Subscribe to specific topic prefixes (e.g., 'storage.*', 'pipeline.*') instead. " +
+                "Global wildcard subscriptions require kernel-level access.");
+        }
+
+        return _inner.SubscribePattern(pattern, WrapHandlerWithEnforcement(pattern, handler));
+    }
 
     public void Unsubscribe(string topic) => _inner.Unsubscribe(topic);
 
@@ -128,6 +141,83 @@ public sealed class AccessEnforcementInterceptor : IMessageBus
         }
 
         _onAllowed?.Invoke(verdict);
+    }
+
+    /// <summary>
+    /// Wraps a subscription handler to enforce access on each delivered message.
+    /// This ensures that even if a subscription was established, each message
+    /// is still checked for proper identity and authorization.
+    /// </summary>
+    private Func<PluginMessage, Task> WrapHandlerWithEnforcement(string topic, Func<PluginMessage, Task> handler)
+    {
+        return async message =>
+        {
+            // Bypass topics pass through
+            if (_bypassTopics.Contains(topic))
+            {
+                await handler(message);
+                return;
+            }
+
+            // Messages delivered to subscribers must still have valid identity
+            if (message.Identity is not null)
+            {
+                var verdict = _matrix.Evaluate(message.Identity, topic, message.Type);
+                if (!verdict.Allowed)
+                {
+                    _onDenied?.Invoke(verdict);
+                    return; // Silently drop — don't throw in subscriber context
+                }
+            }
+            // Note: null-identity messages in subscription delivery are allowed through
+            // because the PUBLISH side already enforced identity. Subscription-side
+            // enforcement is defense-in-depth for messages that bypass the interceptor
+            // (e.g., kernel-internal messages on bypass topics).
+
+            await handler(message);
+        };
+    }
+
+    /// <summary>
+    /// Wraps a request/response subscription handler with enforcement.
+    /// </summary>
+    private Func<PluginMessage, Task<MessageResponse>> WrapResponseHandlerWithEnforcement(
+        string topic, Func<PluginMessage, Task<MessageResponse>> handler)
+    {
+        return async message =>
+        {
+            if (_bypassTopics.Contains(topic))
+                return await handler(message);
+
+            if (message.Identity is not null)
+            {
+                var verdict = _matrix.Evaluate(message.Identity, topic, message.Type);
+                if (!verdict.Allowed)
+                {
+                    _onDenied?.Invoke(verdict);
+                    return new MessageResponse
+                    {
+                        Success = false,
+                        ErrorMessage = $"Access denied: {verdict.Reason}",
+                        ErrorCode = "ACCESS_DENIED"
+                    };
+                }
+            }
+
+            return await handler(message);
+        };
+    }
+
+    /// <summary>
+    /// Determines if a subscription pattern is too broad (BUS-05 fix).
+    /// Patterns that match all topics are restricted to prevent information leakage.
+    /// </summary>
+    private static bool IsRestrictedPattern(string pattern)
+    {
+        // Block global wildcards: "*", "#", "**", or empty
+        if (string.IsNullOrWhiteSpace(pattern)) return true;
+        var trimmed = pattern.Trim();
+        return trimmed is "*" or "#" or "**" or ">" or "*.*";
     }
 }
 

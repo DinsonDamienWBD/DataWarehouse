@@ -564,20 +564,20 @@ namespace DataWarehouse.Kernel
                 Description = "Any authenticated principal can subscribe to config topics"
             });
 
-            // Deny non-system principals from kernel.* topics
+            // Deny non-system principals from kernel.* topics (users and AI agents)
             matrix.AddRule(new HierarchyAccessRule
             {
-                RuleId = "sys-deny-kernel-topics",
+                RuleId = "sys-deny-kernel-topics-users",
                 Level = HierarchyLevel.System,
                 ScopeId = "system",
                 PrincipalPattern = "user:*",
                 Resource = "kernel.*",
                 Action = "*",
                 Decision = LevelDecision.Deny,
-                Description = "Non-system principals denied access to kernel topics"
+                Description = "User principals denied access to kernel topics"
             });
 
-            // Deny non-system principals from security.* topics (except system services)
+            // Deny non-system principals from security.* topics
             matrix.AddRule(new HierarchyAccessRule
             {
                 RuleId = "sys-deny-security-topics-users",
@@ -587,12 +587,50 @@ namespace DataWarehouse.Kernel
                 Resource = "security.*",
                 Action = "*",
                 Decision = LevelDecision.Deny,
-                Description = "Non-system principals denied access to security topics"
+                Description = "User principals denied access to security topics"
+            });
+
+            // Deny non-system principals from system.* topics
+            // (defense-in-depth — interceptor also has bypass list for kernel-internal system topics)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-system-topics-users",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "system.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "User principals denied access to system topics"
+            });
+
+            // --- Tenant-level rules for tenant isolation (AUTH-09) ---
+            // Tenant isolation is enforced by the hierarchy: when a message carries
+            // a CommandIdentity with TenantId, the matrix evaluates at the Tenant level
+            // using that TenantId as the scopeId. Since we use default-deny and only
+            // system-level allows exist (which match scopeId="system"), tenant-scoped
+            // operations will require explicit tenant-level rules to be provisioned
+            // when tenants are created. This prevents cross-tenant access by default.
+
+            // Allow tenant-scoped principals to access resources within their own tenant
+            // The wildcard scopeId="*" means this rule applies to any tenant,
+            // but the matrix evaluates with the identity's TenantId as scopeId,
+            // so only messages from that tenant's principals will match.
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "tenant-allow-own-resources",
+                Level = HierarchyLevel.Tenant,
+                ScopeId = "*",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Tenant principals can access resources within their own tenant scope (AUTH-09)"
             });
 
             // Allow general topic access for any authenticated identity
-            // This is the catch-all that enables inter-plugin communication
-            // The AccessEnforcementInterceptor rejects null-identity messages (fail-closed)
+            // This is the catch-all that enables inter-plugin communication.
+            // The AccessEnforcementInterceptor rejects null-identity messages (fail-closed).
+            // Deny rules above take absolute precedence over this allow.
             matrix.AddRule(new HierarchyAccessRule
             {
                 RuleId = "sys-allow-authenticated-general",
