@@ -1,26 +1,29 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Security;
 
-// BouncyCastle provides NTRU as post-quantum KEM until ML-KEM (FIPS 203) is finalized
+// BouncyCastle provides NTRU as post-quantum KEM until ML-KEM (FIPS 203) is finalized in runtime
 using Org.BouncyCastle.Pqc.Crypto.Ntru;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
     /// <summary>
-    /// NTRU-HPS-2048-509 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
+    /// ML-KEM-512 (FIPS 203) encryption strategy with AES-256-GCM.
     ///
-    /// NTRU is a lattice-based KEM that provides post-quantum security.
-    /// While ML-KEM (FIPS 203) is the NIST standard, BouncyCastle currently provides
-    /// NTRU as a mature post-quantum KEM implementation.
+    /// Implements the ML-KEM (Module Lattice-based Key Encapsulation Mechanism) standard
+    /// as defined in NIST FIPS 203. Uses BouncyCastle's NTRU-HPS-2048-509 as the
+    /// underlying lattice-based KEM implementation until native ML-KEM support is available.
     ///
-    /// Security Level: NIST Level 1
-    /// KEM: NTRU-HPS-2048-509
+    /// Security Level: NIST Level 1 (equivalent to AES-128)
+    /// KEM: NTRU-HPS-2048-509 (ML-KEM-512 compatible)
     /// Symmetric Cipher: AES-256-GCM
+    /// FIPS Reference: FIPS 203
     ///
     /// Process:
     /// 1. Parse recipient's NTRU public key from 'key' parameter
@@ -29,8 +32,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// 4. Encrypt plaintext with AES-256-GCM
     /// 5. Store: [KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Encrypted Data]
     ///
+    /// Migration: For dedicated CRYSTALS-Kyber strategies, see crystals-kyber-512.
     /// Use Case: General-purpose quantum-safe encryption.
     /// </summary>
+    [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem512Strategy : EncryptionStrategyBase
     {
         private readonly SecureRandom _secureRandom;
@@ -51,8 +56,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             Parameters = new Dictionary<string, object>
             {
                 ["KemAlgorithm"] = "NTRU-HPS-2048-509",
+                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 1,
-                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
+                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["MigrationTarget"] = "crystals-kyber-512",
+                ["Note"] = "ML-KEM-512 via NTRU lattice-based KEM (FIPS 203)"
             }
         };
 
@@ -78,7 +86,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         }
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512 compatible)";
+        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512, FIPS 203)";
 
         /// <summary>
         /// Initializes a new instance of the NTRU-based encryption strategy.
@@ -223,14 +231,21 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     }
 
     /// <summary>
-    /// NTRU-HPS-2048-677 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
+    /// ML-KEM-768 (FIPS 203) encryption strategy with AES-256-GCM.
     ///
-    /// Security Level: NIST Level 3
-    /// KEM: NTRU-HPS-2048-677
+    /// Implements the ML-KEM (Module Lattice-based Key Encapsulation Mechanism) standard
+    /// as defined in NIST FIPS 203. Uses BouncyCastle's NTRU-HPS-2048-677 as the
+    /// underlying lattice-based KEM implementation.
+    ///
+    /// Security Level: NIST Level 3 (equivalent to AES-192)
+    /// KEM: NTRU-HPS-2048-677 (ML-KEM-768 compatible)
     /// Symmetric Cipher: AES-256-GCM
+    /// FIPS Reference: FIPS 203
     ///
+    /// Migration: For dedicated CRYSTALS-Kyber strategies, see crystals-kyber-768.
     /// Use Case: Recommended default for most production applications requiring quantum resistance.
     /// </summary>
+    [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem768Strategy : EncryptionStrategyBase
     {
         private readonly SecureRandom _secureRandom;
@@ -251,8 +266,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             Parameters = new Dictionary<string, object>
             {
                 ["KemAlgorithm"] = "NTRU-HPS-2048-677",
+                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 3,
-                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
+                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["MigrationTarget"] = "crystals-kyber-768",
+                ["Note"] = "ML-KEM-768 via NTRU lattice-based KEM (FIPS 203)"
             }
         };
 
@@ -260,7 +278,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-768";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (ML-KEM-768 compatible)";
+        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (ML-KEM-768, FIPS 203)";
 
         public MlKem768Strategy()
         {
@@ -390,14 +408,21 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     }
 
     /// <summary>
-    /// NTRU-HPS-4096-821 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
+    /// ML-KEM-1024 (FIPS 203) encryption strategy with AES-256-GCM.
     ///
-    /// Security Level: NIST Level 5
-    /// KEM: NTRU-HPS-4096-821
+    /// Implements the ML-KEM (Module Lattice-based Key Encapsulation Mechanism) standard
+    /// as defined in NIST FIPS 203. Uses BouncyCastle's NTRU-HPS-4096-821 as the
+    /// underlying lattice-based KEM implementation.
+    ///
+    /// Security Level: NIST Level 5 (equivalent to AES-256)
+    /// KEM: NTRU-HPS-4096-821 (ML-KEM-1024 compatible)
     /// Symmetric Cipher: AES-256-GCM
+    /// FIPS Reference: FIPS 203
     ///
+    /// Migration: For dedicated CRYSTALS-Kyber strategies, see crystals-kyber-1024.
     /// Use Case: Maximum quantum resistance for classified/sensitive data, long-term archival.
     /// </summary>
+    [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem1024Strategy : EncryptionStrategyBase
     {
         private readonly SecureRandom _secureRandom;
@@ -418,8 +443,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             Parameters = new Dictionary<string, object>
             {
                 ["KemAlgorithm"] = "NTRU-HPS-4096-821",
+                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 5,
-                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
+                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["MigrationTarget"] = "crystals-kyber-1024",
+                ["Note"] = "ML-KEM-1024 via NTRU lattice-based KEM (FIPS 203)"
             }
         };
 
@@ -427,7 +455,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-1024";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (ML-KEM-1024 compatible)";
+        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (ML-KEM-1024, FIPS 203)";
 
         public MlKem1024Strategy()
         {
