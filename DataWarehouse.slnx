@@ -81,6 +81,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateSustainability/DataWarehouse.Plugins.UltimateSustainability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateWorkflow/DataWarehouse.Plugins.UltimateWorkflow.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalDashboards/DataWarehouse.Plugins.UniversalDashboards.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UniversalFabric/DataWarehouse.Plugins.UniversalFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
