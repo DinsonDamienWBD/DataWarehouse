@@ -113,6 +113,68 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     /// </summary>
     private void MapEndpoints(WebApplication app)
     {
+        // Security headers middleware
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+            context.Response.Headers.Append("X-Frame-Options", "DENY");
+            context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+            context.Response.Headers.Append("Cache-Control", "no-store");
+
+            await next();
+        });
+
+        // CORS middleware - restrict to configured origins
+        app.Use(async (context, next) =>
+        {
+            var origin = context.Request.Headers.Origin.ToString();
+            if (!string.IsNullOrEmpty(origin))
+            {
+                // Only allow localhost origins for the Launcher API
+                if (origin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                    origin.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase) ||
+                    origin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                    origin.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Response.Headers.Append("Access-Control-Allow-Origin", origin);
+                    context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                    context.Response.Headers.Append("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                }
+                // Non-matching origins get no CORS headers (browser will block)
+            }
+
+            if (context.Request.Method == "OPTIONS")
+            {
+                context.Response.StatusCode = 204;
+                return;
+            }
+
+            await next();
+        });
+
+        // HTTPS enforcement for non-development (via X-Forwarded-Proto from reverse proxy)
+        app.Use(async (context, next) =>
+        {
+            var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+            var isLocalRequest = context.Connection.RemoteIpAddress?.ToString() is "127.0.0.1" or "::1";
+
+            // In production (behind reverse proxy), require HTTPS
+            if (!string.IsNullOrEmpty(forwardedProto) &&
+                !forwardedProto.Equals("https", StringComparison.OrdinalIgnoreCase) &&
+                !isLocalRequest)
+            {
+                context.Response.StatusCode = 403;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = "HTTPS required",
+                    message = "This API requires HTTPS. Use a reverse proxy (nginx/Kestrel) to terminate TLS."
+                });
+                return;
+            }
+
+            await next();
+        });
+
         // Rate limiting middleware - MUST come before API key check
         app.Use(async (context, next) =>
         {

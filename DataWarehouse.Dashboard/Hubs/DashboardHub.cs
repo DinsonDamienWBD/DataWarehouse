@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.SDK.Infrastructure;
@@ -6,7 +7,9 @@ namespace DataWarehouse.Dashboard.Hubs;
 
 /// <summary>
 /// SignalR hub for real-time dashboard updates.
+/// Requires authentication for all connections (AUTH-04).
 /// </summary>
+[Authorize]
 public class DashboardHub : Hub
 {
     private readonly ISystemHealthService _healthService;

@@ -25,8 +25,11 @@ if (string.IsNullOrEmpty(jwtOptions.SecretKey))
 {
     if (builder.Environment.IsDevelopment())
     {
-        // Use a development-only key
-        jwtOptions.SecretKey = "DataWarehouse_Development_Secret_Key_At_Least_32_Chars!";
+        // AUTH-02: Generate ephemeral random key for development (not hardcoded)
+        var keyBytes = new byte[64];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(keyBytes);
+        jwtOptions.SecretKey = Convert.ToBase64String(keyBytes);
+        Console.WriteLine("WARNING: Using ephemeral JWT signing key -- tokens will not survive restart");
         builder.Services.AddSingleton(jwtOptions);
     }
     else
