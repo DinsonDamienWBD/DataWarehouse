@@ -1051,11 +1051,41 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string GetResourceUrl(string path)
         {
             var normalizedPath = NormalizePath(path);
+
+            // Path traversal protection — reject traversal sequences in keys
+            ValidatePathSafe(normalizedPath);
+
             var fullPath = string.IsNullOrEmpty(normalizedPath)
                 ? _baseUrl
                 : $"{_baseUrl}/{normalizedPath}";
 
+            // Validate the constructed URL stays within the base URL scope
+            var baseUri = new Uri(_baseUrl.TrimEnd('/') + "/");
+            var fullUri = new Uri(fullPath);
+            if (!fullUri.AbsolutePath.StartsWith(baseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Path traversal attempt detected");
+
             return fullPath;
+        }
+
+        /// <summary>
+        /// Validates that a path does not contain traversal sequences.
+        /// </summary>
+        private static void ValidatePathSafe(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            // Reject directory traversal sequences (raw and URL-encoded)
+            if (path.Contains("..") ||
+                path.Contains("//") ||
+                path.Contains('\\') ||
+                path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("%2f", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("%5c", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("Path traversal attempt detected");
+            }
         }
 
         private string GetParentCollectionUrl(string key)

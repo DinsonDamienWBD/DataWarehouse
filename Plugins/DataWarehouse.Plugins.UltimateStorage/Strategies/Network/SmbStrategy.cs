@@ -548,6 +548,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 ? _basePath
                 : NormalizePath(Path.Combine(_basePath, prefix).Replace('/', '\\'));
 
+            // Path traversal protection for list prefix
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                var fullSearchPath = Path.GetFullPath(searchPath);
+                var normalizedBasePath = Path.GetFullPath(_basePath);
+                if (!fullSearchPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException("Path traversal attempt detected");
+            }
+
             var items = new List<StorageObjectMetadata>();
             await EnumerateFilesRecursiveAsync(searchPath, prefix ?? string.Empty, items, ct);
 
@@ -775,9 +784,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 return relativePath;
             }
 
-            return string.IsNullOrEmpty(relativePath)
+            var combinedPath = string.IsNullOrEmpty(relativePath)
                 ? _basePath
                 : Path.Combine(_basePath, relativePath).Replace('/', '\\');
+
+            // Path traversal protection — canonicalize and verify prefix
+            var fullPath = Path.GetFullPath(combinedPath);
+            var normalizedBasePath = Path.GetFullPath(_basePath);
+            if (!fullPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Path traversal attempt detected");
+
+            return fullPath;
         }
 
         /// <summary>
