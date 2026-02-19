@@ -1,4 +1,8 @@
 using Spectre.Console;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Commands;
 
@@ -7,12 +11,35 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class PluginCommands
 {
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-plugins")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
+
     public static async Task ListPluginsAsync(string? category)
     {
         await AnsiConsole.Status()
             .StartAsync("Loading plugins...", async ctx =>
             {
-                var plugins = GetPlugins();
+                var plugins = await GetPluginsAsync();
 
                 if (!string.IsNullOrEmpty(category))
                 {
@@ -50,7 +77,6 @@ public static class PluginCommands
                 }
 
                 AnsiConsole.Write(table);
-                await Task.CompletedTask;
             });
     }
 
@@ -59,7 +85,8 @@ public static class PluginCommands
         await AnsiConsole.Status()
             .StartAsync("Loading plugin details...", async ctx =>
             {
-                var plugin = GetPlugins().FirstOrDefault(p => p.Id == id);
+                var plugins = await GetPluginsAsync();
+                var plugin = plugins.FirstOrDefault(p => p.Id == id);
 
                 if (plugin == null)
                 {
@@ -84,7 +111,6 @@ public static class PluginCommands
                 };
 
                 AnsiConsole.Write(panel);
-                await Task.CompletedTask;
             });
     }
 
@@ -124,12 +150,55 @@ public static class PluginCommands
         AnsiConsole.MarkupLine($"[green]Plugin '{id}' reloaded successfully.[/]");
     }
 
-    // Queries kernel for real data; returns empty if kernel unavailable
-    private static List<PluginInfo> GetPlugins()
+    /// <summary>
+    /// Queries the kernel message bus for loaded plugins.
+    /// Returns an empty list if the kernel or plugin registry is unavailable.
+    /// </summary>
+    private static async Task<List<PluginInfo>> GetPluginsAsync()
     {
-        // TODO: Query kernel/message bus for actual plugin list
-        // For now, returns empty list if kernel is unavailable
-        return new List<PluginInfo>();
+        try
+        {
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "kernel.plugin.list",
+                SourcePluginId = "cli",
+                Source = "CLI"
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "kernel.plugin.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> pluginList)
+            {
+                var result = new List<PluginInfo>();
+                foreach (var item in pluginList)
+                {
+                    if (item is Dictionary<string, object> p)
+                    {
+                        result.Add(new PluginInfo
+                        {
+                            Id = p.GetValueOrDefault("Id", "")?.ToString() ?? "",
+                            Name = p.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            Category = p.GetValueOrDefault("Category", "")?.ToString() ?? "",
+                            Version = p.GetValueOrDefault("Version", "")?.ToString() ?? "",
+                            IsEnabled = p.GetValueOrDefault("IsEnabled") is true,
+                            IsHealthy = p.GetValueOrDefault("IsHealthy") is true,
+                            Description = p.GetValueOrDefault("Description", "")?.ToString() ?? ""
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]Plugin information unavailable - kernel plugin registry not responding.[/]");
+            return new List<PluginInfo>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]Plugin information unavailable - kernel context not accessible.[/]");
+            return new List<PluginInfo>();
+        }
     }
 
     private record PluginInfo

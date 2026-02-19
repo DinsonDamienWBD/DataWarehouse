@@ -1,4 +1,8 @@
 using Spectre.Console;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Commands;
 
@@ -7,6 +11,29 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class BackupCommands
 {
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-backup")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
+
     public static async Task CreateBackupAsync(string name, string? destination, bool incremental, bool compress, bool encrypt)
     {
         var backupId = $"backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
@@ -80,10 +107,54 @@ public static class BackupCommands
         await AnsiConsole.Status()
             .StartAsync("Loading backups...", async ctx =>
             {
-                await Task.Delay(300);
+                try
+                {
+                    var kernel = await GetKernelAsync();
+                    var request = new PluginMessage
+                    {
+                        Type = "dataprotection.backup.list",
+                        SourcePluginId = "cli",
+                        Source = "CLI"
+                    };
 
-                // TODO: Query actual backups from DataProtection plugin via message bus
-                AnsiConsole.MarkupLine("[yellow]Backup listing not yet implemented - connect to DataProtection plugin.[/]");
+                    var response = await kernel.MessageBus.SendAsync(
+                        "dataprotection.backup.list", request, TimeSpan.FromSeconds(5));
+
+                    if (response.Success && response.Payload is IEnumerable<object> backups)
+                    {
+                        var table = new Table()
+                            .Border(TableBorder.Rounded)
+                            .AddColumn("ID")
+                            .AddColumn("Name")
+                            .AddColumn("Created")
+                            .AddColumn("Size")
+                            .AddColumn("Type");
+
+                        foreach (var backup in backups)
+                        {
+                            if (backup is Dictionary<string, object> b)
+                            {
+                                table.AddRow(
+                                    b.GetValueOrDefault("Id", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Created", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Size", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Type", "")?.ToString() ?? ""
+                                );
+                            }
+                        }
+
+                        AnsiConsole.Write(table);
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine("[yellow]No backup data available - DataProtection plugin not loaded.[/]");
+                    }
+                }
+                catch (Exception)
+                {
+                    AnsiConsole.MarkupLine("[yellow]No backup data available - DataProtection plugin not loaded.[/]");
+                }
             });
     }
 
