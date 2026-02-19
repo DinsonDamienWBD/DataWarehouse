@@ -400,7 +400,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
         return new GhgFullReport
         {
-            ReportId = $"GHG-{from:yyyyMMdd}-{to:yyyyMMdd}-{Guid.NewGuid():N[..8]}",
+            ReportId = $"GHG-{from:yyyyMMdd}-{to:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8]}",
             GeneratedAt = DateTimeOffset.UtcNow,
             OrganizationName = organizationName,
             PeriodStart = from,
