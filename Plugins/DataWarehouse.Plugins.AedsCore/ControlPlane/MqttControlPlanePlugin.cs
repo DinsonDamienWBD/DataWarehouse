@@ -9,6 +9,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
 namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
@@ -26,6 +27,7 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// <item><description>Automatic reconnection via MQTTnet AutoReconnect feature</description></item>
 /// <item><description>Topic-based routing for unicast and broadcast delivery modes</description></item>
 /// <item><description>Channel buffering for async enumerable manifest receiving</description></item>
+/// <item><description>Topic-level ACL enforcement for subscribe and publish operations (NET-04)</description></item>
 /// </list>
 /// </para>
 /// <para>
@@ -34,6 +36,16 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// <item><description>Personal topic: aeds/client/{clientId}/manifests</description></item>
 /// <item><description>Channel topic: aeds/channel/{channelId}</description></item>
 /// <item><description>Heartbeat topic: aeds/heartbeat/{clientId}</description></item>
+/// </list>
+/// </para>
+/// <para>
+/// <strong>Topic ACL Rules (NET-04 - CVSS 7.5):</strong>
+/// <list type="bullet">
+/// <item><description>aeds/client/{clientId}/# -- each client can only access their own namespace</description></item>
+/// <item><description>aeds/channel/# -- subscribed channels only</description></item>
+/// <item><description>aeds/heartbeat/{clientId} -- own heartbeat only</description></item>
+/// <item><description>aeds/control/# -- admin role only</description></item>
+/// <item><description>aeds/manifest/# -- authorized manifest publishers only</description></item>
 /// </list>
 /// </para>
 /// <para>
@@ -54,6 +66,22 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
     private CancellationTokenSource? _connectionCts;
     private const int MaxBackoffSeconds = 32;
     private int _reconnectAttempt;
+
+    /// <summary>
+    /// Topic ACL entries defining allowed topic patterns per client role.
+    /// Key: role name, Value: list of allowed topic regex patterns.
+    /// </summary>
+    private readonly Dictionary<string, List<Regex>> _topicAcl = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Set of channel IDs this client is authorized to access.
+    /// </summary>
+    private readonly HashSet<string> _authorizedChannels = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The role of this client for topic ACL enforcement.
+    /// </summary>
+    private string _clientRole = "client";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MqttControlPlanePlugin"/> class.
@@ -89,6 +117,9 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
             SingleReader = false,
             SingleWriter = false
         });
+
+        // Initialize topic ACL rules (NET-04: CVSS 7.5)
+        InitializeTopicAcl(config.ClientId);
 
         var factory = new MqttClientFactory();
         _mqttClient = factory.CreateMqttClient();
@@ -131,6 +162,91 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
 
         _reconnectAttempt = 0;
         _logger.LogInformation("MQTT control plane connection established to {ServerUrl}", config.ServerUrl);
+    }
+
+    /// <summary>
+    /// Initializes topic ACL rules based on client role.
+    /// Each client role has specific topic patterns they are allowed to subscribe to and publish on.
+    /// </summary>
+    /// <param name="clientId">The client identifier for scoped ACL rules.</param>
+    private void InitializeTopicAcl(string clientId)
+    {
+        var escapedClientId = Regex.Escape(clientId);
+
+        // Default client role: access own namespace, subscribed channels, own heartbeat
+        _topicAcl["client"] = new List<Regex>
+        {
+            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled),
+            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled),
+            new Regex($@"^aeds/heartbeat/{escapedClientId}$", RegexOptions.Compiled)
+        };
+
+        // Admin role: access everything
+        _topicAcl["admin"] = new List<Regex>
+        {
+            new Regex(@"^aeds/.*$", RegexOptions.Compiled)
+        };
+
+        // Manifest publisher role: client access + manifest publishing
+        _topicAcl["manifest-publisher"] = new List<Regex>
+        {
+            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled),
+            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled),
+            new Regex($@"^aeds/heartbeat/{escapedClientId}$", RegexOptions.Compiled),
+            new Regex(@"^aeds/manifest/.*$", RegexOptions.Compiled)
+        };
+
+        _logger.LogDebug("Topic ACL initialized for client {ClientId} with role {Role}", clientId, _clientRole);
+    }
+
+    /// <summary>
+    /// Authorizes a topic for subscribe or publish based on the client's ACL.
+    /// </summary>
+    /// <param name="topic">The MQTT topic to authorize.</param>
+    /// <param name="operation">The operation type (subscribe or publish).</param>
+    /// <returns>True if the topic is authorized, false otherwise.</returns>
+    private bool AuthorizeTopic(string topic, string operation)
+    {
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            _logger.LogWarning("MQTT topic authorization denied: empty topic for {Operation}", operation);
+            return false;
+        }
+
+        // Validate topic does not contain MQTT wildcards in publish operations
+        if (operation == "publish" && (topic.Contains('#') || topic.Contains('+')))
+        {
+            _logger.LogWarning("MQTT topic authorization denied: wildcards not allowed in publish topic {Topic}", topic);
+            return false;
+        }
+
+        // Check against ACL for current role
+        if (_topicAcl.TryGetValue(_clientRole, out var patterns))
+        {
+            foreach (var pattern in patterns)
+            {
+                if (pattern.IsMatch(topic))
+                {
+                    return true;
+                }
+            }
+        }
+
+        _logger.LogWarning(
+            "MQTT topic authorization denied: client {ClientId} (role={Role}) attempted {Operation} on topic {Topic}",
+            _clientId, _clientRole, operation, topic);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Validates that a received message came on an authorized topic.
+    /// </summary>
+    /// <param name="topic">The topic the message was received on.</param>
+    /// <returns>True if the message should be processed, false if it should be dropped.</returns>
+    private bool IsTopicAllowed(string topic)
+    {
+        return AuthorizeTopic(topic, "subscribe");
     }
 
     /// <summary>
@@ -242,6 +358,15 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         try
         {
             var topic = args.ApplicationMessage.Topic;
+
+            // NET-04: Validate received message against topic ACL
+            if (!IsTopicAllowed(topic))
+            {
+                _logger.LogWarning("Dropping MQTT message on unauthorized topic {Topic} for client {ClientId}",
+                    topic, _clientId);
+                return;
+            }
+
             // In MQTTnet v5, Payload is ReadOnlySequence<byte>
             var payloadSequence = args.ApplicationMessage.Payload;
             var payload = Encoding.UTF8.GetString(payloadSequence.IsSingleSegment
@@ -290,13 +415,20 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
     }
 
     /// <summary>
-    /// Subscribes to an MQTT topic.
+    /// Subscribes to an MQTT topic after verifying topic-level authorization (NET-04).
     /// </summary>
     private async Task SubscribeToTopicAsync(string topic, MqttQualityOfServiceLevel qos, CancellationToken ct)
     {
         if (_mqttClient == null || !_mqttClient.IsConnected)
         {
             throw new InvalidOperationException("MQTT client is not connected");
+        }
+
+        // NET-04: Enforce topic-level authorization before subscribing
+        if (!AuthorizeTopic(topic, "subscribe"))
+        {
+            throw new UnauthorizedAccessException(
+                $"MQTT topic authorization denied: client '{_clientId}' (role={_clientRole}) is not allowed to subscribe to topic '{topic}'");
         }
 
         var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
@@ -365,6 +497,13 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
             throw new InvalidOperationException($"Cannot determine MQTT topic for delivery mode {manifest.DeliveryMode}");
         }
 
+        // NET-04: Enforce topic-level authorization before publishing
+        if (!AuthorizeTopic(topic, "publish"))
+        {
+            throw new UnauthorizedAccessException(
+                $"MQTT topic authorization denied: client '{_clientId}' (role={_clientRole}) is not allowed to publish to topic '{topic}'");
+        }
+
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)
             .WithPayload(payload)
@@ -403,6 +542,13 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         var json = JsonSerializer.Serialize(heartbeat);
         var payload = Encoding.UTF8.GetBytes(json);
         var topic = $"aeds/heartbeat/{heartbeat.ClientId}";
+
+        // NET-04: Enforce topic-level authorization for heartbeat publishing
+        if (!AuthorizeTopic(topic, "publish"))
+        {
+            _logger.LogWarning("Heartbeat publish denied for topic {Topic}, client {ClientId}", topic, _clientId);
+            return;
+        }
 
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)

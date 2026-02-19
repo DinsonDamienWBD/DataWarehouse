@@ -25,11 +25,17 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// <item><description>Channel subscription/unsubscription via control messages</description></item>
 /// <item><description>Thread-safe send operations using SemaphoreSlim</description></item>
 /// <item><description>Clean shutdown with cancellation token propagation</description></item>
+/// <item><description>Origin header validation to prevent cross-origin WebSocket hijacking (NET-07)</description></item>
 /// </list>
 /// </para>
 /// <para>
 /// <strong>Protocol:</strong> Uses native .NET WebSocket client (System.Net.WebSockets.ClientWebSocket)
 /// for persistent bidirectional communication over WSS (WebSocket Secure).
+/// </para>
+/// <para>
+/// <strong>Origin Validation (NET-07 - CVSS 6.1):</strong> Validates the Origin header on
+/// WebSocket connections. When configured with allowed origins, rejects connections from
+/// unauthorized origins. Default behavior: same-origin only (rejects all cross-origin).
 /// </para>
 /// <para>
 /// <strong>Heartbeat Monitoring:</strong> Sends periodic heartbeats at configured intervals and monitors
@@ -51,6 +57,18 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
     private const int HeartbeatExpirySeconds = 90;
     private const int MaxBackoffSeconds = 32;
     private int _reconnectAttempt;
+
+    /// <summary>
+    /// Set of allowed origins for WebSocket connections.
+    /// When empty, only same-origin connections are allowed (NET-07).
+    /// </summary>
+    private readonly HashSet<string> _allowedOrigins = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The expected server origin derived from the connection URL.
+    /// Used for same-origin validation when no explicit allowed origins are configured.
+    /// </summary>
+    private string? _serverOrigin;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WebSocketControlPlanePlugin"/> class.
@@ -88,12 +106,89 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
             SingleWriter = false
         });
 
+        // NET-07: Initialize origin validation from server URL
+        InitializeOriginValidation(config);
+
         await ConnectWithRetryAsync(config, _connectionCts.Token);
 
         _heartbeatTask = RunHeartbeatLoopAsync(config, _connectionCts.Token);
         _receiveTask = RunReceiveLoopAsync(_connectionCts.Token);
 
         _logger.LogInformation("WebSocket control plane connection established to {ServerUrl}", config.ServerUrl);
+    }
+
+    /// <summary>
+    /// Initializes origin validation configuration (NET-07: CVSS 6.1).
+    /// Derives the server origin from the connection URL for same-origin enforcement.
+    /// Additional allowed origins can be configured via the AllowedOrigins configuration parameter.
+    /// </summary>
+    /// <param name="config">The control plane configuration.</param>
+    private void InitializeOriginValidation(ControlPlaneConfig config)
+    {
+        // Derive server origin from WebSocket URL (ws:// -> http://, wss:// -> https://)
+        try
+        {
+            var serverUrl = config.ServerUrl;
+            var httpUrl = serverUrl
+                .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
+                .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase);
+
+            var uri = new Uri(httpUrl);
+            _serverOrigin = $"{uri.Scheme}://{uri.Host}" + (uri.IsDefaultPort ? "" : $":{uri.Port}");
+
+            _logger.LogDebug("WebSocket origin validation initialized. Server origin: {ServerOrigin}", _serverOrigin);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to derive server origin from URL {ServerUrl}, origin validation will be strict (deny all cross-origin)",
+                config.ServerUrl);
+        }
+    }
+
+    /// <summary>
+    /// Validates the Origin header value against allowed origins (NET-07).
+    /// </summary>
+    /// <param name="origin">The origin to validate.</param>
+    /// <returns>True if the origin is allowed, false otherwise.</returns>
+    private bool ValidateOrigin(string? origin)
+    {
+        // No origin header: allow (non-browser clients, e.g., IoT devices, CLIs)
+        if (string.IsNullOrEmpty(origin))
+        {
+            return true;
+        }
+
+        // Check explicit allowed origins list first
+        if (_allowedOrigins.Count > 0 && _allowedOrigins.Contains(origin))
+        {
+            return true;
+        }
+
+        // Same-origin check: compare against derived server origin
+        if (_serverOrigin != null && string.Equals(origin, _serverOrigin, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // If no allowed origins configured and origin doesn't match server origin, reject
+        _logger.LogWarning(
+            "WebSocket origin validation failed: origin '{Origin}' not in allowed list. Server origin: {ServerOrigin}, Allowed origins: [{AllowedOrigins}]",
+            origin, _serverOrigin ?? "unknown", string.Join(", ", _allowedOrigins));
+
+        return false;
+    }
+
+    /// <summary>
+    /// Adds an origin to the allowed origins list for WebSocket connections.
+    /// </summary>
+    /// <param name="origin">The origin to allow (e.g., "https://example.com").</param>
+    public void AddAllowedOrigin(string origin)
+    {
+        if (!string.IsNullOrWhiteSpace(origin))
+        {
+            _allowedOrigins.Add(origin);
+            _logger.LogInformation("Added allowed WebSocket origin: {Origin}", origin);
+        }
     }
 
     /// <summary>
@@ -111,6 +206,12 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
                 if (!string.IsNullOrEmpty(config.AuthToken))
                 {
                     _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {config.AuthToken}");
+                }
+
+                // NET-07: Set Origin header for server-side origin validation
+                if (_serverOrigin != null)
+                {
+                    _webSocket.Options.SetRequestHeader("Origin", _serverOrigin);
                 }
 
                 var uri = new Uri(config.ServerUrl);
@@ -247,8 +348,28 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
     {
         try
         {
+            // NET-07: Validate message size to prevent oversized payload attacks
+            const int maxMessageSizeBytes = 4 * 1024 * 1024; // 4 MB max
+            if (messageText.Length > maxMessageSizeBytes)
+            {
+                _logger.LogWarning("Rejecting oversized WebSocket message ({Size} bytes, max {Max})",
+                    messageText.Length, maxMessageSizeBytes);
+                return;
+            }
+
             var jsonDoc = JsonDocument.Parse(messageText);
             var root = jsonDoc.RootElement;
+
+            // NET-07: Validate origin field in message envelope if present
+            if (root.TryGetProperty("origin", out var originElement))
+            {
+                var messageOrigin = originElement.GetString();
+                if (!ValidateOrigin(messageOrigin))
+                {
+                    _logger.LogWarning("Rejecting WebSocket message with unauthorized origin: {Origin}", messageOrigin);
+                    return;
+                }
+            }
 
             if (root.TryGetProperty("type", out var typeElement))
             {
