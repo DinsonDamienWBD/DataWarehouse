@@ -30,6 +30,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     private const int CircuitBreakerThreshold = 5;
     private bool _circuitOpen = false;
     private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private int _exportIntervalMs = 60000; // Default 60 seconds
 
     /// <inheritdoc/>
     public override string StrategyId => "stackdriver";
@@ -70,6 +71,81 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
     }
 
+    /// <inheritdoc/>
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        // Validate GCP project ID
+        if (string.IsNullOrWhiteSpace(_projectId))
+            throw new InvalidOperationException("GCP project ID is required. Call Configure() before initialization.");
+
+        // Validate project ID format (alphanumeric, hyphens, lowercase, 6-30 chars)
+        if (_projectId.Length < 6 || _projectId.Length > 30 || !System.Text.RegularExpressions.Regex.IsMatch(_projectId, @"^[a-z][a-z0-9-]*[a-z0-9]$"))
+            throw new InvalidOperationException($"Invalid GCP project ID format: '{_projectId}'. Must be 6-30 chars, lowercase alphanumeric with hyphens.");
+
+        // Validate metric prefix
+        if (string.IsNullOrWhiteSpace(_metricPrefix))
+            throw new InvalidOperationException("Metric prefix cannot be empty.");
+
+        // Validate export interval (1 second to 5 minutes)
+        if (_exportIntervalMs < 1000 || _exportIntervalMs > 300000)
+            throw new InvalidOperationException($"Export interval must be between 1000ms and 300000ms. Got: {_exportIntervalMs}ms");
+
+        // If access token is provided, test API reachability
+        if (!string.IsNullOrWhiteSpace(_accessToken))
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
+                    cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException($"Stackdriver API validation failed with status {response.StatusCode}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new InvalidOperationException($"Failed to connect to Stackdriver API: {ex.Message}", ex);
+            }
+        }
+
+        await base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        // Stop flush timer
+        _flushTimer?.Stop();
+
+        // Flush remaining metrics and logs with 10-second timeout
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        await _flushLock.WaitAsync(cts.Token);
+        try
+        {
+            if (_metricsBatch.Count > 0)
+                await FlushMetricsAsync(cts.Token);
+            if (_logsBatch.Count > 0)
+                await FlushLogsAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutdown timeout exceeded, abandon remaining data
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+
+        // Close HTTP connections
+        _httpClient?.Dispose();
+
+        await base.ShutdownAsyncCore(cancellationToken);
+    }
+
     private async Task FlushBatchesAsync(CancellationToken ct)
     {
         if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
@@ -97,16 +173,26 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
 
         if (batch.Count == 0) return;
 
-        await SendWithRetryAsync(async () =>
+        try
         {
-            var payload = new { timeSeries = batch };
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(
-                $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
-                content, ct);
-            response.EnsureSuccessStatusCode();
-        }, ct);
+            await SendWithRetryAsync(async () =>
+            {
+                var payload = new { timeSeries = batch };
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
+                    content, ct);
+                response.EnsureSuccessStatusCode();
+            }, ct);
+
+            IncrementCounter("stackdriver.metrics_sent");
+        }
+        catch (Exception)
+        {
+            IncrementCounter("stackdriver.metrics_failed");
+            throw;
+        }
     }
 
     private async Task FlushLogsAsync(CancellationToken ct)
@@ -143,9 +229,36 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 _circuitOpen = false;
                 return;
             }
+            catch (HttpRequestException ex) when (attempt < maxRetries - 1)
+            {
+                // Handle specific HTTP errors
+                var statusCode = ex.StatusCode;
+                if (statusCode == System.Net.HttpStatusCode.Unauthorized) // 401
+                {
+                    IncrementCounter("stackdriver.auth_failure");
+                    throw; // Don't retry auth failures
+                }
+                else if (statusCode == (System.Net.HttpStatusCode)429) // 429 quota exceeded
+                {
+                    IncrementCounter("stackdriver.quota_exceeded");
+                    var delay = baseDelay * Math.Pow(2, attempt + 2); // Longer backoff for quota
+                    await Task.Delay(delay, ct);
+                }
+                else if (statusCode == System.Net.HttpStatusCode.ServiceUnavailable) // 503
+                {
+                    IncrementCounter("stackdriver.service_unavailable");
+                    var delay = baseDelay * Math.Pow(2, attempt);
+                    await Task.Delay(delay, ct);
+                }
+                else
+                {
+                    var delay = baseDelay * Math.Pow(2, attempt);
+                    await Task.Delay(delay, ct);
+                }
+            }
             catch (Exception) when (attempt < maxRetries - 1)
             {
-                var delay = baseDelay * Math.Pow(2, attempt); // Exponential backoff
+                var delay = baseDelay * Math.Pow(2, attempt);
                 await Task.Delay(delay, ct);
             }
             catch (Exception)
@@ -337,28 +450,41 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken)
     {
-        try
+        var cachedResult = await GetCachedHealthAsync(async ct =>
         {
-            var response = await _httpClient.GetAsync(
-                $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors",
-                cancellationToken);
+            try
+            {
+                var response = await _httpClient.GetAsync(
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
+                    ct);
 
-            return new HealthCheckResult(
-                IsHealthy: response.IsSuccessStatusCode,
-                Description: response.IsSuccessStatusCode ? "Stackdriver connection is healthy" : "Stackdriver API error",
-                Data: new Dictionary<string, object>
-                {
-                    ["projectId"] = _projectId,
-                    ["metricPrefix"] = _metricPrefix
-                });
-        }
-        catch (Exception ex)
-        {
-            return new HealthCheckResult(
-                IsHealthy: false,
-                Description: $"Stackdriver health check failed: {ex.Message}",
-                Data: null);
-        }
+                return new DataWarehouse.SDK.Contracts.StrategyHealthCheckResult(
+                    IsHealthy: response.IsSuccessStatusCode,
+                    Message: response.IsSuccessStatusCode ? "Stackdriver API reachable" : $"Stackdriver API returned {response.StatusCode}",
+                    Details: new Dictionary<string, object>
+                    {
+                        ["projectId"] = _projectId,
+                        ["metricPrefix"] = _metricPrefix,
+                        ["circuitOpen"] = _circuitOpen,
+                        ["metricsSent"] = GetCounter("stackdriver.metrics_sent"),
+                        ["metricsFailed"] = GetCounter("stackdriver.metrics_failed")
+                    });
+            }
+            catch (Exception ex)
+            {
+                return new DataWarehouse.SDK.Contracts.StrategyHealthCheckResult(
+                    IsHealthy: false,
+                    Message: $"Stackdriver health check failed: {ex.Message}",
+                    Details: new Dictionary<string, object> { ["exception"] = ex.GetType().Name });
+            }
+        }, TimeSpan.FromSeconds(60), cancellationToken);
+
+        return new HealthCheckResult(
+            IsHealthy: cachedResult.IsHealthy,
+            Description: cachedResult.Message ?? "Stackdriver health check",
+            Data: cachedResult.Details != null
+                ? new Dictionary<string, object>(cachedResult.Details)
+                : new Dictionary<string, object>());
     }
 
     /// <inheritdoc/>
