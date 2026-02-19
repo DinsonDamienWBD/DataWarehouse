@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Contracts;
 using System;
 using System.Buffers;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -46,15 +47,8 @@ public sealed class BitmapAllocator
         _totalBlocks = totalBlocks;
         _nextFreeHint = 0;
 
-        // Count free blocks
-        _freeBlockCount = 0;
-        for (long i = 0; i < totalBlocks; i++)
-        {
-            if (!GetBit(i))
-            {
-                _freeBlockCount++;
-            }
-        }
+        // Count free blocks using SIMD-accelerated PopCount
+        _freeBlockCount = SimdBitmapScanner.CountZeroBits(bitmap, totalBlocks);
     }
 
     /// <summary>
@@ -349,48 +343,11 @@ public sealed class BitmapAllocator
 
     private long FindNextFreeBlock(long startBlock)
     {
-        for (long i = startBlock; i < _totalBlocks; i++)
-        {
-            if (!GetBit(i))
-            {
-                return i;
-            }
-        }
-
-        return -1;
+        return SimdBitmapScanner.FindFirstZeroBit(_bitmap, _totalBlocks, startBlock);
     }
 
     private long FindContiguousFreeBlocks(int count)
     {
-        int currentRun = 0;
-        long runStart = -1;
-
-        for (long i = 0; i < _totalBlocks; i++)
-        {
-            if (!GetBit(i))
-            {
-                if (runStart < 0)
-                {
-                    runStart = i;
-                    currentRun = 1;
-                }
-                else
-                {
-                    currentRun++;
-                }
-
-                if (currentRun >= count)
-                {
-                    return runStart;
-                }
-            }
-            else
-            {
-                runStart = -1;
-                currentRun = 0;
-            }
-        }
-
-        return -1;
+        return SimdBitmapScanner.FindContiguousZeroBits(_bitmap, _totalBlocks, count);
     }
 }
