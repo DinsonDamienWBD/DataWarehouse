@@ -6,7 +6,9 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.TamperProof.Registration;
 using DataWarehouse.Plugins.TamperProof.Services;
+using DataWarehouse.Plugins.TamperProof.TimeLock;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
@@ -44,6 +46,13 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
     private readonly BlockchainVerificationService _blockchainVerificationService;
     private readonly RecoveryService _recoveryService;
     private readonly BackgroundIntegrityScanner _backgroundScanner;
+
+    // Phase 59: Time-lock providers, vaccination service, and policy engine
+    private IReadOnlyList<TimeLockProviderPluginBase>? _timeLockProviders;
+    private RansomwareVaccinationService? _vaccinationService;
+    private TimeLockPolicyEngine? _policyEngine;
+    private bool _timeLockInitialized;
+
     private bool _disposed;
 
     // Batching for blockchain anchors
@@ -974,6 +983,64 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
 
         return metadata;
     }
+
+    /// <inheritdoc/>
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    {
+        var response = await base.OnHandshakeAsync(request);
+
+        // Phase 59: Initialize time-lock subsystem after base handshake (MessageBus is available)
+        await InitializeTimeLockSubsystemAsync();
+
+        response.Metadata["TimeLockProviders"] = (_timeLockProviders?.Count ?? 0).ToString();
+        response.Metadata["VaccinationServiceAvailable"] = (_vaccinationService != null).ToString();
+        response.Metadata["PolicyEngineAvailable"] = (_policyEngine != null).ToString();
+
+        return response;
+    }
+
+    /// <summary>
+    /// Initializes the time-lock subsystem: providers, vaccination service, and policy engine.
+    /// Called during handshake when the message bus is available. Idempotent.
+    /// </summary>
+    private async Task InitializeTimeLockSubsystemAsync()
+    {
+        if (_timeLockInitialized) return;
+
+        // Initialize policy engine (no bus dependency)
+        _policyEngine = TimeLockRegistration.RegisterPolicyEngine();
+
+        // Initialize time-lock providers and vaccination service via bus
+        if (MessageBus != null)
+        {
+            _timeLockProviders = await TimeLockRegistration.RegisterTimeLockProviders(MessageBus, Id);
+            _vaccinationService = await TimeLockRegistration.RegisterVaccinationService(MessageBus, Id);
+            await TimeLockRegistration.PublishTimeLockCapabilities(MessageBus, _timeLockProviders.Count, Id);
+        }
+
+        _timeLockInitialized = true;
+
+        _logger.LogInformation(
+            "Time-lock subsystem initialized: {ProviderCount} providers, vaccination={VaccinationAvailable}, policy-engine={PolicyAvailable}",
+            _timeLockProviders?.Count ?? 0,
+            _vaccinationService != null,
+            _policyEngine != null);
+    }
+
+    /// <summary>
+    /// Gets the registered time-lock providers, or null if not yet initialized.
+    /// </summary>
+    public IReadOnlyList<TimeLockProviderPluginBase>? TimeLockProviders => _timeLockProviders;
+
+    /// <summary>
+    /// Gets the ransomware vaccination service, or null if not yet initialized.
+    /// </summary>
+    public RansomwareVaccinationService? VaccinationService => _vaccinationService;
+
+    /// <summary>
+    /// Gets the time-lock policy engine, or null if not yet initialized.
+    /// </summary>
+    public TimeLockPolicyEngine? PolicyEngine => _policyEngine;
 
     /// <summary>
     /// Handles incoming message bus messages for TamperProof operations.
