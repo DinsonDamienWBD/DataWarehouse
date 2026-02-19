@@ -48,30 +48,42 @@ public sealed class BoundedMemoryRuntime : IDisposable
     /// </summary>
     public static BoundedMemoryRuntime Instance => _instance.Value;
 
-    private MemoryBudgetTracker? _tracker;
+    private volatile MemoryBudgetTracker? _tracker;
     private MemorySettings _settings = new();
     private Timer? _monitorTimer;
+    // ISO-03 (CVSS 5.9): Lock protects Initialize() against concurrent calls from
+    // multiple plugins. The singleton is process-wide shared state; while the kernel
+    // calls Initialize() once before plugin load, this lock prevents races if a
+    // plugin also calls Initialize().
+    private readonly object _initLock = new();
 
     private BoundedMemoryRuntime() { }
 
     /// <summary>
     /// Initializes the bounded memory runtime with settings.
     /// Idempotent -- safe to call multiple times (uses latest settings).
+    /// Thread-safe: protected by lock to prevent concurrent initialization races.
     /// </summary>
     /// <param name="settings">Memory configuration.</param>
     public void Initialize(MemorySettings settings)
     {
-        _settings = settings;
-        if (!settings.Enabled) return;
+        lock (_initLock)
+        {
+            _settings = settings;
+            if (!settings.Enabled) return;
 
-        _tracker = new MemoryBudgetTracker(settings);
+            _tracker = new MemoryBudgetTracker(settings);
 
-        // Start periodic memory monitoring (Gen1 GC when above threshold)
-        _monitorTimer = new Timer(
-            callback: _ => _tracker?.TriggerProactiveCleanup(),
-            state: null,
-            dueTime: TimeSpan.FromSeconds(10),
-            period: TimeSpan.FromSeconds(10));
+            // Dispose previous timer if re-initializing
+            _monitorTimer?.Dispose();
+
+            // Start periodic memory monitoring (Gen1 GC when above threshold)
+            _monitorTimer = new Timer(
+                callback: _ => _tracker?.TriggerProactiveCleanup(),
+                state: null,
+                dueTime: TimeSpan.FromSeconds(10),
+                period: TimeSpan.FromSeconds(10));
+        }
     }
 
     /// <summary>

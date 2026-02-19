@@ -450,13 +450,14 @@ public sealed class InMemoryBackupService : IBackupService
             }
             catch (Exception ex)
             {
+                // RECON-09: Sanitize error messages -- do not expose ex.Message to API consumers
                 _jobs[jobId] = status with
                 {
                     State = JobState.Failed,
                     CompletedAt = DateTime.UtcNow,
-                    ErrorMessage = ex.Message
+                    ErrorMessage = $"Backup operation failed. CorrelationId: {jobId}"
                 };
-                _logger.LogError(ex, "Backup job {JobId} failed", jobId);
+                _logger.LogError(ex, "Backup job {JobId} failed: {Detail}", jobId, ex.Message);
             }
             finally
             {
@@ -530,13 +531,14 @@ public sealed class InMemoryBackupService : IBackupService
             }
             catch (Exception ex)
             {
+                // RECON-09: Sanitize error messages -- do not expose ex.Message to API consumers
                 _jobs[jobId] = status with
                 {
                     State = JobState.Failed,
                     CompletedAt = DateTime.UtcNow,
-                    ErrorMessage = ex.Message
+                    ErrorMessage = $"Restore operation failed. CorrelationId: {jobId}"
                 };
-                _logger.LogError(ex, "Restore job {JobId} failed", jobId);
+                _logger.LogError(ex, "Restore job {JobId} failed: {Detail}", jobId, ex.Message);
             }
             finally
             {

@@ -203,7 +203,8 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
         {
             _logger.LogError(ex, "Installation failed");
             result.Success = false;
-            result.Message = $"Installation failed: {ex.Message}";
+            // RECON-09: Sanitize error messages -- do not expose internal details
+            result.Message = "Installation failed. Check server logs for details.";
             result.Exception = ex;
         }
 
@@ -254,7 +255,8 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
         {
             _logger.LogError(ex, "Connection failed");
             result.Success = false;
-            result.Message = $"Connection failed: {ex.Message}";
+            // RECON-09: Sanitize error messages -- do not expose internal details
+            result.Message = "Connection failed. Check server logs for details.";
             result.Exception = ex;
 
             if (_connection != null)

@@ -117,6 +117,23 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         await LoadRevenueRecordsAsync();
         await LoadAnalyticsAsync();
 
+        // ISO-05: Security warnings for weakened certification policy
+        if (!_certificationPolicy.RequireSignedAssembly)
+        {
+            Console.Error.WriteLine(
+                "[SECURITY WARNING] PluginMarketplace: RequireSignedAssembly is disabled. " +
+                "Unsigned plugin assemblies will be accepted. This is a security risk (ISO-05, CVSS 7.7). " +
+                "Enable RequireSignedAssembly in production environments.");
+        }
+
+        if (!_certificationPolicy.ValidateAssemblyHash)
+        {
+            Console.Error.WriteLine(
+                "[SECURITY WARNING] PluginMarketplace: ValidateAssemblyHash is disabled. " +
+                "Plugin assembly integrity will not be verified against catalog hashes. " +
+                "Enable ValidateAssemblyHash in production environments.");
+        }
+
         // If catalog is empty, populate with built-in entries
         if (_catalog.IsEmpty)
         {
@@ -3331,8 +3348,18 @@ public sealed record CertificationStageResult(
 /// </summary>
 public sealed record CertificationPolicy
 {
-    /// <summary>Whether signed assemblies are required for certification.</summary>
-    public bool RequireSignedAssembly { get; init; }
+    /// <summary>
+    /// Whether signed assemblies are required for certification.
+    /// ISO-05 (CVSS 7.7): Defaults to true -- unsigned assemblies are rejected.
+    /// Set to false only for development/testing environments.
+    /// </summary>
+    public bool RequireSignedAssembly { get; init; } = true;
+
+    /// <summary>
+    /// Whether to validate the SHA-256 hash of plugin assemblies against the catalog.
+    /// When enabled, tampered assemblies are rejected during certification.
+    /// </summary>
+    public bool ValidateAssemblyHash { get; init; } = true;
 
     /// <summary>Maximum assembly size in megabytes.</summary>
     public int MaxAssemblySizeMb { get; init; } = 50;

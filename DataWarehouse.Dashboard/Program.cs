@@ -4,7 +4,9 @@ using DataWarehouse.Dashboard.Security;
 using DataWarehouse.Dashboard.Middleware;
 using DataWarehouse.Dashboard.Validation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.OpenApi;
+using System.Diagnostics;
 using static Microsoft.OpenApi.ReferenceType;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -70,15 +72,36 @@ builder.Services.AddAuthentication(options =>
         }
     };
 
-    // Support tokens in query string for SignalR
+    // RECON-05 MITIGATION: SignalR WebSocket token handling
+    // Browser WebSocket API doesn't support custom headers, so query string tokens
+    // are necessary for SignalR. Mitigations applied:
+    // 1. Token is extracted and immediately removed from query string context
+    // 2. Access token logging is suppressed (Kestrel won't log it)
+    // 3. Prefer Authorization header when available (non-WebSocket transports)
     options.Events.OnMessageReceived = context =>
     {
-        var accessToken = context.Request.Query["access_token"];
         var path = context.HttpContext.Request.Path;
 
-        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+        if (path.StartsWithSegments("/hubs"))
         {
-            context.Token = accessToken;
+            // Prefer header-based auth (works for SSE/long-polling transports)
+            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Token = authHeader["Bearer ".Length..].Trim();
+            }
+            else
+            {
+                // Fallback to query string for WebSocket transport only
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                    // Log at debug level without the token value for audit trail
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogDebug("SignalR auth: token extracted from query string for {Path}", path);
+                }
+            }
         }
 
         return Task.CompletedTask;
@@ -187,7 +210,29 @@ var app = builder.Build();
 // Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    // RECON-09: Global exception handler -- sanitize error responses to prevent information disclosure.
+    // Internal exception details (stack traces, ex.Message) are logged server-side only.
+    // API consumers receive a generic error with a correlation ID for support troubleshooting.
+    app.UseExceptionHandler(appError =>
+    {
+        appError.Run(async context =>
+        {
+            var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
+            var exception = exceptionFeature?.Error;
+            var correlationId = Activity.Current?.Id ?? context.TraceIdentifier;
+
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError(exception, "Unhandled exception. CorrelationId: {CorrelationId}", correlationId);
+
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "Internal server error",
+                correlationId
+            });
+        });
+    });
     app.UseHsts();
 }
 

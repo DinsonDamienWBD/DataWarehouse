@@ -476,6 +476,10 @@ namespace DataWarehouse.SDK.Contracts.Compression
     /// </summary>
     public abstract class CompressionStrategyBase : StrategyBase, ICompressionStrategy
     {
+        // ISO-03 (CVSS 5.9): Shared mutable state -- thread-safety analysis:
+        // - _statistics: Instance-level, guarded by _statsLock for all reads/writes
+        // - _contentTypeCache: Static ConcurrentDictionary -- inherently thread-safe for concurrent access
+        // Both fields are safe for concurrent multi-plugin access.
         private readonly CompressionStatistics _statistics = new();
         private readonly object _statsLock = new();
         private static readonly ConcurrentDictionary<string, ContentType> _contentTypeCache = new();
