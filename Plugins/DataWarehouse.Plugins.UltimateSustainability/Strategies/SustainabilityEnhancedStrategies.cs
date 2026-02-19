@@ -10,7 +10,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 {
     private readonly ConcurrentDictionary<string, CarbonIntensityData> _intensityData = new();
     private readonly ConcurrentDictionary<string, List<CarbonSchedulingDecision>> _decisions = new();
-    private readonly ConcurrentDictionary<string, CarbonBudget> _budgets = new();
+    private readonly ConcurrentDictionary<string, SchedulingCarbonBudget> _budgets = new();
 
     public override string StrategyId => "carbon-aware-scheduling";
     public override string DisplayName => "Carbon-Aware Scheduling";
@@ -95,9 +95,9 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
     /// <summary>
     /// Initializes a carbon budget for a project/workload group.
     /// </summary>
-    public CarbonBudget InitializeBudget(string budgetId, double totalBudgetGrams, TimeSpan period)
+    public SchedulingCarbonBudget InitializeBudget(string budgetId, double totalBudgetGrams, TimeSpan period)
     {
-        var budget = new CarbonBudget
+        var budget = new SchedulingCarbonBudget
         {
             BudgetId = budgetId,
             TotalBudgetGrams = totalBudgetGrams,
@@ -154,7 +154,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 /// </summary>
 public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<EnergyMeasurement>> _measurements = new();
+    private readonly ConcurrentDictionary<string, List<TrackingEnergyMeasurement>> _measurements = new();
     private readonly ConcurrentDictionary<string, GhgReport> _ghgRecords = new();
 
     public override string StrategyId => "energy-tracking";
@@ -173,7 +173,7 @@ public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
     public void RecordConsumption(string operationId, string operationType, double kwhConsumed,
         string region, double? carbonIntensity = null)
     {
-        var measurement = new EnergyMeasurement
+        var measurement = new TrackingEnergyMeasurement
         {
             OperationId = operationId,
             OperationType = operationType,
@@ -186,7 +186,7 @@ public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
 
         _measurements.AddOrUpdate(
             operationType,
-            _ => new List<EnergyMeasurement> { measurement },
+            _ => new List<TrackingEnergyMeasurement> { measurement },
             (_, list) => { lock (list) { list.Add(measurement); if (list.Count > 100000) list.RemoveAt(0); } return list; });
     }
 
@@ -308,7 +308,7 @@ public sealed record CarbonSchedulingDecision
     public DateTimeOffset DecidedAt { get; init; }
 }
 
-public sealed record CarbonBudget
+public sealed record SchedulingCarbonBudget
 {
     public required string BudgetId { get; init; }
     public double TotalBudgetGrams { get; init; }
@@ -328,7 +328,7 @@ public sealed record CarbonBudgetResult
     public double BudgetUtilization { get; init; }
 }
 
-public sealed record EnergyMeasurement
+public sealed record TrackingEnergyMeasurement
 {
     public required string OperationId { get; init; }
     public required string OperationType { get; init; }
