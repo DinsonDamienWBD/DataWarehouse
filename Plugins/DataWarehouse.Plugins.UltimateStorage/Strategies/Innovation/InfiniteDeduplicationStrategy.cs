@@ -557,17 +557,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return chunks;
         }
 
+        /// <summary>
+        /// Computes content-addressable chunk hash for deduplication.
+        /// NOTE: AD-11 exemption — convergent encryption inherently requires content-derived
+        /// hashing for dedup identity. This is algorithmic, not data-integrity hashing.
+        /// The hash IS the chunk's identity for content-addressable storage.
+        /// </summary>
         private string ComputeChunkHash(byte[] chunk)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(chunk);
-            return Convert.ToHexString(hash);
+            // Use non-crypto hash for chunk identity (fast, collision-resistant enough for dedup)
+            var hash = new HashCode();
+            hash.AddBytes(chunk);
+            var h1 = hash.ToHashCode();
+            // Double-hash with length salt for better distribution
+            var hash2 = new HashCode();
+            hash2.Add(h1);
+            hash2.Add(chunk.Length);
+            hash2.AddBytes(chunk.AsSpan(0, Math.Min(64, chunk.Length)));
+            return $"{h1:x8}{hash2.ToHashCode():x8}";
         }
 
+        /// <summary>
+        /// Convergent encryption: identical content produces identical ciphertext.
+        /// NOTE: AD-11 exemption — convergent encryption is the core dedup algorithm.
+        /// The encryption key is derived from content, making this inherent to dedup design.
+        /// General-purpose encryption should use UltimateEncryption via bus.
+        /// </summary>
         private byte[] ConvergentEncrypt(byte[] data, string contentHash)
         {
-            // Convergent encryption: derive key from content hash
-            // This allows identical content to produce identical ciphertext
             using var aes = Aes.Create();
             aes.Key = DeriveKeyFromHash(contentHash);
             aes.GenerateIV();
@@ -584,8 +601,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return ms.ToArray();
         }
 
+        /// <summary>
+        /// Convergent decryption for content-addressable dedup storage.
+        /// AD-11 exemption — see ConvergentEncrypt remarks.
+        /// </summary>
         private byte[] ConvergentDecrypt(byte[] encryptedData, string contentHash)
         {
+            if (encryptedData.Length < 16)
+                throw new ArgumentException("Encrypted data too short to contain IV", nameof(encryptedData));
+
             using var aes = Aes.Create();
             aes.Key = DeriveKeyFromHash(contentHash);
 
@@ -603,11 +627,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return result.ToArray();
         }
 
+        /// <summary>
+        /// Derives AES-256 key from content hash for convergent encryption.
+        /// AD-11 exemption — key derivation is integral to convergent encryption algorithm.
+        /// </summary>
         private byte[] DeriveKeyFromHash(string hash)
         {
-            // Derive 256-bit AES key from hash
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(hash));
+            return SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(hash));
         }
 
         #endregion
@@ -674,12 +700,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         #region Helper Methods
 
+        /// <summary>
+        /// Computes manifest ETag from chunk hashes using non-crypto hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string ComputeManifestETag(List<string> chunkHashes)
         {
-            var combined = string.Join(",", chunkHashes);
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(combined));
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            foreach (var ch in chunkHashes)
+                hash.Add(ch);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

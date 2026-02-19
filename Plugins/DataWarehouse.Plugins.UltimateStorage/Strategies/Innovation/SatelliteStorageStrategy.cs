@@ -745,13 +745,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Computes ETag for data.
+        /// Generates a non-cryptographic ETag from content.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
         private string ComputeETag(byte[] data)
         {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var hash = sha256.ComputeHash(data);
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            hash.AddBytes(data);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

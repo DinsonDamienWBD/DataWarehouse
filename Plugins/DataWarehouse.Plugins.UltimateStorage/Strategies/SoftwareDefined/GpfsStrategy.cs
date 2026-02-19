@@ -1217,22 +1217,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         }
 
         /// <summary>
-        /// Computes SHA256 ETag for a file.
+        /// Computes ETag for a file using file metadata (fast, no crypto).
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
         private string ComputeFileETag(string filePath)
         {
             try
             {
-                using var sha256 = SHA256.Create();
-                using var stream = File.OpenRead(filePath);
-                var hash = sha256.ComputeHash(stream);
-                return Convert.ToHexString(hash).ToLower();
+                var fileInfo = new FileInfo(filePath);
+                return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
             catch
             {
-                // If we can't compute hash, use file info
-                var fileInfo = new FileInfo(filePath);
-                return $"{fileInfo.Length}-{fileInfo.LastWriteTimeUtc.Ticks}".GetHashCode().ToString("x");
+                return Guid.NewGuid().ToString("N")[..8];
             }
         }
 

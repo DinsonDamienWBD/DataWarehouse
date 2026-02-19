@@ -218,8 +218,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 {
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-algorithm", "AES256");
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key", _sseCustomerKey);
-                    using var sha256 = SHA256.Create();
-                    var keyHash = Convert.ToBase64String(sha256.ComputeHash(Convert.FromBase64String(_sseCustomerKey)));
+                    // AD-11 exemption: S3 SSE-C protocol requires SHA256 hash of customer key in header
+                    var keyHash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(_sseCustomerKey)));
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key-MD5", keyHash);
                 }
             }
@@ -399,8 +399,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             {
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-algorithm", "AES256");
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key", _sseCustomerKey);
-                using var sha256 = SHA256.Create();
-                var keyHash = Convert.ToBase64String(sha256.ComputeHash(Convert.FromBase64String(_sseCustomerKey)));
+                // AD-11 exemption: S3 SSE-C protocol requires SHA256 hash of customer key in header
+                var keyHash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(_sseCustomerKey)));
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key-MD5", keyHash);
             }
 
@@ -591,8 +591,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             {
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-algorithm", "AES256");
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key", _sseCustomerKey);
-                using var sha256 = SHA256.Create();
-                var keyHash = Convert.ToBase64String(sha256.ComputeHash(Convert.FromBase64String(_sseCustomerKey)));
+                // AD-11 exemption: S3 SSE-C protocol requires SHA256 hash of customer key in header
+                var keyHash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(_sseCustomerKey)));
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key-MD5", keyHash);
             }
 
@@ -981,8 +981,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 {
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-algorithm", "AES256");
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key", _sseCustomerKey);
-                    using var sha256 = SHA256.Create();
-                    var keyHash = Convert.ToBase64String(sha256.ComputeHash(Convert.FromBase64String(_sseCustomerKey)));
+                    // AD-11 exemption: S3 SSE-C protocol requires SHA256 hash of customer key in header
+                    var keyHash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(_sseCustomerKey)));
                     request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key-MD5", keyHash);
                 }
             }
@@ -1035,8 +1035,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             {
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-algorithm", "AES256");
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key", _sseCustomerKey);
-                using var sha256 = SHA256.Create();
-                var keyHash = Convert.ToBase64String(sha256.ComputeHash(Convert.FromBase64String(_sseCustomerKey)));
+                // AD-11 exemption: S3 SSE-C protocol requires SHA256 hash of customer key in header
+                var keyHash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(_sseCustomerKey)));
                 request.Headers.TryAddWithoutValidation("x-amz-server-side-encryption-customer-key-MD5", keyHash);
             }
 

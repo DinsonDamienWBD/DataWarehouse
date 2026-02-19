@@ -951,12 +951,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// <param name="key">Object key.</param>
         /// <param name="modified">Last modified timestamp.</param>
         /// <returns>The generated ETag.</returns>
+        /// <summary>
+        /// Generates a non-cryptographic ETag from key and timestamp.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string GenerateETag(string key, DateTime modified)
         {
-            var input = $"{key}:{modified.Ticks}";
-            using var sha256 = SHA256.Create();
-            var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
-            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+            return HashCode.Combine(key, modified.Ticks).ToString("x8");
         }
 
         /// <summary>

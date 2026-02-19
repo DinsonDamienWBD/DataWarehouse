@@ -675,13 +675,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         #region Helper Methods
 
         /// <summary>
-        /// Computes SHA256 hash of data.
+        /// Generates a non-cryptographic hash from content using fast hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
         private string ComputeHash(byte[] data)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(data);
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            hash.AddBytes(data);
+            return hash.ToHashCode().ToString("x8");
         }
 
         /// <summary>

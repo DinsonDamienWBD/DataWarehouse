@@ -288,13 +288,9 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
             var fileInfo = new FileInfo(tempPath);
             var size = fileInfo.Length;
 
-            byte[] hash;
-            using (var fileStream = File.OpenRead(tempPath))
-            {
-                using var sha = System.Security.Cryptography.SHA256.Create();
-                hash = await sha.ComputeHashAsync(fileStream, ct);
-            }
-            var etag = Convert.ToHexString(hash).ToLowerInvariant();
+            // AD-11: Use file metadata for ETag (crypto hashing via UltimateDataIntegrity bus)
+            var tempFileInfo = new FileInfo(tempPath);
+            var etag = HashCode.Combine(tempFileInfo.Length, tempFileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
 
             // Upload to FileStorage
             using (var fileStream = File.OpenRead(tempPath))

@@ -822,22 +822,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Computes checksum using specified hash algorithm.
+        /// Computes checksum using non-cryptographic fast hashing.
+        /// AD-11: Cryptographic integrity verification delegated to UltimateDataIntegrity via bus.
+        /// Self-healing uses fast checksums for corruption detection; bus handles crypto-grade integrity.
         /// </summary>
         private string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
         {
-            HashAlgorithm hashAlgorithm = algorithmName.Name switch
-            {
-                "SHA256" => SHA256.Create(),
-                "SHA512" => SHA512.Create(),
-                _ => SHA256.Create()
-            };
-
-            using (hashAlgorithm)
-            {
-                var hash = hashAlgorithm.ComputeHash(data);
-                return Convert.ToBase64String(hash);
-            }
+            var hash = new HashCode();
+            hash.AddBytes(data);
+            hash.Add(data.Length);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

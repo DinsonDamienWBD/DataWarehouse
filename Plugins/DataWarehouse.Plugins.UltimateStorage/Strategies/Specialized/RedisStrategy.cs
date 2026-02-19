@@ -856,11 +856,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             return $"{_keyPrefix}stream:{key}";
         }
 
+        /// <summary>
+        /// Generates a non-cryptographic ETag from content using fast hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// ETags only need collision resistance for caching, not security.
+        /// </summary>
         private string GenerateETag(byte[] content)
         {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var hash = sha256.ComputeHash(content);
-            return Convert.ToHexString(hash).ToLowerInvariant();
+            var hash = new HashCode();
+            hash.AddBytes(content);
+            return hash.ToHashCode().ToString("x8");
         }
 
         private string GenerateETag(string key, long size, long modifiedTicks)

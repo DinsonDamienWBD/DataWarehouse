@@ -536,11 +536,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
         }
 
+        /// <summary>
+        /// Computes fast checksum for replication verification.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private static string ComputeChecksum(byte[] data)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(data);
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            hash.AddBytes(data);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

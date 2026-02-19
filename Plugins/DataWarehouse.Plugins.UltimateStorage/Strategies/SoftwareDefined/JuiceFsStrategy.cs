@@ -1691,19 +1691,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             };
         }
 
+        /// <summary>
+        /// Generates a non-cryptographic ETag from content.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string ComputeETag(byte[] content)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(content);
-            return Convert.ToHexString(hash).ToLower();
+            var hash = new HashCode();
+            hash.AddBytes(content);
+            return hash.ToHashCode().ToString("x8");
         }
 
+        /// <summary>
+        /// Computes ETag for a file using file metadata (fast, no crypto).
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string ComputeFileETag(string filePath)
         {
-            using var sha256 = SHA256.Create();
-            using var stream = File.OpenRead(filePath);
-            var hash = sha256.ComputeHash(stream);
-            return Convert.ToHexString(hash).ToLower();
+            var fileInfo = new FileInfo(filePath);
+            return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
         }
 
         protected override int GetMaxKeyLength() => 4096; // JuiceFS supports long paths

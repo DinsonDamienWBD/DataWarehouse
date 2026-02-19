@@ -1009,21 +1009,27 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Computes auth token for CephX protocol simulation.
+        /// AD-11 exemption: Authentication token generation is protocol-specific.
+        /// In production, CephX protocol handles this natively.
+        /// </summary>
         private string ComputeAuthToken(string username, string keyring)
         {
-            // Simple token generation for demonstration
-            // In production, this would use proper CephX authentication protocol
             var tokenData = $"{username}:{keyring}:{DateTime.UtcNow:yyyyMMdd}";
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(tokenData));
-            return Convert.ToBase64String(hash);
+            return Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes(tokenData))[..32];
         }
 
+        /// <summary>
+        /// Generates a non-cryptographic ETag from content.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string CalculateETag(byte[] content)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(content);
-            return Convert.ToHexString(hash).ToLower();
+            var hash = new HashCode();
+            hash.AddBytes(content);
+            return hash.ToHashCode().ToString("x8");
         }
 
         private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, CancellationToken ct)

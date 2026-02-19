@@ -491,13 +491,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Computes SHA256 hash of a chunk for content-addressable storage.
+        /// Computes hash of a chunk for content-addressable storage using fast hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
         private string ComputeChunkHash(byte[] chunk)
         {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(chunk);
-            return Convert.ToHexString(hash);
+            var hash = new HashCode();
+            hash.AddBytes(chunk);
+            var h1 = hash.ToHashCode();
+            var hash2 = new HashCode();
+            hash2.Add(h1);
+            hash2.Add(chunk.Length);
+            return $"{h1:x8}{hash2.ToHashCode():x8}";
         }
 
         #endregion
@@ -601,12 +606,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         #region Helper Methods
 
+        /// <summary>
+        /// Computes manifest ETag using non-crypto hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private string ComputeManifestETag(ChunkManifest manifest)
         {
-            var combined = string.Join(",", manifest.ChunkHashes);
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            foreach (var ch in manifest.ChunkHashes)
+                hash.Add(ch);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

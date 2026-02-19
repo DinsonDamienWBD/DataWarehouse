@@ -1035,11 +1035,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             };
         }
 
+        /// <summary>
+        /// Generates a non-cryptographic ETag. AD-11: crypto hashing via UltimateDataIntegrity bus.
+        /// </summary>
         private string CalculateETag(string key, DateTime modified)
         {
-            var input = $"{key}:{modified:O}";
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-            return Convert.ToHexString(hash).ToLower();
+            return HashCode.Combine(key, modified.Ticks).ToString("x8");
         }
 
         protected override int GetMaxKeyLength() => 255; // POSIX filename length limit

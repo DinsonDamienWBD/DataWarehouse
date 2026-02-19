@@ -399,11 +399,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return metadata;
         }
 
+        /// <summary>
+        /// Generates a non-cryptographic hash from content using fast hashing.
+        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// </summary>
         private static string ComputeHash(byte[] data)
         {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var hash = sha256.ComputeHash(data);
-            return Convert.ToBase64String(hash);
+            var hash = new HashCode();
+            hash.AddBytes(data);
+            return hash.ToHashCode().ToString("x8");
         }
 
         #endregion

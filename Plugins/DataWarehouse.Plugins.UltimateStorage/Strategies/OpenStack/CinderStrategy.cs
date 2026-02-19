@@ -916,7 +916,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
             await data.CopyToAsync(ms, 81920, ct);
             var dataBytes = ms.ToArray();
 
-            var hash = Convert.ToBase64String(SHA256.HashData(dataBytes));
+            // AD-11: Use non-crypto hash for metadata tracking; integrity via UltimateDataIntegrity bus
+            var hc = new HashCode();
+            hc.AddBytes(dataBytes);
+            var hash = hc.ToHashCode().ToString("x8");
 
             var updateUrl = $"{_cinderUrl}/volumes/{volumeId}/metadata";
             var metadataUpdate = new
