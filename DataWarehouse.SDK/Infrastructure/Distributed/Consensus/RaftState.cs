@@ -158,6 +158,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         [JsonPropertyName("matchIndex")]
         public long MatchIndex { get; set; }
 
+        // Security: HMAC authentication (AUTH-06)
+        [JsonPropertyName("hmac")]
+        public string? Hmac { get; set; }
+
         public byte[] Serialize()
         {
             return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(this, RaftJsonContext.Default.RaftMessage);

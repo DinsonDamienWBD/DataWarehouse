@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -39,6 +40,22 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private Task? _electionTask;
         private Task? _heartbeatTask;
         private int _currentElectionTimeoutMs;
+
+        // Security: Membership verification and HMAC authentication (DIST-01, DIST-02, AUTH-06)
+        private const long MaxTermJump = 100;
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTermChangeByNode = new();
+        private byte[]? _clusterSecret;
+
+        /// <summary>
+        /// Optional cluster secret for HMAC-SHA256 message authentication.
+        /// When set, all outgoing Raft messages include an HMAC signature and all incoming
+        /// messages are verified. Messages with invalid or missing HMAC are silently dropped.
+        /// </summary>
+        public byte[]? ClusterSecret
+        {
+            get => _clusterSecret;
+            set => _clusterSecret = value;
+        }
 
         /// <summary>
         /// Creates a new Raft consensus engine.
@@ -311,10 +328,18 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
                 var responseData = await _network.RequestFromPeerAsync(
                     peer.NodeId,
-                    request.Serialize(),
+                    SignAndSerialize(request),
                     timeoutCts.Token).ConfigureAwait(false);
 
-                return RaftMessage.Deserialize(responseData);
+                var response = RaftMessage.Deserialize(responseData);
+
+                // Verify HMAC on response if cluster secret is configured
+                if (response != null && _clusterSecret != null && !VerifyMessageHmac(response, responseData))
+                {
+                    return null; // Invalid HMAC -- discard
+                }
+
+                return response;
             }
             catch
             {
@@ -455,11 +480,17 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
                 var responseData = await _network.RequestFromPeerAsync(
                     peer.NodeId,
-                    appendEntries.Serialize(),
+                    SignAndSerialize(appendEntries),
                     timeoutCts.Token).ConfigureAwait(false);
 
                 var response = RaftMessage.Deserialize(responseData);
                 if (response == null) return;
+
+                // Verify HMAC on response if cluster secret is configured
+                if (_clusterSecret != null && !VerifyMessageHmac(response, responseData))
+                {
+                    return; // Invalid HMAC -- discard
+                }
 
                 if (response.Term > currentTerm)
                 {
@@ -590,18 +621,57 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <summary>
         /// Handles an incoming Raft RPC message from the network.
         /// Called by the transport layer when a Raft message is received.
+        /// Performs membership verification and optional HMAC authentication before processing.
         /// </summary>
         internal async Task<byte[]?> HandleIncomingMessageAsync(byte[] data, CancellationToken ct = default)
         {
             var message = RaftMessage.Deserialize(data);
             if (message == null) return null;
 
-            return message.Type switch
+            // Security: Verify HMAC if cluster secret is configured (AUTH-06)
+            if (_clusterSecret != null)
             {
-                RaftMessageType.RequestVote => (await HandleRequestVoteAsync(message, ct).ConfigureAwait(false))?.Serialize(),
-                RaftMessageType.AppendEntries => (await HandleAppendEntriesAsync(message, ct).ConfigureAwait(false))?.Serialize(),
+                if (!VerifyMessageHmac(message, data))
+                {
+                    // HMAC verification failed -- silently drop to avoid information leakage
+                    return null;
+                }
+            }
+
+            // Security: Verify sender is a known cluster member (DIST-01, DIST-02)
+            if (!string.IsNullOrEmpty(message.SenderId))
+            {
+                var knownMembers = _membership.GetMembers();
+                if (!knownMembers.Any(m => string.Equals(m.NodeId, message.SenderId, StringComparison.Ordinal)))
+                {
+                    // Rejected -- do not reveal cluster topology to unknown nodes
+                    return null;
+                }
+            }
+            else
+            {
+                // Messages without sender ID are always rejected
+                return null;
+            }
+
+            var response = message.Type switch
+            {
+                RaftMessageType.RequestVote => await HandleRequestVoteAsync(message, ct).ConfigureAwait(false),
+                RaftMessageType.AppendEntries => await HandleAppendEntriesAsync(message, ct).ConfigureAwait(false),
                 _ => null
             };
+
+            if (response == null) return null;
+
+            // Security: Sign outgoing response with HMAC if cluster secret is configured
+            var responseBytes = response.Serialize();
+            if (_clusterSecret != null)
+            {
+                response.Hmac = ComputeMessageHmac(responseBytes);
+                responseBytes = response.Serialize();
+            }
+
+            return responseBytes;
         }
 
         private async Task<RaftMessage> HandleRequestVoteAsync(RaftMessage request, CancellationToken ct)
@@ -609,6 +679,39 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             await _stateLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
+                // Security: Reject suspicious term inflation (DIST-01 -- election hijack prevention)
+                // A legitimate candidate increments term by 1; large jumps indicate attack
+                if (request.Term > _persistent.CurrentTerm + MaxTermJump)
+                {
+                    return new RaftMessage
+                    {
+                        Type = RaftMessageType.RequestVoteResponse,
+                        Term = _persistent.CurrentTerm,
+                        SenderId = _membership.GetSelf().NodeId,
+                        VoteGranted = false,
+                        Reason = "Rejected: suspicious term inflation"
+                    };
+                }
+
+                // Security: Rate-limit term changes per sender (max 1 per second)
+                if (request.Term > _persistent.CurrentTerm)
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    if (_lastTermChangeByNode.TryGetValue(request.SenderId, out var lastChange)
+                        && (now - lastChange).TotalSeconds < 1.0)
+                    {
+                        return new RaftMessage
+                        {
+                            Type = RaftMessageType.RequestVoteResponse,
+                            Term = _persistent.CurrentTerm,
+                            SenderId = _membership.GetSelf().NodeId,
+                            VoteGranted = false,
+                            Reason = "Rejected: term change rate limited"
+                        };
+                    }
+                    _lastTermChangeByNode[request.SenderId] = now;
+                }
+
                 // If request term > currentTerm, update and step down
                 if (request.Term > _persistent.CurrentTerm)
                 {
@@ -860,6 +963,61 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 }
             }
         }
+
+        #region HMAC Authentication
+
+        /// <summary>
+        /// Computes HMAC-SHA256 for a serialized message using the cluster secret.
+        /// </summary>
+        private string ComputeMessageHmac(byte[] messageBytes)
+        {
+            if (_clusterSecret == null)
+                throw new InvalidOperationException("ClusterSecret is not configured");
+
+            using var hmac = new HMACSHA256(_clusterSecret);
+            var hash = hmac.ComputeHash(messageBytes);
+            return Convert.ToBase64String(hash);
+        }
+
+        /// <summary>
+        /// Verifies the HMAC of an incoming message. The HMAC is computed over the message
+        /// content excluding the hmac field itself by deserializing, clearing hmac, re-serializing.
+        /// </summary>
+        private bool VerifyMessageHmac(RaftMessage message, byte[] originalData)
+        {
+            if (_clusterSecret == null) return true;
+            if (string.IsNullOrEmpty(message.Hmac)) return false;
+
+            var receivedHmac = message.Hmac;
+
+            // Compute HMAC over the message without the hmac field
+            message.Hmac = null;
+            var cleanBytes = message.Serialize();
+            message.Hmac = receivedHmac; // Restore
+
+            using var hmac = new HMACSHA256(_clusterSecret);
+            var expectedHash = hmac.ComputeHash(cleanBytes);
+            var expectedHmac = Convert.ToBase64String(expectedHash);
+
+            return string.Equals(receivedHmac, expectedHmac, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Signs a RaftMessage with HMAC and returns the serialized bytes.
+        /// </summary>
+        private byte[] SignAndSerialize(RaftMessage message)
+        {
+            if (_clusterSecret != null)
+            {
+                // First serialize without HMAC to compute the signature
+                message.Hmac = null;
+                var cleanBytes = message.Serialize();
+                message.Hmac = ComputeMessageHmac(cleanBytes);
+            }
+            return message.Serialize();
+        }
+
+        #endregion
 
         /// <summary>
         /// Disposes the Raft engine, stopping all background tasks and releasing resources.
