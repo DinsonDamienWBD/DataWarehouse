@@ -33,6 +33,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly List<Action<Proposal>> _commitHandlers = new();
         private readonly CancellationTokenSource _cts = new();
         private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new();
+        private readonly IRaftLogStore _logStore;
 
         private RaftRole _role = RaftRole.Follower;
         private string? _leaderId;
@@ -58,7 +59,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         /// <summary>
-        /// Creates a new Raft consensus engine.
+        /// Creates a new Raft consensus engine with in-memory log storage (backward compatible).
         /// </summary>
         /// <param name="membership">Cluster membership for peer discovery and leader reporting.</param>
         /// <param name="network">P2P network for RPC communication.</param>
@@ -67,9 +68,26 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             IClusterMembership membership,
             IP2PNetwork network,
             RaftConfiguration? config = null)
+            : this(membership, network, new InMemoryRaftLogStore(), config)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new Raft consensus engine with the specified log store for persistence.
+        /// </summary>
+        /// <param name="membership">Cluster membership for peer discovery and leader reporting.</param>
+        /// <param name="network">P2P network for RPC communication.</param>
+        /// <param name="logStore">Log store implementation for entry persistence.</param>
+        /// <param name="config">Optional Raft configuration.</param>
+        public RaftConsensusEngine(
+            IClusterMembership membership,
+            IP2PNetwork network,
+            IRaftLogStore logStore,
+            RaftConfiguration? config = null)
         {
             _membership = membership ?? throw new ArgumentNullException(nameof(membership));
             _network = network ?? throw new ArgumentNullException(nameof(network));
+            _logStore = logStore ?? throw new ArgumentNullException(nameof(logStore));
             _config = config ?? new RaftConfiguration();
 
             RandomizeElectionTimeout();
