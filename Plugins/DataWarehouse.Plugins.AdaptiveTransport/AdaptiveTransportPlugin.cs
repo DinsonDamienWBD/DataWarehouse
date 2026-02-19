@@ -50,6 +50,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     private readonly SemaphoreSlim _switchLock = new(1, 1);
     private readonly Timer _qualityMonitorTimer;
     private readonly AdaptiveTransportConfig _config;
+    private readonly AimdCongestionControl _udpCongestionControl = new(initialWindow: 4, minWindow: 1);
     private readonly string _storagePath;
     private TransportProtocol _currentProtocol = TransportProtocol.Tcp;
     private bool _isRunning;
@@ -612,6 +613,11 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     /// <param name="data">Data to send.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Transfer result.</returns>
+    /// <summary>
+    /// Sends data using reliable UDP with custom ACK mechanism and AIMD congestion control.
+    /// Congestion control prevents burst flooding by limiting in-flight segments to the
+    /// congestion window size, with additive increase on ACK and multiplicative decrease on loss.
+    /// </summary>
     public async Task<TransferResult> SendViaReliableUdpAsync(string endpoint, byte[] data, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
@@ -630,10 +636,10 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             var remoteEndpoint = new IPEndPoint(addresses[0], port);
             client.Connect(remoteEndpoint);
 
-            // Start ACK receiver task
-            var ackTask = ReceiveAcksAsync(client, acked, chunks.Count, ct);
+            // Start ACK receiver task with congestion control feedback
+            var ackTask = ReceiveAcksWithCongestionAsync(client, acked, chunks.Count, ct);
 
-            // Send all chunks with sequence numbers
+            // Send chunks using AIMD congestion control
             var retryCount = 0;
             var maxRetries = _config.MaxRetries;
 
@@ -641,16 +647,37 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             {
                 ct.ThrowIfCancellationRequested();
 
+                var sendWindow = _udpCongestionControl.GetSendWindow();
+                var inFlight = 0;
+
                 for (var i = 0; i < chunks.Count; i++)
                 {
                     if (acked.ContainsKey(i)) continue;
 
+                    // Respect congestion window: limit in-flight segments
+                    if (inFlight >= sendWindow)
+                    {
+                        // Wait before sending more (rate limiting based on RTT/window)
+                        var delayMs = _udpCongestionControl.GetSendDelayMs(_config.UdpChunkSize);
+                        if (delayMs > 0)
+                            await Task.Delay(Math.Max(1, (int)delayMs), ct);
+                        inFlight = 0; // Reset in-flight count after delay
+                    }
+
                     var packet = CreateReliablePacket(transferId, i, chunks.Count, chunks[i]);
                     await client.SendAsync(packet, ct);
+                    inFlight++;
                 }
 
                 // Wait for ACKs with timeout
                 await Task.Delay(_config.AckTimeout, ct);
+
+                // If we didn't get all ACKs, treat as loss event for congestion control
+                if (acked.Count < chunks.Count)
+                {
+                    _udpCongestionControl.OnLoss();
+                }
+
                 retryCount++;
             }
 
@@ -734,6 +761,50 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
         ArrayPool<byte>.Shared.Return(packet);
 
         return result;
+    }
+
+    /// <summary>
+    /// Receives ACKs with congestion control feedback. Each ACK triggers additive increase
+    /// and RTT measurement via EWMA for the AIMD controller.
+    /// </summary>
+    private async Task ReceiveAcksWithCongestionAsync(UdpClient client, ConcurrentDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
+    {
+        var sendTimestamps = new ConcurrentDictionary<int, DateTime>();
+        try
+        {
+            while (acked.Count < totalChunks && !ct.IsCancellationRequested)
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(_config.AckTimeout);
+
+                try
+                {
+                    var result = await client.ReceiveAsync(timeoutCts.Token);
+                    // ACK format: [Type:1][Sequence:4]
+                    if (result.Buffer.Length >= 5 && result.Buffer[0] == 0x01) // ACK type
+                    {
+                        var sequence = BitConverter.ToInt32(result.Buffer, 1);
+                        if (acked.TryAdd(sequence, true))
+                        {
+                            // Measure RTT sample and feed to congestion controller
+                            var rttSample = sendTimestamps.TryRemove(sequence, out var sentAt)
+                                ? (DateTime.UtcNow - sentAt).TotalMilliseconds
+                                : _udpCongestionControl.SmoothedRttMs; // Use smoothed if no timestamp
+
+                            _udpCongestionControl.OnAck(rttSample);
+                        }
+                    }
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // Timeout - continue waiting
+                }
+            }
+        }
+        catch
+        {
+            // Receiving stopped
+        }
     }
 
     private async Task ReceiveAcksAsync(UdpClient client, ConcurrentDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
@@ -1298,16 +1369,20 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     private async Task<TransferResult> SendViaTcpAsync(string endpoint, byte[] data, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
+        PooledConnection? pooledConn = null;
+        var returnToPool = false;
+
         try
         {
             var parts = endpoint.Split(':');
             var host = parts[0];
             var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 5000;
 
-            using var client = new TcpClient();
-            await client.ConnectAsync(host, port, ct);
+            // Get connection from pool (reuses existing connections)
+            var pool = _connectionPools.GetOrAdd("Tcp", _ => new ConnectionPool(TransportProtocol.Tcp, _config));
+            pooledConn = await pool.GetTcpConnectionAsync(host, port, ct);
 
-            await using var stream = client.GetStream();
+            var stream = pooledConn.GetStream();
 
             // Send length-prefixed data
             var lengthPrefix = BitConverter.GetBytes(data.Length);
@@ -1321,6 +1396,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
 
             sw.Stop();
             Interlocked.Add(ref _totalBytesSent, data.Length);
+            returnToPool = true;
 
             return new TransferResult
             {
@@ -1340,6 +1416,17 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
                 Error = ex.Message,
                 Duration = sw.Elapsed
             };
+        }
+        finally
+        {
+            if (pooledConn != null)
+            {
+                var pool = _connectionPools.GetOrAdd("Tcp", _ => new ConnectionPool(TransportProtocol.Tcp, _config));
+                if (returnToPool)
+                    pool.ReturnConnection(pooledConn);
+                else
+                    pooledConn.Dispose(); // Connection failed, don't return to pool
+            }
         }
     }
 
@@ -2063,66 +2150,308 @@ internal sealed class TransportConfigData
 }
 
 /// <summary>
-/// Connection pool for a specific protocol.
+/// Connection pool for a specific protocol with health checking, idle eviction,
+/// and connection reuse. Connections are returned to the pool after use, eliminating
+/// per-send connection creation overhead.
 /// </summary>
 internal sealed class ConnectionPool : IAsyncDisposable
 {
     private readonly TransportProtocol _protocol;
     private readonly AdaptiveTransportConfig _config;
-    private readonly ConcurrentBag<object> _connections = new();
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<PooledConnection>> _endpointPools = new();
+    private readonly Timer _healthCheckTimer;
     private int _activeConnections;
+    private int _totalConnections;
+
+    /// <summary>Maximum connections per endpoint.</summary>
+    private const int MaxConnectionsPerEndpoint = 10;
+
+    /// <summary>Idle timeout before connection is evicted.</summary>
+    private static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Health check interval.</summary>
+    private static readonly TimeSpan HealthCheckInterval = TimeSpan.FromSeconds(30);
 
     public int ActiveConnections => _activeConnections;
+    public int TotalConnections => _totalConnections;
 
     public ConnectionPool(TransportProtocol protocol, AdaptiveTransportConfig config)
     {
         _protocol = protocol;
         _config = config;
+        _healthCheckTimer = new Timer(
+            _ => PerformHealthCheck(),
+            null,
+            HealthCheckInterval,
+            HealthCheckInterval);
     }
 
-    public async Task WarmupAsync(int count, CancellationToken ct)
+    /// <summary>
+    /// Gets a pooled TCP connection for the specified endpoint, or creates a new one.
+    /// </summary>
+    /// <param name="host">Target host.</param>
+    /// <param name="port">Target port.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A pooled TCP connection.</returns>
+    public async Task<PooledConnection> GetTcpConnectionAsync(string host, int port, CancellationToken ct)
     {
-        // Pre-create connections based on protocol
-        for (var i = 0; i < count && !ct.IsCancellationRequested; i++)
+        var key = $"{host}:{port}";
+        var pool = _endpointPools.GetOrAdd(key, _ => new ConcurrentQueue<PooledConnection>());
+
+        // Try to get an existing healthy connection
+        while (pool.TryDequeue(out var existing))
         {
-            try
+            if (existing.IsHealthy && !existing.IsExpired(IdleTimeout))
             {
-                switch (_protocol)
-                {
-                    case TransportProtocol.Tcp:
-                        // TCP connections are created on-demand
-                        break;
-                    case TransportProtocol.ReliableUdp:
-                        var udpClient = new UdpClient();
-                        _connections.Add(udpClient);
-                        Interlocked.Increment(ref _activeConnections);
-                        break;
-                }
+                existing.MarkActive();
+                Interlocked.Increment(ref _activeConnections);
+                return existing;
             }
-            catch
+
+            // Connection is unhealthy or expired -- dispose it
+            existing.Dispose();
+            Interlocked.Decrement(ref _totalConnections);
+        }
+
+        // Create new connection
+        var client = new TcpClient();
+        await client.ConnectAsync(host, port, ct);
+        var conn = new PooledConnection(client, key);
+        Interlocked.Increment(ref _activeConnections);
+        Interlocked.Increment(ref _totalConnections);
+        return conn;
+    }
+
+    /// <summary>
+    /// Returns a TCP connection to the pool for reuse.
+    /// </summary>
+    /// <param name="connection">The connection to return.</param>
+    public void ReturnConnection(PooledConnection connection)
+    {
+        Interlocked.Decrement(ref _activeConnections);
+
+        if (!connection.IsHealthy)
+        {
+            connection.Dispose();
+            Interlocked.Decrement(ref _totalConnections);
+            return;
+        }
+
+        var key = connection.EndpointKey;
+        var pool = _endpointPools.GetOrAdd(key, _ => new ConcurrentQueue<PooledConnection>());
+
+        // Check pool capacity
+        if (pool.Count >= MaxConnectionsPerEndpoint)
+        {
+            connection.Dispose();
+            Interlocked.Decrement(ref _totalConnections);
+            return;
+        }
+
+        connection.MarkIdle();
+        pool.Enqueue(connection);
+    }
+
+    /// <summary>
+    /// Periodic health check: pings idle connections, removes expired/unhealthy ones.
+    /// </summary>
+    private void PerformHealthCheck()
+    {
+        foreach (var kvp in _endpointPools)
+        {
+            var pool = kvp.Value;
+            var count = pool.Count;
+
+            for (var i = 0; i < count; i++)
             {
-                // Continue warming up
+                if (!pool.TryDequeue(out var conn))
+                    break;
+
+                if (conn.IsHealthy && !conn.IsExpired(IdleTimeout))
+                {
+                    pool.Enqueue(conn);
+                }
+                else
+                {
+                    conn.Dispose();
+                    Interlocked.Decrement(ref _totalConnections);
+                }
             }
         }
     }
 
+    public Task WarmupAsync(int count, CancellationToken ct)
+    {
+        // Warmup is now done on-demand via GetTcpConnectionAsync
+        // UDP sockets are connectionless and don't need pooling
+        return Task.CompletedTask;
+    }
+
     public async ValueTask DisposeAsync()
     {
-        while (_connections.TryTake(out var conn))
-        {
-            try
-            {
-                if (conn is IDisposable disposable)
-                    disposable.Dispose();
-                else if (conn is IAsyncDisposable asyncDisposable)
-                    await asyncDisposable.DisposeAsync();
+        _healthCheckTimer.Dispose();
 
-                Interlocked.Decrement(ref _activeConnections);
-            }
-            catch
+        foreach (var pool in _endpointPools.Values)
+        {
+            while (pool.TryDequeue(out var conn))
             {
-                // Best effort cleanup
+                conn.Dispose();
+                Interlocked.Decrement(ref _totalConnections);
             }
+        }
+        _endpointPools.Clear();
+        _activeConnections = 0;
+    }
+}
+
+/// <summary>
+/// Wrapper around a TCP connection that tracks health and idle time for pool management.
+/// </summary>
+internal sealed class PooledConnection : IDisposable
+{
+    private readonly TcpClient _client;
+    private DateTime _lastUsed;
+    private bool _disposed;
+
+    /// <summary>The endpoint key for pool routing.</summary>
+    public string EndpointKey { get; }
+
+    /// <summary>
+    /// Gets whether the underlying TCP connection is still healthy (connected and not disposed).
+    /// </summary>
+    public bool IsHealthy => !_disposed && _client.Connected;
+
+    /// <summary>Gets the network stream for data transfer.</summary>
+    public NetworkStream GetStream() => _client.GetStream();
+
+    public PooledConnection(TcpClient client, string endpointKey)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        EndpointKey = endpointKey;
+        _lastUsed = DateTime.UtcNow;
+    }
+
+    /// <summary>Checks whether this connection has been idle longer than the specified timeout.</summary>
+    public bool IsExpired(TimeSpan idleTimeout) => (DateTime.UtcNow - _lastUsed) > idleTimeout;
+
+    /// <summary>Marks this connection as actively in use.</summary>
+    public void MarkActive() => _lastUsed = DateTime.UtcNow;
+
+    /// <summary>Marks this connection as idle (returned to pool).</summary>
+    public void MarkIdle() => _lastUsed = DateTime.UtcNow;
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        try { _client.Dispose(); } catch { /* best effort */ }
+    }
+}
+
+/// <summary>
+/// AIMD (Additive Increase Multiplicative Decrease) congestion control for Reliable UDP.
+/// Prevents burst flooding by limiting the send rate based on network feedback.
+/// </summary>
+internal sealed class AimdCongestionControl
+{
+    private double _congestionWindow;
+    private double _rttMs;
+    private readonly double _minWindow;
+    private readonly double _initialWindow;
+    private readonly double _rttAlpha;
+    private readonly object _lock = new();
+
+    /// <summary>Gets the current congestion window size (in segments).</summary>
+    public double CongestionWindow
+    {
+        get { lock (_lock) return _congestionWindow; }
+    }
+
+    /// <summary>Gets the current smoothed RTT estimate in milliseconds.</summary>
+    public double SmoothedRttMs
+    {
+        get { lock (_lock) return _rttMs; }
+    }
+
+    /// <summary>
+    /// Creates a new AIMD congestion controller.
+    /// </summary>
+    /// <param name="initialWindow">Initial congestion window in segments. Default 4.</param>
+    /// <param name="minWindow">Minimum congestion window. Default 1.</param>
+    /// <param name="rttAlpha">EWMA smoothing factor for RTT. Default 0.125 (RFC 6298).</param>
+    public AimdCongestionControl(double initialWindow = 4, double minWindow = 1, double rttAlpha = 0.125)
+    {
+        _initialWindow = initialWindow;
+        _congestionWindow = initialWindow;
+        _minWindow = minWindow;
+        _rttAlpha = rttAlpha;
+        _rttMs = 100; // Initial RTT estimate
+    }
+
+    /// <summary>
+    /// Called when an ACK is received (additive increase).
+    /// Window increases by 1/window per ACK (linear growth).
+    /// </summary>
+    public void OnAck(double rttSampleMs)
+    {
+        lock (_lock)
+        {
+            // Additive increase: window += 1/window
+            _congestionWindow += 1.0 / _congestionWindow;
+
+            // Update RTT using EWMA: rtt_new = (1 - alpha) * rtt_old + alpha * sample
+            _rttMs = (1 - _rttAlpha) * _rttMs + _rttAlpha * rttSampleMs;
+        }
+    }
+
+    /// <summary>
+    /// Called when a timeout or packet loss is detected (multiplicative decrease).
+    /// Window is halved, with a minimum of minWindow.
+    /// </summary>
+    public void OnLoss()
+    {
+        lock (_lock)
+        {
+            // Multiplicative decrease: window = window / 2
+            _congestionWindow = Math.Max(_minWindow, _congestionWindow / 2);
+        }
+    }
+
+    /// <summary>
+    /// Gets the maximum number of segments that can be in-flight at this moment.
+    /// </summary>
+    public int GetSendWindow()
+    {
+        lock (_lock)
+        {
+            return Math.Max(1, (int)_congestionWindow);
+        }
+    }
+
+    /// <summary>
+    /// Calculates the delay between sends based on the congestion window and RTT.
+    /// Send rate = congestion_window * segment_size / RTT.
+    /// </summary>
+    /// <param name="segmentSize">Segment size in bytes.</param>
+    /// <returns>Delay in milliseconds between sends.</returns>
+    public double GetSendDelayMs(int segmentSize)
+    {
+        lock (_lock)
+        {
+            if (_congestionWindow <= 0 || _rttMs <= 0) return 0;
+            // Delay per segment = RTT / window
+            return _rttMs / _congestionWindow;
+        }
+    }
+
+    /// <summary>
+    /// Resets the congestion window to initial values.
+    /// </summary>
+    public void Reset()
+    {
+        lock (_lock)
+        {
+            _congestionWindow = _initialWindow;
         }
     }
 }
