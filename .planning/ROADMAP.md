@@ -1090,7 +1090,7 @@ Plans:
 - [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, cross-moonshot orchestration pipeline, unified dashboard, health probes, configuration hierarchy. **Plans:** 7 plans in 4 waves
 - [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
 - [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing. **Plans:** 8 plans in 4 waves
-- [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full audit, benchmarks, competitive re-analysis, first certification target: CERTIFIED (zero conditions), second certification target: Find valid reasons for 'NOT' to certify
+- [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full independent audit, hostile certification, competitive re-analysis, benchmarks, 20+ E2E flow traces. **Plans:** 7 plans in 4 waves
 
 ### Phase Details
 
@@ -1414,3 +1414,34 @@ Wave 4 (Verification — depends on all):
   7. Cross-moonshot event wiring: consciousness->tags, sovereignty->compliance, carbon->placement, compliance->timelocks, chaos->sovereignty, placement->fabric
   8. 30+ integration tests pass covering pipeline, config, health, and wiring
   9. Full solution builds with 0 errors, all tests pass
+
+#### Phase 67: v5.0 Final Audit & Certification
+**Goal**: Full independent audit of the complete v5.0 codebase. Hostile certification. Competitive re-analysis. Published auditable results. First target: CERTIFIED (zero conditions). Second target: Find valid reasons for NOT certifying.
+**Depends on**: Phases 52-66 (all v5.0 implementation and integration complete)
+**Plans**: 7 plans, 4 waves
+
+Wave 1 (Independent audits — parallel):
+- [ ] 67-01-PLAN.md — Build health + plugin registration audit (63 plugins, SDK refs, bus wiring, config paths)
+- [ ] 67-02-PLAN.md — Security re-assessment (all 50 v4.5 findings, new v5.0 scan, score /100)
+- [ ] 67-03-PLAN.md — Feature completeness + moonshot verification (3,549 features, 10 moonshots, configurability)
+
+Wave 2 (Depends on Wave 1):
+- [ ] 67-04-PLAN.md — End-to-end flow tracing (20+ critical paths through bus, plugins, strategies)
+- [ ] 67-05-PLAN.md — Performance benchmark suite (VDE, compression, encryption, bus, memory, concurrency)
+
+Wave 3 (Depends on Waves 1-2):
+- [ ] 67-06-PLAN.md — Competitive re-analysis (70+ products updated from v4.5 baseline)
+
+Wave 4 (Final gate — depends on all):
+- [ ] 67-07-PLAN.md — Formal CERTIFICATION.md issuance (PASS/FAIL per domain, per tier, remediation if needed)
+
+**Success Criteria**:
+  1. All 63 plugins pass build/registration/isolation/wiring audit
+  2. Security score assessed with evidence (target 100/100)
+  3. All 3,549 features verified at 100% or documented as intentionally deferred
+  4. All 10 moonshots verified WIRED with real implementations
+  5. 20+ critical E2E flows traced entry-to-exit
+  6. Performance profile published with bottleneck ranking
+  7. 70+ product competitive analysis updated for v5.0
+  8. Formal v5.0-CERTIFICATION.md issued with accountable verdict
+  9. If NOT CERTIFIED: actionable remediation plan included
