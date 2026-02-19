@@ -31,6 +31,12 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     private static readonly ConcurrentDictionary<string, (int Count, DateTime Window)> _rateLimits = new();
     private const int MaxRequestsPerMinute = 100;
 
+    // Trusted proxy IPs for X-Forwarded-For handling (loopback by default)
+    private static readonly HashSet<string> TrustedProxyIps = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "127.0.0.1", "::1"
+    };
+
     /// <summary>
     /// Creates a new LauncherHttpServer.
     /// </summary>
@@ -77,7 +83,9 @@ public sealed class LauncherHttpServer : IAsyncDisposable
         if (string.IsNullOrEmpty(apiKey))
         {
             _apiKey = GenerateApiKey();
-            _logger.LogWarning("Generated API key for LauncherHttpServer: {ApiKey}", _apiKey);
+            // Log only a masked prefix — never log the full API key
+            var maskedKey = _apiKey.Length > 8 ? _apiKey[..8] + "****" : "****";
+            _logger.LogWarning("Generated API key for LauncherHttpServer: {MaskedApiKey}", maskedKey);
             _logger.LogWarning("IMPORTANT: Save this API key - it will not be shown again");
         }
         else
@@ -178,7 +186,20 @@ public sealed class LauncherHttpServer : IAsyncDisposable
         // Rate limiting middleware - MUST come before API key check
         app.Use(async (context, next) =>
         {
-            var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            // Use X-Forwarded-For only when the direct connection is from a trusted proxy
+            var directIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var clientIp = directIp;
+            if (TrustedProxyIps.Contains(directIp))
+            {
+                var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
+                if (!string.IsNullOrEmpty(forwarded))
+                {
+                    // Take the leftmost (original client) IP
+                    var firstIp = forwarded.Split(',', StringSplitOptions.TrimEntries)[0];
+                    if (!string.IsNullOrEmpty(firstIp))
+                        clientIp = firstIp;
+                }
+            }
             var now = DateTime.UtcNow;
 
             // Clean up old entries for this IP if window expired
@@ -222,8 +243,18 @@ public sealed class LauncherHttpServer : IAsyncDisposable
 
             // Check for API key in Authorization header
             if (!context.Request.Headers.TryGetValue("Authorization", out var authHeader) ||
-                !authHeader.ToString().StartsWith("Bearer ") ||
-                authHeader.ToString().Substring(7) != _apiKey)
+                !authHeader.ToString().StartsWith("Bearer "))
+            {
+                context.Response.StatusCode = 401;
+                await context.Response.WriteAsJsonAsync(new { error = "Unauthorized", message = "Valid API key required" });
+                return;
+            }
+
+            // Constant-time comparison to prevent timing attacks
+            var providedKey = authHeader.ToString().Substring(7);
+            var expectedBytes = System.Text.Encoding.UTF8.GetBytes(_apiKey ?? string.Empty);
+            var actualBytes = System.Text.Encoding.UTF8.GetBytes(providedKey);
+            if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
             {
                 context.Response.StatusCode = 401;
                 await context.Response.WriteAsJsonAsync(new { error = "Unauthorized", message = "Valid API key required" });

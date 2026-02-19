@@ -18,6 +18,7 @@ public sealed class NamespaceTree
 {
     private const int MaxPathLength = 4096;
     private const int MaxComponentLength = 255;
+    private const int MaxSymlinkDepth = 40; // Matches Linux MAXSYMLINKS
 
     private readonly IInodeTable _inodeTable;
 
@@ -38,6 +39,11 @@ public sealed class NamespaceTree
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The inode, or null if the path doesn't exist.</returns>
     public async Task<Inode?> ResolvePathAsync(string path, CancellationToken ct = default)
+    {
+        return await ResolvePathAsync(path, symlinkDepth: 0, ct);
+    }
+
+    private async Task<Inode?> ResolvePathAsync(string path, int symlinkDepth, CancellationToken ct)
     {
         ValidatePath(path);
 
@@ -78,8 +84,14 @@ public sealed class NamespaceTree
                     return null; // Invalid symlink
                 }
 
-                // Resolve symlink recursively
-                nextInode = await ResolvePathAsync(nextInode.SymLinkTarget, ct);
+                // Enforce symlink depth limit to prevent infinite loops (e.g., A->B->A)
+                if (symlinkDepth >= MaxSymlinkDepth)
+                {
+                    throw new IOException("Too many levels of symbolic links");
+                }
+
+                // Resolve symlink recursively with incremented depth
+                nextInode = await ResolvePathAsync(nextInode.SymLinkTarget, symlinkDepth + 1, ct);
                 if (nextInode == null)
                 {
                     return null; // Broken symlink
