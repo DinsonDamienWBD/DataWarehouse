@@ -21,6 +21,8 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
 {
     private readonly ConcurrentDictionary<string, ExecutionMetrics> _metrics = new();
     private const double DefaultIntensityThreshold = 10.0; // FLOPS/byte
+    private bool _isInitialized;
+    private CancellationTokenSource? _shutdownCts;
 
     /// <inheritdoc/>
     public override string StrategyId => "compute.industryfirst.hybrid";
@@ -40,15 +42,126 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Custom, ComputeRuntime.Native];
 
     /// <inheritdoc/>
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken = default)
+    {
+        if (_isInitialized) return;
+
+        // Validate configuration from Metadata
+        if (Metadata.TryGetValue("max_concurrent_tasks", out var maxConcurrentObj))
+        {
+            var maxConcurrent = Convert.ToInt32(maxConcurrentObj);
+            if (maxConcurrent < 1 || maxConcurrent > 256)
+                throw new ArgumentException("max_concurrent_tasks must be between 1 and 256");
+        }
+
+        if (Metadata.TryGetValue("memory_limit_per_task_mb", out var memLimitObj))
+        {
+            var memLimit = Convert.ToInt64(memLimitObj);
+            if (memLimit < 64 || memLimit > 65536)
+                throw new ArgumentException("memory_limit_per_task_mb must be between 64MB and 64GB");
+        }
+
+        if (Metadata.TryGetValue("execution_timeout_seconds", out var timeoutObj))
+        {
+            var timeout = Convert.ToInt32(timeoutObj);
+            if (timeout < 1 || timeout > 86400)
+                throw new ArgumentException("execution_timeout_seconds must be between 1 second and 24 hours");
+        }
+
+        if (Metadata.TryGetValue("runtime_types", out var runtimeTypesObj) && runtimeTypesObj is string runtimeTypes)
+        {
+            var validTypes = new[] { "WASM", "Container", "Native", "Hybrid" };
+            var specifiedTypes = runtimeTypes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (!specifiedTypes.All(t => validTypes.Contains(t, StringComparer.OrdinalIgnoreCase)))
+                throw new ArgumentException($"runtime_types must contain only: {string.Join(", ", validTypes)}");
+        }
+
+        _shutdownCts = new CancellationTokenSource();
+        _isInitialized = true;
+
+        await base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<HealthCheckResult> GetCachedHealthAsync(TimeSpan maxAge, CancellationToken cancellationToken = default)
+    {
+        // Check GPU runtime availability
+        var gpuAvailable = await CheckGpuAvailable(cancellationToken);
+
+        // Test minimal task execution
+        var testPassed = false;
+        try
+        {
+            var testTask = new ComputeTask
+            {
+                Id = "health-check",
+                Language = "sh",
+                Code = Encoding.UTF8.GetBytes("echo 'test'"),
+                InputData = Encoding.UTF8.GetBytes("test"),
+                Metadata = new Dictionary<string, object>()
+            };
+
+            using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var result = await ExecuteAsync(testTask, testCts.Token);
+            testPassed = result.Success;
+        }
+        catch
+        {
+            testPassed = false;
+        }
+
+        var health = testPassed ? HealthStatus.Healthy : HealthStatus.Degraded;
+        var checks = new Dictionary<string, object>
+        {
+            ["gpu_available"] = gpuAvailable,
+            ["test_execution"] = testPassed,
+            ["metrics_count"] = _metrics.Count
+        };
+
+        return new HealthCheckResult(health, checks);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken = default)
+    {
+        if (_shutdownCts != null)
+        {
+            // Cancel running tasks with 30-second graceful shutdown
+            _shutdownCts.Cancel();
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown timeout - continue with cleanup
+            }
+
+            _shutdownCts.Dispose();
+            _shutdownCts = null;
+        }
+
+        // Release runtime resources
+        _metrics.Clear();
+        _isInitialized = false;
+
+        await base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)
     {
         ValidateTask(task);
-        return await MeasureExecutionAsync(task.Id, async () =>
+        IncrementCounter("hybridcompute.task_submit");
+
+        try
         {
-            var input = task.GetInputDataAsString();
-            var lines = input.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            if (lines.Length == 0)
-                throw new ArgumentException("No input data for hybrid compute");
+            return await MeasureExecutionAsync(task.Id, async () =>
+            {
+                var input = task.GetInputDataAsString();
+                var lines = input.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length == 0)
+                    throw new ArgumentException("No input data for hybrid compute");
 
             // Determine compute intensity threshold
             var threshold = DefaultIntensityThreshold;
@@ -185,8 +298,40 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
             logs.AppendLine($"  CPU elapsed: {cpuElapsed.TotalMilliseconds:F0}ms, GPU elapsed: {gpuElapsed.TotalMilliseconds:F0}ms");
             logs.AppendLine($"  Split ratio: {(gpuSegments.Count * 100.0 / Math.Max(1, lines.Length)):F1}% GPU");
 
+            IncrementCounter("hybridcompute.task_complete");
             return (EncodeOutput(output.ToString()), logs.ToString());
         }, cancellationToken);
+        }
+        catch (OutOfMemoryException ex)
+        {
+            // Error boundary: OOM
+            IncrementCounter("hybridcompute.task_fail");
+            IncrementCounter("hybridcompute.error.oom");
+            throw new InvalidOperationException($"Hybrid compute ran out of memory during task {task.Id}", ex);
+        }
+        catch (TimeoutException ex)
+        {
+            // Error boundary: Timeout
+            IncrementCounter("hybridcompute.task_fail");
+            IncrementCounter("hybridcompute.error.timeout");
+            throw new InvalidOperationException($"Hybrid compute task {task.Id} exceeded timeout", ex);
+        }
+        catch (Exception ex)
+        {
+            // Error boundary: General failure (includes potential sandbox escape detection)
+            IncrementCounter("hybridcompute.task_fail");
+            IncrementCounter("hybridcompute.error.general");
+
+            // Check for sandbox escape indicators in exception message
+            if (ex.Message.Contains("access denied", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase))
+            {
+                IncrementCounter("hybridcompute.error.sandbox_escape");
+            }
+
+            throw;
+        }
     }
 
     /// <summary>

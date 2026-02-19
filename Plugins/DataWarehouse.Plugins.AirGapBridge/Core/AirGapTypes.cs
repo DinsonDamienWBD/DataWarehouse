@@ -378,6 +378,49 @@ public sealed class PackageManifest
 
     /// <summary>Is this an auto-ingest package.</summary>
     public bool AutoIngest { get; init; }
+
+    /// <summary>
+    /// Validates the package manifest for production readiness.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when manifest is invalid.</exception>
+    public void Validate()
+    {
+        // Validate shard count
+        if (ShardCount <= 0)
+            throw new InvalidOperationException("ShardCount must be positive");
+
+        // Validate total size (1MB minimum, 1TB maximum)
+        if (TotalSizeBytes < 1024 * 1024)
+            throw new InvalidOperationException("TotalSizeBytes must be at least 1MB");
+        if (TotalSizeBytes > 1024L * 1024 * 1024 * 1024)
+            throw new InvalidOperationException("TotalSizeBytes cannot exceed 1TB");
+
+        // Validate encryption algorithm
+        var validAlgorithms = new[] { "AES-256-GCM", "AES-256-CBC", "ChaCha20-Poly1305" };
+        if (!validAlgorithms.Contains(EncryptionAlgorithm))
+            throw new InvalidOperationException($"EncryptionAlgorithm must be one of: {string.Join(", ", validAlgorithms)}");
+
+        // Validate key derivation function
+        var validKdfs = new[] { "Argon2id", "Argon2i", "PBKDF2", "scrypt" };
+        if (!validKdfs.Contains(KeyDerivation))
+            throw new InvalidOperationException($"KeyDerivation must be one of: {string.Join(", ", validKdfs)}");
+
+        // Validate blob URIs
+        if (BlobUris.Any(string.IsNullOrWhiteSpace))
+            throw new InvalidOperationException("All BlobUris must be non-empty");
+
+        // Edge case: Empty transfer set
+        if (BlobUris.Count == 0)
+            throw new InvalidOperationException("Manifest must contain at least one blob URI");
+
+        // Edge case: Single-file transfer optimization check
+        if (ShardCount == 1 && BlobUris.Count > 1)
+            throw new InvalidOperationException("Single shard transfer must have exactly one blob URI");
+
+        // Edge case: Manifest size limit validation (prevent memory exhaustion)
+        if (BlobUris.Count > 100000)
+            throw new InvalidOperationException("Manifest cannot contain more than 100,000 blob URIs");
+    }
 }
 
 /// <summary>
