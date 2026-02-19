@@ -1051,3 +1051,64 @@ All executing agents MUST follow these rules:
 11. **Coding style:** Follow existing patterns in the codebase. Use `async/await`, `CancellationToken`, `ILogger` consistently. Strategy classes use `StrategyBase` domain bases.
 12. **Build gate:** After each plan execution, `dotnet build DataWarehouse.slnx` must succeed with zero NEW errors.
 13. **Verify before implementing:** Before writing ANY inline implementation, search the codebase for existing capability providers. Ask: "Does another plugin already do this?" If yes, delegate via message bus. If no, implement in the plugin that SHOULD own it and expose via bus topics.
+
+---
+
+## Milestone: v5.0 Complete Production Readiness & Real-World Solutions
+
+> 16 phases (52-67) | 7 waves | 215-300 estimated plans | Full design: `.planning/v5.0-MILESTONE-DRAFT.md`
+
+**Milestone Goal:** Achieve ZERO items below 100% production readiness. Eliminate ALL TODOs/hacks/placeholders/mockups. Fix ALL 50 pentest findings (38/100 -> 95+). Close ALL 3,549 feature gaps. Deliver 10 moonshot features + Universal Tag System + S3 Server + Query Engine. Every single line production-ready.
+
+**Priority Ordering:** P1 Clean House -> P2 Secure -> P3 Complete Features -> P4 Moonshots -> P5 Infrastructure -> P6 Integrate -> P7 Certify
+
+### Phases
+
+- [ ] **Phase 52: Clean House** (P1) — Eliminate ALL 428+ TODOs/FIXMEs/HACKs/placeholders/simulations/mockups across 195 files, replace 47 placeholder tests, fix mock transcoding, fix PNG compression, fix stub cloud SDKs
+- [ ] **Phase 53: Security Wiring** (P2) — Fix ALL 50 pentest findings, wire AccessEnforcementInterceptor, implement IAuthenticatedMessageBus, fix 13 TLS bypasses, path traversal, plugin isolation, inter-node auth. Target: 95+/100 security score
+- [ ] **Phase 54: Feature Gap Closure** (P3) — Close ALL 3,549 feature gaps: 1,155 quick wins (80-99%), 631 medium (50-79%), 1,763 major (<50%) across 17 domains. Target: 0 features below 100%
+- [ ] **Phase 55: Universal Tag System** (P4) — Tag schema registry, polymorphic values, per-tag ACL, propagation, policy engine, CRDT tags, ORSet fix, indexing at 1B scale, tag management, search by tag, sort by tag, group by tag, update/move/delete by tag, tag analysis, tag cleanup, batch tag features
+- [ ] **Phase 56: Data Consciousness** (P4) — AI value/liability scoring, auto-archive, dark data discovery, lineage BFS wiring
+- [ ] **Phase 57: Compliance Passports & Sovereignty Mesh** (P4) — Per-object certification, sovereignty zones, cross-border protocol
+- [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API
+- [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine
+- [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution
+- [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
+- [ ] **Phase 62: Carbon-Aware Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting
+- [ ] **Phase 63: Universal Fabric + S3 Server** (P4) — dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring
+- [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, verify cross-feature interactions
+- [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Web Console
+- [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing
+- [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full audit, benchmarks, competitive re-analysis, certification target: CERTIFIED (zero conditions)
+
+### Phase Details
+
+#### Phase 52: Clean House
+**Goal**: Eliminate ALL TODOs, FIXMEs, HACKs, placeholders, simulations, mockups, and stubs across the entire codebase. Replace 47 placeholder test files with real behavior tests. Fix mock transcoding (returns metadata not media). Fix PNG compression (HMAC-SHA256 instead of DEFLATE). Replace stub cloud SDKs (UltimateMultiCloud empty MemoryStream). Fix self-emulating objects lifecycle. Clean up all 428+ markers across 195 plugin files. Every single marker must be resolved: either implemented for real, removed if obsolete, or converted to tracked issue if forward-compat.
+**Depends on**: v4.5 complete (Phase 51)
+**Plans**: 7 plans
+Plans:
+- [ ] 52-01-PLAN.md — CLI TODO resolution (11 TODOs in 5 files)
+- [ ] 52-02-PLAN.md — Storage stub strategies (MemoryStream(0) in 13 files)
+- [ ] 52-03-PLAN.md — SelfEmulatingObjects lifecycle + placeholder WASM
+- [ ] 52-04-PLAN.md — Placeholder tests batch 1: infra + connectors + compute (17 files)
+- [ ] 52-05-PLAN.md — Placeholder tests batch 2: data domain plugins (16 files)
+- [ ] 52-06-PLAN.md — Placeholder tests batch 3: remaining plugins (21 files)
+- [ ] 52-07-PLAN.md — Final verification sweep
+**Success Criteria**:
+  1. Zero TODO/FIXME/HACK/STUB/PLACEHOLDER markers remaining in any production code
+  2. Zero placeholder test files (all 47 replaced with real behavior tests)
+  3. Zero mock/simulation implementations (all replaced with real implementations)
+  4. Zero stub cloud SDKs (real NuGet dependencies for AWS/Azure/GCP)
+  5. PNG compression uses DEFLATE (not HMAC-SHA256)
+  6. Build: 0 errors, 0 warnings, all tests passing
+
+#### Phase 53: Security Wiring
+**Goal**: Fix ALL 50 penetration test findings from the v4.5 pentest report. Wire the AccessEnforcementInterceptor, implement IAuthenticatedMessageBus, add inter-node authentication to all distributed protocols, enforce plugin isolation, fix all TLS certificate validation. Raise security posture from 38/100 to 95+/100.
+**Depends on**: Phase 52
+**Plans**: 14-16 plans
+
+#### Phase 54: Feature Gap Closure
+**Goal**: Close ALL remaining non-100% features from the 3,549 identified in the gap extraction. Quick wins (80-99%) first, then medium (50-79%), then major (<50%). Target: 0 features below 100%.
+**Depends on**: Phase 53
+**Plans**: 90-130 plans
