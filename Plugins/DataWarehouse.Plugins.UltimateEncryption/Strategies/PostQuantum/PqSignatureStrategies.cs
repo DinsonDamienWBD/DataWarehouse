@@ -24,15 +24,18 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// for authenticity and non-repudiation.
     ///
     /// Security Level: NIST Level 3
-    /// Algorithm: ML-DSA-65 (CRYSTALS-Dilithium-3)
+    /// Algorithm: ML-DSA-65 (CRYSTALS-Dilithium-3) per NIST FIPS 204
     ///
     /// Process:
     /// 1. Generate ML-DSA key pair
     /// 2. Sign data with private key
-    /// 3. Store: [Signature][Data] or return signature separately
+    /// 3. Store: [Signature Length:4][Signature][Data]
     ///
     /// Use Case: Quantum-safe digital signatures for authentication and non-repudiation.
     /// This is NOT for encryption - it's for signing/verification only.
+    ///
+    /// Migration: For dedicated per-level strategies, see CrystalsDilithiumStrategies.cs
+    /// which provides DilithiumSignature44/65/87Strategy at NIST Levels 2/3/5.
     /// </summary>
     public sealed class MlDsaStrategy : EncryptionStrategyBase
     {
@@ -59,11 +62,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             Parameters = new Dictionary<string, object>
             {
                 ["Algorithm"] = "ML-DSA-65",
+                ["FipsReference"] = "FIPS 204",
                 ["Type"] = "Signature",
                 ["NistLevel"] = 3,
                 ["PublicKeySize"] = 1952,
                 ["PrivateKeySize"] = 4000,
-                ["SignatureSize"] = 3309
+                ["SignatureSize"] = 3309,
+                ["MigrationTarget"] = "crystals-dilithium-65"
             }
         };
 
@@ -197,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// SLH-DSA (NIST FIPS 205) digital signature strategy - SPHINCS+ hash-based signatures.
     ///
     /// Security Level: Stateless hash-based signatures (more conservative than lattice-based)
-    /// Algorithm: SLH-DSA-SHAKE-128f (SPHINCS+ with SHAKE-128, fast variant)
+    /// Algorithm: SLH-DSA-SHAKE-128f (SPHINCS+ with SHAKE-128, fast variant) per NIST FIPS 205
     ///
     /// Advantages over ML-DSA:
     /// - Based only on hash functions (more conservative security assumption)
@@ -209,6 +214,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// - Slower signing/verification
     ///
     /// Use Case: Maximum assurance digital signatures for critical infrastructure, long-term archival.
+    ///
+    /// Migration: For dedicated per-level strategies, see SphincsPlusStrategies.cs
+    /// which provides SphincsPlus128f/192f/256fStrategy at all NIST security levels.
     /// </summary>
     public sealed class SlhDsaStrategy : EncryptionStrategyBase
     {
@@ -235,12 +243,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             Parameters = new Dictionary<string, object>
             {
                 ["Algorithm"] = "SLH-DSA-SHAKE-128f",
+                ["FipsReference"] = "FIPS 205",
                 ["Type"] = "Signature",
                 ["HashFunction"] = "SHAKE-128",
                 ["Variant"] = "Fast",
                 ["PublicKeySize"] = 32,
                 ["PrivateKeySize"] = 64,
-                ["SignatureSize"] = 17088
+                ["SignatureSize"] = 17088,
+                ["MigrationTarget"] = "sphincs-plus-shake-128f"
             }
         };
 
