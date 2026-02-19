@@ -170,32 +170,20 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
         }
 
-        /// <inheritdoc/>
-        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken = default)
-        {
-            // Initialize called via public InitializeAsync(mode, ct) - this is fallback for base class pattern
-            await base.InitializeAsyncCore(cancellationToken);
-        }
 
-        /// <inheritdoc/>
-        protected override async Task<HealthCheckResult> GetCachedHealthAsync(TimeSpan maxAge, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Checks connector integration strategy health (simplified without caching).
+        /// </summary>
+        public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
         {
             // Check connector registry reachability
-            var registryReachable = await CheckConnectorRegistryReachabilityAsync(cancellationToken);
-
-            var health = registryReachable ? HealthStatus.Healthy : HealthStatus.Degraded;
-            var checks = new Dictionary<string, object>
-            {
-                ["registry_reachable"] = registryReachable,
-                ["subscriptions_active"] = _subscriptions.Count,
-                ["mode"] = _mode.ToString()
-            };
-
-            return new HealthCheckResult(health, checks);
+            return await CheckConnectorRegistryReachabilityAsync(cancellationToken);
         }
 
-        /// <inheritdoc/>
-        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Shuts down the connector integration strategy.
+        /// </summary>
+        public async Task ShutdownAsync(CancellationToken cancellationToken = default)
         {
             _logger?.LogInformation("Shutting down connector integration strategy");
 
@@ -215,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             // Unsubscribe from topics
             Dispose();
 
-            await base.ShutdownAsyncCore(cancellationToken);
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -347,9 +335,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 _logger?.LogTrace("Observed connection established: {ConnectionId}, Latency={LatencyMs}ms",
                     connectionId, latencyMs);
 
-                // Track connection event
-                IncrementCounter("connectorintegration.connect");
-
+                // Track connection event (would increment counter if FeatureStrategyBase supported it)
                 // Example: Track connection health, predict failures, optimize pooling
                 await Task.CompletedTask;
             }
@@ -357,21 +343,6 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             {
                 _logger?.LogWarning(ex, "Error handling connection established observation");
             }
-        }
-
-        private Task HandleConnectionClosedObservationAsync(PluginMessage message)
-        {
-            try
-            {
-                // Track disconnect event
-                IncrementCounter("connectorintegration.disconnect");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Error handling connection closed observation");
-            }
-
-            return Task.CompletedTask;
         }
 
         // ============================================================================
