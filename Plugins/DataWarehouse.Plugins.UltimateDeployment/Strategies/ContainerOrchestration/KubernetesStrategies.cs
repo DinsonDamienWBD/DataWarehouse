@@ -6,6 +6,11 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ContainerOrchestra
 /// </summary>
 public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _k8sStates = new();
+    private DateTimeOffset? _lastHealthCheck;
+    private bool _lastHealthCheckResult = true;
+
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Kubernetes",
@@ -27,6 +32,9 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        // Validate Kubernetes configuration
+        ValidateK8sConfig(config);
+
         var state = initialState;
         var ns = GetNamespace(config);
         var deploymentName = GetDeploymentName(config);
@@ -39,7 +47,37 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         // Phase 2: Apply Deployment manifest
         state = state with { ProgressPercent = 30 };
         var deployment = BuildDeploymentManifest(config, deploymentName);
-        await ApplyDeploymentAsync(ns, deployment, ct);
+
+        try
+        {
+            await ApplyDeploymentAsync(ns, deployment, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            // Handle K8s API errors
+            var statusCode = ex.StatusCode;
+            if (statusCode == System.Net.HttpStatusCode.Unauthorized) // 401
+            {
+                IncrementCounter("k8s.auth_failure");
+                throw new InvalidOperationException("Kubernetes API authentication failed. Check credentials.", ex);
+            }
+            else if (statusCode == System.Net.HttpStatusCode.Forbidden) // 403
+            {
+                IncrementCounter("k8s.forbidden");
+                throw new InvalidOperationException("Kubernetes API forbidden. Check RBAC permissions.", ex);
+            }
+            else if (statusCode == System.Net.HttpStatusCode.Conflict) // 409
+            {
+                IncrementCounter("k8s.conflict");
+                throw new InvalidOperationException("Kubernetes resource conflict. Resource may already exist.", ex);
+            }
+            else if (statusCode == (System.Net.HttpStatusCode)422) // 422 - Unprocessable Entity (validation error)
+            {
+                IncrementCounter("k8s.validation_error");
+                throw new InvalidOperationException("Kubernetes manifest validation failed. Check manifest syntax.", ex);
+            }
+            throw;
+        }
 
         // Phase 3: Wait for rollout
         state = state with { ProgressPercent = 50 };
@@ -70,7 +108,7 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         state = state with { ProgressPercent = 95 };
         var podStatus = await GetPodStatusAsync(ns, deploymentName, ct);
 
-        return state with
+        var finalState = state with
         {
             Health = podStatus.AllReady ? DeploymentHealth.Healthy : DeploymentHealth.Degraded,
             ProgressPercent = 100,
@@ -85,6 +123,11 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
                 ["readyPods"] = podStatus.ReadyPods
             }
         };
+
+        _k8sStates[state.DeploymentId] = finalState;
+        IncrementCounter("k8s.deploy");
+
+        return finalState;
     }
 
     protected override async Task<DeploymentState> RollbackCoreAsync(
@@ -99,6 +142,8 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         // Use kubectl rollout undo
         await RollbackDeploymentAsync(ns!, deploymentName!, ct);
         await WaitForRolloutAsync(ns!, deploymentName!, 5, ct);
+
+        IncrementCounter("k8s.rollback");
 
         return currentState with
         {
@@ -121,6 +166,8 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 
         await ScaleDeploymentAsync(ns!, deploymentName!, targetInstances, ct);
 
+        IncrementCounter("k8s.scale");
+
         return currentState with
         {
             TargetInstances = targetInstances,
@@ -133,11 +180,30 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        var ns = currentState.Metadata.TryGetValue("namespace", out var nsObj) ? nsObj?.ToString() : "default";
-        var deploymentName = currentState.Metadata.TryGetValue("deploymentName", out var dnObj) ? dnObj?.ToString() : "";
+        // Check if health check is cached (60-second cache)
+        if (_lastHealthCheck.HasValue && DateTimeOffset.UtcNow - _lastHealthCheck.Value < TimeSpan.FromSeconds(60))
+        {
+            var ns = currentState.Metadata.TryGetValue("namespace", out var nsObj) ? nsObj?.ToString() : "default";
+            var deploymentName = currentState.Metadata.TryGetValue("deploymentName", out var dnObj) ? dnObj?.ToString() : "";
 
-        var pods = await GetPodsAsync(ns!, deploymentName!, ct);
-        return pods.Select(p => new HealthCheckResult
+            return new[]
+            {
+                new HealthCheckResult
+                {
+                    InstanceId = $"{deploymentName}-cached",
+                    IsHealthy = _lastHealthCheckResult,
+                    StatusCode = _lastHealthCheckResult ? 200 : 503,
+                    ResponseTimeMs = 5,
+                    Details = new Dictionary<string, object> { ["cached"] = true, ["namespace"] = ns ?? "default" }
+                }
+            };
+        }
+
+        var ns2 = currentState.Metadata.TryGetValue("namespace", out var nsObj2) ? nsObj2?.ToString() : "default";
+        var deploymentName2 = currentState.Metadata.TryGetValue("deploymentName", out var dnObj2) ? dnObj2?.ToString() : "";
+
+        var pods = await GetPodsAsync(ns2!, deploymentName2!, ct);
+        var results = pods.Select(p => new HealthCheckResult
         {
             InstanceId = p.Name,
             IsHealthy = p.Ready,
@@ -149,6 +215,11 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
                 ["restartCount"] = p.RestartCount
             }
         }).ToArray();
+
+        _lastHealthCheck = DateTimeOffset.UtcNow;
+        _lastHealthCheckResult = results.All(r => r.IsHealthy);
+
+        return results;
     }
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
@@ -161,7 +232,45 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         });
     }
 
-    // Helper methods
+    // Configuration validation and helper methods
+    private void ValidateK8sConfig(DeploymentConfig config)
+    {
+        // Validate cluster context
+        if (!config.StrategyConfig.TryGetValue("clusterContext", out var context) || context == null || string.IsNullOrWhiteSpace(context.ToString()))
+            throw new InvalidOperationException("Kubernetes cluster context is required.");
+
+        // Validate namespace (valid K8s name: lowercase alphanumeric, hyphens, max 63 chars)
+        var ns = GetNamespace(config);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(ns, @"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$") || ns.Length > 63)
+            throw new InvalidOperationException($"Invalid Kubernetes namespace: '{ns}'. Must be lowercase alphanumeric with hyphens, max 63 chars.");
+
+        // Validate kubeconfig path if not in-cluster
+        if (config.StrategyConfig.TryGetValue("kubeconfigPath", out var kubeconfigPath) && kubeconfigPath != null)
+        {
+            var path = kubeconfigPath.ToString();
+            if (!string.IsNullOrWhiteSpace(path) && !System.IO.File.Exists(path))
+            {
+                // Don't throw - kubeconfig might be in default location
+            }
+        }
+
+        // Validate deployment timeout (10s to 3600s)
+        if (config.DeploymentTimeoutMinutes < 0.17 || config.DeploymentTimeoutMinutes > 60) // 10s to 60 minutes
+            throw new ArgumentException($"Deployment timeout must be between 10 seconds and 60 minutes. Got: {config.DeploymentTimeoutMinutes} minutes");
+
+        // Validate max unavailable replicas
+        if (config.StrategyConfig.TryGetValue("maxUnavailable", out var maxUnavail) && maxUnavail is int maxUnavailable)
+        {
+            if (maxUnavailable < 0)
+                throw new ArgumentException($"Max unavailable replicas cannot be negative. Got: {maxUnavailable}");
+        }
+    }
+
+    private void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
+    }
+
     private static string GetNamespace(DeploymentConfig config)
     {
         return config.StrategyConfig.TryGetValue("namespace", out var ns) && ns is string nsStr

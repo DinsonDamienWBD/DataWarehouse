@@ -526,6 +526,11 @@ public sealed class RecreateStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ABTestingStrategy : DeploymentStrategyBase
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _experimentStates = new();
+    private DateTimeOffset? _lastHealthCheck;
+    private bool _lastHealthCheckResult = true;
+
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "A/B Testing",
@@ -547,6 +552,9 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        // Validate experiment configuration
+        ValidateExperimentConfig(config);
+
         var state = initialState;
 
         // Get A/B split configuration
@@ -572,7 +580,7 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
             }
         };
 
-        return state with
+        var finalState = state with
         {
             Health = DeploymentHealth.Healthy,
             ProgressPercent = 100,
@@ -580,6 +588,11 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
             HealthyInstances = config.TargetInstances,
             CompletedAt = DateTimeOffset.UtcNow
         };
+
+        _experimentStates[state.DeploymentId] = finalState;
+        IncrementCounter("abtest.assignment");
+
+        return finalState;
     }
 
     protected override async Task<DeploymentState> RollbackCoreAsync(
@@ -620,10 +633,28 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        // Check if health check is cached (60-second cache)
+        if (_lastHealthCheck.HasValue && DateTimeOffset.UtcNow - _lastHealthCheck.Value < TimeSpan.FromSeconds(60))
+        {
+            return Task.FromResult(new[]
+            {
+                new HealthCheckResult { InstanceId = $"{deploymentId}-A", IsHealthy = _lastHealthCheckResult, StatusCode = 200, ResponseTimeMs = 10 },
+                new HealthCheckResult { InstanceId = $"{deploymentId}-B", IsHealthy = _lastHealthCheckResult, StatusCode = 200, ResponseTimeMs = 12 }
+            });
+        }
+
+        // Validate experiment state
+        var isRunning = _experimentStates.TryGetValue(deploymentId, out var expState)
+            && expState.Metadata.TryGetValue("experimentStatus", out var status)
+            && status?.ToString() == "running";
+
+        _lastHealthCheck = DateTimeOffset.UtcNow;
+        _lastHealthCheckResult = isRunning;
+
         return Task.FromResult(new[]
         {
-            new HealthCheckResult { InstanceId = $"{deploymentId}-A", IsHealthy = true, StatusCode = 200, ResponseTimeMs = 10 },
-            new HealthCheckResult { InstanceId = $"{deploymentId}-B", IsHealthy = true, StatusCode = 200, ResponseTimeMs = 12 }
+            new HealthCheckResult { InstanceId = $"{deploymentId}-A", IsHealthy = isRunning, StatusCode = 200, ResponseTimeMs = 10 },
+            new HealthCheckResult { InstanceId = $"{deploymentId}-B", IsHealthy = isRunning, StatusCode = 200, ResponseTimeMs = 12 }
         });
     }
 
@@ -637,11 +668,53 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
         });
     }
 
+    private void ValidateExperimentConfig(DeploymentConfig config)
+    {
+        // Validate experiment ID format (if provided)
+        if (config.StrategyConfig.TryGetValue("experimentId", out var expId) && expId != null)
+        {
+            var expIdStr = expId.ToString();
+            if (string.IsNullOrWhiteSpace(expIdStr))
+                throw new ArgumentException("Experiment ID cannot be empty.");
+        }
+
+        // Validate traffic split percentages
+        var splitPercent = GetSplitPercent(config);
+        if (splitPercent < 0 || splitPercent > 100)
+            throw new ArgumentException($"Traffic split percentage must be between 0 and 100. Got: {splitPercent}");
+
+        // Validate variant definitions (at least 2)
+        if (config.StrategyConfig.TryGetValue("variants", out var variants) && variants is Array variantArray)
+        {
+            if (variantArray.Length < 2)
+                throw new ArgumentException("A/B testing requires at least 2 variants.");
+        }
+
+        // Validate measurement duration (1 hour to 90 days)
+        if (config.StrategyConfig.TryGetValue("measurementDurationHours", out var duration) && duration is int hours)
+        {
+            if (hours < 1 || hours > 2160) // 90 days = 2160 hours
+                throw new ArgumentException($"Measurement duration must be between 1 hour and 90 days (2160 hours). Got: {hours} hours");
+        }
+
+        // Validate statistical significance threshold (0.01-0.1, i.e., 1%-10%)
+        if (config.StrategyConfig.TryGetValue("significanceThreshold", out var threshold) && threshold is double thresholdVal)
+        {
+            if (thresholdVal < 0.01 || thresholdVal > 0.1)
+                throw new ArgumentException($"Statistical significance threshold must be between 0.01 and 0.1. Got: {thresholdVal}");
+        }
+    }
+
     private static int GetSplitPercent(DeploymentConfig config)
     {
         if (config.StrategyConfig.TryGetValue("splitPercent", out var sp) && sp is int split)
             return split;
         return 50;
+    }
+
+    private void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
     }
 
     private Task DeployVariantAsync(string variant, DeploymentConfig config, CancellationToken ct)
@@ -663,6 +736,12 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _shadowStates = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<string> _pendingRequests = new();
+    private DateTimeOffset? _lastHealthCheck;
+    private bool _lastHealthCheckResult = true;
+
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Shadow",
@@ -684,6 +763,9 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
         DeploymentState initialState,
         CancellationToken ct)
     {
+        // Validate shadow deployment configuration
+        ValidateShadowConfig(config);
+
         var state = initialState;
 
         // Deploy shadow instances
@@ -698,7 +780,7 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
         state = state with { ProgressPercent = 80 };
         await VerifyShadowTrafficAsync(state.DeploymentId, ct);
 
-        return state with
+        var finalState = state with
         {
             Health = DeploymentHealth.Healthy,
             ProgressPercent = 100,
@@ -711,6 +793,11 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
                 ["mirroringEnabled"] = true
             }
         };
+
+        _shadowStates[state.DeploymentId] = finalState;
+        IncrementCounter("shadow.request_mirrored");
+
+        return finalState;
     }
 
     protected override async Task<DeploymentState> RollbackCoreAsync(
@@ -721,6 +808,9 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
     {
         await DisableTrafficMirroringAsync(deploymentId, ct);
         await RemoveShadowInstancesAsync(deploymentId, ct);
+
+        // Cancel pending shadow requests
+        while (_pendingRequests.TryDequeue(out _)) { }
 
         return currentState with
         {
@@ -750,15 +840,44 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        // Check if health check is cached (60-second cache)
+        if (_lastHealthCheck.HasValue && DateTimeOffset.UtcNow - _lastHealthCheck.Value < TimeSpan.FromSeconds(60))
+        {
+            return Task.FromResult(new[]
+            {
+                new HealthCheckResult
+                {
+                    InstanceId = $"{deploymentId}-shadow",
+                    IsHealthy = _lastHealthCheckResult,
+                    StatusCode = 200,
+                    ResponseTimeMs = 15,
+                    Details = new Dictionary<string, object> { ["type"] = "shadow", ["cached"] = true }
+                }
+            });
+        }
+
+        // Check shadow endpoint reachability (simulated)
+        var isReachable = _shadowStates.TryGetValue(deploymentId, out var shadowState)
+            && shadowState.Metadata.TryGetValue("mirroringEnabled", out var mirroring)
+            && mirroring is bool enabled && enabled;
+
+        _lastHealthCheck = DateTimeOffset.UtcNow;
+        _lastHealthCheckResult = isReachable;
+
         return Task.FromResult(new[]
         {
             new HealthCheckResult
             {
                 InstanceId = $"{deploymentId}-shadow",
-                IsHealthy = true,
-                StatusCode = 200,
+                IsHealthy = isReachable,
+                StatusCode = isReachable ? 200 : 503,
                 ResponseTimeMs = 15,
-                Details = new Dictionary<string, object> { ["type"] = "shadow" }
+                Details = new Dictionary<string, object>
+                {
+                    ["type"] = "shadow",
+                    ["cached"] = false,
+                    ["mirroringEnabled"] = isReachable
+                }
             }
         });
     }
@@ -771,6 +890,47 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
             Version = "unknown",
             Health = DeploymentHealth.Unknown
         });
+    }
+
+    private void ValidateShadowConfig(DeploymentConfig config)
+    {
+        // Validate shadow endpoint
+        if (!config.StrategyConfig.TryGetValue("shadowEndpoint", out var endpoint) || endpoint == null)
+            throw new InvalidOperationException("Shadow endpoint is required for shadow deployment.");
+
+        var endpointStr = endpoint.ToString();
+        if (string.IsNullOrWhiteSpace(endpointStr))
+            throw new InvalidOperationException("Shadow endpoint cannot be empty.");
+
+        if (!Uri.TryCreate(endpointStr, UriKind.Absolute, out _))
+            throw new InvalidOperationException($"Invalid shadow endpoint URI: '{endpointStr}'");
+
+        // Validate traffic percentage (0-100)
+        if (config.StrategyConfig.TryGetValue("trafficPercentage", out var traffic) && traffic is int trafficPercent)
+        {
+            if (trafficPercent < 0 || trafficPercent > 100)
+                throw new ArgumentException($"Traffic percentage must be between 0 and 100. Got: {trafficPercent}");
+        }
+
+        // Validate comparison mode
+        if (config.StrategyConfig.TryGetValue("comparisonMode", out var mode) && mode != null)
+        {
+            var modeStr = mode.ToString();
+            if (modeStr != "sync" && modeStr != "async")
+                throw new ArgumentException($"Comparison mode must be 'sync' or 'async'. Got: '{modeStr}'");
+        }
+
+        // Validate timeout multiplier (1.0-10.0)
+        if (config.StrategyConfig.TryGetValue("timeoutMultiplier", out var multiplier) && multiplier is double mult)
+        {
+            if (mult < 1.0 || mult > 10.0)
+                throw new ArgumentException($"Timeout multiplier must be between 1.0 and 10.0. Got: {mult}");
+        }
+    }
+
+    private void IncrementCounter(string name)
+    {
+        _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
     }
 
     private Task DeployShadowInstancesAsync(DeploymentConfig config, CancellationToken ct)
