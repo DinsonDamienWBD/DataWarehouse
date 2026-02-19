@@ -431,8 +431,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     throw new IOException("Connection closed unexpectedly");
 
                 var length = BitConverter.ToInt32(lengthBuffer, 0);
-                if (length <= 0 || length > 100 * 1024 * 1024) // Max 100 MB
-                    throw new InvalidDataException($"Invalid message length: {length}");
+                // RECON-06: Validate message size against configurable limit (default 10MB)
+                // to prevent memory exhaustion from oversized messages
+                if (length <= 0 || length > _config.MaxMessageSizeBytes)
+                    throw new InvalidDataException($"Message length {length} exceeds maximum allowed size of {_config.MaxMessageSizeBytes} bytes");
 
                 // Read payload
                 var payload = ArrayPool<byte>.Shared.Rent(length);
@@ -577,6 +579,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Path to trusted CA certificate bundle (optional).
         /// </summary>
         public string? TrustedCaBundlePath { get; init; }
+
+        /// <summary>
+        /// Maximum allowed message size in bytes for P2P communication.
+        /// RECON-06: Reduced from 100MB to 10MB by default to limit memory exhaustion attacks.
+        /// Configurable for deployments that need larger messages (e.g., bulk replication).
+        /// </summary>
+        public int MaxMessageSizeBytes { get; init; } = 10 * 1024 * 1024; // 10 MB
     }
 
     /// <summary>

@@ -801,10 +801,11 @@ namespace DataWarehouse.Kernel
         /// <summary>
         /// INFRA-03: Subscribe to message bus topics for audit logging.
         /// Logs config changes, plugin load/unload, and security events.
+        /// INFRA-06: Extended to cover all 9 auditable operation classes identified in pentest.
         /// </summary>
         private void SubscribeToAuditableEvents()
         {
-            // Audit config changes
+            // 1. Audit config changes (INFRA-03)
             _messageBus.Subscribe(ConfigChanged, async msg =>
             {
                 if (_auditLog == null) return;
@@ -816,13 +817,102 @@ namespace DataWarehouse.Kernel
                     "Configuration change via message bus");
             });
 
-            // Audit plugin unloads
+            // 2. Audit plugin unloads (INFRA-03)
             _messageBus.Subscribe(PluginUnloaded, async msg =>
             {
                 if (_auditLog == null) return;
                 var pluginId = msg.Payload.TryGetValue("PluginId", out var id) ? id?.ToString() : "unknown";
                 await _auditLog.LogChangeAsync("System", "kernel.plugin.unload",
                     pluginId, null, $"Plugin {pluginId} unloaded");
+            });
+
+            // INFRA-06: Audit breadcrumbs for remaining unaudited operation classes
+
+            // 3. Security policy changes -- ACL/AccessVerificationMatrix modifications
+            _messageBus.Subscribe(SecurityACL, async msg =>
+            {
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "System";
+                var action = msg.Payload.TryGetValue("Action", out var a) ? a?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- {Detail}",
+                    "SecurityPolicyChange", identity, DateTimeOffset.UtcNow, action);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", "security.policy.change",
+                        null, action, "Security policy modification");
+            });
+
+            // 4. Key rotation events
+            _messageBus.Subscribe(AuthKeyRotated, async msg =>
+            {
+                var keyType = msg.Payload.TryGetValue("KeyType", out var kt) ? kt?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- KeyType={KeyType}",
+                    "KeyRotation", "System", DateTimeOffset.UtcNow, keyType);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.key.rotation",
+                        null, keyType, $"Key rotation: {keyType}");
+            });
+
+            // 5. Signing key changes
+            _messageBus.Subscribe(AuthSigningKeyChanged, async msg =>
+            {
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp}",
+                    "SigningKeyChanged", "System", DateTimeOffset.UtcNow);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.signing.change",
+                        null, null, "Signing key changed");
+            });
+
+            // 6. Replay attack detection (credential access monitoring)
+            _messageBus.Subscribe(AuthReplayDetected, async msg =>
+            {
+                var source = msg.Payload.TryGetValue("Source", out var s) ? s?.ToString() : "unknown";
+                _logger?.LogWarning(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Source={Source}",
+                    "ReplayAttackDetected", "System", DateTimeOffset.UtcNow, source);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.replay.detected",
+                        null, source, $"Replay attack detected from {source}");
+            });
+
+            // 7. Security audit events (credential access, auth events)
+            _messageBus.Subscribe(SecurityAudit, async msg =>
+            {
+                var eventType = msg.Payload.TryGetValue("EventType", out var et) ? et?.ToString() : "audit";
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "System";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp}",
+                    eventType, identity, DateTimeOffset.UtcNow);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", $"security.audit.{eventType}",
+                        null, null, $"Security audit: {eventType}");
+            });
+
+            // 8. Capability changes (includes message bus subscription changes)
+            _messageBus.Subscribe(CapabilityChanged, async msg =>
+            {
+                var capName = msg.Payload.TryGetValue("Capability", out var c) ? c?.ToString() : "unknown";
+                var pluginId = msg.Payload.TryGetValue("PluginId", out var pid) ? pid?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Capability={Capability}",
+                    "CapabilityChanged", pluginId, DateTimeOffset.UtcNow, capName);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(pluginId ?? "System", "capability.change",
+                        null, capName, $"Capability changed: {capName} by {pluginId}");
+            });
+
+            // 9. Security authentication events (covers cluster/federation membership implicitly)
+            _messageBus.Subscribe(SecurityAuth, async msg =>
+            {
+                var authAction = msg.Payload.TryGetValue("Action", out var a) ? a?.ToString() : "auth";
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Action={Action}",
+                    "Authentication", identity, DateTimeOffset.UtcNow, authAction);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", "security.auth",
+                        null, authAction, $"Authentication event: {authAction}");
             });
         }
 
