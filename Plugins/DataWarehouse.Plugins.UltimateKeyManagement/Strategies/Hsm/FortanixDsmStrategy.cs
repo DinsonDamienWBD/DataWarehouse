@@ -87,6 +87,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("fortanixdsm.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "AES",
@@ -107,6 +117,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("fortanixdsm.init");
             // Load configuration
             if (Configuration.TryGetValue("ApiEndpoint", out var endpointObj) && endpointObj is string endpoint)
                 _config.ApiEndpoint = endpoint.TrimEnd('/');

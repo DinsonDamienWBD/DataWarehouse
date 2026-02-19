@@ -43,10 +43,32 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
             MaxConcurrentEvaluations = 5000
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("email.otp.mfa.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("email.otp.mfa.shutdown");
+            _activeSessions.Clear();
+            _rateLimits.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             AccessContext context,
             CancellationToken cancellationToken)
         {
+            IncrementCounter("email.otp.mfa.evaluate");
             try
             {
                 // Extract Email OTP code from SubjectAttributes

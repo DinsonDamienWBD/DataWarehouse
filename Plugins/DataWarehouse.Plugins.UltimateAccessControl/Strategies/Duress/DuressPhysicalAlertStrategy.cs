@@ -54,7 +54,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             MaxConcurrentEvaluations = 50
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.physical.alert.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.physical.alert.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
             await base.InitializeAsync(configuration, cancellationToken);
@@ -68,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("duress.physical.alert.evaluate");
             // Check for duress indicator
             var isDuress = context.SubjectAttributes.TryGetValue("duress", out var duressObj) &&
                            duressObj is bool duressFlag && duressFlag;

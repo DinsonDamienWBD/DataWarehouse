@@ -51,6 +51,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("alibabakms.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM", "AES_256" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -62,6 +72,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("alibabakms.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("RegionId", out var regionObj) && regionObj is string region)
                 _config.RegionId = region;

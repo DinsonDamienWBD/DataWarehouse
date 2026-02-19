@@ -61,6 +61,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("linuxsecretservice.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public LinuxSecretServiceStrategy()
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -72,6 +82,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("linuxsecretservice.init");
             // Load configuration
             if (Configuration.TryGetValue("ApplicationName", out var appObj) && appObj is string app)
                 _config.ApplicationName = app;

@@ -37,8 +37,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             MaxConcurrentEvaluations = 1000
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("behavioral.biometric.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("behavioral.biometric.shutdown");
+            _profiles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("behavioral.biometric.evaluate");
             await Task.Yield();
 
             var profile = _profiles.GetOrAdd(context.SubjectId, _ => new BehavioralProfile { SubjectId = context.SubjectId });

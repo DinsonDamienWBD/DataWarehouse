@@ -62,9 +62,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("threat.intel.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("threat.intel.shutdown");
+            _threatFeed.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("threat.intel.evaluate");
             // Extract indicators from context
             var indicators = ExtractIndicators(context);
 

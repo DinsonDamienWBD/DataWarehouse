@@ -66,8 +66,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("quantumkeydistribution.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("quantumkeydistribution.init");
             // Load configuration
             if (Configuration.TryGetValue("QkdSystem", out var systemObj) && systemObj is string system)
                 _config.QkdSystem = Enum.Parse<QkdSystemType>(system, true);

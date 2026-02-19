@@ -13,7 +13,15 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
     private readonly ConcurrentDictionary<string, CarbonBudget> _budgets = new();
 
     public override string StrategyId => "carbon-aware-scheduling";
-    public override string StrategyName => "Carbon-Aware Scheduling";
+    public override string DisplayName => "Carbon-Aware Scheduling";
+    public override SustainabilityCategory Category => SustainabilityCategory.CarbonAwareness;
+    public override SustainabilityCapabilities Capabilities =>
+        SustainabilityCapabilities.Scheduling | SustainabilityCapabilities.CarbonCalculation |
+        SustainabilityCapabilities.ExternalIntegration | SustainabilityCapabilities.Reporting;
+    public override string SemanticDescription =>
+        "Carbon-aware scheduling that routes workloads to regions with lowest carbon intensity " +
+        "using real-time grid carbon data with budget tracking.";
+    public override string[] Tags => new[] { "carbon", "scheduling", "regions", "emissions" };
 
     /// <summary>
     /// Updates carbon intensity data for a region (from WattTime or similar API).
@@ -147,10 +155,17 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
 {
     private readonly ConcurrentDictionary<string, List<EnergyMeasurement>> _measurements = new();
-    private readonly ConcurrentDictionary<string, GhgEmissionRecord> _ghgRecords = new();
+    private readonly ConcurrentDictionary<string, GhgReport> _ghgRecords = new();
 
     public override string StrategyId => "energy-tracking";
-    public override string StrategyName => "Energy Consumption Tracking";
+    public override string DisplayName => "Energy Consumption Tracking";
+    public override SustainabilityCategory Category => SustainabilityCategory.EnergyOptimization;
+    public override SustainabilityCapabilities Capabilities =>
+        SustainabilityCapabilities.RealTimeMonitoring | SustainabilityCapabilities.CarbonCalculation |
+        SustainabilityCapabilities.Reporting;
+    public override string SemanticDescription =>
+        "Energy consumption tracking per operation with GHG Protocol Scope 1/2/3 reporting.";
+    public override string[] Tags => new[] { "energy", "tracking", "ghg", "emissions", "reporting" };
 
     /// <summary>
     /// Records energy consumption for an operation.

@@ -3,6 +3,7 @@ using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;

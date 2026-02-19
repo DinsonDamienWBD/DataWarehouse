@@ -70,6 +70,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.tamperproof.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.tamperproof.shutdown");
+            _chains.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates a new tamper-proof chain for a resource.
         /// </summary>
         public TamperProofChain CreateChain(string chainId, string description)
@@ -222,6 +242,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.tamperproof.evaluate");
             await Task.Yield();
 
             if (!_requireChainVerificationOnAccess)

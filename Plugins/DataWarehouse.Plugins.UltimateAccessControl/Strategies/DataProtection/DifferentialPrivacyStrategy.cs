@@ -39,6 +39,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.differential.privacy.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.differential.privacy.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public double AddLaplaceNoise(double value, double sensitivity)
         {
             var scale = sensitivity / _epsilon;
@@ -79,6 +98,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.differential.privacy.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

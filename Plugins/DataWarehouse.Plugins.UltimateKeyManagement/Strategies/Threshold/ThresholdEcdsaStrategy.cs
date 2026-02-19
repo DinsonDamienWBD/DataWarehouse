@@ -69,6 +69,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("thresholdecdsa.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "ECIES-secp256k1",
@@ -79,6 +89,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("thresholdecdsa.init");
             if (Configuration.TryGetValue("Threshold", out var t) && t is int threshold)
                 _config.Threshold = threshold;
             if (Configuration.TryGetValue("TotalParties", out var n) && n is int total)

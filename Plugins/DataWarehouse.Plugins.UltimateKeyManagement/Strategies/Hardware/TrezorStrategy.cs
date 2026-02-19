@@ -90,6 +90,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("trezor.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "CipherKeyValue-AES256",
@@ -100,6 +110,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("trezor.init");
             // Load configuration
             if (Configuration.TryGetValue("DerivationPath", out var pathObj) && pathObj is string path)
                 _config.DerivationPath = path;

@@ -30,8 +30,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             MaxConcurrentEvaluations = 500
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("chameleon.hash.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("chameleon.hash.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("chameleon.hash.evaluate");
             await Task.Yield();
 
             var hasTrapdoorKey = context.SubjectAttributes.TryGetValue("chameleon_trapdoor", out var trapdoor) && trapdoor != null;

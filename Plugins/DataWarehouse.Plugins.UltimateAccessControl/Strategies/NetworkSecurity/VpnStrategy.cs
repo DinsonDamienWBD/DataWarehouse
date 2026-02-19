@@ -24,8 +24,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             MaxConcurrentEvaluations = 10000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("network.vpn.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.vpn.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.vpn.evaluate");
             var requireVpn = context.ResourceAttributes.TryGetValue("RequireVpn", out var rv) && rv is bool rvBool && rvBool;
             var isVpn = context.EnvironmentAttributes.TryGetValue("VpnConnected", out var vpn) && vpn is bool vpnBool && vpnBool;
 

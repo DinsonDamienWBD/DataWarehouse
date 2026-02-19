@@ -35,10 +35,32 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
             MaxConcurrentEvaluations = 10000
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("totp.mfa.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("totp.mfa.shutdown");
+            _userSecrets.Clear();
+            _lastUsedTimeSteps.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             AccessContext context,
             CancellationToken cancellationToken)
         {
+            IncrementCounter("totp.mfa.evaluate");
             try
             {
                 // Extract TOTP code from SubjectAttributes

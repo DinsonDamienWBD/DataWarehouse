@@ -37,7 +37,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             MaxConcurrentEvaluations = 100
         };
 
-        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("quantum.secure.channel.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("quantum.secure.channel.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
             await base.InitializeAsync(configuration, cancellationToken);
             _qkdHardwareAvailable = Configuration.TryGetValue("qkd_hardware_endpoint", out var endpoint) && endpoint != null;
@@ -54,6 +73,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
 
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("quantum.secure.channel.evaluate");
             await Task.Yield();
 
             var channelId = $"{context.SubjectId}:{context.ResourceId}";

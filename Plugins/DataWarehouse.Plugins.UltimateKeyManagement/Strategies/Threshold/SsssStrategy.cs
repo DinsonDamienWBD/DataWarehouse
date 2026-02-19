@@ -68,8 +68,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ssss.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("ssss.init");
             if (Configuration.TryGetValue("Threshold", out var t) && t is int threshold)
                 _config.Threshold = threshold;
             if (Configuration.TryGetValue("StoragePath", out var p) && p is string path)

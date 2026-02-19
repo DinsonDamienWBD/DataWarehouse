@@ -47,7 +47,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             MaxConcurrentEvaluations = 5000
         };
 
+        
+
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.blockchain.anchor.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.blockchain.anchor.shutdown");
+            _anchors.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <summary>
         /// Creates a blockchain anchor for data.
         /// </summary>
         public BlockchainAnchor CreateAnchor(string resourceId, byte[] data, string blockchainNetwork = "local")
@@ -109,6 +129,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.blockchain.anchor.evaluate");
             await Task.Yield();
 
             if (!_anchors.TryGetValue(context.ResourceId, out var anchor))

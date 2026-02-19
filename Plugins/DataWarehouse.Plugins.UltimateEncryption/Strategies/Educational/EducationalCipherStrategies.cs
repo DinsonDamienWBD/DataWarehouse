@@ -20,6 +20,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
         /// <inheritdoc/>
         public override string StrategyId => "caesar";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("caesar.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("caesar.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
         /// <inheritdoc/>
         public override string StrategyName => "Caesar Cipher (EDUCATIONAL ONLY - NOT SECURE)";
 

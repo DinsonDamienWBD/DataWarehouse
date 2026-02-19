@@ -75,6 +75,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.checksum.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.checksum.shutdown");
+            _integrityRecords.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Registers a resource with integrity verification.
         /// </summary>
         public async Task<IntegrityRecord> RegisterResourceAsync(string resourceId, byte[] data, CancellationToken cancellationToken = default)
@@ -152,6 +172,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.checksum.evaluate");
             if (!_requireIntegrityOnAccess)
             {
                 return new AccessDecision

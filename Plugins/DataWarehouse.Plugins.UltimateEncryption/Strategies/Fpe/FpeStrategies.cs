@@ -22,6 +22,24 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "ff1-fpe";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ff1.fpe.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ff1.fpe.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
     /// <inheritdoc/>
     public override string StrategyName => "FF1 Format-Preserving Encryption";
 

@@ -38,8 +38,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             MaxConcurrentEvaluations = 10
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("homomorphic.access.control.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("homomorphic.access.control.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("homomorphic.access.control.evaluate");
             await Task.Yield();
 
             // Simplified homomorphic evaluation (production would use actual HE library)

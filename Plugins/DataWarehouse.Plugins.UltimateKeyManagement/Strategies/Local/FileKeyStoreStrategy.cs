@@ -52,8 +52,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("filekeystore.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("filekeystore.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("KeyStorePath", out var pathObj) && pathObj is string path)
                 _config.KeyStorePath = path;

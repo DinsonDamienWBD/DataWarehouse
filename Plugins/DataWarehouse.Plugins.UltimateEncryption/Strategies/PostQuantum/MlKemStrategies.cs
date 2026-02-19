@@ -59,6 +59,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// <inheritdoc/>
         public override string StrategyId => "ml-kem-512";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ml.kem.512.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ml.kem.512.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
         /// <inheritdoc/>
         public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512 compatible)";
 

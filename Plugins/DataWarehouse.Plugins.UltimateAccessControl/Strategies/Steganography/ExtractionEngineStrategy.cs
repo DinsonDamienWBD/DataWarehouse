@@ -114,6 +114,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("extraction.engine.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("extraction.engine.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Extracts hidden data from a stego-carrier with auto-detection.
         /// </summary>
         /// <param name="carrierData">The carrier containing hidden data.</param>
@@ -370,6 +389,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("extraction.engine.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

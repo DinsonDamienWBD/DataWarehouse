@@ -183,6 +183,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("smpcvault.shutdown");
+            _keys.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "ECIES-SMPC",
@@ -194,6 +205,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("smpcvault.init");
             // Load configuration
             if (Configuration.TryGetValue("Parties", out var partiesObj) && partiesObj is int parties)
                 _config.Parties = parties;

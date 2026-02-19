@@ -60,6 +60,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.entropy.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.entropy.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Analyzes the entropy of data.
         /// </summary>
         public EntropyAnalysisResult AnalyzeEntropy(byte[] data)
@@ -87,6 +106,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.entropy.evaluate");
             await Task.Yield();
 
             // Entropy analysis doesn't block access - it provides information

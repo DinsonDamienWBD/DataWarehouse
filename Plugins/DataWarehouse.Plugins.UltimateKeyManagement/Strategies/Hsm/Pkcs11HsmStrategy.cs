@@ -57,12 +57,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-KWP", "RSA-OAEP", "AES-256-CBC-PAD" };
 
         public bool SupportsHsmKeyGeneration => true;
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("pkcs11hsm.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("LibraryPath", out var libraryPathObj) && libraryPathObj is string libraryPath)
                 _config.LibraryPath = libraryPath;

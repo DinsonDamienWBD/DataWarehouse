@@ -51,6 +51,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("macoskeychain.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public MacOsKeychainStrategy()
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -62,6 +72,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("macoskeychain.init");
             // Load configuration
             if (Configuration.TryGetValue("ServiceName", out var serviceObj) && serviceObj is string service)
                 _config.ServiceName = service;

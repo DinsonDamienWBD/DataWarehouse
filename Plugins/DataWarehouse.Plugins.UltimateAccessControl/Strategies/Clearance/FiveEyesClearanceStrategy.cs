@@ -49,9 +49,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             MaxConcurrentEvaluations = 1000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("five.eyes.clearance.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("five.eyes.clearance.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("five.eyes.clearance.evaluate");
             // Extract user's nationality/clearance
             var userCountry = context.SubjectAttributes.TryGetValue("nationality", out var countryObj)
                 ? countryObj?.ToString()

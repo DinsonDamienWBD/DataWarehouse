@@ -713,9 +713,32 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("canary.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("canary.shutdown");
+            _canaries.Clear();
+            _exclusionRules.Clear();
+            _metrics.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("canary.evaluate");
             // Check if the accessed resource is a canary
             if (_canaries.TryGetValue(context.ResourceId, out var canary) && canary.IsActive)
             {

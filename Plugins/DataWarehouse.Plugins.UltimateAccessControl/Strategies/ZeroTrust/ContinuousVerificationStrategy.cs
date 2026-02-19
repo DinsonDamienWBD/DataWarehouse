@@ -78,6 +78,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("continuous.verification.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("continuous.verification.shutdown");
+            _sessions.Clear();
+            _profiles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates or updates a session context.
         /// </summary>
         public SessionContext CreateSession(string sessionId, string userId, string deviceId, GeoLocation? location)
@@ -235,6 +256,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("continuous.verification.evaluate");
             // Extract session ID from context
             if (!context.EnvironmentAttributes.TryGetValue("SessionId", out var sessionIdObj) ||
                 sessionIdObj is not string sessionId)

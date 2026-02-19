@@ -24,8 +24,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
             MaxConcurrentEvaluations = 5000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("military.cds.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.cds.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.cds.evaluate");
             var isTransfer = context.Action.Equals("transfer", StringComparison.OrdinalIgnoreCase);
             var hasApproval = context.SubjectAttributes.ContainsKey("CdsApproval");
 

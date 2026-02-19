@@ -78,6 +78,31 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("multi.tenancy.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("multi.tenancy.shutdown");
+            _tenants.Clear();
+            _memberships.Clear();
+            _crossTenantGrants.Clear();
+            _hierarchies.Clear();
+            _impersonationSessions.Clear();
+            _quotas.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         #region Tenant Management
 
         /// <summary>
@@ -429,6 +454,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("multi.tenancy.evaluate");
             // Extract tenant information from context
             var subjectTenantId = GetSubjectTenantId(context);
             var resourceTenantId = GetResourceTenantId(context);

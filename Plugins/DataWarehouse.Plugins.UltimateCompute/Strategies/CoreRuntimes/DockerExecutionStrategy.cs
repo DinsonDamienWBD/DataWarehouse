@@ -118,9 +118,9 @@ internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
         var maxMem = GetMaxMemoryBytes(task, 512 * 1024 * 1024);
         args.Append($" --memory {maxMem}");
 
-        // CPU limits
-        if (task.ResourceLimits?.MaxCpuPercent is > 0)
-            args.Append($" --cpus {task.ResourceLimits.MaxCpuPercent / 100.0:F1}");
+        // CPU limits (use MaxCpuTime as a proxy: shorter time budget = fewer CPUs allowed)
+        if (task.ResourceLimits?.MaxCpuTime is TimeSpan cpuTime && cpuTime.TotalSeconds > 0)
+            args.Append($" --cpus {Math.Max(0.1, Math.Min(1.0, cpuTime.TotalSeconds / 30.0)):F1}");
 
         // Network isolation
         if (task.ResourceLimits?.AllowNetworkAccess == false)

@@ -266,7 +266,7 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
         }
     }
 
-    private void IncrementCounter(string name)
+    private new void IncrementCounter(string name)
     {
         _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
     }

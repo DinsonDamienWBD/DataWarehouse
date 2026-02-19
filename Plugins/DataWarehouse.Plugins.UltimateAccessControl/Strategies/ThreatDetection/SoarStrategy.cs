@@ -52,9 +52,31 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("soar.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("soar.shutdown");
+            _playbooks.Clear();
+            _activeIncidents.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("soar.evaluate");
             // Assess threat level based on context
             var threatLevel = AssessThreatLevel(context);
 

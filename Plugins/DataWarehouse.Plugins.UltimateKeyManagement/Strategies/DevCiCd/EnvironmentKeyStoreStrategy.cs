@@ -54,6 +54,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("environmentkeystore.shutdown");
+            _generatedKeys.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override Task InitializeStorage(CancellationToken cancellationToken)
         {
             // Load configuration from Configuration dictionary

@@ -66,6 +66,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("awscloudhsm.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM", "RSA-OAEP-256", "AES-KEY-WRAP" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -81,6 +91,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("awscloudhsm.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ClusterId", out var clusterIdObj) && clusterIdObj is string clusterId)
                 _config.ClusterId = clusterId;

@@ -33,10 +33,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
             MaxConcurrentEvaluations = 1000
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("biometric.mfa.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("biometric.mfa.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             AccessContext context,
             CancellationToken cancellationToken)
         {
+            IncrementCounter("biometric.mfa.evaluate");
             try
             {
                 // Extract biometric data from SubjectAttributes

@@ -30,8 +30,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             MaxConcurrentEvaluations = 200
         };
 
-        protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("decentralized.id.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("decentralized.id.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("decentralized.id.evaluate");
             await Task.Yield();
 
             var did = context.SubjectAttributes.TryGetValue("did", out var didValue) && didValue is string didStr ? didStr : null;

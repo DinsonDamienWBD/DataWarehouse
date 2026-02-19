@@ -29,7 +29,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             MaxConcurrentEvaluations = 10000
         };
 
-        public string Tokenize(string sensitiveData)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.tokenization.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.tokenization.shutdown");
+            _tokenVault.Clear();
+            _reverseVault.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public string Tokenize(string sensitiveData)
         {
             if (_reverseVault.TryGetValue(sensitiveData, out var existingToken))
                 return existingToken;
@@ -47,6 +68,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.tokenization.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

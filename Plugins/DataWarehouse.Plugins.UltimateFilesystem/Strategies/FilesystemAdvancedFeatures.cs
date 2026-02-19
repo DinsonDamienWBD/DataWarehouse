@@ -171,7 +171,7 @@ public sealed class ContentAddressableStorageLayer
             }
 
             // Rabin fingerprint rolling hash
-            fingerprint = ((fingerprint << 1) | data[pos]) ^ (data[pos] * 0x1FFF);
+            fingerprint = ((fingerprint << 1) | data[pos]) ^ (ulong)(data[pos] * 0x1FFF);
 
             // Check for breakpoint (when fingerprint matches mask pattern)
             if ((fingerprint & mask) == 0)
@@ -215,12 +215,11 @@ public sealed class ContentAddressableStorageLayer
             try
             {
                 // Publish hash request to UltimateDataIntegrity
-                await _messageBus.PublishAsync("integrity.hash.compute", new Dictionary<string, object>
-                {
-                    ["algorithm"] = "SHA256",
-                    ["data_length"] = data.Length,
-                    ["request_id"] = Guid.NewGuid().ToString("N")
-                }, ct);
+                var hashMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "integrity.hash.compute" };
+                hashMsg.Payload["algorithm"] = "SHA256";
+                hashMsg.Payload["data_length"] = data.Length;
+                hashMsg.Payload["request_id"] = Guid.NewGuid().ToString("N");
+                await _messageBus.PublishAsync("integrity.hash.compute", hashMsg, ct);
             }
             catch
             {
@@ -387,15 +386,14 @@ public sealed class BlockLevelEncryptionManager
         {
             try
             {
-                await _messageBus.PublishAsync("encryption.block.encrypt", new Dictionary<string, object>
-                {
-                    ["volume_id"] = volumeId,
-                    ["cipher"] = header.Cipher,
-                    ["key_size"] = header.KeySizeBits,
-                    ["block_offset"] = blockOffset,
-                    ["data_length"] = data.Length,
-                    ["use_hardware"] = header.UseHardwareAcceleration
-                }, ct);
+                var encMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.encrypt" };
+                encMsg.Payload["volume_id"] = volumeId;
+                encMsg.Payload["cipher"] = header.Cipher;
+                encMsg.Payload["key_size"] = header.KeySizeBits;
+                encMsg.Payload["block_offset"] = blockOffset;
+                encMsg.Payload["data_length"] = data.Length;
+                encMsg.Payload["use_hardware"] = header.UseHardwareAcceleration;
+                await _messageBus.PublishAsync("encryption.block.encrypt", encMsg, ct);
             }
             catch
             {
@@ -427,13 +425,12 @@ public sealed class BlockLevelEncryptionManager
         {
             try
             {
-                await _messageBus.PublishAsync("encryption.block.decrypt", new Dictionary<string, object>
-                {
-                    ["volume_id"] = volumeId,
-                    ["cipher"] = header.Cipher,
-                    ["block_offset"] = blockOffset,
-                    ["data_length"] = encryptedData.Length
-                }, ct);
+                var decMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.decrypt" };
+                decMsg.Payload["volume_id"] = volumeId;
+                decMsg.Payload["cipher"] = header.Cipher;
+                decMsg.Payload["block_offset"] = blockOffset;
+                decMsg.Payload["data_length"] = encryptedData.Length;
+                await _messageBus.PublishAsync("encryption.block.decrypt", decMsg, ct);
             }
             catch { /* Fall through to local */ }
         }

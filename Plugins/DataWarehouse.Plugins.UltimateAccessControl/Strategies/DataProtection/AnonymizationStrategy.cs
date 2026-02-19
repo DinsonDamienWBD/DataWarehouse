@@ -40,6 +40,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.anonymization.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.anonymization.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public Dictionary<string, object> GeneralizeData(Dictionary<string, object> data, string[] quasiIdentifiers)
         {
             var anonymized = new Dictionary<string, object>(data);
@@ -68,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.anonymization.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

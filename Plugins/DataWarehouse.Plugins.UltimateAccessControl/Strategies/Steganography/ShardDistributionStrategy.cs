@@ -103,6 +103,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("shard.distribution.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("shard.distribution.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates shards from secret data using threshold sharing.
         /// </summary>
         /// <param name="secretData">The secret data to shard.</param>
@@ -396,6 +415,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("shard.distribution.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

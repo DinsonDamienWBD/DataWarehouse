@@ -712,7 +712,7 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
         return 50;
     }
 
-    private void IncrementCounter(string name)
+    private new void IncrementCounter(string name)
     {
         _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
     }
@@ -928,7 +928,7 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
         }
     }
 
-    private void IncrementCounter(string name)
+    private new void IncrementCounter(string name)
     {
         _counters.AddOrUpdate(name, 1, (_, current) => System.Threading.Interlocked.Increment(ref current));
     }

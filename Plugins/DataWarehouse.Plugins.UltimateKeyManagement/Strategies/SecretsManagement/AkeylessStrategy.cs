@@ -53,6 +53,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("akeyless.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -64,6 +74,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("akeyless.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("GatewayUrl", out var urlObj) && urlObj is string url)
                 _config.GatewayUrl = url;

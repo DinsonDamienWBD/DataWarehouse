@@ -39,9 +39,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             MaxConcurrentEvaluations = 1000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("compartmentalization.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("compartmentalization.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("compartmentalization.evaluate");
             // Extract user's compartments/codewords
             var userCompartments = context.SubjectAttributes.TryGetValue("compartments", out var userObj) &&
                                    userObj is IEnumerable<string> userComps

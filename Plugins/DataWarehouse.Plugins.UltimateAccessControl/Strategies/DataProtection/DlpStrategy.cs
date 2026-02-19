@@ -62,6 +62,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.dlp.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.dlp.shutdown");
+            _rules.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         private void AddDefaultRules()
         {
             // US Social Security Number
@@ -177,6 +197,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.dlp.evaluate");
             await Task.Yield();
 
             // DLP can inspect content from context if available

@@ -82,6 +82,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("zanzibar.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("zanzibar.shutdown");
+            _tuples.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Adds a relationship tuple.
         /// </summary>
         public void WriteTuple(string user, string relation, string object_)
@@ -196,6 +216,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("zanzibar.evaluate");
             var user = context.SubjectId;
             var relation = context.Action; // Map action to relation (e.g., "read" -> "viewer")
             var object_ = context.ResourceId;

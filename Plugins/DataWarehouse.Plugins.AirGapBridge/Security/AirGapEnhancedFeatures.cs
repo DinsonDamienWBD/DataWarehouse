@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Contracts.EdgeComputing;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Security;
 

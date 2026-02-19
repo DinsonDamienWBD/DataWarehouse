@@ -60,6 +60,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("gcpcloudhsm.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "GOOGLE_SYMMETRIC_ENCRYPTION",
@@ -73,6 +83,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("gcpcloudhsm.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ProjectId", out var projectIdObj) && projectIdObj is string projectId)
                 _config.ProjectId = projectId;

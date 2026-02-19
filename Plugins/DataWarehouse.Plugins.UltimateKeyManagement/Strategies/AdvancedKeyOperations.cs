@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
         private byte[]? _masterIkm; // Input keying material
 
         public override string StrategyId => "hkdf-advanced";
-        public override string StrategyName => "Advanced HKDF Key Derivation";
+        public override string Name => "Advanced HKDF Key Derivation";
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -290,7 +290,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
         private readonly List<string> _authorizedRecoveryAgents = new();
 
         public override string StrategyId => "key-escrow-recovery";
-        public override string StrategyName => "Key Escrow and Recovery";
+        public override string Name => "Key Escrow and Recovery";
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -363,7 +363,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
                 KeyId = keyId,
                 EncryptedKeyMaterial = keyData,
                 EscrowedAt = DateTime.UtcNow,
-                EscrowedBy = context.Identity ?? "system",
+                EscrowedBy = context.UserId ?? "system",
                 RecoveryThreshold = _recoveryThreshold,
                 TotalShares = _totalShares
             };
@@ -527,7 +527,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
         private string _curveType = "P-384";
 
         public override string StrategyId => "key-agreement";
-        public override string StrategyName => "ECDH/X25519 Key Agreement";
+        public override string Name => "ECDH/X25519 Key Agreement";
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -705,7 +705,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
         private string _defaultAlgorithm = "AES-KWP";
 
         public override string StrategyId => "key-wrapping";
-        public override string StrategyName => "AES-KWP/RSA-OAEP Key Wrapping";
+        public override string Name => "AES-KWP/RSA-OAEP Key Wrapping";
 
         public override KeyStoreCapabilities Capabilities => new()
         {

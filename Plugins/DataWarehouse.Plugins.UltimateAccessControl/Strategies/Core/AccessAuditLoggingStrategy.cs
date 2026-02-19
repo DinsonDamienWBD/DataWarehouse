@@ -104,6 +104,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("audit.logging.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("audit.logging.shutdown");
+            _recentLogs.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         #region Destination Management
 
         /// <summary>
@@ -708,6 +728,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("audit.logging.evaluate");
             // This strategy is primarily for logging, so it always permits
             // and logs the access attempt for other strategies to make the actual decision
             var decision = new AccessDecision

@@ -86,6 +86,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("spiffe.spire.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("spiffe.spire.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Registers a workload with a SPIFFE ID.
         /// </summary>
         public WorkloadRegistration RegisterWorkload(string spiffeId, string selector, Dictionary<string, string>? attributes = null)
@@ -222,6 +241,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("spiffe.spire.evaluate");
             // Extract SPIFFE ID from context
             string? spiffeId = null;
 

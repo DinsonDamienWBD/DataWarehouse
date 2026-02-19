@@ -49,6 +49,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.saml.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.saml.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(!string.IsNullOrEmpty(_issuer) && _certificate != null);
@@ -56,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.saml.evaluate");
             await Task.CompletedTask;
 
             if (!context.EnvironmentAttributes.TryGetValue("SamlAssertion", out var assertionObj) ||

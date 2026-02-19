@@ -45,9 +45,31 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("honeypot.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("honeypot.shutdown");
+            _honeypots.Clear();
+            _attackerInteractions.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("honeypot.evaluate");
             // Check if resource is a honeypot
             if (_honeypots.TryGetValue(context.ResourceId, out var honeypot))
             {

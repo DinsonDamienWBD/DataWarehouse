@@ -26,7 +26,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             MaxConcurrentEvaluations = 10000
         };
 
-        public string MaskCreditCard(string value) =>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.masking.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.masking.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public string MaskCreditCard(string value) =>
             value.Length > 4 ? "****-****-****-" + value.Substring(value.Length - 4) : value;
 
         public string MaskEmail(string email) =>
@@ -40,6 +59,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.masking.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

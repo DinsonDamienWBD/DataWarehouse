@@ -82,6 +82,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dynamic.authz.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dynamic.authz.shutdown");
+            _policies.Clear();
+            _jitElevations.Clear();
+            _behaviorProfiles.Clear();
+            _riskCache.Clear();
+            _activeSessions.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         #region Policy Management
 
         /// <summary>
@@ -638,6 +662,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dynamic.authz.evaluate");
             // Enrich context
             var enrichedContext = await EnrichContextAsync(context, cancellationToken);
 

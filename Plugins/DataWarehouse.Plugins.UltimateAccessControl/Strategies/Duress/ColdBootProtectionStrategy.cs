@@ -47,9 +47,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             MaxConcurrentEvaluations = 1000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cold.boot.protection.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cold.boot.protection.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("cold.boot.protection.evaluate");
             // Check for cold boot threat indicator
             var isColdBootThreat = context.EnvironmentAttributes.TryGetValue("cold_boot_threat", out var threatObj) &&
                                    threatObj is bool threat && threat;

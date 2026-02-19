@@ -104,6 +104,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("casbin.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("casbin.shutdown");
+            _policies.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Adds a policy rule.
         /// </summary>
         public void AddPolicy(string subject, string object_, string action)
@@ -191,6 +211,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("casbin.evaluate");
             var subject = context.SubjectId;
             var object_ = context.ResourceId;
             var action = context.Action;

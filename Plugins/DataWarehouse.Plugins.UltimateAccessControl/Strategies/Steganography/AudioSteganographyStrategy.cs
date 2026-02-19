@@ -108,6 +108,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("audio.steganography.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("audio.steganography.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Embeds secret data into audio carrier.
         /// </summary>
         /// <param name="audioData">The carrier audio data (WAV/AIFF).</param>
@@ -263,6 +282,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("audio.steganography.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

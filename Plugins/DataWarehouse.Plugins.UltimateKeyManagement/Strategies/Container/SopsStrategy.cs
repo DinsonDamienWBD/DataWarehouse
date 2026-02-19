@@ -71,6 +71,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("sops.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public SopsStrategy()
         {
             _yamlSerializer = new SerializerBuilder()
@@ -85,6 +95,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("sops.init");
             LoadConfiguration();
 
             // Find sops CLI

@@ -53,6 +53,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("delinea.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public DelineaStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -60,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("delinea.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ServerUrl", out var urlObj) && urlObj is string url)
                 _config.ServerUrl = url;

@@ -64,8 +64,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("externalsecrets.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("externalsecrets.init");
             LoadConfiguration();
 
             // Initialize Kubernetes client

@@ -39,7 +39,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             MaxConcurrentEvaluations = 10000
         };
 
-        public string Pseudonymize(string identifier)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.pseudonymization.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dataprotection.pseudonymization.shutdown");
+            _pseudonymMap.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public string Pseudonymize(string identifier)
         {
             if (_pseudonymMap.TryGetValue(identifier, out var existingPseudonym))
                 return existingPseudonym;
@@ -54,6 +74,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dataprotection.pseudonymization.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

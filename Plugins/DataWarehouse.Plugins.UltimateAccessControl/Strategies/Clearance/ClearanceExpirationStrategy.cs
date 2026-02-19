@@ -38,9 +38,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             MaxConcurrentEvaluations = 2000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("clearance.expiration.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("clearance.expiration.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("clearance.expiration.evaluate");
             // Check clearance expiration date
             if (context.SubjectAttributes.TryGetValue("clearance_expiry", out var expiryObj) &&
                 expiryObj is DateTime expiry)

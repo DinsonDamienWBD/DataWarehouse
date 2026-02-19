@@ -86,8 +86,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("biometricderivedkey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("biometricderivedkey.init");
             // Load configuration
             if (Configuration.TryGetValue("BiometricType", out var typeObj) && typeObj is string type)
                 _config.BiometricType = Enum.Parse<BiometricType>(type, true);

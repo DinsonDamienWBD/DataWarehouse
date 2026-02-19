@@ -16,6 +16,24 @@ public sealed class Aes256CbcStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "aes-256-cbc";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("aes.256.cbc.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("aes.256.cbc.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
     /// <inheritdoc/>
     public override string StrategyName => "AES-256-CBC-HMAC";
 

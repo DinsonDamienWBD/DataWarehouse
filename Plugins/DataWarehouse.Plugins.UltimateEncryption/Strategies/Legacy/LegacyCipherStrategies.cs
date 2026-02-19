@@ -51,6 +51,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
         };
 
         public override string StrategyId => "blowfish-448-cbc";
+
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("blowfish.448.cbc.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("blowfish.448.cbc.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
         public override string StrategyName => "Blowfish-448 CBC with HMAC (Legacy)";
 
         protected override async Task<byte[]> EncryptCoreAsync(

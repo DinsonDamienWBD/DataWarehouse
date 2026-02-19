@@ -61,6 +61,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
         };
 
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "TPM-RSA-OAEP",
@@ -71,6 +72,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("tpm.init");
             // Load configuration
             if (Configuration.TryGetValue("DevicePath", out var deviceObj) && deviceObj is string device)
                 _config.DevicePath = device;

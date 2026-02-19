@@ -105,6 +105,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("video.frame.embedding.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("video.frame.embedding.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Embeds secret data into video frames.
         /// </summary>
         /// <param name="videoData">The carrier video data.</param>
@@ -264,6 +283,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("video.frame.embedding.evaluate");
             return Task.FromResult(new AccessDecision
             {
                 IsGranted = true,

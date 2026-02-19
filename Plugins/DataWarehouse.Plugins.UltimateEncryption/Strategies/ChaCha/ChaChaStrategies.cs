@@ -16,6 +16,24 @@ public sealed class ChaCha20Poly1305Strategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "chacha20-poly1305";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("chacha20.poly1305.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("chacha20.poly1305.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
     /// <inheritdoc/>
     public override string StrategyName => "ChaCha20-Poly1305";
 

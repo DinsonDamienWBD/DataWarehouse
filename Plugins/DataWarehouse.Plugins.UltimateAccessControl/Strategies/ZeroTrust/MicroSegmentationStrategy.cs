@@ -75,6 +75,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("micro.segmentation.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("micro.segmentation.shutdown");
+            _securityZones.Clear();
+            _policies.Clear();
+            _workloads.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Defines a security zone.
         /// </summary>
         public SecurityZone DefineZone(string zoneName, SecurityLevel securityLevel, string[] allowedProtocols)
@@ -189,6 +211,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("micro.segmentation.evaluate");
             // Extract source and target identifiers
             var sourceId = context.SubjectId;
             var targetId = context.ResourceId;

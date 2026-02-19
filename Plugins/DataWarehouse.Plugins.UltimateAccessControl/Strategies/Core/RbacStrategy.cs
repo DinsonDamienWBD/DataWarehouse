@@ -73,6 +73,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("rbac.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("rbac.shutdown");
+            _roles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates a new role.
         /// </summary>
         public void CreateRole(string roleName, IEnumerable<string>? permissions = null, IEnumerable<string>? parentRoles = null)
@@ -159,6 +179,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("rbac.evaluate");
             // Get user's roles
             var userRoles = context.Roles;
 

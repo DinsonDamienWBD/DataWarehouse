@@ -396,11 +396,11 @@ public sealed class VectorSearchIntegrationStrategy : IntelligenceStrategyBase
                 .Select(r =>
                 {
                     var keywordScore = 0f;
-                    if (r.Metadata != null)
+                    if (r.Entry.Metadata != null)
                     {
-                        foreach (var (_, value) in r.Metadata)
+                        foreach (var kvp in r.Entry.Metadata)
                         {
-                            if (value?.ToString()?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true)
+                            if (kvp.Value?.ToString()?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true)
                             {
                                 keywordScore = 1.0f;
                                 break;
@@ -411,10 +411,14 @@ public sealed class VectorSearchIntegrationStrategy : IntelligenceStrategyBase
                     var combinedScore = r.Score * vectorWeight + keywordScore * keywordWeight;
                     return new VectorMatch
                     {
-                        Id = r.Id,
+                        Entry = new DataWarehouse.SDK.AI.VectorEntry
+                        {
+                            Id = r.Entry.Id,
+                            Vector = r.Entry.Vector,
+                            Metadata = r.Entry.Metadata ?? new Dictionary<string, object>()
+                        },
                         Score = combinedScore,
-                        Vector = r.Vector,
-                        Metadata = r.Metadata
+                        Rank = r.Rank
                     };
                 })
                 .OrderByDescending(r => r.Score)
@@ -622,12 +626,12 @@ public sealed class TextClassificationStrategy : FeatureStrategyBase
     };
 
     /// <summary>Classifies text into categories.</summary>
-    public async Task<ClassificationResult> ClassifyAsync(string text, string[]? categories = null, CancellationToken ct = default)
+    public async Task<TextClassificationResult> ClassifyAsync(string text, string[]? categories = null, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
             if (AIProvider == null)
-                return new ClassificationResult { Category = "unknown", Confidence = 0 };
+                return new TextClassificationResult { Category = "unknown", Confidence = 0 };
 
             var categoryHint = categories != null ? $" Categories: {string.Join(", ", categories)}." : "";
             var response = await AIProvider.CompleteAsync(new AIRequest
@@ -636,14 +640,14 @@ public sealed class TextClassificationStrategy : FeatureStrategyBase
                 Prompt = text, MaxTokens = 100, Temperature = 0.0f
             }, ct);
 
-            try { return JsonSerializer.Deserialize<ClassificationResult>(response.Content) ?? new ClassificationResult(); }
-            catch { return new ClassificationResult { Category = "unknown", Confidence = 0 }; }
+            try { return JsonSerializer.Deserialize<TextClassificationResult>(response.Content) ?? new TextClassificationResult(); }
+            catch { return new TextClassificationResult { Category = "unknown", Confidence = 0 }; }
         });
     }
 }
 
 /// <summary>Classification result.</summary>
-public sealed class ClassificationResult
+public sealed class TextClassificationResult
 {
     public string Category { get; set; } = "unknown";
     public float Confidence { get; set; }

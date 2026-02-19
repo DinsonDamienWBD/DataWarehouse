@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -39,7 +40,10 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.UHD,
         MaxBitrate: null,
-        SupportedCodecs: new HashSet<string> { "onnx-inference" }))
+        SupportedCodecs: new HashSet<string> { "onnx-inference" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "onnx-inference";
@@ -142,14 +146,14 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
     public IReadOnlyList<OnnxModelInfo> GetLoadedModels()
         => _loadedModels.Values.ToList().AsReadOnly();
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("onnx.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -159,13 +163,13 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
             SampleRate: null, FileSize: inputStream.Length));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -198,7 +202,10 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.EightK,
         MaxBitrate: null,
-        SupportedCodecs: new HashSet<string> { "ai-upscale" }))
+        SupportedCodecs: new HashSet<string> { "ai-upscale" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "ai-upscaling";
@@ -251,14 +258,14 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
         }, cancellationToken);
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("ai.upscale.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -268,13 +275,13 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
             SampleRate: null, FileSize: inputStream.Length));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -307,7 +314,10 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.UHD,
         MaxBitrate: null,
-        SupportedCodecs: new HashSet<string> { "yolo-detection" }))
+        SupportedCodecs: new HashSet<string> { "yolo-detection" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "object-detection";
@@ -414,11 +424,11 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
         "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
     };
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -428,13 +438,13 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
             SampleRate: null, FileSize: inputStream.Length));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -464,7 +474,10 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.UHD,
         MaxBitrate: null,
-        SupportedCodecs: new HashSet<string> { "face-detection" }))
+        SupportedCodecs: new HashSet<string> { "face-detection" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "face-detection";
@@ -509,11 +522,11 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
         }, cancellationToken);
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -523,13 +536,13 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
             SampleRate: null, FileSize: inputStream.Length));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -562,7 +575,10 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
         SupportsAdaptiveBitrate: false,
         MaxResolution: default,
         MaxBitrate: null,
-        SupportedCodecs: new HashSet<string> { "whisper-stt" }))
+        SupportedCodecs: new HashSet<string> { "whisper-stt" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "speech-to-text";
@@ -612,11 +628,11 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
         }, cancellationToken);
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -626,13 +642,13 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
             SampleRate: 16000, FileSize: inputStream.Length));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 #region AI Processing Types

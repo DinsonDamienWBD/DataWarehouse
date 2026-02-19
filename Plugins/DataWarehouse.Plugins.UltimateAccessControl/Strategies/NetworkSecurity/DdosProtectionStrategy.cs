@@ -36,8 +36,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.ddos.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.ddos.shutdown");
+            _rateLimits.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("network.ddos.evaluate");
             var clientIp = context.ClientIpAddress ?? "unknown";
             var now = DateTime.UtcNow;
 

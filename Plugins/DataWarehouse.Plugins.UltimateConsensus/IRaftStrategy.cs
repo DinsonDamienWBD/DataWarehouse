@@ -549,7 +549,7 @@ public sealed class PbftStrategy : IRaftStrategy
 
     private void ApplyCommittedEntries(PbftGroupState state)
     {
-        while (state.CommittedEntries.ContainsKey(state.LastApplied + 1))
+        while (state.CommittedEntries.ContainsKey((int)(state.LastApplied + 1)))
         {
             state.LastApplied++;
             // Entry applied to state machine

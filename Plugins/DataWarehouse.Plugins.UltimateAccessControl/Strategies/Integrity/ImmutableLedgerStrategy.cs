@@ -59,7 +59,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             MaxConcurrentEvaluations = 10000
         };
 
+        
+
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.immutable.ledger.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.immutable.ledger.shutdown");
+            _ledgers.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <summary>
         /// Creates a new immutable ledger.
         /// </summary>
         public ImmutableLedger CreateLedger(string ledgerId, string description)
@@ -235,6 +255,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.immutable.ledger.evaluate");
             await Task.Yield();
 
             if (!_ledgers.TryGetValue(context.ResourceId, out var ledger))

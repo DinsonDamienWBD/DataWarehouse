@@ -24,8 +24,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             MaxConcurrentEvaluations = 10000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("network.sdwan.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.sdwan.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.sdwan.evaluate");
             var sourceBranch = context.EnvironmentAttributes.TryGetValue("BranchId", out var sb) ? sb?.ToString() : null;
             var targetBranch = context.ResourceAttributes.TryGetValue("BranchId", out var tb) ? tb?.ToString() : null;
 

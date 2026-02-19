@@ -65,8 +65,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("age.shutdown");
+            _keyCache.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("age.init");
             // Load configuration
             if (Configuration.TryGetValue("KeyStorePath", out var keyStorePathObj) && keyStorePathObj is string keyStorePath)
                 _config.KeyStorePath = keyStorePath;

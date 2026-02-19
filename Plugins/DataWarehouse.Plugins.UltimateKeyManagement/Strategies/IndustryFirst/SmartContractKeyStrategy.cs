@@ -104,8 +104,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("smartcontractkey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("smartcontractkey.init");
             // Load configuration
             if (Configuration.TryGetValue("RpcUrl", out var rpcObj) && rpcObj is string rpc)
                 _config.RpcUrl = rpc;

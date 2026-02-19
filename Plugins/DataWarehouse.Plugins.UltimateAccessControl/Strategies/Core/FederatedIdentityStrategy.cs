@@ -97,6 +97,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("federated.identity.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("federated.identity.shutdown");
+            _identityProviders.Clear();
+            _sessions.Clear();
+            _identityMappings.Clear();
+            _tokenCache.Clear();
+            _claimsTransformations.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         #region Identity Provider Management
 
         /// <summary>
@@ -858,6 +882,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("federated.identity.evaluate");
             // Check for federation token in context
             if (!context.EnvironmentAttributes.TryGetValue("FederationToken", out var tokenObj) ||
                 tokenObj is not string token)

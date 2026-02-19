@@ -72,8 +72,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("timelockpuzzle.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("timelockpuzzle.init");
             if (Configuration.TryGetValue("SquaringsPerSecond", out var sps) && sps is long squarings)
                 _config.SquaringsPerSecond = squarings;
             if (Configuration.TryGetValue("DefaultUnlockSeconds", out var dur) && dur is long duration)

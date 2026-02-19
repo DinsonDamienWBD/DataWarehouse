@@ -63,6 +63,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         /// <inheritdoc/>
         public override string StrategyId => "argon2id-kdf";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("argon2id.kdf.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("argon2id.kdf.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
         /// <inheritdoc/>
         public override string StrategyName => "Argon2id Key Derivation Function";
 

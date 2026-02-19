@@ -54,6 +54,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("windowscredmanager.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public WindowsCredManagerStrategy()
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -65,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("windowscredmanager.init");
             // Load configuration
             if (Configuration.TryGetValue("CredentialPrefix", out var prefixObj) && prefixObj is string prefix)
                 _config.CredentialPrefix = prefix;

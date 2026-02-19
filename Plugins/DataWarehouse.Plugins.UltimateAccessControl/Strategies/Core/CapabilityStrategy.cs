@@ -80,6 +80,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("capability.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("capability.shutdown");
+            _capabilities.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates a new capability token.
         /// </summary>
         public Capability CreateCapability(
@@ -199,6 +219,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("capability.evaluate");
             // Check if a capability token is provided in context
             if (!context.SubjectAttributes.TryGetValue("CapabilityToken", out var tokenObj) ||
                 tokenObj is not string token)

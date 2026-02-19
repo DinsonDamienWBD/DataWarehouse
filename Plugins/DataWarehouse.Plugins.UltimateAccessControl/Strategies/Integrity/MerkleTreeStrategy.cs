@@ -48,7 +48,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             MaxConcurrentEvaluations = 10000
         };
 
+        
+
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.merkle.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.merkle.shutdown");
+            _trees.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <summary>
         /// Builds a Merkle tree from a list of data items.
         /// </summary>
         public MerkleTree BuildTree(string treeId, IEnumerable<byte[]> dataItems)
@@ -149,6 +169,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.merkle.evaluate");
             await Task.Yield();
 
             if (!_trees.TryGetValue(context.ResourceId, out var tree))

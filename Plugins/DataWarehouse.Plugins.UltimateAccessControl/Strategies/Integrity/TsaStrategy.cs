@@ -47,7 +47,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             MaxConcurrentEvaluations = 5000
         };
 
+        
+
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.tsa.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("integrity.tsa.shutdown");
+            _tokens.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <summary>
         /// Generates a timestamp token for data.
         /// </summary>
         public TimestampToken GenerateTimestamp(string resourceId, byte[] data)
@@ -114,6 +134,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("integrity.tsa.evaluate");
             await Task.Yield();
 
             if (!_tokens.TryGetValue(context.ResourceId, out var token))

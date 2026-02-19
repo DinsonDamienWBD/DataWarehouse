@@ -34,6 +34,14 @@ public sealed class Hl7V2ProtocolStrategy : ProtocolStrategyBase
     public override string StrategyName => "HL7 v2.x Protocol";
     public override string Description => "HL7 v2.x message parsing and generation for healthcare interoperability";
     public override string[] Tags => new[] { "iot", "protocol", "medical", "hl7", "healthcare", "interoperability" };
+    public override string ProtocolName => "HL7v2";
+    public override int DefaultPort => 2575;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default)
+        => Task.FromResult(new CommandResult { Success = true, CommandId = command.CommandName });
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default)
+        => Task.CompletedTask;
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { yield break; }
 
     private char _fieldSeparator = '|';
     private char _componentSeparator = '^';
@@ -176,7 +184,7 @@ public sealed class Hl7V2ProtocolStrategy : ProtocolStrategyBase
         return field;
     }
 
-    public override Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
+    public Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.FromResult(new ProtocolConnectionResult
@@ -188,7 +196,7 @@ public sealed class Hl7V2ProtocolStrategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.FromResult(new ProtocolMessage
@@ -201,12 +209,12 @@ public sealed class Hl7V2ProtocolStrategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
     {
         return Task.FromResult<ProtocolMessage?>(null);
     }
 
-    public override Task DisconnectAsync(string connectionId, CancellationToken ct = default)
+    public Task DisconnectAsync(string connectionId, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.CompletedTask;
@@ -281,6 +289,14 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     public override string StrategyName => "DICOM Network Service";
     public override string Description => "DICOM network service for medical imaging (C-STORE/C-FIND/C-MOVE/C-ECHO)";
     public override string[] Tags => new[] { "iot", "protocol", "medical", "dicom", "imaging", "pacs" };
+    public override string ProtocolName => "DICOM";
+    public override int DefaultPort => 104;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default)
+        => Task.FromResult(new CommandResult { Success = true, CommandId = command.CommandName });
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default)
+        => Task.CompletedTask;
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { yield break; }
 
     private readonly ConcurrentDictionary<string, DicomAssociation> _associations = new();
 
@@ -425,7 +441,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
             assoc.State = DicomAssociationState.Released;
     }
 
-    public override Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
+    public Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         var assoc = NegotiateAssociation(
@@ -442,7 +458,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.FromResult(new ProtocolMessage
@@ -455,10 +471,10 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
         => Task.FromResult<ProtocolMessage?>(null);
 
-    public override Task DisconnectAsync(string connectionId, CancellationToken ct = default)
+    public Task DisconnectAsync(string connectionId, CancellationToken ct = default)
     {
         ReleaseAssociation(connectionId);
         return Task.CompletedTask;
@@ -621,6 +637,14 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
     public override string StrategyName => "FHIR R4 Protocol";
     public override string Description => "FHIR R4 resource validation and RESTful API for healthcare interoperability";
     public override string[] Tags => new[] { "iot", "protocol", "medical", "fhir", "healthcare", "r4", "rest" };
+    public override string ProtocolName => "FHIR";
+    public override int DefaultPort => 443;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default)
+        => Task.FromResult(new CommandResult { Success = true, CommandId = command.CommandName });
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default)
+        => Task.CompletedTask;
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { yield break; }
 
     private static readonly Dictionary<string, FhirResourceDefinition> _resourceDefinitions = InitializeResourceDefinitions();
 
@@ -753,7 +777,7 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
         return bundle;
     }
 
-    public override Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
+    public Task<ProtocolConnectionResult> ConnectAsync(ProtocolConnectionRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.FromResult(new ProtocolConnectionResult
@@ -765,7 +789,7 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage> SendMessageAsync(ProtocolSendRequest request, CancellationToken ct = default)
     {
         RecordOperation();
         return Task.FromResult(new ProtocolMessage
@@ -782,10 +806,10 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
         });
     }
 
-    public override Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
+    public Task<ProtocolMessage?> ReceiveMessageAsync(ProtocolReceiveRequest request, CancellationToken ct = default)
         => Task.FromResult<ProtocolMessage?>(null);
 
-    public override Task DisconnectAsync(string connectionId, CancellationToken ct = default)
+    public Task DisconnectAsync(string connectionId, CancellationToken ct = default)
         => Task.CompletedTask;
 
     private static Dictionary<string, FhirResourceDefinition> InitializeResourceDefinitions()
@@ -900,5 +924,51 @@ public sealed class FhirValidationIssue
 
 /// <summary>FHIR issue severity.</summary>
 public enum FhirIssueSeverity { Fatal, Error, Warning, Information }
+
+#endregion
+
+#region Protocol helper types (used by medical strategies)
+
+/// <summary>Request to connect to a protocol endpoint.</summary>
+public sealed class ProtocolConnectionRequest
+{
+    public required string Endpoint { get; init; }
+    public int? Port { get; init; }
+    public Dictionary<string, string>? Headers { get; init; }
+}
+
+/// <summary>Result of a protocol connection attempt.</summary>
+public sealed class ProtocolConnectionResult
+{
+    public required bool Success { get; init; }
+    public string? ConnectionId { get; init; }
+    public string? ProtocolVersion { get; init; }
+    public string? Message { get; init; }
+}
+
+/// <summary>Request to send a message via a protocol.</summary>
+public sealed class ProtocolSendRequest
+{
+    public required string Topic { get; init; }
+    public byte[]? Payload { get; init; }
+    public Dictionary<string, string>? Properties { get; init; }
+}
+
+/// <summary>Request to receive a message via a protocol.</summary>
+public sealed class ProtocolReceiveRequest
+{
+    public required string Topic { get; init; }
+    public TimeSpan? Timeout { get; init; }
+}
+
+/// <summary>A protocol message.</summary>
+public sealed class ProtocolMessage
+{
+    public string MessageId { get; init; } = Guid.NewGuid().ToString();
+    public string? Topic { get; init; }
+    public byte[]? Payload { get; init; }
+    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public Dictionary<string, string>? Properties { get; init; }
+}
 
 #endregion

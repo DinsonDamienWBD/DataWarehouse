@@ -253,6 +253,7 @@ public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
     /// <summary>Executes sync job.</summary>
     public async Task<EdgeSyncResult> ExecuteSyncAsync(string jobId, CancellationToken ct = default)
     {
+        IncrementCounter("on_premise_integration.operation");
         if (!_syncJobs.TryGetValue(jobId, out var job))
         {
             RecordFailure();

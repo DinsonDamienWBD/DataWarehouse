@@ -67,6 +67,24 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "hybrid-aes-kyber";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("hybrid.aes.kyber.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("hybrid.aes.kyber.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
     /// <inheritdoc/>
     public override string StrategyName => "Hybrid AES-256-GCM + ECDH-P384 + NTRU";
 

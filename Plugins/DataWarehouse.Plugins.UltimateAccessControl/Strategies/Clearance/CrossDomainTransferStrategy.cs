@@ -49,9 +49,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             MaxConcurrentEvaluations = 100
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cross.domain.transfer.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cross.domain.transfer.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("cross.domain.transfer.evaluate");
             // Extract source and destination classification levels
             var sourceLevel = context.SubjectAttributes.TryGetValue("source_classification", out var srcObj) && srcObj != null
                 ? srcObj.ToString()

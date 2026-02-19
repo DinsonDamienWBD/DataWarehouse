@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -28,8 +29,11 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.UHD,
-        MaxBitrate: Bitrate.Video4K,
-        SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" }))
+        MaxBitrate: Bitrate.Video4K.BitsPerSecond,
+        SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: false))
     { }
 
     public override string StrategyId => "stereo-3d-video";
@@ -84,14 +88,14 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
         return new MemoryStream();
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("stereo3d.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -103,13 +107,13 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
             CustomMetadata: new Dictionary<string, string> { ["StereoMode"] = "SideBySide" }));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -136,8 +140,11 @@ internal sealed class Video360Strategy : MediaStrategyBase
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
         MaxResolution: Resolution.EightK, // 360 video typically 4K-8K equirectangular
-        MaxBitrate: Bitrate.Video4K,
-        SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "vp9", "equirect", "cubemap" }))
+        MaxBitrate: Bitrate.Video4K.BitsPerSecond,
+        SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "vp9", "equirect", "cubemap" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: false))
     { }
 
     public override string StrategyId => "video-360";
@@ -187,14 +194,14 @@ internal sealed class Video360Strategy : MediaStrategyBase
         return new MemoryStream();
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("video360.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -210,13 +217,13 @@ internal sealed class Video360Strategy : MediaStrategyBase
             }));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -243,8 +250,11 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
         MaxResolution: Resolution.EightK,
-        MaxBitrate: Bitrate.Video4K,
-        SupportedCodecs: new HashSet<string> { "h265", "av1", "vr-viewport" }))
+        MaxBitrate: Bitrate.Video4K.BitsPerSecond,
+        SupportedCodecs: new HashSet<string> { "h265", "av1", "vr-viewport" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: false))
     { }
 
     public override string StrategyId => "vr-video";
@@ -300,14 +310,14 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
         };
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("vr.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -323,13 +333,13 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
             }));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 /// <summary>
@@ -357,8 +367,11 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.EightK,
-        MaxBitrate: Bitrate.Video4K,
-        SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "tone-map" }))
+        MaxBitrate: Bitrate.Video4K.BitsPerSecond,
+        SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "tone-map" },
+        SupportsThumbnailGeneration: false,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: false))
     { }
 
     public override string StrategyId => "hdr-tone-mapping";
@@ -408,14 +421,14 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
         };
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("hdr.transcode");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
@@ -432,13 +445,13 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
             }));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
         => Task.FromResult<Stream>(new MemoryStream());
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 #region Advanced Video Types

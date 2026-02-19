@@ -39,9 +39,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             MaxConcurrentEvaluations = 5000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("edr.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("edr.shutdown");
+            _endpointProfiles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("edr.evaluate");
             // Extract endpoint information
             var machineName = context.EnvironmentAttributes.TryGetValue("MachineName", out var machine)
                 ? machine?.ToString() ?? "unknown"

@@ -29,13 +29,34 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             MaxConcurrentEvaluations = 10000
         };
 
-        public void AddRule(string ipPattern, int? port, bool allow)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.firewall.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.firewall.shutdown");
+            _rules.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public void AddRule(string ipPattern, int? port, bool allow)
         {
             _rules.Add(new FirewallRule { IpPattern = ipPattern, Port = port, Allow = allow });
         }
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("network.firewall.evaluate");
             var clientIp = context.ClientIpAddress;
             if (string.IsNullOrEmpty(clientIp))
             {

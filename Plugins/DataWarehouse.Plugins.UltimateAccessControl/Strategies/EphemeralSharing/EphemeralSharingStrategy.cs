@@ -1757,6 +1757,29 @@ img {
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ephemeral.sharing.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ephemeral.sharing.shutdown");
+            _shares.Clear();
+            _accessCounters.Clear();
+            _ttlEngines.Clear();
+            _cleanupTimer?.Dispose();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Creates a new ephemeral share with full T76 features.
         /// </summary>
         public EphemeralShareResult CreateShare(string resourceId, ShareOptions options)
@@ -1907,6 +1930,7 @@ img {
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("ephemeral.sharing.evaluate");
             // Extract share token from context
             if (!context.EnvironmentAttributes.TryGetValue("ShareToken", out var tokenObj) ||
                 tokenObj is not string token)

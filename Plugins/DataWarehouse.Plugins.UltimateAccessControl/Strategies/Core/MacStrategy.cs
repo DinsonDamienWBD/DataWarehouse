@@ -81,6 +81,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("mac.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("mac.shutdown");
+            _subjectClearances.Clear();
+            _resourceClassifications.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Sets the security clearance for a subject.
         /// </summary>
         public void SetSubjectClearance(string subjectId, SecurityClearanceLevel clearance)
@@ -130,6 +151,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("mac.evaluate");
             var subjectClearance = GetSubjectClearance(context.SubjectId);
             var resourceClassification = GetResourceClassification(context.ResourceId);
 

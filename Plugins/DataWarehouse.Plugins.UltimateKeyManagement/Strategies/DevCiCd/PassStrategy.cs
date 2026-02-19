@@ -66,8 +66,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("pass.shutdown");
+            _keyCache.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("pass.init");
             // Load configuration
             if (Configuration.TryGetValue("PasswordStorePath", out var storePathObj) && storePathObj is string storePath)
                 _config.PasswordStorePath = storePath;

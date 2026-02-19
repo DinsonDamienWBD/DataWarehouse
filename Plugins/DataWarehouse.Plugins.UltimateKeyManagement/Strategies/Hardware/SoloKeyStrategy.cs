@@ -62,6 +62,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("solokey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "Credential-HKDF-AES256"
@@ -71,6 +81,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("solokey.init");
             // Load configuration
             if (Configuration.TryGetValue("Origin", out var originObj) && originObj is string origin)
                 _config.Origin = origin;

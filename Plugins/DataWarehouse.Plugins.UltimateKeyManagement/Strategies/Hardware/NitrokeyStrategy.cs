@@ -68,6 +68,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("nitrokey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "AES-256-CBC-PAD",
@@ -80,6 +90,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("nitrokey.init");
             // Load configuration
             if (Configuration.TryGetValue("LibraryPath", out var libObj) && libObj is string lib)
                 _config.LibraryPath = lib;

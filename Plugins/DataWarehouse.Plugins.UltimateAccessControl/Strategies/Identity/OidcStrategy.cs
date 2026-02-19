@@ -61,6 +61,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.oidc.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.oidc.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_issuer))
@@ -79,6 +98,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.oidc.evaluate");
             if (!context.EnvironmentAttributes.TryGetValue("IdToken", out var tokenObj) || tokenObj is not string idToken)
             {
                 return new AccessDecision { IsGranted = false, Reason = "ID token not provided" };

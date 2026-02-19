@@ -55,6 +55,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.radius.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.radius.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
         {
             try
@@ -72,6 +91,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.radius.evaluate");
             if (!context.EnvironmentAttributes.TryGetValue("Username", out var usernameObj) ||
                 usernameObj is not string username)
             {

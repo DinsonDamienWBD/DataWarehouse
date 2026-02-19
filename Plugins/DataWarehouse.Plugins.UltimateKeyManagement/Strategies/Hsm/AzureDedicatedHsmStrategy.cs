@@ -62,6 +62,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("azurededicatedhsm.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "RSA-OAEP-256",
@@ -76,6 +86,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("azurededicatedhsm.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ManagedHsmUrl", out var hsmUrlObj) && hsmUrlObj is string hsmUrl)
                 _config.ManagedHsmUrl = hsmUrl;

@@ -60,6 +60,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("digitaloceanvault.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public DigitalOceanVaultStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -68,6 +78,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("digitaloceanvault.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ApiToken", out var apiTokenObj) && apiTokenObj is string apiToken)
                 _config.ApiToken = apiToken;

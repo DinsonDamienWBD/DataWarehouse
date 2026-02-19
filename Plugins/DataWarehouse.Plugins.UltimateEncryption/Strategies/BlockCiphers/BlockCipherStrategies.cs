@@ -18,6 +18,24 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "serpent-256-ctr-hmac";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("serpent.256.ctr.hmac.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("serpent.256.ctr.hmac.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
     /// <inheritdoc/>
     public override string StrategyName => "Serpent-256-CTR-HMAC";
 

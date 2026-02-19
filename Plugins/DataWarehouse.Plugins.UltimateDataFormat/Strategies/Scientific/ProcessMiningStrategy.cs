@@ -74,17 +74,17 @@ public sealed class ProcessMiningStrategy : DataFormatStrategyBase
                (header.Contains("xes-standard") || header.Contains("xmlns"));
     }
 
-    protected override async Task<FormatParseResult> ParseCoreAsync(Stream stream, FormatParseOptions? options, CancellationToken ct)
+    public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)
     {
         IncrementCounter("processmining.parse");
 
         try
         {
-            var doc = await XDocument.LoadAsync(stream, LoadOptions.None, ct);
+            var doc = await XDocument.LoadAsync(input, LoadOptions.None, ct);
             var root = doc.Root;
 
             if (root == null || root.Name.LocalName != "log")
-                return FormatParseResult.Failed("Not a valid XES log file");
+                return DataFormatResult.Fail("Not a valid XES log file");
 
             var ns = root.GetDefaultNamespace();
 
@@ -145,13 +145,19 @@ public sealed class ProcessMiningStrategy : DataFormatStrategyBase
                 ["AverageTraceLength"] = traces.Count > 0 ? (double)totalEvents / traces.Count : 0
             };
 
-            return FormatParseResult.Success(metadata);
+            return DataFormatResult.Ok(metadata);
         }
         catch (Exception ex)
         {
-            return FormatParseResult.Failed($"XES parsing failed: {ex.Message}");
+            return DataFormatResult.Fail($"XES parsing failed: {ex.Message}");
         }
     }
+
+    public override Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default)
+        => SerializeCoreAsync(data, output, ct);
+
+    protected override Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)
+        => Task.FromResult(new FormatValidationResult { IsValid = true });
 
     /// <summary>
     /// Builds a directly-follows graph from trace data.
@@ -232,7 +238,7 @@ public sealed class ProcessMiningStrategy : DataFormatStrategyBase
         };
     }
 
-    protected override async Task<Stream> SerializeCoreAsync(object data, FormatSerializeOptions? options, CancellationToken ct)
+    private async Task<DataFormatResult> SerializeCoreAsync(object data, Stream output, CancellationToken ct)
     {
         IncrementCounter("processmining.serialize");
 
@@ -257,7 +263,8 @@ public sealed class ProcessMiningStrategy : DataFormatStrategyBase
 
         await doc.SaveAsync(ms, SaveOptions.None, ct);
         ms.Position = 0;
-        return ms;
+        await ms.CopyToAsync(output, ct);
+        return DataFormatResult.Ok();
     }
 }
 

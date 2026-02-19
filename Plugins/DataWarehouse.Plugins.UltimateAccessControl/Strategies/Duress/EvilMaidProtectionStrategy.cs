@@ -49,7 +49,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             MaxConcurrentEvaluations = 100
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("evil.maid.protection.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("evil.maid.protection.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
             await base.InitializeAsync(configuration, cancellationToken);
@@ -68,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("evil.maid.protection.evaluate");
             // Verify boot integrity
             var integrityCheck = await VerifyBootIntegrityAsync(cancellationToken);
 

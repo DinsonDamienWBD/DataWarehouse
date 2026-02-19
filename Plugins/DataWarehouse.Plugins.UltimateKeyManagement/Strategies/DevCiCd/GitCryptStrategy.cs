@@ -62,8 +62,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("gitcrypt.shutdown");
+            _keyCache.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("gitcrypt.init");
             // Load configuration
             if (Configuration.TryGetValue("RepositoryPath", out var repoPathObj) && repoPathObj is string repoPath)
                 _config.RepositoryPath = repoPath;

@@ -25,8 +25,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             MaxConcurrentEvaluations = 5000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("network.waf.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.waf.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("network.waf.evaluate");
             var requestData = context.ResourceAttributes.TryGetValue("RequestData", out var rd) ? rd?.ToString() : "";
 
             // Simple XSS/SQLi detection

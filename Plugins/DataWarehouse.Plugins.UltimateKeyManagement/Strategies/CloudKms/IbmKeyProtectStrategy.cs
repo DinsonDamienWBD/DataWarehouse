@@ -54,6 +54,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ibmkeyprotect.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM", "RSAES_OAEP_SHA_256" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -65,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("ibmkeyprotect.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("InstanceId", out var instanceIdObj) && instanceIdObj is string instanceId)
                 _config.InstanceId = instanceId;

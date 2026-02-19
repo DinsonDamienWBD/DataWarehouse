@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -24,7 +25,7 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 internal sealed class GpuAccelerationStrategy : MediaStrategyBase
 {
     private static readonly ConcurrentDictionary<int, GpuDeviceInfo> _gpuCache = new();
-    private static DateTime _lastGpuScan = DateTime.MinValue;
+    private DateTime _lastGpuScan = DateTime.MinValue;
     private static readonly TimeSpan GpuCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
@@ -45,14 +46,17 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
         MaxResolution: Resolution.EightK,
-        MaxBitrate: Bitrate.Video4K,
+        MaxBitrate: Bitrate.Video4K.BitsPerSecond,
         SupportedCodecs: new HashSet<string>
         {
             "h264_nvenc", "hevc_nvenc", "av1_nvenc",
             "h264_qsv", "hevc_qsv", "av1_qsv",
             "h264_amf", "hevc_amf", "av1_amf",
             "h264", "h265", "av1"
-        }))
+        },
+        SupportsThumbnailGeneration: true,
+        SupportsMetadataExtraction: true,
+        SupportsHardwareAcceleration: true))
     { }
 
     public override string StrategyId => "gpu-acceleration";
@@ -348,7 +352,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         return File.Exists("/usr/lib/x86_64-linux-gnu/libamfrt64.so");
     }
 
-    protected override Task<Stream> TranscodeCoreAsync(
+    protected override Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("gpu.transcode");
@@ -359,7 +363,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<MediaMetadata> ExtractMetadataCoreAsync(
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
         Stream inputStream, CancellationToken cancellationToken)
     {
         IncrementCounter("gpu.metadata");
@@ -381,16 +385,16 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             }));
     }
 
-    protected override Task<Stream> GenerateThumbnailCoreAsync(
-        Stream inputStream, Resolution targetResolution, CancellationToken cancellationToken)
+    protected override Task<Stream> GenerateThumbnailAsyncCore(
+        Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         IncrementCounter("gpu.thumbnail");
         return Task.FromResult<Stream>(new MemoryStream());
     }
 
-    protected override Task<Stream?> CreateStreamingManifestCoreAsync(
-        Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
-        => Task.FromResult<Stream?>(null);
+    protected override Task<Uri> StreamAsyncCore(
+        Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
+        => Task.FromResult(new Uri("about:blank"));
 }
 
 #region GPU Types

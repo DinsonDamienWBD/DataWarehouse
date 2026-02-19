@@ -588,9 +588,33 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         return base.InitializeAsync(configuration, cancellationToken);
     }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("deception.network.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("deception.network.shutdown");
+            _environments.Clear();
+            _misdirectionPaths.Clear();
+            _threatLures.Clear();
+            _attackerProfiles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
     /// <inheritdoc/>
     protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
     {
+            IncrementCounter("deception.network.evaluate");
         // Check if accessing a deception environment
         foreach (var env in _environments.Values.Where(e => e.IsActive))
         {

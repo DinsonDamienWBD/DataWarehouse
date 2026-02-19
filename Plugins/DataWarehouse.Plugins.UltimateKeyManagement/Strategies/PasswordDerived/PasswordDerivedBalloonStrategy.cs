@@ -63,8 +63,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("passwordderivedballoon.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("passwordderivedballoon.init");
             // Load configuration
             if (Configuration.TryGetValue("Password", out var pwdObj) && pwdObj is string pwd)
                 _masterPassword = pwd;

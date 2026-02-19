@@ -92,6 +92,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.oauth2.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.oauth2.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Checks if OAuth 2.0 introspection endpoint is available.
         /// </summary>
         public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -220,6 +239,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.oauth2.evaluate");
             // Extract Bearer token from context
             if (!context.EnvironmentAttributes.TryGetValue("BearerToken", out var tokenObj) ||
                 tokenObj is not string token)

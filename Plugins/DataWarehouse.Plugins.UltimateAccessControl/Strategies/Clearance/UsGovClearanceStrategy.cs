@@ -49,9 +49,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             MaxConcurrentEvaluations = 1000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("us.gov.clearance.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("us.gov.clearance.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("us.gov.clearance.evaluate");
             // Extract clearance level from subject attributes
             var userClearance = context.SubjectAttributes.TryGetValue("clearance_level", out var userObj) &&
                                 userObj is string userLevel

@@ -36,6 +36,7 @@ public sealed class ContainerAbstractionStrategy : MultiCloudStrategyBase
         string targetCluster,
         CancellationToken ct = default)
     {
+        IncrementCounter("container_abstraction.deploy");
         var deploymentId = Guid.NewGuid().ToString("N");
 
         var deployment = new ContainerDeployment
@@ -171,6 +172,7 @@ public sealed class ServerlessPortabilityStrategy : MultiCloudStrategyBase
         int timeoutSeconds = 30,
         CancellationToken ct = default)
     {
+        IncrementCounter("serverless_portability.deploy");
         if (!_functions.TryGetValue(functionId, out var function))
         {
             RecordFailure();
@@ -302,6 +304,7 @@ public sealed class DataMigrationStrategy : MultiCloudStrategyBase
     /// <summary>Executes migration job.</summary>
     public async Task<MigrationJobResult> ExecuteAsync(string jobId, CancellationToken ct = default)
     {
+        IncrementCounter("container_abstraction.operation");
         if (!_jobs.TryGetValue(jobId, out var job))
         {
             RecordFailure();
@@ -416,6 +419,7 @@ public sealed class VendorAgnosticApiStrategy : MultiCloudStrategyBase
         Dictionary<string, object> parameters,
         CancellationToken ct = default)
     {
+        IncrementCounter("serverless_portability.operation");
         var mapping = GetProviderMapping(operation, providerId);
         if (mapping == null)
         {

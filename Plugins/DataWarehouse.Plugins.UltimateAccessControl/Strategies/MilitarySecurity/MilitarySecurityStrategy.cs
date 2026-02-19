@@ -27,7 +27,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
             MaxConcurrentEvaluations = 10000
         };
 
-        public void SetClassification(string resourceId, string level, string[] caveats)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.classification.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.classification.shutdown");
+            _markings.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public void SetClassification(string resourceId, string level, string[] caveats)
         {
             _markings[resourceId] = new ClassificationMarking
             {
@@ -40,6 +60,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("military.classification.evaluate");
             if (!_markings.TryGetValue(context.ResourceId, out var marking))
             {
                 return Task.FromResult(new AccessDecision

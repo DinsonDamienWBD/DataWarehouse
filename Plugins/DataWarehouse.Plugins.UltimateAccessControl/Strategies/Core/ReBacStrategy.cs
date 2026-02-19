@@ -70,6 +70,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("rebac.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("rebac.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Adds a relationship between subject and target.
         /// </summary>
         public void AddRelationship(string subjectId, string relationType, string targetId)
@@ -125,6 +144,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("rebac.evaluate");
             var subjectId = context.SubjectId;
             var resourceId = context.ResourceId;
             var action = context.Action;

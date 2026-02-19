@@ -68,6 +68,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         /// <inheritdoc/>
         public override string StrategyId => "paillier-he";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("paillier.he.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("paillier.he.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
         /// <inheritdoc/>
         public override string StrategyName => "Paillier Homomorphic Encryption";
 

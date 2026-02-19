@@ -94,8 +94,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("aicustodian.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("aicustodian.init");
             // Load configuration
             if (Configuration.TryGetValue("Provider", out var providerObj) && providerObj is string provider)
                 _config.Provider = Enum.Parse<LlmProvider>(provider, true);

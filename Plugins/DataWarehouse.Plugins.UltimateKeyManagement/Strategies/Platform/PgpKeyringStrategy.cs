@@ -64,6 +64,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("pgpkeyring.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "PGP-RSA",
@@ -75,6 +85,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("pgpkeyring.init");
             // Load configuration
             if (Configuration.TryGetValue("KeyringPath", out var pathObj) && pathObj is string path)
                 _config.KeyringPath = path;

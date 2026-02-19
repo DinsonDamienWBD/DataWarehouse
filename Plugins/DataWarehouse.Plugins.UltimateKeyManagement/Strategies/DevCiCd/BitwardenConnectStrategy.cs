@@ -67,6 +67,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("bitwardenconnect.shutdown");
+            _keyCache.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public BitwardenConnectStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -74,6 +85,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("bitwardenconnect.init");
             // Load configuration
             if (Configuration.TryGetValue("ApiUrl", out var apiUrlObj) && apiUrlObj is string apiUrl)
                 _config.ApiUrl = apiUrl;

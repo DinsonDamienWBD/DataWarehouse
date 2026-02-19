@@ -54,6 +54,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("azurekeyvault.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "RSA-OAEP-256", "RSA-OAEP", "AES-256-GCM" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -65,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("azurekeyvault.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("VaultUrl", out var vaultUrlObj) && vaultUrlObj is string vaultUrl)
                 _config.VaultUrl = vaultUrl;

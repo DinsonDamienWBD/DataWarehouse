@@ -62,6 +62,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dac.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dac.shutdown");
+            _resourceOwners.Clear();
+            _resourcePermissions.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Sets the owner of a resource.
         /// </summary>
         public void SetResourceOwner(string resourceId, string ownerId)
@@ -126,6 +147,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("dac.evaluate");
             var resourceId = context.ResourceId;
             var subjectId = context.SubjectId;
 

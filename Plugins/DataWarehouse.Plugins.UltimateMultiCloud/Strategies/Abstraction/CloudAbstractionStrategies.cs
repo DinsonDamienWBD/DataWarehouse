@@ -66,6 +66,7 @@ public sealed class UnifiedCloudApiStrategy : MultiCloudStrategyBase
         Dictionary<string, object> parameters,
         CancellationToken ct = default)
     {
+        IncrementCounter("unified_cloud_api.operation");
         var targetProvider = preferredProvider ?? _adapters.Keys.FirstOrDefault()
             ?? throw new InvalidOperationException("No providers registered");
 

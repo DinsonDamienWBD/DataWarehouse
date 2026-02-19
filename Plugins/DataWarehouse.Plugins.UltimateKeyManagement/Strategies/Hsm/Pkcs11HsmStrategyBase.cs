@@ -68,6 +68,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
         };
 
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "AES-256-CBC-PAD",
@@ -80,6 +81,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("pkcs11hsmbase.init");
             // Load configuration
             if (Configuration.TryGetValue("LibraryPath", out var libPathObj) && libPathObj is string libPath)
                 _config.LibraryPath = libPath;

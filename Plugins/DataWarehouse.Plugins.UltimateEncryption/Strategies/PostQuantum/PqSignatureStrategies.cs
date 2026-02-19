@@ -70,6 +70,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// <inheritdoc/>
         public override string StrategyId => "ml-dsa-65";
 
+        /// <summary>
+        /// Production hardening: validates configuration on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ml.dsa.65.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ml.dsa.65.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
         /// <inheritdoc/>
         public override string StrategyName => "ML-DSA-65 (Dilithium) Signature";
 

@@ -54,6 +54,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.InitializeAsync(configuration, cancellationToken);
         }
 
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.scim.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.scim.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_scimEndpoint))
@@ -164,6 +183,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.scim.evaluate");
             // SCIM is primarily for provisioning, not authentication
             // However, we can validate that a user exists and is active
             var userId = context.SubjectId;

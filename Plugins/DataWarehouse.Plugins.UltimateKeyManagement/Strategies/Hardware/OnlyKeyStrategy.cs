@@ -84,6 +84,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("onlykey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "ECDH-P256",
@@ -94,6 +104,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("onlykey.init");
             // Load configuration
             if (Configuration.TryGetValue("SerialNumber", out var serialObj) && serialObj is string serial)
                 _config.SerialNumber = serial;

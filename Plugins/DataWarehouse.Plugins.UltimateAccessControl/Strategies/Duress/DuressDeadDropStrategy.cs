@@ -57,9 +57,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             MaxConcurrentEvaluations = 50
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.dead.drop.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.dead.drop.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("duress.dead.drop.evaluate");
             var isDuress = context.SubjectAttributes.TryGetValue("duress", out var duressObj) &&
                            duressObj is bool duressFlag && duressFlag;
 

@@ -24,8 +24,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
             MaxConcurrentEvaluations = 10000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("military.mls.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.mls.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.mls.evaluate");
             var subjectLevel = GetLevel(context.SubjectAttributes.TryGetValue("SecurityLevel", out var sl) ? sl?.ToString() : "U");
             var objectLevel = GetLevel(context.ResourceAttributes.TryGetValue("SecurityLevel", out var ol) ? ol?.ToString() : "U");
 

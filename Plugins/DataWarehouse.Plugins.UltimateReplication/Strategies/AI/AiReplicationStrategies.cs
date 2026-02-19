@@ -1351,7 +1351,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
             foreach (var region in targetRegions)
             {
-                var cost = _regionCosts.GetValueOrDefault(region, new RegionCost());
+                var cost = _regionCosts.GetValueOrDefault(region, new RegionCost()) ?? new RegionCost();
                 totalCost += sizeGb * cost.InterRegionCostPerGb;
                 totalCost += sizeGb * cost.StorageCostPerGb / 30.0; // Daily amortized
             }

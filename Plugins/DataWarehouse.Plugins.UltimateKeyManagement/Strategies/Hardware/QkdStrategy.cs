@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         private DateTime _sessionStart = DateTime.UtcNow;
 
         public override string StrategyId => "qkd";
-        public override string StrategyName => "Quantum Key Distribution";
+        public override string Name => "Quantum Key Distribution";
 
         public override KeyStoreCapabilities Capabilities => new()
         {

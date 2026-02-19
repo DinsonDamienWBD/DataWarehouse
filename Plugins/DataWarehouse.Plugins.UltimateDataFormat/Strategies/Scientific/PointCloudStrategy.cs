@@ -80,15 +80,15 @@ public sealed class PointCloudStrategy : DataFormatStrategyBase
         return false;
     }
 
-    protected override async Task<FormatParseResult> ParseCoreAsync(Stream stream, FormatParseOptions? options, CancellationToken ct)
+    public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)
     {
         IncrementCounter("pointcloud.parse");
 
-        using var reader = new StreamReader(stream, leaveOpen: true);
+        using var reader = new StreamReader(input, leaveOpen: true);
         var firstLine = await reader.ReadLineAsync(ct);
 
         if (firstLine == null)
-            return FormatParseResult.Failed("Empty stream");
+            return DataFormatResult.Fail("Empty stream");
 
         if (firstLine.StartsWith("ply", StringComparison.OrdinalIgnoreCase))
             return await ParsePlyAsync(reader, ct);
@@ -97,10 +97,16 @@ public sealed class PointCloudStrategy : DataFormatStrategyBase
             firstLine.StartsWith("# .PCD", StringComparison.OrdinalIgnoreCase))
             return await ParsePcdAsync(reader, firstLine, ct);
 
-        return FormatParseResult.Failed("Unrecognized point cloud format");
+        return DataFormatResult.Fail("Unrecognized point cloud format");
     }
 
-    private async Task<FormatParseResult> ParsePlyAsync(StreamReader reader, CancellationToken ct)
+    public override Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default)
+        => SerializeCoreAsync(data, output, ct);
+
+    protected override Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)
+        => Task.FromResult(new FormatValidationResult { IsValid = true });
+
+    private async Task<DataFormatResult> ParsePlyAsync(StreamReader reader, CancellationToken ct)
     {
         var properties = new List<string>();
         var vertexCount = 0;
@@ -143,10 +149,10 @@ public sealed class PointCloudStrategy : DataFormatStrategyBase
             ["HasAlpha"] = properties.Any(p => p.Contains("alpha") || p.Contains(" a"))
         };
 
-        return FormatParseResult.Success(metadata);
+        return DataFormatResult.Ok(metadata);
     }
 
-    private async Task<FormatParseResult> ParsePcdAsync(StreamReader reader, string firstLine, CancellationToken ct)
+    private async Task<DataFormatResult> ParsePcdAsync(StreamReader reader, string firstLine, CancellationToken ct)
     {
         var metadata = new Dictionary<string, object> { ["Format"] = "PCD" };
         var lines = new List<string> { firstLine };
@@ -178,14 +184,13 @@ public sealed class PointCloudStrategy : DataFormatStrategyBase
             }
         }
 
-        return FormatParseResult.Success(metadata);
+        return DataFormatResult.Ok(metadata);
     }
 
-    protected override async Task<Stream> SerializeCoreAsync(object data, FormatSerializeOptions? options, CancellationToken ct)
+    private async Task<DataFormatResult> SerializeCoreAsync(object data, Stream output, CancellationToken ct)
     {
         IncrementCounter("pointcloud.serialize");
-        var ms = new MemoryStream();
-        var writer = new StreamWriter(ms, leaveOpen: true);
+        var writer = new StreamWriter(output, leaveOpen: true);
 
         // Write PLY format by default
         await writer.WriteLineAsync("ply");
@@ -197,7 +202,6 @@ public sealed class PointCloudStrategy : DataFormatStrategyBase
         await writer.WriteLineAsync("end_header");
         await writer.FlushAsync(ct);
 
-        ms.Position = 0;
-        return ms;
+        return DataFormatResult.Ok();
     }
 }

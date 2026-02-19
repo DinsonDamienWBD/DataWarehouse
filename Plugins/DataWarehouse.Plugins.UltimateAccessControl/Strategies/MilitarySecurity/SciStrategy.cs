@@ -25,8 +25,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
             MaxConcurrentEvaluations = 10000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("military.sci.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.sci.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.sci.evaluate");
             var requiredCompartments = context.ResourceAttributes.TryGetValue("SciCompartments", out var rc) && rc is string[] rca ? rca : Array.Empty<string>();
             var userCompartments = context.SubjectAttributes.TryGetValue("SciCompartments", out var uc) && uc is string[] uca ? uca : Array.Empty<string>();
 

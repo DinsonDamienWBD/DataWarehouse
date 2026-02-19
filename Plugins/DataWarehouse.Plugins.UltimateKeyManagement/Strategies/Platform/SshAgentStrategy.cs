@@ -60,8 +60,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("sshagent.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("sshagent.init");
             // Load configuration
             if (Configuration.TryGetValue("AgentSocketPath", out var socketObj) && socketObj is string socket)
                 _config.AgentSocketPath = socket;

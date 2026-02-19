@@ -102,8 +102,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("sqltdemetadata.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("sqltdemetadata.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("CertificateFilePath", out var certPathObj) && certPathObj is string certPath)
                 _config.CertificateFilePath = certPath;

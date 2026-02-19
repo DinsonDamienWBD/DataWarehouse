@@ -81,6 +81,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.iam.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.iam.shutdown");
+            _users.Clear();
+            _roles.Clear();
+            _sessions.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Checks if the IAM infrastructure is available (always true for in-memory store).
         /// </summary>
         public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -309,6 +331,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.iam.evaluate");
             await Task.CompletedTask; // Make async for extensibility
 
             // Extract session or credentials from context

@@ -16,7 +16,14 @@ public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
     private string _apiToken = "";
 
     public override string StrategyId => "renewable-routing";
-    public override string StrategyName => "Renewable Energy Routing";
+    public override string DisplayName => "Renewable Energy Routing";
+    public override SustainabilityCategory Category => SustainabilityCategory.CloudOptimization;
+    public override SustainabilityCapabilities Capabilities =>
+        SustainabilityCapabilities.ExternalIntegration | SustainabilityCapabilities.Scheduling |
+        SustainabilityCapabilities.CarbonCalculation | SustainabilityCapabilities.Reporting;
+    public override string SemanticDescription =>
+        "Routes workloads to regions with highest renewable energy percentage using Electricity Maps API data.";
+    public override string[] Tags => new[] { "renewable", "routing", "electricity-maps", "green-energy" };
 
     public RenewableRoutingStrategy()
     {

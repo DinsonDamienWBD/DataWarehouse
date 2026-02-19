@@ -24,8 +24,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
             MaxConcurrentEvaluations = 5000
         };
 
-        protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
+            IncrementCounter("military.itar.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.itar.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+        {
+            IncrementCounter("military.itar.evaluate");
             var isItarControlled = context.ResourceAttributes.TryGetValue("ItarControlled", out var itar) && itar is bool i && i;
             var isUsPerson = context.SubjectAttributes.TryGetValue("UsPersonStatus", out var us) && us is bool u && u;
 

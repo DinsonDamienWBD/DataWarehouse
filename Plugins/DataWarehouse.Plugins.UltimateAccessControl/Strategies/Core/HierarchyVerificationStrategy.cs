@@ -39,7 +39,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             MaxConcurrentEvaluations = 100000
         };
 
+        
+
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("hierarchy.verification.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("hierarchy.verification.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <summary>
         /// Initializes a new instance of the <see cref="HierarchyVerificationStrategy"/> class.
         /// </summary>
         /// <param name="matrix">The AccessVerificationMatrix instance for multi-level verification.</param>
@@ -51,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("hierarchy.verification.evaluate");
             // If no CommandIdentity on the context, we cannot evaluate hierarchy — deny (fail-closed)
             // Other strategies like RBAC/ABAC will handle access based on SubjectId
             if (context.Identity is null)

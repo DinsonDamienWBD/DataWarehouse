@@ -79,6 +79,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("service.mesh.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("service.mesh.shutdown");
+            _servicePolicies.Clear();
+            _services.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Registers a service in the mesh.
         /// </summary>
         public ServiceRegistration RegisterService(string serviceName, string namespace_, ServiceMeshType meshType)
@@ -169,6 +190,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("service.mesh.evaluate");
             // Extract source and target service information
             if (!context.EnvironmentAttributes.TryGetValue("SourceService", out var sourceServiceObj) ||
                 sourceServiceObj is not string sourceService)

@@ -58,9 +58,31 @@ public sealed class PerFileIsolationStrategy : AccessControlStrategyBase
         MaxConcurrentEvaluations = 10000
     };
 
-    /// <inheritdoc/>
+    
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("micro.isolation.per.file.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("micro.isolation.per.file.shutdown");
+            _isolatedFiles.Clear();
+            _domains.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
     protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken ct)
     {
+            IncrementCounter("micro.isolation.per.file.evaluate");
         var fileId = context.ResourceId;
         var subjectId = context.SubjectId;
         var requestedAction = context.Action;

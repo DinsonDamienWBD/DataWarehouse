@@ -50,6 +50,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("vaultkeystore.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM", "RSA-OAEP-256" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -61,6 +71,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("vaultkeystore.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("Address", out var addressObj) && addressObj is string address)
                 _config.Address = address;

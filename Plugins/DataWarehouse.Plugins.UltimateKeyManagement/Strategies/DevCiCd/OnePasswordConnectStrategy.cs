@@ -65,6 +65,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("onepasswordconnect.shutdown");
+            _keyCache.Clear();
+            _itemIdCache.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public OnePasswordConnectStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -72,6 +84,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("onepasswordconnect.init");
             // Load configuration
             if (Configuration.TryGetValue("ConnectHost", out var hostObj) && hostObj is string host)
                 _config.ConnectHost = host.TrimEnd('/');

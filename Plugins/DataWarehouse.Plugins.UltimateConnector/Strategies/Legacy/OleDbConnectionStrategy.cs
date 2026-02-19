@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 
+
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 {
     /// <summary>
@@ -60,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             try
             {
                 var connection = handle.GetConnection<DbConnection>();
-                return Task.FromResult(connection.State == ConnectionState.Open);
+                return Task.FromResult(connection.State == System.Data.ConnectionState.Open);
             }
             catch { return Task.FromResult(false); }
         }
@@ -76,7 +77,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var connection = handle.GetConnection<DbConnection>();
-            var isHealthy = connection.State == ConnectionState.Open;
+            var isHealthy = connection.State == System.Data.ConnectionState.Open;
             return Task.FromResult(new ConnectionHealth(isHealthy,
                 isHealthy ? $"OLE DB connected to {connection.DataSource}" : "OLE DB connection lost",
                 TimeSpan.Zero, DateTimeOffset.UtcNow));

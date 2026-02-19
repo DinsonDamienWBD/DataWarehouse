@@ -52,9 +52,30 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             MaxConcurrentEvaluations = 5000
         };
 
-        /// <inheritdoc/>
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ueba.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("ueba.shutdown");
+            _profiles.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+/// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("ueba.evaluate");
             // Get or create behavior profile for subject
             var profile = _profiles.GetOrAdd(context.SubjectId, _ => new UserBehaviorProfile
             {

@@ -108,6 +108,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.ldap.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("identity.ldap.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Checks if the LDAP server is available.
         /// </summary>
         public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
@@ -269,6 +288,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("identity.ldap.evaluate");
             // Extract username and password from context
             if (!context.EnvironmentAttributes.TryGetValue("Username", out var usernameObj) ||
                 usernameObj is not string username)

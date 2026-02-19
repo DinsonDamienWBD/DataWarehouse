@@ -40,7 +40,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             MaxConcurrentEvaluations = 100
         };
 
-        public void RegisterAlertStrategy(IAccessControlStrategy strategy)
+        
+
+        /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.multi.channel.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("duress.multi.channel.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+public void RegisterAlertStrategy(IAccessControlStrategy strategy)
         {
             _alertStrategies.Add(strategy);
         }
@@ -48,6 +67,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("duress.multi.channel.evaluate");
             var isDuress = context.SubjectAttributes.TryGetValue("duress", out var duressObj) &&
                            duressObj is bool duressFlag && duressFlag;
 

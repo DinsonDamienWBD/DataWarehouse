@@ -630,7 +630,7 @@ public class CanBusProtocolStrategy : ProtocolStrategyBase
 
         var frame = new byte[2 + data.Length];
         frame[0] = (byte)(id >> 3);
-        frame[1] = (byte)((id << 5) | (data.Length & 0x0F));
+        frame[1] = (byte)(((uint)(id << 5)) | (uint)(data.Length & 0x0F));
         Array.Copy(data, 0, frame, 2, data.Length);
         return frame;
     }

@@ -28,7 +28,7 @@ public sealed class LineageVersioningStrategy : LineageStrategyBase
     /// <summary>
     /// Creates a snapshot of the current lineage graph for a data object.
     /// </summary>
-    public LineageSnapshot CreateSnapshot(string dataObjectId, LineageGraph graph, string? description = null)
+    public LineageSnapshot CreateSnapshot(string dataObjectId, SimpleLineageGraph graph, string? description = null)
     {
         var version = Interlocked.Increment(ref _globalVersion);
         var snapshot = new LineageSnapshot
@@ -97,7 +97,7 @@ public sealed class EnhancedBlastRadiusStrategy : LineageStrategyBase
     /// Calculates blast radius using BFS from a modified node.
     /// Returns all affected downstream nodes with distance and criticality.
     /// </summary>
-    public BlastRadiusResult CalculateBlastRadius(string sourceNodeId, LineageGraph graph, int maxDepth = 10)
+    public BlastRadiusResult CalculateBlastRadius(string sourceNodeId, SimpleLineageGraph graph, int maxDepth = 10)
     {
         var visited = new HashSet<string>();
         var queue = new Queue<(string NodeId, int Depth)>();
@@ -151,7 +151,7 @@ public sealed class EnhancedBlastRadiusStrategy : LineageStrategyBase
         };
     }
 
-    private static double CalculateCriticality(LineageNode node, int distance)
+    private static double CalculateCriticality(SimpleLineageNode node, int distance)
     {
         // Base criticality from node type
         var baseCriticality = node.Type switch
@@ -169,7 +169,7 @@ public sealed class EnhancedBlastRadiusStrategy : LineageStrategyBase
         return baseCriticality * distanceDecay;
     }
 
-    private static string[] BuildPath(LineageGraph graph, string from, string to, HashSet<string> visited)
+    private static string[] BuildPath(SimpleLineageGraph graph, string from, string to, HashSet<string> visited)
     {
         // Simplified path reconstruction
         return new[] { from, to };
@@ -198,7 +198,7 @@ public sealed class LineageDiffStrategy : LineageStrategyBase
     /// <summary>
     /// Computes the diff between two lineage graph snapshots.
     /// </summary>
-    public LineageDiffResult ComputeDiff(LineageGraph before, LineageGraph after)
+    public LineageDiffResult ComputeDiff(SimpleLineageGraph before, SimpleLineageGraph after)
     {
         var beforeNodeIds = new HashSet<string>(before.Nodes.Select(n => n.Id));
         var afterNodeIds = new HashSet<string>(after.Nodes.Select(n => n.Id));
@@ -332,18 +332,18 @@ public sealed record LineageSnapshot
     public required string SnapshotId { get; init; }
     public required string DataObjectId { get; init; }
     public int Version { get; init; }
-    public required LineageGraph Graph { get; init; }
+    public required SimpleLineageGraph Graph { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public string? Description { get; init; }
 }
 
-public sealed record LineageGraph
+public sealed record SimpleLineageGraph
 {
-    public List<LineageNode> Nodes { get; init; } = new();
-    public List<LineageEdge> Edges { get; init; } = new();
+    public List<SimpleLineageNode> Nodes { get; init; } = new();
+    public List<SimpleLineageEdge> Edges { get; init; } = new();
 }
 
-public sealed record LineageNode
+public sealed record SimpleLineageNode
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
@@ -351,7 +351,7 @@ public sealed record LineageNode
     public Dictionary<string, object> Metadata { get; init; } = new();
 }
 
-public sealed record LineageEdge
+public sealed record SimpleLineageEdge
 {
     public required string SourceId { get; init; }
     public required string TargetId { get; init; }
@@ -383,19 +383,19 @@ public sealed record AffectedNode
 
 public sealed record LineageDiffResult
 {
-    public List<LineageNode> AddedNodes { get; init; } = new();
-    public List<LineageNode> RemovedNodes { get; init; } = new();
+    public List<SimpleLineageNode> AddedNodes { get; init; } = new();
+    public List<SimpleLineageNode> RemovedNodes { get; init; } = new();
     public List<NodeModification> ModifiedNodes { get; init; } = new();
-    public List<LineageEdge> AddedEdges { get; init; } = new();
-    public List<LineageEdge> RemovedEdges { get; init; } = new();
+    public List<SimpleLineageEdge> AddedEdges { get; init; } = new();
+    public List<SimpleLineageEdge> RemovedEdges { get; init; } = new();
     public int TotalChanges { get; init; }
 }
 
 public sealed record NodeModification
 {
     public required string NodeId { get; init; }
-    public required LineageNode Before { get; init; }
-    public required LineageNode After { get; init; }
+    public required SimpleLineageNode Before { get; init; }
+    public required SimpleLineageNode After { get; init; }
 }
 
 public sealed record SystemRegistration

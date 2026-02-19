@@ -65,6 +65,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("multipartycomputation.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[]
         {
             "ECIES-MPC",
@@ -75,6 +85,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("multipartycomputation.init");
             // Load configuration
             if (Configuration.TryGetValue("Threshold", out var thresholdObj) && thresholdObj is int threshold)
                 _config.Threshold = threshold;

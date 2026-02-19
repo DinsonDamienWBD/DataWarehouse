@@ -54,6 +54,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("gcpkms.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM", "GOOGLE_SYMMETRIC_ENCRYPTION" };
 
         public bool SupportsHsmKeyGeneration => true;
@@ -65,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("gcpkms.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ProjectId", out var projectIdObj) && projectIdObj is string projectId)
                 _config.ProjectId = projectId;

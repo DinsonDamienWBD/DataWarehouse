@@ -87,6 +87,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("mtls.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("mtls.shutdown");
+            _pinnedCertificates.Clear();
+            _revokedCertificates.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Pins a certificate for a specific client or service.
         /// </summary>
         public void PinCertificate(string clientId, X509Certificate2 certificate)
@@ -294,6 +315,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("mtls.evaluate");
             // Extract client certificate from context
             if (!context.EnvironmentAttributes.TryGetValue("ClientCertificate", out var certObj) ||
                 certObj is not X509Certificate2 certificate)

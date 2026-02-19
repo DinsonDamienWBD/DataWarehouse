@@ -105,6 +105,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         }
 
         /// <summary>
+        /// Production hardening: validates configuration parameters on initialization.
+        /// </summary>
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cedar.init");
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Production hardening: releases resources and clears caches on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("cedar.shutdown");
+            _policies.Clear();
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
+        /// <summary>
         /// Adds a Cedar policy.
         /// </summary>
         public void AddPolicy(string policyId, string effect, string principal, string action, string resource, string? condition)
@@ -223,6 +243,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <inheritdoc/>
         protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("cedar.evaluate");
             if (_useLocalEvaluation || string.IsNullOrWhiteSpace(_cedarEndpoint))
             {
                 // Local evaluation

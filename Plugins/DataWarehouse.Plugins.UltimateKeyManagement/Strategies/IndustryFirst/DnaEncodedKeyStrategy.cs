@@ -92,8 +92,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("dnaencodedkey.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("dnaencodedkey.init");
             // Load configuration
             if (Configuration.TryGetValue("SynthesisProvider", out var providerObj) && providerObj is string provider)
                 _config.SynthesisProvider = Enum.Parse<DnaSynthesisProvider>(provider, true);

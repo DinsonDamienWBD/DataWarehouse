@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         private string _currentKeyId = "hsm-rotation-master-v1";
 
         public override string StrategyId => "hsm-rotation";
-        public override string StrategyName => "HSM Key Rotation Manager";
+        public override string Name => "HSM Key Rotation Manager";
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -326,7 +326,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 {
                     try
                     {
-                        var context = SecurityContext.SystemAdmin();
+                        var context = new SystemAdminSecurityContext();
                         await RotateKeyAsync(kvp.Key, context, "Automated scheduled rotation");
                     }
                     catch (Exception)
@@ -458,5 +458,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         public required DateTime CreatedAt { get; init; }
         public required DateTime RetiredAt { get; init; }
         public required DateTime ExpiresAt { get; init; }
+    }
+
+    internal sealed class SystemAdminSecurityContext : DataWarehouse.SDK.Security.ISecurityContext
+    {
+        public string UserId => "system";
+        public string? TenantId => null;
+        public IEnumerable<string> Roles => new[] { "admin" };
+        public bool IsSystemAdmin => true;
     }
 }

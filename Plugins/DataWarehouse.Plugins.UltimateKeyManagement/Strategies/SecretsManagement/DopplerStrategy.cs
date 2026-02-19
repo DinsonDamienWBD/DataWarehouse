@@ -49,6 +49,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
         };
 
+        /// <summary>
+        /// Production hardening: releases resources on shutdown.
+        /// </summary>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            IncrementCounter("doppler.shutdown");
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+
         public DopplerStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -56,6 +66,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
+            IncrementCounter("doppler.init");
             // Load configuration from Configuration dictionary
             if (Configuration.TryGetValue("ServiceToken", out var tokenObj) && tokenObj is string token)
                 _config.ServiceToken = token;
