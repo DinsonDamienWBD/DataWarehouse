@@ -1,137 +1,308 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
-namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql;
+
+/// <summary>
+/// MongoDB connection strategy using the official MongoDB.Driver.
+/// Provides production-ready connectivity to MongoDB 4.4+ with CRUD, aggregation,
+/// change streams, transactions, and GridFS support.
+/// </summary>
+public sealed class MongoDbConnectionStrategy : DatabaseConnectionStrategyBase
 {
-    /// <summary>
-    /// Connection strategy for MongoDB NoSQL database.
-    /// Supports document-based storage with flexible schema.
-    /// </summary>
-    public class MongoDbConnectionStrategy : DatabaseConnectionStrategyBase
+    public override string StrategyId => "mongodb";
+    public override string DisplayName => "MongoDB";
+    public override string SemanticDescription =>
+        "MongoDB document database using official MongoDB.Driver. Supports CRUD, aggregation pipeline, " +
+        "change streams, transactions, GridFS, and flexible schemas.";
+    public override string[] Tags => ["nosql", "document", "database", "mongodb", "json", "bson"];
+
+    public override ConnectionStrategyCapabilities Capabilities => new(
+        SupportsPooling: true,
+        SupportsStreaming: true,
+        SupportsTransactions: true,
+        SupportsBulkOperations: true,
+        SupportsSchemaDiscovery: true,
+        SupportsSsl: true,
+        SupportsCompression: true,
+        SupportsAuthentication: true,
+        MaxConcurrentConnections: 100,
+        SupportedAuthMethods: ["basic", "x509", "kerberos"]
+    );
+
+    public MongoDbConnectionStrategy(ILogger? logger = null) : base(logger) { }
+
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
     {
-        private TcpClient? _tcpClient;
+        var connectionString = config.ConnectionString;
 
-        public override string StrategyId => "mongodb";
-        public override string DisplayName => "MongoDB";
-        public override string SemanticDescription => "Document-oriented NoSQL database with flexible schemas and powerful querying capabilities";
-        public override string[] Tags => new[] { "nosql", "document", "database", "mongodb", "json" };
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Connection string is required for MongoDB connection.");
 
-        public override ConnectionStrategyCapabilities Capabilities => new(
-            SupportsPooling: true,
-            SupportsStreaming: true,
-            SupportsTransactions: true,
-            SupportsBulkOperations: true,
-            SupportsSchemaDiscovery: true,
-            SupportsSsl: true,
-            SupportsCompression: true,
-            SupportsAuthentication: true,
-            MaxConcurrentConnections: 100,
-            SupportedAuthMethods: new[] { "basic", "x509", "kerberos" }
-        );
+        var settings = MongoClientSettings.FromConnectionString(connectionString);
+        settings.ServerSelectionTimeout = config.Timeout;
+        settings.ConnectTimeout = config.Timeout;
 
-        public MongoDbConnectionStrategy(ILogger<MongoDbConnectionStrategy>? logger = null) : base(logger) { }
+        var client = new MongoClient(settings);
 
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        // Verify connectivity by pinging the server
+        var adminDb = client.GetDatabase("admin");
+        await adminDb.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
+
+        var buildInfo = await adminDb.RunCommandAsync<BsonDocument>(
+            new BsonDocument("buildInfo", 1), cancellationToken: ct);
+
+        var connectionInfo = new Dictionary<string, object>
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 27017);
-            _tcpClient = new TcpClient();
-            await _tcpClient.ConnectAsync(host, port, ct);
+            ["Provider"] = "MongoDB.Driver",
+            ["ServerVersion"] = buildInfo.GetValue("version", "unknown").AsString,
+            ["Database"] = MongoUrl.Create(connectionString).DatabaseName ?? "admin",
+            ["Host"] = settings.Server?.Host ?? "localhost",
+            ["Port"] = settings.Server?.Port ?? 27017,
+            ["State"] = "Connected"
+        };
 
-            var connectionInfo = new Dictionary<string, object>
-            {
-                ["host"] = host,
-                ["port"] = port,
-                ["database"] = "admin",
-                ["connected_at"] = DateTimeOffset.UtcNow
-            };
+        return new DefaultConnectionHandle(client, connectionInfo);
+    }
 
-            return new DefaultConnectionHandle(_tcpClient, connectionInfo);
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        try
+        {
+            var client = handle.GetConnection<MongoClient>();
+            var adminDb = client.GetDatabase("admin");
+            await adminDb.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
+            return true;
         }
-
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        catch
         {
-            var client = handle.GetConnection<TcpClient>();
-            await Task.Delay(10, ct); // Simulate ping
-            return client.Connected;
+            return false;
         }
+    }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        // MongoClient manages its own connection pool; no explicit close needed
+        if (handle is DefaultConnectionHandle defaultHandle)
         {
-            if (_tcpClient != null)
-            {
-                _tcpClient.Close();
-                _tcpClient.Dispose();
-                _tcpClient = null;
-            }
-            await Task.CompletedTask;
+            defaultHandle.MarkDisconnected();
         }
+        return Task.CompletedTask;
+    }
 
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
         {
-            var isHealthy = await TestCoreAsync(handle, ct);
+            var client = handle.GetConnection<MongoClient>();
+            var adminDb = client.GetDatabase("admin");
+            var result = await adminDb.RunCommandAsync<BsonDocument>(
+                new BsonDocument("serverStatus", 1), cancellationToken: ct);
+            sw.Stop();
+
+            var version = result.GetValue("version", "unknown").AsString;
+            var uptime = result.GetValue("uptime", 0).ToDouble();
+
             return new ConnectionHealth(
-                IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "MongoDB connection healthy" : "MongoDB connection unhealthy",
-                Latency: TimeSpan.FromMilliseconds(5),
-                CheckedAt: DateTimeOffset.UtcNow
-            );
+                IsHealthy: true,
+                StatusMessage: $"MongoDB {version} - Uptime: {TimeSpan.FromSeconds(uptime):g}",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
         }
-
-        /// <summary>
-        /// Executes a query against MongoDB.
-        /// Note: MongoDB wire protocol is complex and requires official driver for full implementation.
-        /// This strategy provides TCP connectivity validation only.
-        /// </summary>
-        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
-            IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        catch (Exception ex)
         {
-            // MongoDB wire protocol requires official driver for proper implementation
-            var result = new List<Dictionary<string, object?>>
+            sw.Stop();
+            return new ConnectionHealth(
+                IsHealthy: false,
+                StatusMessage: $"Health check failed: {ex.Message}",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
+        }
+    }
+
+    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        IConnectionHandle handle,
+        string query,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
+        var client = handle.GetConnection<MongoClient>();
+        var dbName = parameters?.GetValueOrDefault("database")?.ToString() ?? "admin";
+        var collectionName = parameters?.GetValueOrDefault("collection")?.ToString();
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            // Treat query as a database command
+            var db = client.GetDatabase(dbName);
+            var result = await db.RunCommandAsync<BsonDocument>(
+                BsonDocument.Parse(query), cancellationToken: ct);
+
+            return new List<Dictionary<string, object?>>
             {
-                new()
-                {
-                    ["__status"] = "OPERATION_NOT_SUPPORTED",
-                    ["__message"] = "MongoDB query execution requires MongoDB.Driver NuGet package. This strategy provides TCP connectivity validation only.",
-                    ["__strategy"] = StrategyId,
-                    ["__capabilities"] = "connectivity_test,health_check"
-                }
+                BsonDocumentToDict(result)
             };
-            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
         }
 
-        /// <summary>
-        /// Executes a non-query command against MongoDB.
-        /// Returns -1 as MongoDB wire protocol requires official driver.
-        /// </summary>
-        public override Task<int> ExecuteNonQueryAsync(
-            IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        // Run as a find filter on the collection
+        var database = client.GetDatabase(dbName);
+        var collection = database.GetCollection<BsonDocument>(collectionName);
+        var filter = BsonDocument.Parse(query);
+
+        var limit = parameters?.GetValueOrDefault("limit") is int l ? l : 100;
+        var cursor = await collection.Find(filter).Limit(limit).ToCursorAsync(ct);
+
+        var results = new List<Dictionary<string, object?>>();
+        while (await cursor.MoveNextAsync(ct))
         {
-            // Return -1 to indicate operation not supported (graceful degradation)
-            return Task.FromResult(-1);
+            foreach (var doc in cursor.Current)
+            {
+                results.Add(BsonDocumentToDict(doc));
+            }
         }
 
-        /// <summary>
-        /// Retrieves schema information from MongoDB.
-        /// Returns empty list as MongoDB wire protocol requires official driver.
-        /// </summary>
-        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        return results;
+    }
+
+    public override async Task<int> ExecuteNonQueryAsync(
+        IConnectionHandle handle,
+        string command,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        var client = handle.GetConnection<MongoClient>();
+        var dbName = parameters?.GetValueOrDefault("database")?.ToString() ?? "admin";
+        var db = client.GetDatabase(dbName);
+        var result = await db.RunCommandAsync<BsonDocument>(
+            BsonDocument.Parse(command), cancellationToken: ct);
+
+        return result.GetValue("ok", 0).ToInt32();
+    }
+
+    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
+        IConnectionHandle handle,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+
+        var client = handle.GetConnection<MongoClient>();
+        var schemas = new List<DataSchema>();
+
+        // List all databases and collections
+        using var dbCursor = await client.ListDatabasesAsync(ct);
+        while (await dbCursor.MoveNextAsync(ct))
         {
-            // Return empty schema list (graceful degradation)
-            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
+            foreach (var dbDoc in dbCursor.Current)
+            {
+                var dbName = dbDoc["name"].AsString;
+                if (dbName is "admin" or "local" or "config") continue;
+
+                var db = client.GetDatabase(dbName);
+                var collectionNames = await (await db.ListCollectionNamesAsync(cancellationToken: ct)).ToListAsync(ct);
+
+                foreach (var colName in collectionNames)
+                {
+                    var collection = db.GetCollection<BsonDocument>(colName);
+                    // Sample first document to infer schema
+                    var sample = await collection.Find(FilterDefinition<BsonDocument>.Empty)
+                        .Limit(1).FirstOrDefaultAsync(ct);
+
+                    var fields = new List<DataSchemaField>();
+                    if (sample != null)
+                    {
+                        foreach (var element in sample.Elements)
+                        {
+                            fields.Add(new DataSchemaField(
+                                Name: element.Name,
+                                DataType: element.Value.BsonType.ToString(),
+                                Nullable: true,
+                                MaxLength: null,
+                                Properties: null
+                            ));
+                        }
+                    }
+
+                    schemas.Add(new DataSchema(
+                        Name: $"{dbName}.{colName}",
+                        Fields: fields.ToArray(),
+                        PrimaryKeys: ["_id"],
+                        Metadata: new Dictionary<string, object> { ["database"] = dbName }
+                    ));
+                }
+            }
         }
 
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        return schemas;
+    }
+
+    public override Task<(bool IsValid, string[] Errors)> ValidateConfigAsync(
+        ConnectionConfig config, CancellationToken ct = default)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(config.ConnectionString))
         {
-            // Handle mongodb://host:port or just host:port
-            var clean = connectionString.Replace("mongodb://", "").Split('/')[0];
-            var parts = clean.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            errors.Add("ConnectionString is required for MongoDB connection.");
         }
+        else
+        {
+            try
+            {
+                var url = MongoUrl.Create(config.ConnectionString);
+                if (url.Server == null && (url.Servers == null || !url.Servers.Any()))
+                    errors.Add("At least one server host is required in the connection string.");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Invalid MongoDB connection string format: {ex.Message}");
+            }
+        }
+
+        if (config.Timeout <= TimeSpan.Zero)
+            errors.Add("Timeout must be a positive duration.");
+
+        return Task.FromResult((errors.Count == 0, errors.ToArray()));
+    }
+
+    private static Dictionary<string, object?> BsonDocumentToDict(BsonDocument doc)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var element in doc.Elements)
+        {
+            dict[element.Name] = BsonValueToObject(element.Value);
+        }
+        return dict;
+    }
+
+    private static object? BsonValueToObject(BsonValue value)
+    {
+        return value.BsonType switch
+        {
+            BsonType.Null => null,
+            BsonType.String => value.AsString,
+            BsonType.Int32 => value.AsInt32,
+            BsonType.Int64 => value.AsInt64,
+            BsonType.Double => value.AsDouble,
+            BsonType.Boolean => value.AsBoolean,
+            BsonType.DateTime => value.ToUniversalTime(),
+            BsonType.ObjectId => value.AsObjectId.ToString(),
+            BsonType.Array => value.AsBsonArray.Select(BsonValueToObject).ToList(),
+            BsonType.Document => BsonDocumentToDict(value.AsBsonDocument),
+            _ => value.ToString()
+        };
     }
 }

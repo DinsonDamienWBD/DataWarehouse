@@ -1,126 +1,269 @@
 using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Cassandra;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 
-namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql;
+
+/// <summary>
+/// Apache Cassandra connection strategy using the DataStax CSharp Driver.
+/// Provides production-ready connectivity with prepared statements, batch operations,
+/// lightweight transactions, and tunable consistency.
+/// </summary>
+public sealed class CassandraConnectionStrategy : DatabaseConnectionStrategyBase
 {
-    /// <summary>
-    /// Connection strategy for Apache Cassandra distributed NoSQL database.
-    /// </summary>
-    public class CassandraConnectionStrategy : DatabaseConnectionStrategyBase
+    public override string StrategyId => "cassandra";
+    public override string DisplayName => "Apache Cassandra";
+    public override string SemanticDescription =>
+        "Apache Cassandra distributed database using DataStax CSharp Driver. Supports CQL queries, " +
+        "prepared statements, batch operations, lightweight transactions, and tunable consistency levels.";
+    public override string[] Tags => ["nosql", "cassandra", "distributed", "wide-column", "apache", "cql"];
+
+    public override ConnectionStrategyCapabilities Capabilities => new(
+        SupportsPooling: true,
+        SupportsStreaming: true,
+        SupportsTransactions: false,
+        SupportsBulkOperations: true,
+        SupportsSchemaDiscovery: true,
+        SupportsSsl: true,
+        SupportsCompression: true,
+        SupportsAuthentication: true,
+        MaxConcurrentConnections: 200,
+        SupportedAuthMethods: ["password", "kerberos"]
+    );
+
+    public CassandraConnectionStrategy(ILogger? logger = null) : base(logger) { }
+
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
     {
-        private TcpClient? _tcpClient;
+        var connectionString = config.ConnectionString;
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Connection string (contact points) is required for Cassandra.");
 
-        public override string StrategyId => "cassandra";
-        public override string DisplayName => "Apache Cassandra";
-        public override string SemanticDescription => "Distributed wide-column store designed for high availability and scalability";
-        public override string[] Tags => new[] { "nosql", "cassandra", "distributed", "wide-column", "apache" };
+        var contactPoints = connectionString.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(cp => cp.Trim()).ToArray();
 
-        public override ConnectionStrategyCapabilities Capabilities => new(
-            SupportsPooling: true,
-            SupportsStreaming: true,
-            SupportsTransactions: false,
-            SupportsBulkOperations: true,
-            SupportsSchemaDiscovery: true,
-            SupportsSsl: true,
-            SupportsCompression: true,
-            SupportsAuthentication: true,
-            MaxConcurrentConnections: 200,
-            SupportedAuthMethods: new[] { "password", "kerberos" }
-        );
+        var builder = Cluster.Builder()
+            .AddContactPoints(contactPoints)
+            .WithQueryTimeout((int)config.Timeout.TotalMilliseconds)
+            .WithCompression(CompressionType.LZ4);
 
-        public CassandraConnectionStrategy(ILogger<CassandraConnectionStrategy>? logger = null) : base(logger) { }
-
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        if (config.Properties.TryGetValue("Username", out var username) &&
+            config.Properties.TryGetValue("Password", out var password))
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 9042);
-            _tcpClient = new TcpClient();
-            await _tcpClient.ConnectAsync(host, port, ct);
-
-            return new DefaultConnectionHandle(_tcpClient, new Dictionary<string, object>
-            {
-                ["host"] = host,
-                ["port"] = port,
-                ["protocol_version"] = "4.0"
-            });
+            builder = builder.WithCredentials(username?.ToString(), password?.ToString());
         }
 
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        if (config.Properties.TryGetValue("Keyspace", out var keyspace) &&
+            keyspace is string ks && !string.IsNullOrWhiteSpace(ks))
         {
-            var client = handle.GetConnection<TcpClient>();
-            await Task.Delay(10, ct);
-            return client.Connected;
+            builder = builder.WithDefaultKeyspace(ks);
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        var cluster = builder.Build();
+        var session = await Task.Run(() => cluster.Connect(), ct);
+
+        var connectionInfo = new Dictionary<string, object>
         {
-            if (_tcpClient != null)
+            ["Provider"] = "CassandraCSharpDriver",
+            ["ClusterName"] = cluster.Metadata.ClusterName ?? "unknown",
+            ["Keyspace"] = session.Keyspace ?? "system",
+            ["Hosts"] = string.Join(",", cluster.AllHosts().Select(h => h.Address)),
+            ["State"] = "Connected"
+        };
+
+        return new DefaultConnectionHandle(session, connectionInfo);
+    }
+
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        try
+        {
+            var session = handle.GetConnection<ISession>();
+            var rs = await Task.Run(() => session.Execute("SELECT now() FROM system.local"), ct);
+            return rs.Any();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var session = handle.GetConnection<ISession>();
+        var cluster = session.Cluster;
+
+        await Task.Run(() =>
+        {
+            session.Dispose();
+            cluster.Dispose();
+        }, ct);
+
+        if (handle is DefaultConnectionHandle defaultHandle)
+        {
+            defaultHandle.MarkDisconnected();
+        }
+    }
+
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var session = handle.GetConnection<ISession>();
+            var rs = await Task.Run(() => session.Execute("SELECT cluster_name, release_version FROM system.local"), ct);
+            sw.Stop();
+
+            var row = rs.FirstOrDefault();
+            var clusterName = row?.GetValue<string>("cluster_name") ?? "unknown";
+            var version = row?.GetValue<string>("release_version") ?? "unknown";
+
+            return new ConnectionHealth(
+                IsHealthy: true,
+                StatusMessage: $"Cassandra {version} - Cluster: {clusterName}",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return new ConnectionHealth(
+                IsHealthy: false,
+                StatusMessage: $"Health check failed: {ex.Message}",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
+        }
+    }
+
+    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        IConnectionHandle handle,
+        string query,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
+        var session = handle.GetConnection<ISession>();
+        RowSet rs;
+
+        if (parameters != null && parameters.Count > 0)
+        {
+            var prepared = await Task.Run(() => session.Prepare(query), ct);
+            var bound = prepared.Bind(parameters.Values.ToArray());
+            rs = await Task.Run(() => session.Execute(bound), ct);
+        }
+        else
+        {
+            rs = await Task.Run(() => session.Execute(query), ct);
+        }
+
+        var results = new List<Dictionary<string, object?>>();
+        var columns = rs.Columns;
+
+        foreach (var row in rs)
+        {
+            var dict = new Dictionary<string, object?>();
+            for (int i = 0; i < columns.Length; i++)
             {
-                _tcpClient.Close();
-                _tcpClient.Dispose();
-                _tcpClient = null;
+                dict[columns[i].Name] = row.IsNull(i) ? null : row.GetValue<object>(i);
             }
-            await Task.CompletedTask;
+            results.Add(dict);
         }
 
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        return results;
+    }
+
+    public override async Task<int> ExecuteNonQueryAsync(
+        IConnectionHandle handle,
+        string command,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        var session = handle.GetConnection<ISession>();
+
+        if (parameters != null && parameters.Count > 0)
         {
-            var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(isHealthy, isHealthy ? "Cassandra healthy" : "Cassandra unhealthy",
-                TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
+            var prepared = await Task.Run(() => session.Prepare(command), ct);
+            var bound = prepared.Bind(parameters.Values.ToArray());
+            await Task.Run(() => session.Execute(bound), ct);
+        }
+        else
+        {
+            await Task.Run(() => session.Execute(command), ct);
         }
 
-        /// <summary>
-        /// Executes a CQL query against Cassandra.
-        /// Note: Full CQL protocol implementation requires DataStax driver.
-        /// This strategy provides TCP connectivity validation only.
-        /// </summary>
-        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
-            IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        return 1; // CQL doesn't return affected row count
+    }
+
+    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
+        IConnectionHandle handle,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+
+        var session = handle.GetConnection<ISession>();
+        var keyspace = session.Keyspace ?? "system";
+
+        var rs = await Task.Run(() => session.Execute(
+            $"SELECT table_name, column_name, type, kind FROM system_schema.columns WHERE keyspace_name = '{keyspace}'"), ct);
+
+        var schemas = new Dictionary<string, (List<DataSchemaField> Fields, List<string> PrimaryKeys)>();
+
+        foreach (var row in rs)
         {
-            // Cassandra CQL binary protocol requires native driver for full implementation
-            var result = new List<Dictionary<string, object?>>
+            var tableName = row.GetValue<string>("table_name");
+            var columnName = row.GetValue<string>("column_name");
+            var type = row.GetValue<string>("type");
+            var kind = row.GetValue<string>("kind");
+
+            if (!schemas.ContainsKey(tableName))
             {
-                new()
-                {
-                    ["__status"] = "OPERATION_NOT_SUPPORTED",
-                    ["__message"] = "CQL query execution requires DataStax C# Driver. This strategy provides TCP connectivity validation only.",
-                    ["__strategy"] = StrategyId,
-                    ["__capabilities"] = "connectivity_test,health_check"
-                }
-            };
-            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
+                schemas[tableName] = (new List<DataSchemaField>(), new List<string>());
+            }
+
+            schemas[tableName].Fields.Add(new DataSchemaField(
+                Name: columnName,
+                DataType: type,
+                Nullable: kind != "partition_key" && kind != "clustering",
+                MaxLength: null,
+                Properties: new Dictionary<string, object> { ["kind"] = kind }
+            ));
+
+            if (kind == "partition_key" || kind == "clustering")
+            {
+                schemas[tableName].PrimaryKeys.Add(columnName);
+            }
         }
 
-        /// <summary>
-        /// Executes a non-query CQL command against Cassandra.
-        /// Returns -1 as CQL protocol requires native driver.
-        /// </summary>
-        public override Task<int> ExecuteNonQueryAsync(
-            IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
-        {
-            // Return -1 to indicate operation not supported (graceful degradation)
-            return Task.FromResult(-1);
-        }
+        return schemas.Select(kvp => new DataSchema(
+            Name: kvp.Key,
+            Fields: kvp.Value.Fields.ToArray(),
+            PrimaryKeys: kvp.Value.PrimaryKeys.ToArray(),
+            Metadata: new Dictionary<string, object> { ["keyspace"] = keyspace }
+        )).ToList();
+    }
 
-        /// <summary>
-        /// Retrieves schema information from Cassandra.
-        /// Returns empty list as CQL protocol requires native driver.
-        /// </summary>
-        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
-        {
-            // Return empty schema list (graceful degradation)
-            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
-        }
+    public override Task<(bool IsValid, string[] Errors)> ValidateConfigAsync(
+        ConnectionConfig config, CancellationToken ct = default)
+    {
+        var errors = new List<string>();
 
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
-        {
-            var parts = connectionString.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
-        }
+        if (string.IsNullOrWhiteSpace(config.ConnectionString))
+            errors.Add("ConnectionString (contact points) is required for Cassandra.");
+
+        if (config.Timeout <= TimeSpan.Zero)
+            errors.Add("Timeout must be a positive duration.");
+
+        return Task.FromResult((errors.Count == 0, errors.ToArray()));
     }
 }

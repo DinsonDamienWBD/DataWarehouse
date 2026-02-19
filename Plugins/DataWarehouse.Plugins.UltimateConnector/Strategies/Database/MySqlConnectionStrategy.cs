@@ -1,23 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
-using System.Net.Sockets;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using ConnectionState = System.Data.ConnectionState;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Database;
 
 /// <summary>
-/// MySQL connection strategy using TCP connectivity check.
-/// Provides connection validation via TCP socket to MySQL server (default port 3306).
-/// Note: Full query operations require MySql.Data or MySqlConnector NuGet package.
+/// MySQL connection strategy using MySqlConnector driver.
+/// Provides production-ready connectivity to MySQL 5.7+ and MySQL 8.x database servers.
 /// </summary>
 public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
 {
-    private const int DefaultMySqlPort = 3306;
-
     /// <inheritdoc/>
     public override string StrategyId => "mysql";
 
@@ -29,9 +29,9 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
 
     /// <inheritdoc/>
     public override string SemanticDescription =>
-        "MySQL relational database connection. Open-source RDBMS with support for ACID transactions, " +
-        "replication, partitioning, stored procedures, and full-text search. Widely used for web applications, " +
-        "e-commerce, and content management systems. Compatible with MySQL 5.7+ and MySQL 8.x.";
+        "MySQL relational database connection using MySqlConnector driver. Open-source RDBMS with support for " +
+        "ACID transactions, replication, partitioning, stored procedures, and full-text search. " +
+        "Compatible with MySQL 5.7+ and MySQL 8.x.";
 
     /// <inheritdoc/>
     public override string[] Tags =>
@@ -40,10 +40,6 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
         "web", "lamp", "database", "oracle"
     ];
 
-    /// <summary>
-    /// Initializes a new instance of <see cref="MySqlConnectionStrategy"/>.
-    /// </summary>
-    /// <param name="logger">Optional logger for diagnostics.</param>
     public MySqlConnectionStrategy(ILogger? logger = null) : base(logger) { }
 
     /// <inheritdoc/>
@@ -54,41 +50,43 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Connection string is required for MySQL connection.");
 
-        // Parse connection string to extract host and port
-        var (host, port) = ParseConnectionString(connectionString);
+        var connection = new MySqlConnection(connectionString);
 
-        // Test TCP connectivity
-        using var tcpClient = new TcpClient();
-        await tcpClient.ConnectAsync(host, port, ct);
-
-        // Store connection metadata
-        var connectionInfo = new Dictionary<string, object>
+        try
         {
-            ["Provider"] = "TCP/MySQL",
-            ["Host"] = host,
-            ["Port"] = port,
-            ["ConnectionString"] = connectionString,
-            ["State"] = "Connected"
-        };
+            await connection.OpenAsync(ct);
 
-        // Use connection string as the underlying connection for TCP-based validation
-        var mockConnection = new MySqlTcpConnection(host, port, connectionString);
+            var connectionInfo = new Dictionary<string, object>
+            {
+                ["Provider"] = "MySqlConnector",
+                ["ServerVersion"] = connection.ServerVersion,
+                ["Database"] = connection.Database!,
+                ["DataSource"] = connection.DataSource!,
+                ["State"] = connection.State.ToString()
+            };
 
-        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+            return new DefaultConnectionHandle(connection, connectionInfo);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 
     /// <inheritdoc/>
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
+        var connection = handle.GetConnection<MySqlConnection>();
+
+        if (connection.State != ConnectionState.Open)
+            return false;
+
         try
         {
-            var mockConnection = handle.GetConnection<MySqlTcpConnection>();
-
-            // Test TCP connectivity
-            using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
-
-            return true;
+            await using var cmd = new MySqlCommand("SELECT 1", connection);
+            var result = await cmd.ExecuteScalarAsync(ct);
+            return result != null && Convert.ToInt32(result) == 1;
         }
         catch
         {
@@ -97,33 +95,48 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
+        var connection = handle.GetConnection<MySqlConnection>();
+
+        if (connection.State != ConnectionState.Closed)
+        {
+            await connection.CloseAsync();
+        }
+
+        await connection.DisposeAsync();
+
         if (handle is DefaultConnectionHandle defaultHandle)
         {
             defaultHandle.MarkDisconnected();
         }
-
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
+        var connection = handle.GetConnection<MySqlConnection>();
 
         try
         {
-            var mockConnection = handle.GetConnection<MySqlTcpConnection>();
+            if (connection.State != ConnectionState.Open)
+            {
+                sw.Stop();
+                return new ConnectionHealth(
+                    IsHealthy: false,
+                    StatusMessage: $"Connection is not open (State: {connection.State})",
+                    Latency: sw.Elapsed,
+                    CheckedAt: DateTimeOffset.UtcNow);
+            }
 
-            // Test TCP connectivity and measure latency
-            using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await using var cmd = new MySqlCommand("SELECT 1", connection);
+            await cmd.ExecuteScalarAsync(ct);
             sw.Stop();
 
             return new ConnectionHealth(
                 IsHealthy: true,
-                StatusMessage: $"MySQL TCP connection active - {mockConnection.Host}:{mockConnection.Port}",
+                StatusMessage: $"MySQL {connection.ServerVersion} - Database: {connection.Database}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }
@@ -132,65 +145,149 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
             sw.Stop();
             return new ConnectionHealth(
                 IsHealthy: false,
-                StatusMessage: $"TCP health check failed: {ex.Message}",
+                StatusMessage: $"Health check failed: {ex.Message}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Query execution requires MySql.Data or MySqlConnector NuGet package.
-    /// This strategy only provides TCP connectivity validation.
-    /// Returns empty result set with operation status information.
-    /// </remarks>
-    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
         IConnectionHandle handle,
         string query,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
     {
-        var result = new List<Dictionary<string, object?>>
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
+        var connection = handle.GetConnection<MySqlConnection>();
+
+        await using var cmd = new MySqlCommand(query, connection);
+
+        if (parameters != null)
         {
-            new()
+            foreach (var (key, value) in parameters)
             {
-                ["__status"] = "OPERATION_NOT_SUPPORTED",
-                ["__message"] = "Query execution requires MySqlConnector NuGet package. This strategy provides TCP connectivity validation only.",
-                ["__strategy"] = StrategyId,
-                ["__capabilities"] = "connectivity_test,health_check"
+                cmd.Parameters.AddWithValue(key, value ?? DBNull.Value);
             }
-        };
-        return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
+        }
+
+        var results = new List<Dictionary<string, object?>>();
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        while (await reader.ReadAsync(ct))
+        {
+            var row = new Dictionary<string, object?>();
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                var columnName = reader.GetName(i);
+                var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                row[columnName] = value;
+            }
+            results.Add(row);
+        }
+
+        return results;
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Non-query execution requires MySql.Data or MySqlConnector NuGet package.
-    /// This strategy only provides TCP connectivity validation.
-    /// Returns -1 to indicate operation not supported.
-    /// </remarks>
-    public override Task<int> ExecuteNonQueryAsync(
+    public override async Task<int> ExecuteNonQueryAsync(
         IConnectionHandle handle,
         string command,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
     {
-        // Return -1 to indicate operation not supported (graceful degradation)
-        return Task.FromResult(-1);
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        var connection = handle.GetConnection<MySqlConnection>();
+
+        await using var cmd = new MySqlCommand(command, connection);
+
+        if (parameters != null)
+        {
+            foreach (var (key, value) in parameters)
+            {
+                cmd.Parameters.AddWithValue(key, value ?? DBNull.Value);
+            }
+        }
+
+        return await cmd.ExecuteNonQueryAsync(ct);
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Schema retrieval requires MySql.Data or MySqlConnector NuGet package.
-    /// This strategy only provides TCP connectivity validation.
-    /// Returns empty schema list.
-    /// </remarks>
-    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
+    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
         IConnectionHandle handle,
         CancellationToken ct = default)
     {
-        // Return empty schema list (graceful degradation)
-        return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
+        ArgumentNullException.ThrowIfNull(handle);
+
+        var connection = handle.GetConnection<MySqlConnection>();
+
+        const string schemaQuery = @"
+            SELECT
+                t.TABLE_NAME,
+                c.COLUMN_NAME,
+                c.DATA_TYPE,
+                c.IS_NULLABLE,
+                c.CHARACTER_MAXIMUM_LENGTH,
+                CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as IS_PRIMARY_KEY
+            FROM INFORMATION_SCHEMA.TABLES t
+            INNER JOIN INFORMATION_SCHEMA.COLUMNS c
+                ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_SCHEMA = c.TABLE_SCHEMA
+            LEFT JOIN (
+                SELECT ku.TABLE_NAME, ku.COLUMN_NAME
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku
+                    ON tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+                WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+            ) pk ON c.TABLE_NAME = pk.TABLE_NAME AND c.COLUMN_NAME = pk.COLUMN_NAME
+            WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE'
+            ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION";
+
+        var schemas = new Dictionary<string, (List<DataSchemaField> Fields, List<string> PrimaryKeys)>();
+
+        await using var cmd = new MySqlCommand(schemaQuery, connection);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        while (await reader.ReadAsync(ct))
+        {
+            var tableName = reader.GetString(0);
+            var columnName = reader.GetString(1);
+            var dataType = reader.GetString(2);
+            var isNullable = reader.GetString(3) == "YES";
+            var maxLength = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4);
+            var isPrimaryKey = reader.GetInt32(5) == 1;
+
+            if (!schemas.ContainsKey(tableName))
+            {
+                schemas[tableName] = (new List<DataSchemaField>(), new List<string>());
+            }
+
+            var field = new DataSchemaField(
+                Name: columnName,
+                DataType: dataType,
+                Nullable: isNullable,
+                MaxLength: maxLength,
+                Properties: null
+            );
+
+            schemas[tableName].Fields.Add(field);
+
+            if (isPrimaryKey)
+            {
+                schemas[tableName].PrimaryKeys.Add(columnName);
+            }
+        }
+
+        return schemas.Select(kvp => new DataSchema(
+            Name: kvp.Key,
+            Fields: kvp.Value.Fields.ToArray(),
+            PrimaryKeys: kvp.Value.PrimaryKeys.ToArray(),
+            Metadata: null
+        )).ToList();
     }
 
     /// <inheritdoc/>
@@ -207,13 +304,13 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
         {
             try
             {
-                var (host, port) = ParseConnectionString(config.ConnectionString);
+                var builder = new MySqlConnectionStringBuilder(config.ConnectionString);
 
-                if (string.IsNullOrWhiteSpace(host))
-                    errors.Add("Host/Server is required in the connection string.");
+                if (string.IsNullOrWhiteSpace(builder.Server))
+                    errors.Add("Server is required in the connection string.");
 
-                if (port <= 0 || port > 65535)
-                    errors.Add("Port must be between 1 and 65535.");
+                if (string.IsNullOrWhiteSpace(builder.Database))
+                    errors.Add("Database name is required in the connection string.");
             }
             catch (Exception ex)
             {
@@ -228,61 +325,5 @@ public sealed class MySqlConnectionStrategy : DatabaseConnectionStrategyBase
             errors.Add("MaxRetries must be non-negative.");
 
         return Task.FromResult((errors.Count == 0, errors.ToArray()));
-    }
-
-    /// <summary>
-    /// Parses a MySQL connection string to extract host and port.
-    /// </summary>
-    /// <param name="connectionString">MySQL connection string.</param>
-    /// <returns>Tuple containing host and port.</returns>
-    private static (string Host, int Port) ParseConnectionString(string connectionString)
-    {
-        var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
-        string? host = null;
-        int port = DefaultMySqlPort;
-
-        foreach (var part in parts)
-        {
-            var keyValue = part.Split('=', 2, StringSplitOptions.TrimEntries);
-            if (keyValue.Length != 2) continue;
-
-            var key = keyValue[0].ToLowerInvariant();
-            var value = keyValue[1];
-
-            switch (key)
-            {
-                case "server":
-                case "host":
-                case "data source":
-                    host = value;
-                    break;
-                case "port":
-                    if (int.TryParse(value, out var parsedPort))
-                        port = parsedPort;
-                    break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(host))
-            throw new ArgumentException("Host/Server not found in connection string.");
-
-        return (host, port);
-    }
-
-    /// <summary>
-    /// Mock connection object for TCP-based MySQL connectivity.
-    /// </summary>
-    private sealed class MySqlTcpConnection
-    {
-        public string Host { get; }
-        public int Port { get; }
-        public string ConnectionString { get; }
-
-        public MySqlTcpConnection(string host, int port, string connectionString)
-        {
-            Host = host;
-            Port = port;
-            ConnectionString = connectionString;
-        }
     }
 }

@@ -1,313 +1,295 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 
-namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql;
+
+/// <summary>
+/// Redis connection strategy using StackExchange.Redis driver.
+/// Provides production-ready connectivity to Redis 6.0+ with support for
+/// String, Hash, List, Set, SortedSet, Pub/Sub, Streams, Lua scripting, and cluster.
+/// </summary>
+public sealed class RedisConnectionStrategy : DatabaseConnectionStrategyBase
 {
-    /// <summary>
-    /// Connection strategy for Redis in-memory data structure store.
-    /// Supports key-value storage, caching, and pub/sub messaging.
-    /// </summary>
-    public class RedisConnectionStrategy : DatabaseConnectionStrategyBase
+    public override string StrategyId => "redis";
+    public override string DisplayName => "Redis";
+    public override string SemanticDescription =>
+        "Redis in-memory data store using StackExchange.Redis driver. Supports strings, hashes, lists, " +
+        "sets, sorted sets, pub/sub, streams, Lua scripting, pipelining, and cluster mode.";
+    public override string[] Tags => ["nosql", "cache", "key-value", "redis", "in-memory", "pub-sub"];
+
+    public override ConnectionStrategyCapabilities Capabilities => new(
+        SupportsPooling: true,
+        SupportsStreaming: true,
+        SupportsTransactions: true,
+        SupportsBulkOperations: true,
+        SupportsSchemaDiscovery: false,
+        SupportsSsl: true,
+        SupportsCompression: false,
+        SupportsAuthentication: true,
+        MaxConcurrentConnections: 1000,
+        SupportedAuthMethods: ["password", "acl"]
+    );
+
+    public RedisConnectionStrategy(ILogger? logger = null) : base(logger) { }
+
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
     {
-        private TcpClient? _tcpClient;
+        var connectionString = config.ConnectionString;
 
-        public override string StrategyId => "redis";
-        public override string DisplayName => "Redis";
-        public override string SemanticDescription => "High-performance in-memory data structure store used as database, cache, and message broker";
-        public override string[] Tags => new[] { "nosql", "cache", "key-value", "redis", "in-memory" };
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Connection string is required for Redis connection.");
 
-        public override ConnectionStrategyCapabilities Capabilities => new(
-            SupportsPooling: true,
-            SupportsStreaming: true,
-            SupportsTransactions: true,
-            SupportsBulkOperations: true,
-            SupportsSchemaDiscovery: false,
-            SupportsSsl: true,
-            SupportsCompression: false,
-            SupportsAuthentication: true,
-            MaxConcurrentConnections: 1000,
-            SupportedAuthMethods: new[] { "password", "acl" }
-        );
+        var options = ConfigurationOptions.Parse(connectionString);
+        options.ConnectTimeout = (int)config.Timeout.TotalMilliseconds;
+        options.SyncTimeout = (int)config.Timeout.TotalMilliseconds;
+        options.AsyncTimeout = (int)config.Timeout.TotalMilliseconds;
+        options.AbortOnConnectFail = false;
 
-        public RedisConnectionStrategy(ILogger<RedisConnectionStrategy>? logger = null) : base(logger) { }
+        var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
 
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        var server = multiplexer.GetServers().FirstOrDefault();
+        var connectionInfo = new Dictionary<string, object>
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 6379);
-            _tcpClient = new TcpClient();
-            await _tcpClient.ConnectAsync(host, port, ct);
+            ["Provider"] = "StackExchange.Redis",
+            ["Endpoint"] = server?.EndPoint?.ToString() ?? "unknown",
+            ["ServerVersion"] = server?.Version?.ToString() ?? "unknown",
+            ["IsConnected"] = multiplexer.IsConnected,
+            ["State"] = "Connected"
+        };
 
-            // Send PING command
-            var stream = _tcpClient.GetStream();
-            var pingCmd = Encoding.UTF8.GetBytes("*1\r\n$4\r\nPING\r\n");
-            await stream.WriteAsync(pingCmd, 0, pingCmd.Length, ct);
+        return new DefaultConnectionHandle(multiplexer, connectionInfo);
+    }
 
-            var buffer = new byte[1024];
-            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
-            var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        try
+        {
+            var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+            if (!multiplexer.IsConnected) return Task.FromResult(false);
 
-            if (!response.Contains("PONG"))
-                throw new InvalidOperationException("Redis PING failed");
+            var db = multiplexer.GetDatabase();
+            var result = db.Ping();
+            return Task.FromResult(result.TotalMilliseconds >= 0);
+        }
+        catch
+        {
+            return Task.FromResult(false);
+        }
+    }
 
-            var connectionInfo = new Dictionary<string, object>
+    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+        await multiplexer.CloseAsync();
+        await multiplexer.DisposeAsync();
+
+        if (handle is DefaultConnectionHandle defaultHandle)
+        {
+            defaultHandle.MarkDisconnected();
+        }
+    }
+
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+            var db = multiplexer.GetDatabase();
+            var latency = db.Ping();
+            sw.Stop();
+
+            var server = multiplexer.GetServers().FirstOrDefault();
+            var version = server?.Version?.ToString() ?? "unknown";
+
+            return Task.FromResult(new ConnectionHealth(
+                IsHealthy: multiplexer.IsConnected,
+                StatusMessage: $"Redis {version} - Ping: {latency.TotalMilliseconds:F1}ms",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return Task.FromResult(new ConnectionHealth(
+                IsHealthy: false,
+                StatusMessage: $"Health check failed: {ex.Message}",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow));
+        }
+    }
+
+    /// <summary>
+    /// Executes a Redis command. The query string is parsed as a Redis command (e.g., "GET mykey", "HGETALL myhash").
+    /// </summary>
+    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        IConnectionHandle handle,
+        string query,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
+        var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+        var db = multiplexer.GetDatabase();
+
+        var parts = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+            throw new ArgumentException("Redis command is empty.");
+
+        var command = parts[0].ToUpperInvariant();
+        var args = parts.Skip(1).Select(p => (RedisValue)p).ToArray();
+
+        var result = await db.ExecuteAsync(command, args.Cast<object>().ToArray());
+        var results = new List<Dictionary<string, object?>>();
+
+        if (result.IsNull)
+        {
+            results.Add(new Dictionary<string, object?> { ["result"] = null, ["type"] = "null" });
+        }
+        else if (result.Resp2Type == ResultType.SimpleString || result.Resp2Type == ResultType.BulkString)
+        {
+            results.Add(new Dictionary<string, object?> { ["result"] = (string?)result, ["type"] = "string" });
+        }
+        else if (result.Resp2Type == ResultType.Integer)
+        {
+            results.Add(new Dictionary<string, object?> { ["result"] = (long)result, ["type"] = "integer" });
+        }
+        else if (result.Resp2Type == ResultType.Array)
+        {
+            var arr = (RedisResult[])result!;
+            for (int i = 0; i < arr.Length; i++)
             {
-                ["host"] = host,
-                ["port"] = port,
-                ["connected_at"] = DateTimeOffset.UtcNow
-            };
-
-            return new DefaultConnectionHandle(_tcpClient, connectionInfo);
-        }
-
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            var client = handle.GetConnection<TcpClient>();
-            await Task.Delay(5, ct);
-            return client.Connected;
-        }
-
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            if (_tcpClient != null)
-            {
-                _tcpClient.Close();
-                _tcpClient.Dispose();
-                _tcpClient = null;
-            }
-            await Task.CompletedTask;
-        }
-
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(
-                IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "Redis connection healthy" : "Redis connection unhealthy",
-                Latency: TimeSpan.FromMilliseconds(2),
-                CheckedAt: DateTimeOffset.UtcNow
-            );
-        }
-
-        /// <summary>
-        /// Executes a Redis command using RESP protocol.
-        /// Supports basic commands like GET, KEYS, etc.
-        /// </summary>
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
-            IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
-        {
-            if (_tcpClient == null || !_tcpClient.Connected)
-            {
-                return new List<Dictionary<string, object?>>
+                results.Add(new Dictionary<string, object?>
                 {
-                    new()
-                    {
-                        ["__status"] = "NOT_CONNECTED",
-                        ["__message"] = "Redis connection not established.",
-                        ["__strategy"] = StrategyId
-                    }
-                };
+                    ["index"] = i,
+                    ["value"] = (string?)arr[i],
+                    ["type"] = "array_element"
+                });
             }
+        }
+        else
+        {
+            results.Add(new Dictionary<string, object?> { ["result"] = result.ToString(), ["type"] = "other" });
+        }
 
+        return results;
+    }
+
+    /// <summary>
+    /// Executes a Redis write command (SET, DEL, HSET, etc.).
+    /// </summary>
+    public override async Task<int> ExecuteNonQueryAsync(
+        IConnectionHandle handle,
+        string command,
+        Dictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+        var db = multiplexer.GetDatabase();
+
+        var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var cmd = parts[0].ToUpperInvariant();
+        var args = parts.Skip(1).Select(p => (object)(RedisValue)p).ToArray();
+
+        var result = await db.ExecuteAsync(cmd, args);
+
+        if (result.Resp2Type == ResultType.Integer)
+            return (int)(long)result;
+
+        return result.IsNull ? 0 : 1;
+    }
+
+    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
+        IConnectionHandle handle,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
+
+        var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
+        var server = multiplexer.GetServers().FirstOrDefault();
+
+        var schemas = new List<DataSchema>();
+
+        if (server != null)
+        {
+            // Get database info via INFO keyspace
+            var info = await server.InfoAsync("keyspace");
+            var keyspaceSection = info.FirstOrDefault(s => s.Key == "Keyspace");
+
+            if (keyspaceSection is { Key: not null })
+            {
+                foreach (var entry in keyspaceSection!)
+                {
+                    schemas.Add(new DataSchema(
+                        Name: entry.Key,
+                        Fields:
+                        [
+                            new DataSchemaField("key", "String", false, null, null),
+                            new DataSchemaField("value", "Any", true, null, null),
+                            new DataSchemaField("type", "String", true, null, null),
+                            new DataSchemaField("ttl", "Int64", true, null, null)
+                        ],
+                        PrimaryKeys: ["key"],
+                        Metadata: new Dictionary<string, object> { ["info"] = entry.Value }
+                    ));
+                }
+            }
+        }
+
+        if (schemas.Count == 0)
+        {
+            schemas.Add(new DataSchema(
+                "db0",
+                [
+                    new DataSchemaField("key", "String", false, null, null),
+                    new DataSchemaField("value", "Any", true, null, null),
+                    new DataSchemaField("type", "String", true, null, null),
+                    new DataSchemaField("ttl", "Int64", true, null, null)
+                ],
+                ["key"],
+                new Dictionary<string, object> { ["type"] = "keyspace" }
+            ));
+        }
+
+        return schemas;
+    }
+
+    public override Task<(bool IsValid, string[] Errors)> ValidateConfigAsync(
+        ConnectionConfig config, CancellationToken ct = default)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(config.ConnectionString))
+        {
+            errors.Add("ConnectionString is required for Redis connection.");
+        }
+        else
+        {
             try
             {
-                var stream = _tcpClient.GetStream();
-                var parts = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-                // Build RESP command
-                var respCmd = new StringBuilder();
-                respCmd.Append($"*{parts.Length}\r\n");
-                foreach (var part in parts)
-                {
-                    respCmd.Append($"${part.Length}\r\n{part}\r\n");
-                }
-
-                var cmdBytes = Encoding.UTF8.GetBytes(respCmd.ToString());
-                await stream.WriteAsync(cmdBytes, 0, cmdBytes.Length, ct);
-
-                var buffer = new byte[4096];
-                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
-                var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-
-                var results = new List<Dictionary<string, object?>>();
-
-                // Parse RESP response
-                if (response.StartsWith("+"))
-                {
-                    results.Add(new Dictionary<string, object?>
-                    {
-                        ["result"] = response[1..].TrimEnd('\r', '\n'),
-                        ["type"] = "simple_string"
-                    });
-                }
-                else if (response.StartsWith("-"))
-                {
-                    results.Add(new Dictionary<string, object?>
-                    {
-                        ["__status"] = "ERROR",
-                        ["__message"] = response[1..].TrimEnd('\r', '\n'),
-                        ["__strategy"] = StrategyId
-                    });
-                }
-                else if (response.StartsWith(":"))
-                {
-                    results.Add(new Dictionary<string, object?>
-                    {
-                        ["result"] = long.Parse(response[1..].TrimEnd('\r', '\n')),
-                        ["type"] = "integer"
-                    });
-                }
-                else if (response.StartsWith("$"))
-                {
-                    var lines = response.Split("\r\n");
-                    if (lines.Length > 1 && lines[0] != "$-1")
-                    {
-                        results.Add(new Dictionary<string, object?>
-                        {
-                            ["result"] = lines[1],
-                            ["type"] = "bulk_string"
-                        });
-                    }
-                    else
-                    {
-                        results.Add(new Dictionary<string, object?>
-                        {
-                            ["result"] = null,
-                            ["type"] = "null"
-                        });
-                    }
-                }
-                else if (response.StartsWith("*"))
-                {
-                    var lines = response.Split("\r\n");
-                    var count = int.Parse(lines[0][1..]);
-                    var values = new List<string>();
-                    for (int i = 1; i < lines.Length - 1; i += 2)
-                    {
-                        if (i + 1 < lines.Length && !lines[i].StartsWith("$-1"))
-                        {
-                            values.Add(lines[i + 1]);
-                        }
-                    }
-
-                    foreach (var value in values)
-                    {
-                        results.Add(new Dictionary<string, object?>
-                        {
-                            ["key"] = value,
-                            ["type"] = "array_element"
-                        });
-                    }
-                }
-
-                return results;
+                ConfigurationOptions.Parse(config.ConnectionString);
             }
             catch (Exception ex)
             {
-                return new List<Dictionary<string, object?>>
-                {
-                    new()
-                    {
-                        ["__status"] = "ERROR",
-                        ["__message"] = $"Redis command error: {ex.Message}",
-                        ["__strategy"] = StrategyId
-                    }
-                };
+                errors.Add($"Invalid Redis connection string format: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Executes a Redis write command using RESP protocol.
-        /// </summary>
-        public override async Task<int> ExecuteNonQueryAsync(
-            IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
-        {
-            if (_tcpClient == null || !_tcpClient.Connected)
-                return -1;
+        if (config.Timeout <= TimeSpan.Zero)
+            errors.Add("Timeout must be a positive duration.");
 
-            try
-            {
-                var stream = _tcpClient.GetStream();
-                var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-                // Build RESP command
-                var respCmd = new StringBuilder();
-                respCmd.Append($"*{parts.Length}\r\n");
-                foreach (var part in parts)
-                {
-                    respCmd.Append($"${part.Length}\r\n{part}\r\n");
-                }
-
-                var cmdBytes = Encoding.UTF8.GetBytes(respCmd.ToString());
-                await stream.WriteAsync(cmdBytes, 0, cmdBytes.Length, ct);
-
-                var buffer = new byte[1024];
-                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
-                var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-
-                // Return 1 for success, 0 for null response, -1 for error
-                if (response.StartsWith("+") || response.StartsWith(":"))
-                    return 1;
-                if (response.StartsWith("$-1") || response.StartsWith("*-1"))
-                    return 0;
-                if (response.StartsWith("-"))
-                    return -1;
-
-                return 1;
-            }
-            catch
-            {
-                return -1;
-            }
-        }
-
-        /// <summary>
-        /// Retrieves schema information from Redis using INFO and DBSIZE commands.
-        /// </summary>
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
-        {
-            if (_tcpClient == null || !_tcpClient.Connected)
-                return Array.Empty<DataSchema>();
-
-            try
-            {
-                // Get database info
-                var infoResult = await ExecuteQueryAsync(handle, "INFO keyspace", null, ct);
-                var schemas = new List<DataSchema>();
-
-                // Redis keyspace is schema-less, but we can show available databases
-                schemas.Add(new DataSchema(
-                    "db0",
-                    new[]
-                    {
-                        new DataSchemaField("key", "String", false, null, null),
-                        new DataSchemaField("value", "Any", true, null, null),
-                        new DataSchemaField("type", "String", true, null, null),
-                        new DataSchemaField("ttl", "Int64", true, null, null)
-                    },
-                    new[] { "key" },
-                    new Dictionary<string, object> { ["type"] = "keyspace" }
-                ));
-
-                return schemas;
-            }
-            catch
-            {
-                return Array.Empty<DataSchema>();
-            }
-        }
-
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
-        {
-            var clean = connectionString.Replace("redis://", "").Split('/')[0];
-            var parts = clean.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
-        }
+        return Task.FromResult((errors.Count == 0, errors.ToArray()));
     }
 }
