@@ -169,6 +169,16 @@ namespace DataWarehouse.Kernel
                 _logger?.LogInformation("Configuration loaded from {Path}, preset: {Preset}",
                     DefaultConfigPath, _currentConfiguration.PresetName);
 
+                // INFRA-02: Validate and audit environment variable configuration overrides
+                await ValidateEnvironmentOverridesAsync();
+
+                // INFRA-03: Audit kernel startup event
+                await _auditLog.LogChangeAsync("System", "kernel.lifecycle.startup", null, KernelId,
+                    $"Kernel initialized in {OperatingMode} mode");
+
+                // Subscribe to config change and plugin lifecycle events for audit logging
+                SubscribeToAuditableEvents();
+
                 // Publish startup event
                 await _messageBus.PublishAsync(SystemStartup, new PluginMessage
                 {
@@ -253,6 +263,13 @@ namespace DataWarehouse.Kernel
                 if (plugin is IFeaturePlugin feature && _config.AutoStartFeatures)
                 {
                     _ = StartFeatureInBackgroundAsync(feature, ct);
+                }
+
+                // INFRA-03: Audit plugin registration
+                if (_auditLog != null)
+                {
+                    _ = _auditLog.LogChangeAsync("System", "kernel.plugin.load",
+                        null, plugin.Id, $"Plugin {plugin.Name} ({plugin.Category}) registered");
                 }
 
                 // Publish plugin loaded event
@@ -710,12 +727,125 @@ namespace DataWarehouse.Kernel
             return matrix;
         }
 
+        /// <summary>
+        /// INFRA-02: Security-sensitive configuration keys that cannot be overridden
+        /// via environment variables in production mode.
+        /// </summary>
+        private static readonly HashSet<string> ProtectedConfigKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "DATAWAREHOUSE_REQUIRE_SIGNED_ASSEMBLIES",
+            "DATAWAREHOUSE_VERIFY_SSL",
+            "DATAWAREHOUSE_VERIFY_SSL_CERTIFICATES",
+            "DATAWAREHOUSE_DISABLE_AUTH",
+            "DATAWAREHOUSE_DISABLE_ENCRYPTION",
+            "DATAWAREHOUSE_ALLOW_UNSIGNED_PLUGINS"
+        };
+
+        /// <summary>
+        /// INFRA-02: Configuration keys that trigger a warning when set via environment variables.
+        /// </summary>
+        private static readonly HashSet<string> WarningConfigKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "DATAWAREHOUSE_CREATE_DEFAULT_ADMIN",
+            "DATAWAREHOUSE_DEBUG_MODE",
+            "DATAWAREHOUSE_DISABLE_RATE_LIMITING"
+        };
+
+        /// <summary>
+        /// INFRA-02: Validates environment variable configuration overrides.
+        /// Blocks security-sensitive overrides in production and logs all env var config usage.
+        /// </summary>
+        private async Task ValidateEnvironmentOverridesAsync()
+        {
+            if (_auditLog == null) return;
+
+            var isProduction = _config.OperatingMode == OperatingMode.Server ||
+                               _config.OperatingMode == OperatingMode.Hyperscale;
+
+            var envVars = Environment.GetEnvironmentVariables();
+            foreach (var key in envVars.Keys)
+            {
+                var keyStr = key?.ToString();
+                if (keyStr == null || !keyStr.StartsWith("DATAWAREHOUSE_", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var value = envVars[key!]?.ToString();
+
+                // Block protected keys in production
+                if (isProduction && ProtectedConfigKeys.Contains(keyStr))
+                {
+                    _logger?.LogError(
+                        "SECURITY: Environment variable {Key} cannot override security configuration in production mode (INFRA-02)",
+                        keyStr);
+                    await _auditLog.LogChangeAsync("System", $"env.override.blocked.{keyStr}",
+                        null, "[BLOCKED]",
+                        "Security-sensitive env var override blocked in production mode (INFRA-02)");
+                    continue;
+                }
+
+                // Warn about sensitive keys
+                if (WarningConfigKeys.Contains(keyStr))
+                {
+                    _logger?.LogWarning(
+                        "SECURITY: Environment variable {Key} is overriding configuration. Review for security implications (INFRA-02)",
+                        keyStr);
+                }
+
+                // Audit all DATAWAREHOUSE_ env var overrides
+                await _auditLog.LogChangeAsync("System", $"env.override.{keyStr}",
+                    null, value ?? "[empty]",
+                    "Configuration set via environment variable");
+            }
+        }
+
+        /// <summary>
+        /// INFRA-03: Subscribe to message bus topics for audit logging.
+        /// Logs config changes, plugin load/unload, and security events.
+        /// </summary>
+        private void SubscribeToAuditableEvents()
+        {
+            // Audit config changes
+            _messageBus.Subscribe(ConfigChanged, async msg =>
+            {
+                if (_auditLog == null) return;
+                var path = msg.Payload.TryGetValue("SettingPath", out var p) ? p?.ToString() : "unknown";
+                var oldVal = msg.Payload.TryGetValue("OldValue", out var o) ? o?.ToString() : null;
+                var newVal = msg.Payload.TryGetValue("NewValue", out var n) ? n?.ToString() : null;
+                var user = msg.Payload.TryGetValue("User", out var u) ? u?.ToString() : "System";
+                await _auditLog.LogChangeAsync(user ?? "System", path ?? "config.unknown", oldVal, newVal,
+                    "Configuration change via message bus");
+            });
+
+            // Audit plugin unloads
+            _messageBus.Subscribe(PluginUnloaded, async msg =>
+            {
+                if (_auditLog == null) return;
+                var pluginId = msg.Payload.TryGetValue("PluginId", out var id) ? id?.ToString() : "unknown";
+                await _auditLog.LogChangeAsync("System", "kernel.plugin.unload",
+                    pluginId, null, $"Plugin {pluginId} unloaded");
+            });
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
             _isDisposed = true;
 
             _logger?.LogInformation("Shutting down DataWarehouse Kernel {KernelId}", KernelId);
+
+            // INFRA-03: Audit kernel shutdown event
+            if (_auditLog != null)
+            {
+                try
+                {
+                    _ = _auditLog.LogChangeAsync("System", "kernel.lifecycle.shutdown",
+                        KernelId, null, "Kernel shutting down");
+                }
+                catch
+                {
+                    // Best-effort audit during shutdown
+                }
+            }
 
             // Signal shutdown
             _shutdownCts.Cancel();
