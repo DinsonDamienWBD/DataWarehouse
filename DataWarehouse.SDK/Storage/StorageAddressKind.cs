@@ -52,5 +52,20 @@ public enum StorageAddressKind
     /// <summary>
     /// Extensibility point for custom address schemes (scheme + opaque address string).
     /// </summary>
-    CustomAddress
+    CustomAddress,
+
+    /// <summary>
+    /// dw:// bucket-based address (dw://bucket/path/to/object).
+    /// </summary>
+    DwBucket,
+
+    /// <summary>
+    /// dw:// node-based address (dw://node@hostname/object).
+    /// </summary>
+    DwNode,
+
+    /// <summary>
+    /// dw:// cluster-based address (dw://cluster:name/key).
+    /// </summary>
+    DwCluster
 }

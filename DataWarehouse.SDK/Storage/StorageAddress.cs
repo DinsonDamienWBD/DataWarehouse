@@ -176,6 +176,42 @@ public abstract record StorageAddress
     }
 
     /// <summary>
+    /// Creates a DwBucketAddress for dw://bucket/path addressing.
+    /// </summary>
+    /// <param name="bucket">The bucket name (3-63 chars, lowercase alphanumeric + hyphens, S3-compatible).</param>
+    /// <param name="objectPath">The object path within the bucket.</param>
+    public static StorageAddress FromDwBucket(string bucket, string objectPath)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(bucket);
+        ArgumentNullException.ThrowIfNullOrEmpty(objectPath);
+        return new DwBucketAddress(bucket, objectPath);
+    }
+
+    /// <summary>
+    /// Creates a DwNodeAddress for dw://node@hostname/path addressing.
+    /// </summary>
+    /// <param name="nodeId">The hostname or node identifier.</param>
+    /// <param name="objectPath">The object path on the node.</param>
+    public static StorageAddress FromDwNode(string nodeId, string objectPath)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(nodeId);
+        ArgumentNullException.ThrowIfNullOrEmpty(objectPath);
+        return new DwNodeAddress(nodeId, objectPath);
+    }
+
+    /// <summary>
+    /// Creates a DwClusterAddress for dw://cluster:name/key addressing.
+    /// </summary>
+    /// <param name="clusterName">The cluster name.</param>
+    /// <param name="key">The distributed key within the cluster.</param>
+    public static StorageAddress FromDwCluster(string clusterName, string key)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(clusterName);
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        return new DwClusterAddress(clusterName, key);
+    }
+
+    /// <summary>
     /// Parses a URI into the appropriate StorageAddress variant based on the URI scheme.
     /// </summary>
     /// <remarks>
@@ -207,6 +243,7 @@ public abstract record StorageAddress
             "i2c" => ParseI2cUri(uri),
             "spi" => ParseSpiUri(uri),
             "block" => new BlockDeviceAddress(uri.AbsolutePath.TrimStart('/')),
+            "dw" => DwAddressParser.Parse(uri),
             "http" or "https" or "tcp" or "udp" => new NetworkEndpointAddress(
                 uri.Host,
                 uri.Port > 0 ? uri.Port : uri.Scheme == "https" ? 443 : 80,
