@@ -1085,7 +1085,7 @@ Plans:
 - [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine. **Plans:** 10 plans in 5 waves
 - [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution. **Plans:** 8 plans in 4 waves
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
-- [ ] **Phase 62: Carbon-Aware Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting
+- [ ] **Phase 62: Carbon-Aware Lifecycle Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting. **Plans:** 6 plans in 4 waves
 - [ ] **Phase 63: Universal Fabric + S3 Server** (P4) — dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring
 - [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, verify cross-feature interactions
 - [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
@@ -1269,3 +1269,50 @@ Plans:
   6. Edge inference works offline with local models, improves via federated learning
   7. End-to-end pipeline processes classify -> fidelity -> route -> sync -> conflict-resolve
   8. Full solution builds with 0 errors
+
+#### Phase 61: Chaos Vaccination & Blast Radius
+**Goal**: Build automated fault injection ("chaos vaccination") that proactively tests system resilience, plus blast radius enforcement limiting any single failure's impact. Immune memory for faster recovery of previously-seen failures.
+**Depends on**: Existing UltimateResilience (66 resilience strategies, circuit breakers, bulkheads), SDK resilience contracts (ICircuitBreaker, IBulkheadIsolation, IHealthCheck)
+**Plans**: 7 plans in 5 waves
+
+Plans:
+- [ ] 61-01-PLAN.md — SDK contracts: IChaosInjectionEngine, IBlastRadiusEnforcer, IImmuneResponseSystem, IVaccinationScheduler, IChaosResultsDatabase, ChaosVaccinationTypes
+- [ ] 61-02-PLAN.md — ChaosVaccination plugin scaffold, chaos injection engine, 5 fault injectors (network partition, disk failure, node crash, latency spike, memory pressure)
+- [ ] 61-03-PLAN.md — Blast radius enforcement: isolation zones, failure propagation monitor, auto-abort on breach
+- [ ] 61-04-PLAN.md — Immune response system: fault signature analysis, remediation executor, immune memory with learning
+- [ ] 61-05-PLAN.md — Vaccination scheduler (cron + interval), cron parser, in-memory chaos results database
+- [ ] 61-06-PLAN.md — Integration wiring: connect all sub-components, message bus topics, existing resilience bridge, capabilities + knowledge
+- [ ] 61-07-PLAN.md — Add to solution, full build verification, plugin isolation check
+
+**Success Criteria**:
+  1. ChaosVaccination plugin compiles and registers with kernel
+  2. 5 fault injectors execute real fault simulations via message bus
+  3. Blast radius enforcer creates isolation zones backed by circuit breakers and bulkheads
+  4. Immune response system learns from experiments and auto-remediates known faults
+  5. Vaccination scheduler runs experiments on cron/interval schedules with time windows
+  6. All experiment results stored and queryable with summary statistics
+  7. Plugin crash does not crash kernel, node failure does not corrupt cluster
+  8. Full solution builds with 0 errors, no cross-plugin references
+
+#### Phase 62: Carbon-Aware Lifecycle Tiering
+**Goal**: Measure watts-per-operation for all storage operations, enforce carbon budgets per tenant, place data on renewable-powered backends, enable GHG Protocol-compliant sustainability reporting with real data.
+**Depends on**: Existing UltimateSustainability (45 strategies), CarbonNeutralStorageStrategy, CostAwareRouter patterns, SDK contracts
+**Plans**: 6 plans in 4 waves
+
+Plans:
+- [ ] 62-01-PLAN.md — SDK carbon contracts: CarbonTypes, IEnergyMeasurement, ICarbonBudget, IGreenPlacement, ICarbonReporting
+- [ ] 62-02-PLAN.md — Energy Measurement Engine: RAPL, powercap, cloud provider, estimation strategies + composite service
+- [ ] 62-03-PLAN.md — Carbon Budget Enforcement: per-tenant budgets, persistent store, progressive throttling
+- [ ] 62-04-PLAN.md — Renewable-Aware Placement: WattTime v3 API, ElectricityMaps API, backend green scoring, composite placement service
+- [ ] 62-05-PLAN.md — Green Tiering: cold data detection, carbon-aware migration, policy engine
+- [ ] 62-06-PLAN.md — Carbon Reporting API: GHG Protocol Scope 2/3 reporting, dashboard data, integration tests
+
+**Success Criteria**:
+  1. SDK carbon contracts compile and are usable from any plugin
+  2. Energy measurement cascade (RAPL -> powercap -> cloud -> estimation) produces real watt readings
+  3. Per-tenant carbon budgets enforce soft throttling at 80% and hard rejection at 100%
+  4. WattTime and ElectricityMaps API integrations fetch real-time grid carbon intensity
+  5. Green placement scores backends and routes data to greenest option
+  6. Cold data auto-migrates to lowest-carbon backend during low-carbon windows
+  7. GHG Protocol Scope 2+3 reports generate with correct emission factors
+  8. Full solution builds with 0 errors, all carbon-aware tests pass
