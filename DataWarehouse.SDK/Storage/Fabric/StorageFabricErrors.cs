@@ -5,6 +5,33 @@ using System.IO;
 namespace DataWarehouse.SDK.Storage.Fabric;
 
 /// <summary>
+/// General-purpose exception for storage fabric errors that do not fall into a more specific category.
+/// Serves as the base exception type for fabric operations.
+/// </summary>
+[SdkCompatibility("5.0.0", Notes = "Phase 63: Universal Storage Fabric")]
+public class StorageFabricException : Exception
+{
+    /// <summary>
+    /// Initializes a new instance of <see cref="StorageFabricException"/> with a message.
+    /// </summary>
+    /// <param name="message">A description of the error.</param>
+    public StorageFabricException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="StorageFabricException"/> with a message and inner exception.
+    /// </summary>
+    /// <param name="message">A description of the error.</param>
+    /// <param name="inner">The exception that caused this error.</param>
+    public StorageFabricException(string message, Exception inner)
+        : base(message, inner)
+    {
+    }
+}
+
+/// <summary>
 /// Thrown when no registered backend can handle the specified storage address.
 /// </summary>
 /// <remarks>
