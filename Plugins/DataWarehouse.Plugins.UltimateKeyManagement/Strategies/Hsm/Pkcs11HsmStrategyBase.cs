@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
 using Net.Pkcs11Interop.Common;
 using Net.Pkcs11Interop.HighLevelAPI;
@@ -107,6 +108,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             if (Configuration.TryGetValue("UseUserPin", out var useUserPinObj) && useUserPinObj is bool useUserPin)
                 _config.UseUserPin = useUserPin;
 
+            // Validate configuration
+            if (string.IsNullOrEmpty(_config.LibraryPath))
+                throw new InvalidOperationException($"LibraryPath is required for {VendorName} HSM strategy");
+
+            if (!File.Exists(_config.LibraryPath))
+                throw new InvalidOperationException($"PKCS#11 library not found at: {_config.LibraryPath}");
+
+            if (_config.SlotId.HasValue && _config.SlotId.Value < 0)
+                throw new ArgumentException($"SlotId must be >= 0, got {_config.SlotId.Value}");
+
             // Initialize PKCS#11 library
             await InitializePkcs11Async(cancellationToken);
         }
@@ -179,26 +190,38 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
-            await _sessionLock.WaitAsync(cancellationToken);
-            try
+            var result = await GetCachedHealthAsync(async ct =>
             {
-                if (_session == null || _slot == null)
-                    return false;
+                await _sessionLock.WaitAsync(ct);
+                try
+                {
+                    if (_session == null || _slot == null)
+                        return new StrategyHealthCheckResult(false, $"{VendorName} HSM session not initialized");
 
-                // Verify session is still active by getting session info
-                var sessionInfo = _session.GetSessionInfo();
-                return sessionInfo.State == CKS.CKS_RW_USER_FUNCTIONS ||
-                       sessionInfo.State == CKS.CKS_RW_PUBLIC_SESSION ||
-                       sessionInfo.State == CKS.CKS_RW_SO_FUNCTIONS;
-            }
-            catch
-            {
-                return false;
-            }
-            finally
-            {
-                _sessionLock.Release();
-            }
+                    // Verify session is still active by getting session info
+                    var sessionInfo = _session.GetSessionInfo();
+                    var isHealthy = sessionInfo.State == CKS.CKS_RW_USER_FUNCTIONS ||
+                                   sessionInfo.State == CKS.CKS_RW_PUBLIC_SESSION ||
+                                   sessionInfo.State == CKS.CKS_RW_SO_FUNCTIONS;
+
+                    // Try to read token info
+                    var tokenInfo = _slot.GetTokenInfo();
+
+                    return new StrategyHealthCheckResult(
+                        isHealthy,
+                        isHealthy ? $"{VendorName} HSM operational (token: {tokenInfo.Label.Trim()})" : "HSM session in invalid state");
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+                finally
+                {
+                    _sessionLock.Release();
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken);
+
+            return result.IsHealthy;
         }
 
         public override Task<string> GetCurrentKeyIdAsync()
@@ -345,6 +368,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     Buffer.BlockCopy(iv, 0, result, 0, iv.Length);
                     Buffer.BlockCopy(wrappedKey, 0, result, iv.Length, wrappedKey.Length);
 
+                    IncrementCounter("hsm.encrypt");
                     return result;
                 }
                 finally
@@ -352,6 +376,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     // Clean up temporary key
                     _session.DestroyObject(tempKeyHandle);
                 }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"HSM key wrap failed for KEK '{kekId}'", ex);
             }
             finally
             {
@@ -406,6 +434,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 {
                     // Extract the key value
                     var valueAttr = _session.GetAttributeValue(unwrappedKeyHandle, new List<CKA> { CKA.CKA_VALUE });
+                    IncrementCounter("hsm.sign");
                     return valueAttr[0].GetValueAsByteArray();
                 }
                 finally
@@ -413,6 +442,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     // Clean up temporary key object
                     _session.DestroyObject(unwrappedKeyHandle);
                 }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"HSM key unwrap failed for KEK '{kekId}'", ex);
             }
             finally
             {
@@ -571,12 +604,48 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_UNWRAP, true)
                 };
 
-                return _session.GenerateKey(mechanism, keyAttributes);
+                var handle = _session.GenerateKey(mechanism, keyAttributes);
+                IncrementCounter("hsm.keygen");
+                return handle;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"HSM key generation failed for label '{keyLabel}'", ex);
             }
             finally
             {
                 _sessionLock.Release();
             }
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            var timeout = TimeSpan.FromSeconds(10);
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(timeout);
+
+            if (await _sessionLock.WaitAsync(timeout, cts.Token))
+            {
+                try
+                {
+                    if (_loggedIn && _session != null)
+                    {
+                        try
+                        {
+                            _session.Logout();
+                            _loggedIn = false;
+                        }
+                        catch { /* Best-effort logout */ }
+                    }
+                }
+                finally
+                {
+                    _sessionLock.Release();
+                }
+            }
+
+            await base.ShutdownAsyncCore(cancellationToken);
         }
 
         private IObjectHandle? FindKeyByLabel(string label, CKO objectClass)

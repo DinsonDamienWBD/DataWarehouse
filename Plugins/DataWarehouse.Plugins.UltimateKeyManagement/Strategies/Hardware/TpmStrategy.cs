@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -79,6 +80,23 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 _config.AuthValue = auth;
             if (Configuration.TryGetValue("KeyStoragePath", out var storagePath) && storagePath is string path)
                 _config.KeyStoragePath = path;
+
+            // Validate configuration
+            if (_config.PcrSelection.Length > 0)
+            {
+                foreach (var pcr in _config.PcrSelection)
+                {
+                    if (pcr < 0 || pcr > 23)
+                        throw new ArgumentException($"Invalid PCR index {pcr}. Valid range: 0-23");
+                }
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                var devicePath = string.IsNullOrEmpty(_config.DevicePath) ? "/dev/tpmrm0" : _config.DevicePath;
+                if (!File.Exists(devicePath) && !File.Exists("/dev/tpm0"))
+                    throw new InvalidOperationException($"TPM device not found at {devicePath}");
+            }
 
             await Task.Run(() => InitializeTpm(), cancellationToken);
 
@@ -173,24 +191,70 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
-            await _tpmLock.WaitAsync(cancellationToken);
-            try
+            var result = await GetCachedHealthAsync(async ct =>
             {
-                if (_tpm == null || _disposed)
-                    return false;
+                await _tpmLock.WaitAsync(ct);
+                try
+                {
+                    if (_tpm == null || _disposed)
+                        return new StrategyHealthCheckResult(false, "TPM not initialized or disposed");
 
-                // Try to get TPM properties
-                _tpm.GetCapability(Cap.TpmProperties, (uint)Pt.FamilyIndicator, 1, out ICapabilitiesUnion caps);
-                return caps != null;
-            }
-            catch
+                    // Try to get TPM properties
+                    _tpm.GetCapability(Cap.TpmProperties, (uint)Pt.FamilyIndicator, 1, out ICapabilitiesUnion caps);
+
+                    if (caps == null)
+                        return new StrategyHealthCheckResult(false, "Cannot read TPM capabilities");
+
+                    // Try to read PCR values to verify TPM accessibility
+                    var pcrSelection = CreatePcrSelection();
+                    _tpm.PcrRead(pcrSelection, out _, out Tpm2bDigest[] pcrValues);
+
+                    var isHealthy = pcrValues != null && pcrValues.Length > 0;
+
+                    return new StrategyHealthCheckResult(
+                        isHealthy,
+                        isHealthy ? "TPM 2.0 operational" : "TPM PCR read failed");
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+                finally
+                {
+                    _tpmLock.Release();
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken);
+
+            return result.IsHealthy;
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_tpmLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                return false;
+                try
+                {
+                    // Flush transient objects
+                    if (_tpm != null && !_disposed)
+                    {
+                        try
+                        {
+                            // TPM cleanup - flush any loaded objects
+                            // SRK is persistent, doesn't need flushing
+                        }
+                        catch { /* Best-effort cleanup */ }
+                    }
+
+                    _disposed = true;
+                }
+                finally
+                {
+                    _tpmLock.Release();
+                }
             }
-            finally
-            {
-                _tpmLock.Release();
-            }
+
+            await base.ShutdownAsyncCore(cancellationToken);
         }
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
@@ -204,7 +268,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 }
 
                 // Unseal the key
-                return UnsealKey(sealedBlob);
+                var key = UnsealKey(sealedBlob);
+                IncrementCounter("tpm.unseal");
+                return key;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"TPM unseal failed for key '{keyId}'", ex);
             }
             finally
             {
@@ -225,6 +295,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
                 // Persist sealed blobs to file storage
                 PersistSealedKeyBlobs();
+
+                IncrementCounter("tpm.seal");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"TPM seal failed for key '{keyId}'", ex);
             }
             finally
             {
@@ -426,7 +502,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 Buffer.BlockCopy(iv, 0, result, 0, iv.Length);
                 Buffer.BlockCopy(encrypted, 0, result, iv.Length, encrypted.Length);
 
+                IncrementCounter("tpm.sign");
                 return result;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"TPM key wrap failed for KEK '{kekId}'", ex);
             }
             finally
             {
@@ -462,7 +543,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     iv,
                     out _);
 
+                IncrementCounter("tpm.unseal");
                 return decrypted;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"TPM key unwrap failed for KEK '{kekId}'", ex);
             }
             finally
             {

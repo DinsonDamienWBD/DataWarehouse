@@ -82,8 +82,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             // Validate configuration
             if (string.IsNullOrEmpty(_config.LibraryPath))
                 throw new InvalidOperationException("LibraryPath is required for PKCS#11 HSM strategy");
+
+            if (!File.Exists(_config.LibraryPath))
+                throw new InvalidOperationException($"PKCS#11 library not found at: {_config.LibraryPath}");
+
             if (string.IsNullOrEmpty(_config.Pin))
                 throw new InvalidOperationException("Pin is required for PKCS#11 HSM strategy");
+
+            if (_config.SlotId < 0)
+                throw new ArgumentException($"SlotId must be >= 0, got {_config.SlotId}");
 
             // Initialize PKCS#11 library
             await Task.Run(() => InitializePkcs11(), cancellationToken);
@@ -154,19 +161,63 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
-            try
+            var result = await GetCachedHealthAsync(async ct =>
             {
-                return await Task.Run(() =>
+                try
                 {
-                    EnsureSession();
-                    var info = _slot!.GetTokenInfo();
-                    return info != null;
-                }, cancellationToken);
-            }
-            catch
+                    return await Task.Run(() =>
+                    {
+                        EnsureSession();
+                        var tokenInfo = _slot!.GetTokenInfo();
+                        var sessionInfo = _session!.GetSessionInfo();
+
+                        var isHealthy = tokenInfo != null &&
+                                      (sessionInfo.State == CKS.CKS_RW_USER_FUNCTIONS ||
+                                       sessionInfo.State == CKS.CKS_RW_PUBLIC_SESSION);
+
+                        return new StrategyHealthCheckResult(
+                            isHealthy,
+                            isHealthy ? $"PKCS#11 HSM operational (slot {_config.SlotId})" : "HSM not in operational state");
+                    }, ct);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken);
+
+            return result.IsHealthy;
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            var timeout = TimeSpan.FromSeconds(10);
+            lock (_sessionLock)
             {
-                return false;
+                try
+                {
+                    _session?.Logout();
+                    _session?.Dispose();
+                }
+                catch { /* Best-effort cleanup */ }
+                finally
+                {
+                    _session = null;
+                }
+
+                try
+                {
+                    _pkcs11Library?.Dispose();
+                }
+                catch { /* Best-effort cleanup */ }
+                finally
+                {
+                    _pkcs11Library = null;
+                }
             }
+
+            await base.ShutdownAsyncCore(cancellationToken);
         }
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
@@ -245,25 +296,36 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
             return await Task.Run(() =>
             {
-                EnsureSession();
-
-                var wrappingKey = FindKeyByLabel(kekId)
-                    ?? throw new KeyNotFoundException($"KEK '{kekId}' not found in HSM");
-
-                // Determine wrapping mechanism based on key type
-                var keyType = GetKeyType(wrappingKey);
-
-                if (_config.UseRsaWrapping || keyType == CKK.CKK_RSA)
+                try
                 {
-                    // RSA-OAEP wrapping
-                    using var mechanism = _session!.Factories.MechanismFactory.Create(CKM.CKM_RSA_PKCS_OAEP);
-                    return _session.WrapKey(mechanism, wrappingKey, CreateTemporaryDataKey(dataKey));
+                    EnsureSession();
+
+                    var wrappingKey = FindKeyByLabel(kekId)
+                        ?? throw new KeyNotFoundException($"KEK '{kekId}' not found in HSM");
+
+                    // Determine wrapping mechanism based on key type
+                    var keyType = GetKeyType(wrappingKey);
+
+                    byte[] result;
+                    if (_config.UseRsaWrapping || keyType == CKK.CKK_RSA)
+                    {
+                        // RSA-OAEP wrapping
+                        using var mechanism = _session!.Factories.MechanismFactory.Create(CKM.CKM_RSA_PKCS_OAEP);
+                        result = _session.WrapKey(mechanism, wrappingKey, CreateTemporaryDataKey(dataKey));
+                    }
+                    else
+                    {
+                        // AES Key Wrap with Padding (RFC 5649)
+                        using var mechanism = _session!.Factories.MechanismFactory.Create(CKM.CKM_AES_KEY_WRAP_PAD);
+                        result = _session.WrapKey(mechanism, wrappingKey, CreateTemporaryDataKey(dataKey));
+                    }
+
+                    IncrementCounter("hsm.encrypt");
+                    return result;
                 }
-                else
+                catch (Exception ex)
                 {
-                    // AES Key Wrap with Padding (RFC 5649)
-                    using var mechanism = _session!.Factories.MechanismFactory.Create(CKM.CKM_AES_KEY_WRAP_PAD);
-                    return _session.WrapKey(mechanism, wrappingKey, CreateTemporaryDataKey(dataKey));
+                    throw new InvalidOperationException($"HSM key wrap failed for KEK '{kekId}'", ex);
                 }
             });
         }
@@ -274,50 +336,58 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
             return await Task.Run(() =>
             {
-                EnsureSession();
-
-                var wrappingKey = FindKeyByLabel(kekId)
-                    ?? throw new KeyNotFoundException($"KEK '{kekId}' not found in HSM");
-
-                // Determine unwrapping mechanism based on key type
-                var keyType = GetKeyType(wrappingKey);
-
-                // Attributes for the unwrapped key
-                var unwrappedKeyAttributes = new List<IObjectAttribute>
+                try
                 {
-                    _session!.Factories.ObjectAttributeFactory.Create(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY),
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_KEY_TYPE, CKK.CKK_AES),
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_TOKEN, false), // Session object (temporary)
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_PRIVATE, true),
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_SENSITIVE, false), // Allow extraction
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_EXTRACTABLE, true),
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_ENCRYPT, true),
-                    _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_DECRYPT, true)
-                };
+                    EnsureSession();
 
-                IObjectHandle unwrappedKey;
+                    var wrappingKey = FindKeyByLabel(kekId)
+                        ?? throw new KeyNotFoundException($"KEK '{kekId}' not found in HSM");
 
-                if (_config.UseRsaWrapping || keyType == CKK.CKK_RSA)
-                {
-                    // RSA-OAEP unwrapping
-                    using var mechanism = _session.Factories.MechanismFactory.Create(CKM.CKM_RSA_PKCS_OAEP);
-                    unwrappedKey = _session.UnwrapKey(mechanism, wrappingKey, wrappedKey, unwrappedKeyAttributes);
+                    // Determine unwrapping mechanism based on key type
+                    var keyType = GetKeyType(wrappingKey);
+
+                    // Attributes for the unwrapped key
+                    var unwrappedKeyAttributes = new List<IObjectAttribute>
+                    {
+                        _session!.Factories.ObjectAttributeFactory.Create(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY),
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_KEY_TYPE, CKK.CKK_AES),
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_TOKEN, false), // Session object (temporary)
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_PRIVATE, true),
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_SENSITIVE, false), // Allow extraction
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_EXTRACTABLE, true),
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_ENCRYPT, true),
+                        _session.Factories.ObjectAttributeFactory.Create(CKA.CKA_DECRYPT, true)
+                    };
+
+                    IObjectHandle unwrappedKey;
+
+                    if (_config.UseRsaWrapping || keyType == CKK.CKK_RSA)
+                    {
+                        // RSA-OAEP unwrapping
+                        using var mechanism = _session.Factories.MechanismFactory.Create(CKM.CKM_RSA_PKCS_OAEP);
+                        unwrappedKey = _session.UnwrapKey(mechanism, wrappingKey, wrappedKey, unwrappedKeyAttributes);
+                    }
+                    else
+                    {
+                        // AES Key Wrap with Padding
+                        using var mechanism = _session.Factories.MechanismFactory.Create(CKM.CKM_AES_KEY_WRAP_PAD);
+                        unwrappedKey = _session.UnwrapKey(mechanism, wrappingKey, wrappedKey, unwrappedKeyAttributes);
+                    }
+
+                    // Extract the key value
+                    var valueAttr = _session.GetAttributeValue(unwrappedKey, new List<CKA> { CKA.CKA_VALUE });
+                    var keyValue = valueAttr[0].GetValueAsByteArray();
+
+                    // Destroy the temporary key object
+                    _session.DestroyObject(unwrappedKey);
+
+                    IncrementCounter("hsm.sign");
+                    return keyValue;
                 }
-                else
+                catch (Exception ex)
                 {
-                    // AES Key Wrap with Padding
-                    using var mechanism = _session.Factories.MechanismFactory.Create(CKM.CKM_AES_KEY_WRAP_PAD);
-                    unwrappedKey = _session.UnwrapKey(mechanism, wrappingKey, wrappedKey, unwrappedKeyAttributes);
+                    throw new InvalidOperationException($"HSM key unwrap failed for KEK '{kekId}'", ex);
                 }
-
-                // Extract the key value
-                var valueAttr = _session.GetAttributeValue(unwrappedKey, new List<CKA> { CKA.CKA_VALUE });
-                var keyValue = valueAttr[0].GetValueAsByteArray();
-
-                // Destroy the temporary key object
-                _session.DestroyObject(unwrappedKey);
-
-                return keyValue;
             });
         }
 
