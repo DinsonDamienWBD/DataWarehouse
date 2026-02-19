@@ -1068,7 +1068,7 @@ All executing agents MUST follow these rules:
 - [ ] **Phase 53: Security Wiring** (P2) — Fix ALL 50 pentest findings, wire AccessEnforcementInterceptor, implement IAuthenticatedMessageBus, fix 13 TLS bypasses, path traversal, plugin isolation, inter-node auth. Target: 95+/100 security score
 - [ ] **Phase 54: Feature Gap Closure** (P3) — Close ALL 3,549 feature gaps: 1,155 quick wins (80-99%), 631 medium (50-79%), 1,763 major (<50%) across 17 domains. Target: 0 features below 100%
 - [ ] **Phase 55: Universal Tag System** (P4) — Tag schema registry, polymorphic values, per-tag ACL, propagation, policy engine, CRDT tags, ORSet fix, indexing at 1B scale, tag management, search by tag, sort by tag, group by tag, update/move/delete by tag, tag analysis, tag cleanup, batch tag features
-- [ ] **Phase 56: Data Consciousness** (P4) — AI value/liability scoring, auto-archive, dark data discovery, lineage BFS wiring
+- [ ] **Phase 56: Data Consciousness** (P4) — AI value/liability scoring, auto-archive, dark data discovery, lineage BFS wiring. **Plans:** 7 plans in 4 waves
 - [ ] **Phase 57: Compliance Passports & Sovereignty Mesh** (P4) — Per-object certification, sovereignty zones, cross-border protocol
 - [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API
 - [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine
@@ -1077,9 +1077,9 @@ All executing agents MUST follow these rules:
 - [ ] **Phase 62: Carbon-Aware Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting
 - [ ] **Phase 63: Universal Fabric + S3 Server** (P4) — dw:// namespace, S3-compatible server, cross-language SDKs, real cloud SDK wiring
 - [ ] **Phase 64: Moonshot Integration** (P4) — Wire all 10 moonshots together, verify cross-feature interactions
-- [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Web Console
+- [ ] **Phase 65: Infrastructure** (P5) — Query Engine, Performance Engineering, Test Coverage, Dynamic Capability, Full CLI, Full GUI and Full Web Console - all 3 depending on UltimateInterface, Server-side service and Client-side service daemon to facilitate pub/sub and notification and communication along side actual data transfer
 - [ ] **Phase 66: Cross-Feature Orchestration** (P6) — End-to-end verification, security E2E, full integration testing
-- [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full audit, benchmarks, competitive re-analysis, certification target: CERTIFIED (zero conditions)
+- [ ] **Phase 67: v5.0 Audit & Certification** (P7) — Full audit, benchmarks, competitive re-analysis, first certification target: CERTIFIED (zero conditions), second certification target: Find valid reasons for 'NOT' to certify
 
 ### Phase Details
 
@@ -1159,8 +1159,9 @@ Wave 4 (Verification — depends on all):
 **Success Criteria**:
   1. All 1,155 quick-win features (80-99%) reach 100%
   2. All 631 medium features (50-79%) reach 100%
-  3. Top 150 critical major-gap features (<50%) reach functional implementation
-  4. Full solution builds with 0 errors, 0 warnings
-  5. All existing tests pass with 0 failures
-  6. Updated v5.0 Feature Verification Matrix produced
-  7. Remaining gap inventory documented for follow-up phases
+  3. All 1,763 critical major-gap features (<50%) reach 100%
+  4. All 3,549 features reach 100%
+  5. Full solution builds with 0 errors, 0 warnings
+  6. All existing tests pass with 0 failures
+  7. Updated v5.0 Feature Verification Matrix produced
+  8. Remaining gap inventory documented for follow-up phases
