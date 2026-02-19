@@ -44,6 +44,30 @@ public interface IHashProvider
     Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Production hardening: common input validation for all hash providers.
+/// Maximum stream size: 10 GB to prevent resource exhaustion.
+/// </summary>
+internal static class HashProviderGuards
+{
+    internal const long MaxStreamSizeBytes = 10L * 1024 * 1024 * 1024; // 10 GB
+
+    internal static void ValidateStream(Stream data, string algorithmName)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (!data.CanRead)
+            throw new ArgumentException($"{algorithmName}: Stream must be readable", nameof(data));
+    }
+
+    internal static void ValidateStreamSize(Stream data, string algorithmName)
+    {
+        if (data.CanSeek && data.Length > MaxStreamSizeBytes)
+            throw new ArgumentException(
+                $"{algorithmName}: Stream size {data.Length} exceeds maximum of {MaxStreamSizeBytes} bytes",
+                nameof(data));
+    }
+}
+
 #region T4.16 - SHA-3 Variants
 
 /// <summary>
@@ -71,6 +95,8 @@ public class Sha3_256Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(256);
         var buffer = new byte[8192];
         int bytesRead;
@@ -86,11 +112,14 @@ public class Sha3_256Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(256);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -124,6 +153,8 @@ public class Sha3_384Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(384);
         var buffer = new byte[8192];
         int bytesRead;
@@ -139,11 +170,14 @@ public class Sha3_384Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(384);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -177,6 +211,8 @@ public class Sha3_512Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(512);
         var buffer = new byte[8192];
         int bytesRead;
@@ -192,11 +228,14 @@ public class Sha3_512Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new Sha3Digest(512);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -234,6 +273,8 @@ public class Keccak256Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(256);
         var buffer = new byte[8192];
         int bytesRead;
@@ -249,11 +290,14 @@ public class Keccak256Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(256);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -287,6 +331,8 @@ public class Keccak384Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(384);
         var buffer = new byte[8192];
         int bytesRead;
@@ -302,11 +348,14 @@ public class Keccak384Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(384);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -340,6 +389,8 @@ public class Keccak512Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(512);
         var buffer = new byte[8192];
         int bytesRead;
@@ -355,11 +406,14 @@ public class Keccak512Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         var digest = new KeccakDigest(512);
         var buffer = new byte[8192];
         int bytesRead;
         while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             digest.BlockUpdate(buffer, 0, bytesRead);
         }
         var result = new byte[HashSizeBytes];
@@ -1097,6 +1151,8 @@ public class Sha256Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         using var sha = SHA256.Create();
         return sha.ComputeHash(data);
     }
@@ -1104,6 +1160,8 @@ public class Sha256Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         return await SHA256.HashDataAsync(data, ct);
     }
 }
@@ -1128,6 +1186,8 @@ public class Sha384Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         using var sha = SHA384.Create();
         return sha.ComputeHash(data);
     }
@@ -1135,6 +1195,8 @@ public class Sha384Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         return await SHA384.HashDataAsync(data, ct);
     }
 }
@@ -1159,6 +1221,8 @@ public class Sha512Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         using var sha = SHA512.Create();
         return sha.ComputeHash(data);
     }
@@ -1166,6 +1230,8 @@ public class Sha512Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
+        HashProviderGuards.ValidateStream(data, AlgorithmName);
+        HashProviderGuards.ValidateStreamSize(data, AlgorithmName);
         return await SHA512.HashDataAsync(data, ct);
     }
 }

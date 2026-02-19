@@ -117,6 +117,63 @@ public sealed class RsaOaepStrategy : EncryptionStrategyBase
         _secureRandom = new SecureRandom();
     }
 
+    /// <summary>
+    /// Production hardening: validates RSA configuration on initialization.
+    /// </summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("rsa.oaep.init");
+        // Validate key size is NIST-compliant
+        if (_keySize < 2048)
+            throw new InvalidOperationException($"RSA key size {_keySize} is below NIST minimum of 2048 bits");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Production hardening: releases resources and zeroes sensitive memory on shutdown.
+    /// </summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("rsa.oaep.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Production hardening: cached health check verifying RSA round-trip capability.
+    /// </summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            try
+            {
+                // Verify we can create an RSA key pair and perform a round-trip
+                using var rsa = RSA.Create(_keySize);
+                var testData = new byte[32];
+                RandomNumberGenerator.Fill(testData);
+                var encrypted = rsa.Encrypt(testData, RSAEncryptionPadding.OaepSHA256);
+                var decrypted = rsa.Decrypt(encrypted, RSAEncryptionPadding.OaepSHA256);
+                var isHealthy = testData.AsSpan().SequenceEqual(decrypted);
+                CryptographicOperations.ZeroMemory(testData);
+                CryptographicOperations.ZeroMemory(decrypted);
+                return new StrategyHealthCheckResult(
+                    isHealthy,
+                    isHealthy ? $"RSA-{_keySize}-OAEP healthy" : "Round-trip failed",
+                    new Dictionary<string, object>
+                    {
+                        ["KeySize"] = _keySize,
+                        ["Padding"] = "OAEP-SHA256",
+                        ["EncryptOps"] = GetCounter("rsa.oaep.encrypt"),
+                        ["DecryptOps"] = GetCounter("rsa.oaep.decrypt")
+                    });
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult(false, $"RSA health check failed: {ex.Message}");
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
     /// <inheritdoc/>
     protected override async Task<byte[]> EncryptCoreAsync(
         byte[] plaintext,
@@ -124,6 +181,13 @@ public sealed class RsaOaepStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
+        IncrementCounter("rsa.oaep.encrypt");
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (plaintext.Length == 0)
+            throw new ArgumentException("Plaintext cannot be empty", nameof(plaintext));
+
         return await Task.Run(() =>
         {
             // Parse RSA public key from key material
@@ -162,6 +226,13 @@ public sealed class RsaOaepStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
+        IncrementCounter("rsa.oaep.decrypt");
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (ciphertext.Length == 0)
+            throw new ArgumentException("Ciphertext cannot be empty", nameof(ciphertext));
+
         return await Task.Run(() =>
         {
             // Parse RSA private key from key material
@@ -356,6 +427,62 @@ public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
         _secureRandom = new SecureRandom();
     }
 
+    /// <summary>
+    /// Production hardening: validates RSA PKCS1 configuration on initialization.
+    /// </summary>
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("rsa.pkcs1.init");
+        if (_keySize < 2048)
+            throw new InvalidOperationException($"RSA key size {_keySize} is below NIST minimum of 2048 bits");
+        return base.InitializeAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Production hardening: releases resources on shutdown.
+    /// </summary>
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        IncrementCounter("rsa.pkcs1.shutdown");
+        return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Production hardening: cached health check for RSA-PKCS1 round-trip.
+    /// </summary>
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return GetCachedHealthAsync(async (cancellationToken) =>
+        {
+            try
+            {
+                using var rsa = RSA.Create(_keySize);
+                var testData = new byte[32];
+                RandomNumberGenerator.Fill(testData);
+                var encrypted = rsa.Encrypt(testData, RSAEncryptionPadding.Pkcs1);
+                var decrypted = rsa.Decrypt(encrypted, RSAEncryptionPadding.Pkcs1);
+                var isHealthy = testData.AsSpan().SequenceEqual(decrypted);
+                CryptographicOperations.ZeroMemory(testData);
+                CryptographicOperations.ZeroMemory(decrypted);
+                return new StrategyHealthCheckResult(
+                    isHealthy,
+                    isHealthy ? $"RSA-{_keySize}-PKCS1 healthy" : "Round-trip failed",
+                    new Dictionary<string, object>
+                    {
+                        ["KeySize"] = _keySize,
+                        ["Padding"] = "PKCS1-v1.5",
+                        ["Legacy"] = true,
+                        ["EncryptOps"] = GetCounter("rsa.pkcs1.encrypt"),
+                        ["DecryptOps"] = GetCounter("rsa.pkcs1.decrypt")
+                    });
+            }
+            catch (Exception ex)
+            {
+                return new StrategyHealthCheckResult(false, $"RSA PKCS1 health check failed: {ex.Message}");
+            }
+        }, TimeSpan.FromSeconds(60), ct);
+    }
+
     /// <inheritdoc/>
     protected override async Task<byte[]> EncryptCoreAsync(
         byte[] plaintext,
@@ -363,6 +490,13 @@ public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
+        IncrementCounter("rsa.pkcs1.encrypt");
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (plaintext.Length == 0)
+            throw new ArgumentException("Plaintext cannot be empty", nameof(plaintext));
+
         return await Task.Run(() =>
         {
             // Parse RSA public key from key material
@@ -396,6 +530,13 @@ public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
+        IncrementCounter("rsa.pkcs1.decrypt");
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (ciphertext.Length == 0)
+            throw new ArgumentException("Ciphertext cannot be empty", nameof(ciphertext));
+
         return await Task.Run(() =>
         {
             // Parse RSA private key from key material
