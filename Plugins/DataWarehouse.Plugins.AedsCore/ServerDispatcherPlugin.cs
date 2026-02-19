@@ -38,6 +38,9 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     private readonly ConcurrentDictionary<string, Task> _activeJobs = new();
     private readonly SemaphoreSlim _queueLock = new(1, 1);
     private int _jobCounter = 0;
+    private const int MaxQueueDepth = 10_000;
+    private long _totalJobsProcessed;
+    private long _totalJobsFailed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ServerDispatcherPlugin"/> class.
@@ -66,6 +69,12 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         await _queueLock.WaitAsync(ct);
         try
         {
+            if (_jobs.Count >= MaxQueueDepth)
+            {
+                _logger.LogWarning("Job queue depth limit reached ({MaxDepth}). Rejecting new job.", MaxQueueDepth);
+                throw new InvalidOperationException($"Job queue is full ({MaxQueueDepth} jobs). Cannot accept new jobs.");
+            }
+
             var jobId = $"job-{Interlocked.Increment(ref _jobCounter):D8}";
 
             var job = new DistributionJob(

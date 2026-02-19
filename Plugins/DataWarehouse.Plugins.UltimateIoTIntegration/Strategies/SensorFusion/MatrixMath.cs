@@ -19,6 +19,8 @@ public sealed class Matrix
     /// <param name="cols">Number of columns.</param>
     public Matrix(int rows, int cols)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rows);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cols);
         Rows = rows;
         Cols = cols;
         _data = new double[rows, cols];
@@ -30,6 +32,7 @@ public sealed class Matrix
     /// <param name="data">Initial matrix data.</param>
     public Matrix(double[,] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
         Rows = data.GetLength(0);
         Cols = data.GetLength(1);
         _data = (double[,])data.Clone();

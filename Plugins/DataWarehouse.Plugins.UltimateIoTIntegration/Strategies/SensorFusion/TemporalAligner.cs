@@ -23,6 +23,8 @@ public sealed class TemporalAligner
     /// <param name="toleranceMs">Maximum time difference (ms) for alignment (default 1.0ms).</param>
     public TemporalAligner(int maxBufferSize = 100, double toleranceMs = 1.0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBufferSize);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(toleranceMs);
         _maxBufferSize = maxBufferSize;
         _toleranceMs = toleranceMs;
     }

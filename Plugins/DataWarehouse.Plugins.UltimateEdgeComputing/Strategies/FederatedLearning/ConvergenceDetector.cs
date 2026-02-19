@@ -21,6 +21,8 @@ public sealed class ConvergenceDetector
     /// <param name="patience">Number of consecutive rounds with small loss change to consider converged.</param>
     public ConvergenceDetector(double lossThreshold = 0.001, int patience = 5)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(lossThreshold);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(patience);
         _lossThreshold = lossThreshold;
         _patience = patience;
     }

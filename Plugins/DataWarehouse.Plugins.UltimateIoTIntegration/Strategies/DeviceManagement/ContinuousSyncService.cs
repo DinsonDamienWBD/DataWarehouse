@@ -124,6 +124,7 @@ internal class BoundedList<T>
 
     public BoundedList(int maxSize)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxSize);
         _maxSize = maxSize;
     }
 

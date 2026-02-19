@@ -18,6 +18,7 @@ public sealed class DifferentialPrivacyIntegration
     /// <param name="initialBudget">Initial privacy budget (epsilon).</param>
     public DifferentialPrivacyIntegration(double initialBudget = 10.0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialBudget);
         _remainingBudget = initialBudget;
     }
 
