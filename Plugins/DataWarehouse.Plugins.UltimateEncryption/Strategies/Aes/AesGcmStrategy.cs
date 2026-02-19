@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Aes;
@@ -112,10 +113,10 @@ public sealed class AesGcmStrategy : EncryptionStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override ValueTask DisposeAsyncCore()
+    protected override async ValueTask DisposeAsyncCore()
     {
         // No async disposal needed
-        return ValueTask.CompletedTask;
+        await base.DisposeAsyncCore();
     }
 
     /// <inheritdoc/>
@@ -239,30 +240,17 @@ public sealed class Aes128GcmStrategy : EncryptionStrategyBase
 
                 var success = testPlaintext.SequenceEqual(testDecrypted);
 
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = success,
-                    Message = success ? "AES-128-GCM operational" : "Round-trip test failed",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(
+                    success,
+                    success ? "AES-128-GCM operational" : "Round-trip test failed");
             }
             catch (PlatformNotSupportedException)
             {
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = false,
-                    Message = "AES-GCM not available on this platform",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(false, "AES-GCM not available on this platform");
             }
             catch (Exception ex)
             {
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = false,
-                    Message = $"Health check failed: {ex.Message}",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
             }
         }, TimeSpan.FromSeconds(60), ct);
     }
@@ -274,9 +262,9 @@ public sealed class Aes128GcmStrategy : EncryptionStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override ValueTask DisposeAsyncCore()
+    protected override async ValueTask DisposeAsyncCore()
     {
-        return ValueTask.CompletedTask;
+        await base.DisposeAsyncCore();
     }
 
     /// <inheritdoc/>
@@ -392,30 +380,17 @@ public sealed class Aes192GcmStrategy : EncryptionStrategyBase
 
                 var success = testPlaintext.SequenceEqual(testDecrypted);
 
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = success,
-                    Message = success ? "AES-192-GCM operational" : "Round-trip test failed",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(
+                    success,
+                    success ? "AES-192-GCM operational" : "Round-trip test failed");
             }
             catch (PlatformNotSupportedException)
             {
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = false,
-                    Message = "AES-GCM not available on this platform",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(false, "AES-GCM not available on this platform");
             }
             catch (Exception ex)
             {
-                return new StrategyHealthCheckResult
-                {
-                    IsHealthy = false,
-                    Message = $"Health check failed: {ex.Message}",
-                    CheckedAt = DateTime.UtcNow
-                };
+                return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
             }
         }, TimeSpan.FromSeconds(60), ct);
     }
@@ -427,9 +402,9 @@ public sealed class Aes192GcmStrategy : EncryptionStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override ValueTask DisposeAsyncCore()
+    protected override async ValueTask DisposeAsyncCore()
     {
-        return ValueTask.CompletedTask;
+        await base.DisposeAsyncCore();
     }
 
     /// <inheritdoc/>
