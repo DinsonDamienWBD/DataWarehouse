@@ -5,6 +5,7 @@ using DataWarehouse.SDK.VirtualDiskEngine.Container;
 using DataWarehouse.SDK.VirtualDiskEngine.CopyOnWrite;
 using DataWarehouse.SDK.VirtualDiskEngine.Index;
 using DataWarehouse.SDK.VirtualDiskEngine.Integrity;
+using DataWarehouse.SDK.VirtualDiskEngine.Concurrency;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using DataWarehouse.SDK.VirtualDiskEngine.Metadata;
 using System;
@@ -27,7 +28,8 @@ namespace DataWarehouse.SDK.VirtualDiskEngine;
 public sealed class VirtualDiskEngine : IAsyncDisposable
 {
     private readonly VdeOptions _options;
-    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly StripedWriteLock _stripedLock = new(64);
+    private readonly SemaphoreSlim _checkpointLock = new(1, 1);
     private bool _disposed;
     private bool _initialized;
 
@@ -203,117 +205,111 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(data);
 
-        await _writeLock.WaitAsync(ct);
+        await using var writeRegion = await _stripedLock.AcquireAsync(key, ct);
+
+        // Map key to VDE path (prefix with root directory)
+        string vdePath = KeyToVdePath(key);
+
+        // Begin WAL transaction
+        await using var txn = await _wal!.BeginTransactionAsync(ct);
+
+        // Create or get existing file inode
+        Inode fileInode;
+        var existingInode = await _namespaceTree!.ResolvePathAsync(vdePath, ct);
+
+        if (existingInode != null)
+        {
+            // Update existing file
+            fileInode = existingInode;
+        }
+        else
+        {
+            // Create new file
+            fileInode = await _namespaceTree.CreateFileAsync(vdePath, InodePermissions.OwnerAll, ct);
+        }
+
+        // Read data stream in block-sized chunks and write to disk
+        var blockPointers = new List<long>();
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(_options.BlockSize);
         try
         {
-            // Map key to VDE path (prefix with root directory)
-            string vdePath = KeyToVdePath(key);
+            long totalBytesRead = 0;
+            int bytesRead;
 
-            // Begin WAL transaction
-            await using var txn = await _wal!.BeginTransactionAsync(ct);
-
-            // Create or get existing file inode
-            Inode fileInode;
-            var existingInode = await _namespaceTree!.ResolvePathAsync(vdePath, ct);
-
-            if (existingInode != null)
+            while ((bytesRead = await data.ReadAsync(buffer.AsMemory(0, _options.BlockSize), ct)) > 0)
             {
-                // Update existing file
-                fileInode = existingInode;
+                // Pad last block if needed
+                if (bytesRead < _options.BlockSize)
+                {
+                    Array.Clear(buffer, bytesRead, _options.BlockSize - bytesRead);
+                }
+
+                // Allocate block
+                long blockNumber = _allocator!.AllocateBlock(ct);
+
+                // Write data via CoW engine
+                long actualBlockNumber = await _cowEngine!.WriteBlockCowAsync(blockNumber, buffer.AsMemory(0, _options.BlockSize), ct);
+
+                // Compute and store checksum
+                ulong checksum = _checksummer!.ComputeChecksum(buffer.AsSpan(0, _options.BlockSize));
+                await _checksummer.StoreChecksumAsync(actualBlockNumber, checksum, ct);
+
+                blockPointers.Add(actualBlockNumber);
+                totalBytesRead += bytesRead;
             }
-            else
+
+            // Update inode with block pointers
+            if (blockPointers.Count > Inode.DirectBlockCount)
             {
-                // Create new file
-                fileInode = await _namespaceTree.CreateFileAsync(vdePath, InodePermissions.OwnerAll, ct);
+                throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
             }
 
-            // Read data stream in block-sized chunks and write to disk
-            var blockPointers = new List<long>();
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(_options.BlockSize);
-            try
+            for (int i = 0; i < blockPointers.Count && i < Inode.DirectBlockCount; i++)
             {
-                long totalBytesRead = 0;
-                int bytesRead;
-
-                while ((bytesRead = await data.ReadAsync(buffer.AsMemory(0, _options.BlockSize), ct)) > 0)
-                {
-                    // Pad last block if needed
-                    if (bytesRead < _options.BlockSize)
-                    {
-                        Array.Clear(buffer, bytesRead, _options.BlockSize - bytesRead);
-                    }
-
-                    // Allocate block
-                    long blockNumber = _allocator!.AllocateBlock(ct);
-
-                    // Write data via CoW engine
-                    long actualBlockNumber = await _cowEngine!.WriteBlockCowAsync(blockNumber, buffer.AsMemory(0, _options.BlockSize), ct);
-
-                    // Compute and store checksum
-                    ulong checksum = _checksummer!.ComputeChecksum(buffer.AsSpan(0, _options.BlockSize));
-                    await _checksummer.StoreChecksumAsync(actualBlockNumber, checksum, ct);
-
-                    blockPointers.Add(actualBlockNumber);
-                    totalBytesRead += bytesRead;
-                }
-
-                // Update inode with block pointers
-                if (blockPointers.Count > Inode.DirectBlockCount)
-                {
-                    throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
-                }
-
-                for (int i = 0; i < blockPointers.Count && i < Inode.DirectBlockCount; i++)
-                {
-                    fileInode.DirectBlockPointers[i] = blockPointers[i];
-                }
-
-                fileInode.Size = totalBytesRead;
-                fileInode.ModifiedUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                await _inodeTable!.UpdateInodeAsync(fileInode, ct);
-
-                // Store metadata as extended attributes
-                if (metadata != null)
-                {
-                    foreach (var kvp in metadata)
-                    {
-                        byte[] valueBytes = Encoding.UTF8.GetBytes(kvp.Value);
-                        await _inodeTable.SetExtendedAttributeAsync(fileInode.InodeNumber, kvp.Key, valueBytes, ct);
-                    }
-                }
-
-                // Index key in B-Tree (key bytes -> inode number)
-                byte[] keyBytes = Encoding.UTF8.GetBytes(key);
-                await _keyIndex!.InsertAsync(keyBytes, fileInode.InodeNumber, ct);
-
-                // Commit WAL transaction
-                await txn.CommitAsync(ct);
-
-                // Auto-checkpoint if WAL utilization exceeds threshold
-                if (_wal.WalUtilization * 100 >= _options.CheckpointWalUtilizationPercent)
-                {
-                    await CheckpointAsync(ct);
-                }
-
-                // Return metadata
-                return new StorageObjectMetadata
-                {
-                    Key = key,
-                    Size = totalBytesRead,
-                    Created = DateTimeOffset.FromUnixTimeSeconds(fileInode.CreatedUtc).UtcDateTime,
-                    Modified = DateTimeOffset.FromUnixTimeSeconds(fileInode.ModifiedUtc).UtcDateTime,
-                    ETag = $"inode-{fileInode.InodeNumber}",
-                    Tier = Contracts.Storage.StorageTier.Hot
-                };
+                fileInode.DirectBlockPointers[i] = blockPointers[i];
             }
-            finally
+
+            fileInode.Size = totalBytesRead;
+            fileInode.ModifiedUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            await _inodeTable!.UpdateInodeAsync(fileInode, ct);
+
+            // Store metadata as extended attributes
+            if (metadata != null)
             {
-                ArrayPool<byte>.Shared.Return(buffer);
+                foreach (var kvp in metadata)
+                {
+                    byte[] valueBytes = Encoding.UTF8.GetBytes(kvp.Value);
+                    await _inodeTable.SetExtendedAttributeAsync(fileInode.InodeNumber, kvp.Key, valueBytes, ct);
+                }
             }
+
+            // Index key in B-Tree (key bytes -> inode number)
+            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+            await _keyIndex!.InsertAsync(keyBytes, fileInode.InodeNumber, ct);
+
+            // Commit WAL transaction
+            await txn.CommitAsync(ct);
+
+            // Auto-checkpoint if WAL utilization exceeds threshold
+            if (_wal.WalUtilization * 100 >= _options.CheckpointWalUtilizationPercent)
+            {
+                await CheckpointAsync(ct);
+            }
+
+            // Return metadata
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = totalBytesRead,
+                Created = DateTimeOffset.FromUnixTimeSeconds(fileInode.CreatedUtc).UtcDateTime,
+                Modified = DateTimeOffset.FromUnixTimeSeconds(fileInode.ModifiedUtc).UtcDateTime,
+                ETag = $"inode-{fileInode.InodeNumber}",
+                Tier = Contracts.Storage.StorageTier.Hot
+            };
         }
         finally
         {
-            _writeLock.Release();
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
@@ -413,59 +409,53 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
         ArgumentNullException.ThrowIfNull(key);
 
-        await _writeLock.WaitAsync(ct);
-        try
+        await using var writeRegion = await _stripedLock.AcquireAsync(key, ct);
+
+        // Lookup key in B-Tree
+        byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+        long? inodeNumber = await _keyIndex!.LookupAsync(keyBytes, ct);
+
+        if (inodeNumber == null)
         {
-            // Lookup key in B-Tree
-            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
-            long? inodeNumber = await _keyIndex!.LookupAsync(keyBytes, ct);
-
-            if (inodeNumber == null)
-            {
-                // Key doesn't exist - idempotent delete
-                return;
-            }
-
-            // Begin WAL transaction
-            await using var txn = await _wal!.BeginTransactionAsync(ct);
-
-            // Get inode to collect block numbers
-            Inode? inode = await _inodeTable!.GetInodeAsync(inodeNumber.Value, ct);
-            if (inode != null)
-            {
-                // Collect all block numbers
-                var blockNumbers = new List<long>();
-                for (int i = 0; i < Inode.DirectBlockCount; i++)
-                {
-                    if (inode.DirectBlockPointers[i] > 0)
-                    {
-                        blockNumbers.Add(inode.DirectBlockPointers[i]);
-                    }
-                }
-
-                // Decrement ref counts (will free blocks with refCount == 0)
-                await _spaceReclaimer!.ReclaimBlocksAsync(blockNumbers, ct);
-            }
-
-            // Delete from namespace tree
-            string vdePath = KeyToVdePath(key);
-            await _namespaceTree!.DeleteAsync(vdePath, ct);
-
-            // Remove from B-Tree
-            await _keyIndex.DeleteAsync(keyBytes, ct);
-
-            // Commit WAL transaction
-            await txn.CommitAsync(ct);
-
-            // Auto-checkpoint if needed
-            if (_wal.WalUtilization * 100 >= _options.CheckpointWalUtilizationPercent)
-            {
-                await CheckpointAsync(ct);
-            }
+            // Key doesn't exist - idempotent delete
+            return;
         }
-        finally
+
+        // Begin WAL transaction
+        await using var txn = await _wal!.BeginTransactionAsync(ct);
+
+        // Get inode to collect block numbers
+        Inode? inode = await _inodeTable!.GetInodeAsync(inodeNumber.Value, ct);
+        if (inode != null)
         {
-            _writeLock.Release();
+            // Collect all block numbers
+            var blockNumbers = new List<long>();
+            for (int i = 0; i < Inode.DirectBlockCount; i++)
+            {
+                if (inode.DirectBlockPointers[i] > 0)
+                {
+                    blockNumbers.Add(inode.DirectBlockPointers[i]);
+                }
+            }
+
+            // Decrement ref counts (will free blocks with refCount == 0)
+            await _spaceReclaimer!.ReclaimBlocksAsync(blockNumbers, ct);
+        }
+
+        // Delete from namespace tree
+        string vdePath = KeyToVdePath(key);
+        await _namespaceTree!.DeleteAsync(vdePath, ct);
+
+        // Remove from B-Tree
+        await _keyIndex.DeleteAsync(keyBytes, ct);
+
+        // Commit WAL transaction
+        await txn.CommitAsync(ct);
+
+        // Auto-checkpoint if needed
+        if (_wal.WalUtilization * 100 >= _options.CheckpointWalUtilizationPercent)
+        {
+            await CheckpointAsync(ct);
         }
     }
 
@@ -670,6 +660,8 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
     /// <summary>
     /// Writes a checkpoint: flushes all dirty data, commits WAL, updates superblock.
+    /// Uses a dedicated checkpoint lock (separate from striped write locks) to serialize
+    /// checkpoint operations without blocking per-key writes.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     public async Task CheckpointAsync(CancellationToken ct = default)
@@ -677,7 +669,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ThrowIfNotInitialized();
 
-        await _writeLock.WaitAsync(ct);
+        await _checkpointLock.WaitAsync(ct);
         try
         {
             // Flush all subsystems
@@ -692,7 +684,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         }
         finally
         {
-            _writeLock.Release();
+            _checkpointLock.Release();
         }
     }
 
@@ -725,7 +717,8 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             await _container.DisposeAsync();
         }
 
-        _writeLock.Dispose();
+        await _stripedLock.DisposeAsync();
+        _checkpointLock.Dispose();
     }
 
     #endregion
