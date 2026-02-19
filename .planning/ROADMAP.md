@@ -1383,3 +1383,34 @@ Wave 4 (Final gate):
   9. No performance regressions from v4.5 baseline
   10. 20+ integration tests passing
   11. INTEGRATION-FINAL-REPORT.md recommends PROCEED to Phase 67
+
+#### Phase 64: Moonshot Integration & Cross-Moonshot Orchestration
+**Goal**: Wire all 10 moonshot features (Phases 55-63) together into coherent end-to-end flows. Ensure moonshots that depend on each other work as an integrated system. Add cross-moonshot orchestration pipeline, unified dashboard, independent health probes, and full configuration with strategy selection and Instance->Tenant->User hierarchy.
+**Depends on**: Phases 55-63 (all 10 moonshot features implemented)
+**Plans**: 7 plans in 4 waves
+
+Wave 1 (SDK Foundation — independent):
+- [ ] 64-01-PLAN.md — SDK orchestration types: IMoonshotOrchestrator, MoonshotRegistry, IMoonshotHealthProbe, MoonshotDashboardTypes
+- [ ] 64-02-PLAN.md — Moonshot configuration: MoonshotConfiguration with hierarchy, AllowUserToOverride, defaults, validator
+
+Wave 2 (Pipeline + Health — depends on Wave 1):
+- [ ] 64-03-PLAN.md — Cross-moonshot orchestration pipeline: MoonshotOrchestrator, 10 pipeline stages, default pipeline definition
+- [ ] 64-04-PLAN.md — Moonshot health probes: 10 independent probes + health aggregator
+
+Wave 3 (Dashboard + Wiring — depends on Waves 2):
+- [ ] 64-05-PLAN.md — Moonshot dashboard: metrics collector, dashboard provider, dashboard strategy
+- [ ] 64-06-PLAN.md — Cross-moonshot event wiring: 7 bidirectional wires (tags+consciousness, compliance+sovereignty, etc.)
+
+Wave 4 (Verification — depends on all):
+- [ ] 64-07-PLAN.md — Integration tests: 10 end-to-end pipeline tests, config validation, health probes, cross-wiring
+
+**Success Criteria**:
+  1. Data ingest triggers full moonshot pipeline: consciousness -> tags -> compliance -> sovereignty -> placement -> timelocks -> sync -> chaos -> carbon -> fabric
+  2. Disabled moonshots are skipped gracefully without breaking the pipeline
+  3. Stage failures are captured but do not halt the pipeline (fail-open with logging)
+  4. Unified dashboard shows all 10 moonshot statuses, metrics, health, and trends
+  5. Each moonshot has independent health/readiness probes (Ready/Degraded/Faulted)
+  6. Configuration supports Instance->Tenant->User hierarchy with Locked/TenantOverridable/UserOverridable policies
+  7. Cross-moonshot event wiring: consciousness->tags, sovereignty->compliance, carbon->placement, compliance->timelocks, chaos->sovereignty, placement->fabric
+  8. 30+ integration tests pass covering pipeline, config, health, and wiring
+  9. Full solution builds with 0 errors, all tests pass
