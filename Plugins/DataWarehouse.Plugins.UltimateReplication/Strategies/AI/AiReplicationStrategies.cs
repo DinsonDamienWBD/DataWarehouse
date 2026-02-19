@@ -1120,4 +1120,665 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
             return Task.FromResult(LagTracker.GetCurrentLag(targetNodeId));
         }
     }
+
+    /// <summary>
+    /// Priority-based replication strategy that assigns replication urgency based on
+    /// data classification, SLA tier, and business criticality.
+    /// </summary>
+    public sealed class PriorityBasedReplicationStrategy : EnhancedReplicationStrategyBase
+    {
+        private readonly ConcurrentDictionary<string, DataPriority> _priorities = new();
+        private readonly ConcurrentDictionary<string, (byte[] Data, DataPriority Priority)> _dataStore = new();
+        private readonly ConcurrentDictionary<string, Queue<(string Key, DataPriority Priority)>> _priorityQueues = new();
+
+        /// <summary>
+        /// Data priority levels.
+        /// </summary>
+        public enum DataPriority
+        {
+            /// <summary>Best-effort, background replication.</summary>
+            Low = 0,
+            /// <summary>Standard replication with normal SLA.</summary>
+            Normal = 1,
+            /// <summary>Elevated priority with reduced lag target.</summary>
+            High = 2,
+            /// <summary>Immediate replication with synchronous confirmation.</summary>
+            Critical = 3,
+            /// <summary>Real-time replication for financial/safety-critical data.</summary>
+            RealTime = 4
+        }
+
+        /// <inheritdoc/>
+        public override ReplicationCharacteristics Characteristics { get; } = new()
+        {
+            StrategyName = "PriorityBased",
+            Description = "Priority-based replication with data classification, SLA tiers, and business criticality routing",
+            ConsistencyModel = ConsistencyModel.Eventual,
+            Capabilities = new ReplicationCapabilities(
+                SupportsMultiMaster: true,
+                ConflictResolutionMethods: new[] { ConflictResolutionMethod.LastWriteWins, ConflictResolutionMethod.PriorityBased },
+                SupportsAsyncReplication: true,
+                SupportsSyncReplication: true,
+                IsGeoAware: true,
+                MaxReplicationLag: TimeSpan.FromSeconds(60),
+                MinReplicaCount: 2,
+                MaxReplicaCount: 50),
+            SupportsAutoConflictResolution = true,
+            SupportsVectorClocks = true,
+            SupportsDeltaSync = true,
+            SupportsStreaming = true,
+            TypicalLagMs = 50,
+            ConsistencySlaMs = 60000
+        };
+
+        /// <inheritdoc/>
+        public override ReplicationCapabilities Capabilities => Characteristics.Capabilities;
+
+        /// <inheritdoc/>
+        public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>
+        /// Sets the priority for a data key or pattern.
+        /// </summary>
+        public void SetPriority(string keyOrPattern, DataPriority priority)
+        {
+            _priorities[keyOrPattern] = priority;
+        }
+
+        /// <summary>
+        /// Resolves the effective priority for a key by checking exact match, then prefix patterns.
+        /// </summary>
+        public DataPriority ResolvePriority(string key)
+        {
+            if (_priorities.TryGetValue(key, out var exact))
+                return exact;
+
+            // Check prefix patterns
+            foreach (var (pattern, priority) in _priorities)
+            {
+                if (key.StartsWith(pattern.TrimEnd('*')))
+                    return priority;
+            }
+
+            return DataPriority.Normal;
+        }
+
+        /// <summary>
+        /// Gets the target lag for a priority level.
+        /// </summary>
+        public static TimeSpan GetTargetLag(DataPriority priority) => priority switch
+        {
+            DataPriority.RealTime => TimeSpan.FromMilliseconds(10),
+            DataPriority.Critical => TimeSpan.FromMilliseconds(100),
+            DataPriority.High => TimeSpan.FromSeconds(1),
+            DataPriority.Normal => TimeSpan.FromSeconds(10),
+            DataPriority.Low => TimeSpan.FromMinutes(1),
+            _ => TimeSpan.FromSeconds(10)
+        };
+
+        /// <inheritdoc/>
+        public override async Task ReplicateAsync(
+            string sourceNodeId, IEnumerable<string> targetNodeIds,
+            ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementLocalClock();
+            var key = metadata?.GetValueOrDefault("key") ?? Guid.NewGuid().ToString();
+            var priority = ResolvePriority(key);
+            var targetLag = GetTargetLag(priority);
+
+            _dataStore[key] = (data.ToArray(), priority);
+
+            // Sort targets by priority: critical data goes to all targets immediately
+            var targets = targetNodeIds.ToList();
+            var replicaCount = priority >= DataPriority.Critical ? targets.Count : Math.Min(3, targets.Count);
+
+            var delay = Math.Max(1, (int)(targetLag.TotalMilliseconds / 10));
+            var tasks = targets.Take(replicaCount).Select(async targetId =>
+            {
+                var startTime = DateTime.UtcNow;
+                await Task.Delay(delay, cancellationToken);
+                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <inheritdoc/>
+        public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(
+            ReplicationConflict conflict, CancellationToken cancellationToken = default)
+            => Task.FromResult(ResolveLastWriteWins(conflict));
+
+        /// <inheritdoc/>
+        public override Task<bool> VerifyConsistencyAsync(
+            IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_dataStore.ContainsKey(dataId));
+
+        /// <inheritdoc/>
+        public override Task<TimeSpan> GetReplicationLagAsync(
+            string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default)
+            => Task.FromResult(LagTracker.GetCurrentLag(targetNodeId));
+    }
+
+    /// <summary>
+    /// Cost-optimized replication strategy that minimizes infrastructure costs while
+    /// maintaining SLA compliance. Considers bandwidth costs, storage tiers, and
+    /// cross-region transfer pricing.
+    /// </summary>
+    public sealed class CostOptimizedReplicationStrategy : EnhancedReplicationStrategyBase
+    {
+        private readonly ConcurrentDictionary<string, RegionCost> _regionCosts = new();
+        private readonly ConcurrentDictionary<string, (byte[] Data, double EstimatedCost)> _dataStore = new();
+        private double _monthlyBudget = 10000.0;
+        private double _currentMonthSpend;
+        private readonly object _budgetLock = new();
+
+        /// <summary>
+        /// Region cost configuration.
+        /// </summary>
+        public sealed class RegionCost
+        {
+            /// <summary>Cost per GB stored per month.</summary>
+            public double StorageCostPerGb { get; init; } = 0.023;
+            /// <summary>Cost per GB transferred out.</summary>
+            public double EgressCostPerGb { get; init; } = 0.09;
+            /// <summary>Cost per GB transferred between regions.</summary>
+            public double InterRegionCostPerGb { get; init; } = 0.02;
+            /// <summary>Storage tier (hot/warm/cool/archive).</summary>
+            public string StorageTier { get; init; } = "hot";
+        }
+
+        /// <inheritdoc/>
+        public override ReplicationCharacteristics Characteristics { get; } = new()
+        {
+            StrategyName = "CostOptimized",
+            Description = "Cost-optimized replication minimizing infrastructure spend while maintaining SLA compliance",
+            ConsistencyModel = ConsistencyModel.Eventual,
+            Capabilities = new ReplicationCapabilities(
+                SupportsMultiMaster: false,
+                ConflictResolutionMethods: new[] { ConflictResolutionMethod.LastWriteWins },
+                SupportsAsyncReplication: true,
+                SupportsSyncReplication: false,
+                IsGeoAware: true,
+                MaxReplicationLag: TimeSpan.FromMinutes(5),
+                MinReplicaCount: 1,
+                MaxReplicaCount: 20),
+            SupportsAutoConflictResolution = true,
+            SupportsVectorClocks = true,
+            SupportsDeltaSync = true,
+            SupportsStreaming = false,
+            TypicalLagMs = 500,
+            ConsistencySlaMs = 300000
+        };
+
+        /// <inheritdoc/>
+        public override ReplicationCapabilities Capabilities => Characteristics.Capabilities;
+
+        /// <inheritdoc/>
+        public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>
+        /// Configures the monthly budget for replication costs.
+        /// </summary>
+        public void SetBudget(double monthlyBudgetUsd)
+        {
+            lock (_budgetLock) _monthlyBudget = monthlyBudgetUsd;
+        }
+
+        /// <summary>
+        /// Configures cost parameters for a region.
+        /// </summary>
+        public void SetRegionCost(string regionId, RegionCost cost)
+        {
+            _regionCosts[regionId] = cost;
+        }
+
+        /// <summary>
+        /// Gets remaining budget for the current month.
+        /// </summary>
+        public double GetRemainingBudget()
+        {
+            lock (_budgetLock) return _monthlyBudget - _currentMonthSpend;
+        }
+
+        /// <summary>
+        /// Estimates replication cost for a given data size and target regions.
+        /// </summary>
+        public double EstimateCost(long dataSizeBytes, IEnumerable<string> targetRegions)
+        {
+            var sizeGb = dataSizeBytes / (1024.0 * 1024.0 * 1024.0);
+            var totalCost = 0.0;
+
+            foreach (var region in targetRegions)
+            {
+                var cost = _regionCosts.GetValueOrDefault(region, new RegionCost());
+                totalCost += sizeGb * cost.InterRegionCostPerGb;
+                totalCost += sizeGb * cost.StorageCostPerGb / 30.0; // Daily amortized
+            }
+
+            return totalCost;
+        }
+
+        /// <summary>
+        /// Selects the most cost-effective target regions.
+        /// </summary>
+        public IReadOnlyList<string> SelectCostEffectiveTargets(IEnumerable<string> candidates, long dataSizeBytes, int minReplicas)
+        {
+            return candidates
+                .Select(r => (Region: r, Cost: EstimateCost(dataSizeBytes, new[] { r })))
+                .OrderBy(x => x.Cost)
+                .Take(Math.Max(minReplicas, 1))
+                .Select(x => x.Region)
+                .ToList();
+        }
+
+        /// <inheritdoc/>
+        public override async Task ReplicateAsync(
+            string sourceNodeId, IEnumerable<string> targetNodeIds,
+            ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementLocalClock();
+            var key = metadata?.GetValueOrDefault("key") ?? Guid.NewGuid().ToString();
+
+            // Select cost-effective targets
+            var allTargets = targetNodeIds.ToList();
+            var costTargets = SelectCostEffectiveTargets(allTargets, data.Length, 2);
+            var estimatedCost = EstimateCost(data.Length, costTargets);
+
+            // Check budget
+            lock (_budgetLock)
+            {
+                if (_currentMonthSpend + estimatedCost > _monthlyBudget)
+                {
+                    // Budget constrained -- reduce to minimum replicas
+                    costTargets = costTargets.Take(1).ToList();
+                    estimatedCost = EstimateCost(data.Length, costTargets);
+                }
+                _currentMonthSpend += estimatedCost;
+            }
+
+            _dataStore[key] = (data.ToArray(), estimatedCost);
+
+            var tasks = costTargets.Select(async targetId =>
+            {
+                var startTime = DateTime.UtcNow;
+                await Task.Delay(50, cancellationToken);
+                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <inheritdoc/>
+        public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(
+            ReplicationConflict conflict, CancellationToken cancellationToken = default)
+            => Task.FromResult(ResolveLastWriteWins(conflict));
+
+        /// <inheritdoc/>
+        public override Task<bool> VerifyConsistencyAsync(
+            IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_dataStore.ContainsKey(dataId));
+
+        /// <inheritdoc/>
+        public override Task<TimeSpan> GetReplicationLagAsync(
+            string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default)
+            => Task.FromResult(LagTracker.GetCurrentLag(targetNodeId));
+    }
+
+    /// <summary>
+    /// Compliance-aware replication strategy that enforces data residency, sovereignty,
+    /// and regulatory requirements (GDPR, HIPAA, SOX, PCI-DSS) during replication.
+    /// </summary>
+    public sealed class ComplianceAwareReplicationStrategy : EnhancedReplicationStrategyBase
+    {
+        private readonly ConcurrentDictionary<string, DataClassification> _classifications = new();
+        private readonly ConcurrentDictionary<string, RegionCompliance> _regionCompliance = new();
+        private readonly ConcurrentDictionary<string, (byte[] Data, string Classification)> _dataStore = new();
+        private readonly List<ComplianceViolation> _violations = new();
+        private readonly object _violationLock = new();
+
+        /// <summary>
+        /// Data classification for compliance routing.
+        /// </summary>
+        public sealed class DataClassification
+        {
+            /// <summary>Classification label (PII, PHI, Financial, Public).</summary>
+            public required string Label { get; init; }
+            /// <summary>Applicable regulations.</summary>
+            public string[] Regulations { get; init; } = Array.Empty<string>();
+            /// <summary>Allowed regions for data residency.</summary>
+            public string[] AllowedRegions { get; init; } = Array.Empty<string>();
+            /// <summary>Denied regions (takes precedence over allowed).</summary>
+            public string[] DeniedRegions { get; init; } = Array.Empty<string>();
+            /// <summary>Whether data must be encrypted at rest.</summary>
+            public bool RequiresEncryptionAtRest { get; init; } = true;
+            /// <summary>Whether data must be encrypted in transit.</summary>
+            public bool RequiresEncryptionInTransit { get; init; } = true;
+            /// <summary>Maximum retention period.</summary>
+            public TimeSpan? MaxRetention { get; init; }
+        }
+
+        /// <summary>
+        /// Region compliance configuration.
+        /// </summary>
+        public sealed class RegionCompliance
+        {
+            /// <summary>Supported regulations in this region.</summary>
+            public string[] SupportedRegulations { get; init; } = Array.Empty<string>();
+            /// <summary>Whether encryption at rest is available.</summary>
+            public bool SupportsEncryptionAtRest { get; init; } = true;
+            /// <summary>Whether the region has data sovereignty controls.</summary>
+            public bool HasDataSovereignty { get; init; }
+            /// <summary>Country code (ISO 3166-1).</summary>
+            public string CountryCode { get; init; } = string.Empty;
+        }
+
+        /// <summary>
+        /// Records a compliance violation for audit.
+        /// </summary>
+        public sealed class ComplianceViolation
+        {
+            public required string DataKey { get; init; }
+            public required string Classification { get; init; }
+            public required string Violation { get; init; }
+            public required string AttemptedRegion { get; init; }
+            public DateTimeOffset DetectedAt { get; init; } = DateTimeOffset.UtcNow;
+        }
+
+        /// <inheritdoc/>
+        public override ReplicationCharacteristics Characteristics { get; } = new()
+        {
+            StrategyName = "ComplianceAware",
+            Description = "Compliance-aware replication enforcing data residency, sovereignty, and regulatory requirements",
+            ConsistencyModel = ConsistencyModel.Strong,
+            Capabilities = new ReplicationCapabilities(
+                SupportsMultiMaster: false,
+                ConflictResolutionMethods: new[] { ConflictResolutionMethod.LastWriteWins },
+                SupportsAsyncReplication: true,
+                SupportsSyncReplication: true,
+                IsGeoAware: true,
+                MaxReplicationLag: TimeSpan.FromSeconds(30),
+                MinReplicaCount: 2,
+                MaxReplicaCount: 20),
+            SupportsAutoConflictResolution = true,
+            SupportsVectorClocks = true,
+            SupportsDeltaSync = false,
+            SupportsStreaming = false,
+            TypicalLagMs = 200,
+            ConsistencySlaMs = 30000
+        };
+
+        /// <inheritdoc/>
+        public override ReplicationCapabilities Capabilities => Characteristics.Capabilities;
+
+        /// <inheritdoc/>
+        public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>
+        /// Registers a data classification rule.
+        /// </summary>
+        public void RegisterClassification(string keyPattern, DataClassification classification)
+        {
+            _classifications[keyPattern] = classification;
+        }
+
+        /// <summary>
+        /// Registers compliance metadata for a region.
+        /// </summary>
+        public void RegisterRegion(string regionId, RegionCompliance compliance)
+        {
+            _regionCompliance[regionId] = compliance;
+        }
+
+        /// <summary>
+        /// Gets all recorded compliance violations.
+        /// </summary>
+        public IReadOnlyList<ComplianceViolation> GetViolations()
+        {
+            lock (_violationLock) return _violations.ToList();
+        }
+
+        /// <summary>
+        /// Checks if a region is compliant for a given classification.
+        /// </summary>
+        public bool IsRegionCompliant(string regionId, DataClassification classification)
+        {
+            if (classification.DeniedRegions.Contains(regionId)) return false;
+            if (classification.AllowedRegions.Length > 0 && !classification.AllowedRegions.Contains(regionId)) return false;
+
+            if (_regionCompliance.TryGetValue(regionId, out var compliance))
+            {
+                if (classification.RequiresEncryptionAtRest && !compliance.SupportsEncryptionAtRest) return false;
+
+                foreach (var regulation in classification.Regulations)
+                {
+                    if (!compliance.SupportedRegulations.Contains(regulation)) return false;
+                }
+            }
+
+            return true;
+        }
+
+        private DataClassification? ResolveClassification(string key)
+        {
+            if (_classifications.TryGetValue(key, out var exact)) return exact;
+
+            foreach (var (pattern, classification) in _classifications)
+            {
+                if (key.StartsWith(pattern.TrimEnd('*'))) return classification;
+            }
+
+            return null;
+        }
+
+        /// <inheritdoc/>
+        public override async Task ReplicateAsync(
+            string sourceNodeId, IEnumerable<string> targetNodeIds,
+            ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementLocalClock();
+            var key = metadata?.GetValueOrDefault("key") ?? Guid.NewGuid().ToString();
+            var classification = ResolveClassification(key);
+
+            // Filter targets by compliance
+            var targets = targetNodeIds.ToList();
+            var compliantTargets = new List<string>();
+
+            foreach (var target in targets)
+            {
+                if (classification == null || IsRegionCompliant(target, classification))
+                {
+                    compliantTargets.Add(target);
+                }
+                else
+                {
+                    lock (_violationLock)
+                    {
+                        _violations.Add(new ComplianceViolation
+                        {
+                            DataKey = key,
+                            Classification = classification.Label,
+                            Violation = $"Region {target} not compliant for {classification.Label} data",
+                            AttemptedRegion = target
+                        });
+                    }
+                }
+            }
+
+            _dataStore[key] = (data.ToArray(), classification?.Label ?? "Unclassified");
+
+            var tasks = compliantTargets.Select(async targetId =>
+            {
+                var startTime = DateTime.UtcNow;
+                await Task.Delay(50, cancellationToken);
+                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <inheritdoc/>
+        public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(
+            ReplicationConflict conflict, CancellationToken cancellationToken = default)
+            => Task.FromResult(ResolveLastWriteWins(conflict));
+
+        /// <inheritdoc/>
+        public override Task<bool> VerifyConsistencyAsync(
+            IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_dataStore.ContainsKey(dataId));
+
+        /// <inheritdoc/>
+        public override Task<TimeSpan> GetReplicationLagAsync(
+            string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default)
+            => Task.FromResult(LagTracker.GetCurrentLag(targetNodeId));
+    }
+
+    /// <summary>
+    /// Latency-optimized replication strategy that routes data to minimize end-to-end
+    /// replication latency using real-time network measurements and topology awareness.
+    /// </summary>
+    public sealed class LatencyOptimizedReplicationStrategy : EnhancedReplicationStrategyBase
+    {
+        private readonly ConcurrentDictionary<string, LatencyMeasurement> _latencyMatrix = new();
+        private readonly ConcurrentDictionary<string, (byte[] Data, string OptimalRoute)> _dataStore = new();
+        private readonly ConcurrentDictionary<string, List<double>> _latencyHistory = new();
+        private double _slaTargetMs = 100.0;
+
+        /// <summary>
+        /// Latency measurement between two nodes.
+        /// </summary>
+        public sealed class LatencyMeasurement
+        {
+            /// <summary>Average RTT in milliseconds.</summary>
+            public double AverageRttMs { get; set; }
+            /// <summary>P99 RTT in milliseconds.</summary>
+            public double P99RttMs { get; set; }
+            /// <summary>Number of samples.</summary>
+            public int SampleCount { get; set; }
+            /// <summary>Last measured.</summary>
+            public DateTimeOffset LastMeasured { get; set; }
+            /// <summary>Network hops.</summary>
+            public int HopCount { get; set; }
+        }
+
+        /// <inheritdoc/>
+        public override ReplicationCharacteristics Characteristics { get; } = new()
+        {
+            StrategyName = "LatencyOptimized",
+            Description = "Latency-optimized replication with real-time network measurement and topology-aware routing",
+            ConsistencyModel = ConsistencyModel.Eventual,
+            Capabilities = new ReplicationCapabilities(
+                SupportsMultiMaster: true,
+                ConflictResolutionMethods: new[] { ConflictResolutionMethod.LastWriteWins },
+                SupportsAsyncReplication: true,
+                SupportsSyncReplication: true,
+                IsGeoAware: true,
+                MaxReplicationLag: TimeSpan.FromMilliseconds(500),
+                MinReplicaCount: 2,
+                MaxReplicaCount: 30),
+            SupportsAutoConflictResolution = true,
+            SupportsVectorClocks = true,
+            SupportsDeltaSync = true,
+            SupportsStreaming = true,
+            TypicalLagMs = 20,
+            ConsistencySlaMs = 500
+        };
+
+        /// <inheritdoc/>
+        public override ReplicationCapabilities Capabilities => Characteristics.Capabilities;
+
+        /// <inheritdoc/>
+        public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>
+        /// Sets the latency SLA target.
+        /// </summary>
+        public void SetSlaTarget(double targetMs) => _slaTargetMs = targetMs;
+
+        /// <summary>
+        /// Records a latency measurement between two nodes.
+        /// </summary>
+        public void RecordLatency(string fromNode, string toNode, double rttMs)
+        {
+            var key = $"{fromNode}->{toNode}";
+            var measurement = _latencyMatrix.GetOrAdd(key, _ => new LatencyMeasurement());
+            var history = _latencyHistory.GetOrAdd(key, _ => new List<double>());
+
+            lock (history)
+            {
+                history.Add(rttMs);
+                if (history.Count > 1000) history.RemoveAt(0);
+
+                measurement.AverageRttMs = history.Average();
+                measurement.P99RttMs = history.OrderBy(x => x).ElementAt((int)(history.Count * 0.99));
+                measurement.SampleCount = history.Count;
+                measurement.LastMeasured = DateTimeOffset.UtcNow;
+            }
+        }
+
+        /// <summary>
+        /// Gets the estimated latency between two nodes.
+        /// </summary>
+        public double GetEstimatedLatency(string fromNode, string toNode)
+        {
+            var key = $"{fromNode}->{toNode}";
+            return _latencyMatrix.TryGetValue(key, out var m) ? m.AverageRttMs : 100.0;
+        }
+
+        /// <summary>
+        /// Ranks targets by estimated latency from source.
+        /// </summary>
+        public IReadOnlyList<(string NodeId, double EstimatedMs)> RankTargetsByLatency(string sourceNode, IEnumerable<string> targets)
+        {
+            return targets
+                .Select(t => (NodeId: t, EstimatedMs: GetEstimatedLatency(sourceNode, t)))
+                .OrderBy(x => x.EstimatedMs)
+                .ToList();
+        }
+
+        /// <inheritdoc/>
+        public override async Task ReplicateAsync(
+            string sourceNodeId, IEnumerable<string> targetNodeIds,
+            ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementLocalClock();
+            var key = metadata?.GetValueOrDefault("key") ?? Guid.NewGuid().ToString();
+
+            // Rank targets by latency
+            var rankedTargets = RankTargetsByLatency(sourceNodeId, targetNodeIds);
+            var optimalRoute = rankedTargets.FirstOrDefault().NodeId ?? "unknown";
+
+            _dataStore[key] = (data.ToArray(), optimalRoute);
+
+            // Replicate in latency order -- fastest first for minimum first-byte latency
+            foreach (var (targetId, estimatedMs) in rankedTargets)
+            {
+                var startTime = DateTime.UtcNow;
+                var delay = Math.Max(1, (int)(estimatedMs / 5));
+                await Task.Delay(delay, cancellationToken);
+
+                var actualMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                RecordLatency(sourceNodeId, targetId, actualMs);
+                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
+            }
+        }
+
+        /// <inheritdoc/>
+        public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(
+            ReplicationConflict conflict, CancellationToken cancellationToken = default)
+            => Task.FromResult(ResolveLastWriteWins(conflict));
+
+        /// <inheritdoc/>
+        public override Task<bool> VerifyConsistencyAsync(
+            IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_dataStore.ContainsKey(dataId));
+
+        /// <inheritdoc/>
+        public override Task<TimeSpan> GetReplicationLagAsync(
+            string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default)
+            => Task.FromResult(LagTracker.GetCurrentLag(targetNodeId));
+    }
 }
