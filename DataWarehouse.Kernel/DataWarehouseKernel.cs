@@ -11,8 +11,6 @@ using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Reflection;
-
 // Use SDK's MessageTopics (not Kernel's removed duplicate)
 using static DataWarehouse.SDK.Contracts.MessageTopics;
 
@@ -43,6 +41,7 @@ namespace DataWarehouse.Kernel
         private readonly ConcurrentDictionary<string, Task> _backgroundJobs = new();
         private readonly SemaphoreSlim _initLock = new(1, 1);
 
+        private readonly PluginLoader _pluginLoader;
         private IStorageProvider? _primaryStorage;
         private IStorageProvider? _cacheStorage;
         private bool _isInitialized;
@@ -131,6 +130,25 @@ namespace DataWarehouse.Kernel
 
             // Create capability registry with message bus integration
             _capabilityRegistry = new PluginCapabilityRegistry(_messageBus);
+
+            // Create secure plugin loader with production-safe defaults (ISO-02, INFRA-01, ISO-05)
+            // RequireSignedAssemblies defaults to true for production security.
+            // Set to false only in development via KernelConfiguration.
+            var pluginSecurityConfig = new PluginSecurityConfig
+            {
+                RequireSignedAssemblies = config.RequireSignedPluginAssemblies,
+                EnableSecurityAuditLog = true,
+                MaxAssemblySize = 50 * 1024 * 1024 // 50MB
+            };
+            var kernelContext = new LoggerKernelContext(
+                logger,
+                config.RootPath ?? Environment.CurrentDirectory,
+                config.OperatingMode);
+            _pluginLoader = new PluginLoader(
+                _registry,
+                kernelContext,
+                pluginDirectory: null,
+                securityConfig: pluginSecurityConfig);
         }
 
         /// <summary>
@@ -410,6 +428,11 @@ namespace DataWarehouse.Kernel
             }
         }
 
+        /// <summary>
+        /// Loads plugins from configured paths using the secure PluginLoader.
+        /// All assembly loading goes through PluginLoader with hash/signature validation (ISO-02, INFRA-01).
+        /// Assembly.LoadFrom is never called directly -- all loading uses isolated AssemblyLoadContext.
+        /// </summary>
         private async Task LoadPluginsFromPathsAsync(IEnumerable<string> paths, CancellationToken ct)
         {
             foreach (var path in paths)
@@ -423,6 +446,15 @@ namespace DataWarehouse.Kernel
                 var assemblies = Directory.GetFiles(path, "*.dll", SearchOption.AllDirectories);
                 foreach (var assemblyPath in assemblies)
                 {
+                    // Skip common runtime/SDK DLLs (same filter as PluginLoader.LoadAllPluginsAsync)
+                    var fileName = Path.GetFileName(assemblyPath);
+                    if (fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+                        fileName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
+                        fileName.StartsWith("DataWarehouse.SDK", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         await LoadPluginsFromAssemblyAsync(assemblyPath, ct);
@@ -435,26 +467,59 @@ namespace DataWarehouse.Kernel
             }
         }
 
+        /// <summary>
+        /// Loads plugins from a single assembly using the secure PluginLoader pipeline.
+        /// Replaces direct Assembly.LoadFrom with validated, isolated loading (ISO-02, INFRA-01).
+        /// Security validation includes: size limits, blocklist, hash verification, signature checks.
+        /// </summary>
         private async Task LoadPluginsFromAssemblyAsync(string assemblyPath, CancellationToken ct)
         {
-            var assembly = Assembly.LoadFrom(assemblyPath);
-            var pluginTypes = assembly.GetTypes()
-                .Where(t => typeof(IPlugin).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface);
+            // Route all assembly loading through PluginLoader for security validation
+            // PluginLoader performs: hash verification, signature check, size limits, blocklist,
+            // and loads into a collectible AssemblyLoadContext for isolation
+            var result = await _pluginLoader.LoadPluginAsync(assemblyPath, ct);
 
-            foreach (var type in pluginTypes)
+            if (!result.Success)
             {
-                try
+                _logger?.LogWarning("PluginLoader rejected assembly {Assembly}: {Error}",
+                    assemblyPath, result.Error);
+                return;
+            }
+
+            // PluginLoader already registered plugins with the registry.
+            // Now inject kernel services (message bus, capability registry, configuration)
+            // for each loaded plugin, since PluginLoader doesn't have access to these.
+            if (result.PluginIds != null)
+            {
+                foreach (var pluginId in result.PluginIds)
                 {
-                    if (Activator.CreateInstance(type) is IPlugin plugin)
+                    var plugin = _registry.GetAllPlugins().FirstOrDefault(p => p.Id == pluginId);
+                    if (plugin is PluginBase pluginBase)
                     {
-                        await RegisterPluginAsync(plugin, ct);
+                        pluginBase.InjectKernelServices(_enforcedMessageBus, _capabilityRegistry, null);
+
+                        if (_currentConfiguration != null)
+                        {
+                            pluginBase.InjectConfiguration(_currentConfiguration);
+                        }
+                    }
+
+                    // Start feature plugins
+                    if (plugin is IFeaturePlugin feature && _config.AutoStartFeatures)
+                    {
+                        _ = StartFeatureInBackgroundAsync(feature, ct);
+                    }
+
+                    // Register with pipeline if transformation
+                    if (plugin is IDataTransformation transformation)
+                    {
+                        _pipelineOrchestrator.RegisterStage(transformation);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to instantiate plugin {Type}", type.FullName);
-                }
             }
+
+            _logger?.LogInformation("Loaded {Count} plugin(s) from {Assembly} via secure PluginLoader",
+                result.PluginIds?.Length ?? 0, Path.GetFileName(assemblyPath));
         }
 
         private async Task InitializeStorageAsync(CancellationToken ct)
@@ -696,7 +761,63 @@ namespace DataWarehouse.Kernel
             _shutdownCts.Dispose();
             _initLock.Dispose();
 
+            _pluginLoader.Dispose();
+
             _logger?.LogInformation("DataWarehouse Kernel {KernelId} shut down", KernelId);
         }
+    }
+
+    /// <summary>
+    /// Adapts ILogger to SDK IKernelContext for PluginLoader compatibility.
+    /// Implements the SDK's IKernelContext (DataWarehouse.SDK.Contracts.IKernelContext) which is
+    /// required by PluginLoader. Provides logging, plugin access stubs, and storage stubs.
+    /// </summary>
+    internal sealed class LoggerKernelContext : DataWarehouse.SDK.Contracts.IKernelContext
+    {
+        private readonly ILogger? _logger;
+        private readonly PluginRegistry? _registry;
+
+        public string RootPath { get; }
+        public OperatingMode Mode { get; }
+        public IKernelStorageService Storage { get; }
+
+        public LoggerKernelContext(
+            ILogger? logger,
+            string rootPath,
+            OperatingMode mode,
+            PluginRegistry? registry = null)
+        {
+            _logger = logger;
+            _registry = registry;
+            RootPath = rootPath;
+            Mode = mode;
+            Storage = new NullKernelStorageService();
+        }
+
+        public T? GetPlugin<T>() where T : class, IPlugin => _registry?.GetPlugin<T>();
+        public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => _registry?.GetPlugins<T>() ?? [];
+
+        public void LogInfo(string message) => _logger?.LogInformation("{Message}", message);
+        public void LogError(string message, Exception? ex = null) => _logger?.LogError(ex, "{Message}", message);
+        public void LogWarning(string message) => _logger?.LogWarning("{Message}", message);
+        public void LogDebug(string message) => _logger?.LogDebug("{Message}", message);
+    }
+
+    /// <summary>
+    /// No-op storage service for kernel context adapter.
+    /// Plugin loading does not require kernel storage access.
+    /// </summary>
+    internal sealed class NullKernelStorageService : IKernelStorageService
+    {
+        public Task SaveAsync(string path, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SaveAsync(string path, byte[] data, IDictionary<string, string>? metadata = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<Stream?> LoadAsync(string path, CancellationToken ct = default) => Task.FromResult<Stream?>(null);
+        public Task<byte[]?> LoadBytesAsync(string path, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
+        public Task<bool> DeleteAsync(string path, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<bool> ExistsAsync(string path, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<IReadOnlyList<StorageItemInfo>> ListAsync(string prefix, int limit = 100, int offset = 0, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<StorageItemInfo>>(Array.Empty<StorageItemInfo>());
+        public Task<IDictionary<string, string>?> GetMetadataAsync(string path, CancellationToken ct = default) =>
+            Task.FromResult<IDictionary<string, string>?>(null);
     }
 }

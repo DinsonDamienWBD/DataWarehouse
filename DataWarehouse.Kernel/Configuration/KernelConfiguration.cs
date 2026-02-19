@@ -62,5 +62,12 @@ namespace DataWarehouse.Kernel.Configuration
         /// Enable detailed diagnostic logging.
         /// </summary>
         public bool EnableDiagnostics { get; set; }
+
+        /// <summary>
+        /// Whether to require plugin assemblies to be signed with a strong name.
+        /// Default: true (production security). Set to false only in development mode.
+        /// Addresses ISO-05 (CVSS 7.7) from pentest report.
+        /// </summary>
+        public bool RequireSignedPluginAssemblies { get; set; } = true;
     }
 }
