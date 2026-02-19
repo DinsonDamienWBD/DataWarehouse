@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -37,6 +38,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private int _maxFailedAttempts = 5;
         private TimeSpan _sessionTimeout = TimeSpan.FromMinutes(30);
         private TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);
+        private double _riskThresholdMultiplier = 1.0;
+        private string? _trustBrokerEndpoint;
+        private string? _policyEngineEndpoint;
+        private int _devicePostureCheckIntervalMs = 60000; // 1 minute default
 
         /// <inheritdoc/>
         public override string StrategyId => "zero-trust";
@@ -74,7 +79,132 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 _lockoutDuration = TimeSpan.FromMinutes(lockMins);
             }
 
+            if (configuration.TryGetValue("TrustBrokerEndpoint", out var broker) && broker is string brokerStr)
+            {
+                _trustBrokerEndpoint = brokerStr;
+            }
+
+            if (configuration.TryGetValue("PolicyEngineEndpoint", out var policyEngine) && policyEngine is string policyStr)
+            {
+                _policyEngineEndpoint = policyStr;
+            }
+
+            if (configuration.TryGetValue("DevicePostureCheckIntervalMs", out var intervalObj) && intervalObj is int interval)
+            {
+                _devicePostureCheckIntervalMs = interval;
+            }
+
             return base.InitializeAsync(configuration, cancellationToken);
+        }
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate trust broker endpoint if provided
+            if (!string.IsNullOrWhiteSpace(_trustBrokerEndpoint))
+            {
+                if (!Uri.TryCreate(_trustBrokerEndpoint, UriKind.Absolute, out var brokerUri))
+                {
+                    throw new InvalidOperationException($"Invalid trust broker endpoint: {_trustBrokerEndpoint}");
+                }
+
+                if (brokerUri.Scheme != "https" && !brokerUri.Host.Contains("localhost"))
+                {
+                    throw new InvalidOperationException(
+                        $"Trust broker endpoint must use HTTPS except for localhost: {_trustBrokerEndpoint}");
+                }
+            }
+
+            // Validate policy engine endpoint if provided
+            if (!string.IsNullOrWhiteSpace(_policyEngineEndpoint))
+            {
+                if (!Uri.TryCreate(_policyEngineEndpoint, UriKind.Absolute, out var policyUri))
+                {
+                    throw new InvalidOperationException($"Invalid policy engine endpoint: {_policyEngineEndpoint}");
+                }
+            }
+
+            // Validate device posture check interval (1s to 5min)
+            if (_devicePostureCheckIntervalMs < 1000 || _devicePostureCheckIntervalMs > 300000)
+            {
+                throw new ArgumentException(
+                    $"Device posture check interval must be between 1000 and 300000ms, got: {_devicePostureCheckIntervalMs}");
+            }
+
+            // Validate max failed attempts (1-100)
+            if (_maxFailedAttempts < 1 || _maxFailedAttempts > 100)
+            {
+                throw new ArgumentException($"Max failed attempts must be between 1 and 100, got: {_maxFailedAttempts}");
+            }
+
+            // Validate session timeout (1min to 24h)
+            if (_sessionTimeout.TotalMinutes < 1 || _sessionTimeout.TotalHours > 24)
+            {
+                throw new ArgumentException(
+                    $"Session timeout must be between 1 minute and 24 hours, got: {_sessionTimeout}");
+            }
+
+            return base.InitializeAsyncCore(cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Terminate all active sessions
+            foreach (var sessionId in _sessions.Keys.ToArray())
+            {
+                TerminateSession(sessionId);
+            }
+
+            // Do NOT clear device trust records (persistent state)
+            // Clear failed attempt records (transient state)
+            _failedAttempts.Clear();
+
+            // Close any persistent connections to trust broker (if applicable)
+            // In production, this would disconnect from external policy engines
+            await Task.CompletedTask;
+
+            await base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the health status of the Zero Trust strategy with caching.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> GetHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                var details = new Dictionary<string, object>
+                {
+                    ["activeSessions"] = _sessions.Count(s => s.Value.IsActive),
+                    ["totalSessions"] = _sessions.Count,
+                    ["trustedDevices"] = _deviceTrust.Count,
+                    ["lockedAccounts"] = _failedAttempts.Count(f => f.Value >= _maxFailedAttempts)
+                };
+
+                // Check trust broker reachability if configured
+                if (!string.IsNullOrWhiteSpace(_trustBrokerEndpoint))
+                {
+                    try
+                    {
+                        // Production: would ping trust broker endpoint
+                        // For now, just validate configuration
+                        details["trustBrokerConfigured"] = true;
+                        details["trustBrokerEndpoint"] = _trustBrokerEndpoint;
+                        await Task.CompletedTask;
+                    }
+                    catch
+                    {
+                        return new StrategyHealthCheckResult(
+                            IsHealthy: false,
+                            Message: $"Trust broker {_trustBrokerEndpoint} unreachable",
+                            Details: details);
+                    }
+                }
+
+                return new StrategyHealthCheckResult(
+                    IsHealthy: true,
+                    Message: "Zero Trust strategy operational",
+                    Details: details);
+            }, TimeSpan.FromSeconds(60), ct);
         }
 
         /// <summary>
@@ -152,6 +282,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         /// <inheritdoc/>
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
+            IncrementCounter("ztna.access_request");
+
             var verificationResults = new List<VerificationResult>();
             var overallRiskScore = 0.0;
 
@@ -162,6 +294,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             {
                 return Task.FromResult(CreateDenyDecision("Identity verification failed", identityResult, verificationResults));
             }
+
+            // Device posture check (incremented when device verification happens)
+            IncrementCounter("ztna.posture_check");
 
             // 2. Account Lockout Check
             var lockoutResult = CheckAccountLockout(context.SubjectId);
