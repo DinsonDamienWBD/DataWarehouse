@@ -1,5 +1,6 @@
 ﻿using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Storage;
+using DataWarehouse.SDK.Tags;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -333,6 +334,13 @@ namespace DataWarehouse.SDK.Contracts.Storage
         /// Version identifier if versioning is supported.
         /// </summary>
         public string? VersionId { get; init; }
+
+        /// <summary>
+        /// Typed tag collection attached to this object.
+        /// Null when tags have not been loaded (lazy-load pattern).
+        /// Empty TagCollection when object has no tags.
+        /// </summary>
+        public TagCollection? Tags { get; init; }
     }
 
     #endregion

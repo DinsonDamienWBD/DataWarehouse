@@ -39,6 +39,10 @@ public interface IObjectStorageCore
     /// <summary>Gets metadata for a specific object without retrieving its data.</summary>
     Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);
 
+    /// <summary>Gets metadata including tags for a specific object.</summary>
+    Task<StorageObjectMetadata> GetMetadataWithTagsAsync(string key, CancellationToken ct = default)
+        => GetMetadataAsync(key, ct); // Default: delegates to non-tag version (backward compat)
+
     /// <summary>Gets the health status of the underlying storage backend.</summary>
     Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);
 
