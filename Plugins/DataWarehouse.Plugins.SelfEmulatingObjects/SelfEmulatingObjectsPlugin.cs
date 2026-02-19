@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -27,6 +28,7 @@ public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
     private IKernelContext? _context;
     private WasmViewer.ViewerBundler? _bundler;
     private WasmViewer.ViewerRuntime? _runtime;
+    private readonly ConcurrentDictionary<string, List<WasmViewer.SelfEmulatingObjectSnapshot>> _snapshots = new();
 
     public override string Id => "com.datawarehouse.selfemulating";
     public override string Name => "Self-Emulating Objects";
@@ -46,7 +48,12 @@ public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
         MessageBus!.Subscribe("selfemulating.bundle", HandleBundleRequestAsync);
         MessageBus!.Subscribe("selfemulating.view", HandleViewRequestAsync);
 
-        _context?.LogInfo("Self-Emulating Objects plugin initialized");
+        // Subscribe to lifecycle operations
+        MessageBus!.Subscribe("selfemulating.snapshot", HandleSnapshotRequestAsync);
+        MessageBus!.Subscribe("selfemulating.rollback", HandleRollbackRequestAsync);
+        MessageBus!.Subscribe("selfemulating.replay", HandleReplayRequestAsync);
+
+        _context?.LogInfo("Self-Emulating Objects plugin initialized with snapshot/rollback/replay lifecycle");
         return await base.OnHandshakeAsync(request);
     }
 
@@ -129,6 +136,197 @@ public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
     }
 
     /// <summary>
+    /// Handles snapshot requests: creates a timestamped deep copy of the object.
+    /// </summary>
+    private async Task HandleSnapshotRequestAsync(PluginMessage message)
+    {
+        if (message.Payload.TryGetValue("bundledObject", out var bundledObj) &&
+            bundledObj is WasmViewer.SelfEmulatingObject obj)
+        {
+            var description = message.Payload.TryGetValue("description", out var descObj)
+                ? descObj as string
+                : null;
+
+            // Deep copy: clone byte arrays and metadata dictionary
+            var snapshot = new WasmViewer.SelfEmulatingObjectSnapshot
+            {
+                SnapshotId = Guid.NewGuid().ToString("N"),
+                ObjectId = obj.Id,
+                Object = new WasmViewer.SelfEmulatingObject
+                {
+                    Id = obj.Id,
+                    Data = (byte[])obj.Data.Clone(),
+                    ViewerWasm = (byte[])obj.ViewerWasm.Clone(),
+                    Format = obj.Format,
+                    ViewerName = obj.ViewerName,
+                    ViewerVersion = obj.ViewerVersion,
+                    CreatedAt = obj.CreatedAt,
+                    Metadata = new Dictionary<string, string>(obj.Metadata)
+                },
+                CreatedAt = DateTime.UtcNow,
+                Description = description
+            };
+
+            var snapList = _snapshots.GetOrAdd(obj.Id, _ => new List<WasmViewer.SelfEmulatingObjectSnapshot>());
+            lock (snapList)
+            {
+                snapList.Add(snapshot);
+            }
+
+            await MessageBus!.PublishAsync("selfemulating.snapshot.created", new PluginMessage
+            {
+                Type = "selfemulating.snapshot.created",
+                SourcePluginId = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["snapshotId"] = snapshot.SnapshotId,
+                    ["objectId"] = obj.Id,
+                    ["createdAt"] = snapshot.CreatedAt,
+                    ["description"] = description ?? string.Empty
+                }
+            });
+
+            _context?.LogInfo($"Created snapshot {snapshot.SnapshotId} for object {obj.Id}");
+        }
+    }
+
+    /// <summary>
+    /// Handles rollback requests: restores an object to a previous snapshot state.
+    /// </summary>
+    private async Task HandleRollbackRequestAsync(PluginMessage message)
+    {
+        var objectId = message.Payload.TryGetValue("objectId", out var idObj) ? idObj as string : null;
+        var snapshotId = message.Payload.TryGetValue("snapshotId", out var snapIdObj) ? snapIdObj as string : null;
+
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _context?.LogError("Rollback request missing objectId");
+            return;
+        }
+
+        if (!_snapshots.TryGetValue(objectId, out var snapList))
+        {
+            _context?.LogError($"No snapshots found for object {objectId}");
+            return;
+        }
+
+        WasmViewer.SelfEmulatingObjectSnapshot? target;
+        lock (snapList)
+        {
+            target = !string.IsNullOrEmpty(snapshotId)
+                ? snapList.Find(s => s.SnapshotId == snapshotId)
+                : snapList.Count > 0 ? snapList[^1] : null; // Latest snapshot if no ID specified
+        }
+
+        if (target == null)
+        {
+            _context?.LogError($"Snapshot not found for object {objectId}, snapshotId={snapshotId}");
+            return;
+        }
+
+        // Return a deep copy of the snapshot's object
+        var restored = new WasmViewer.SelfEmulatingObject
+        {
+            Id = target.Object.Id,
+            Data = (byte[])target.Object.Data.Clone(),
+            ViewerWasm = (byte[])target.Object.ViewerWasm.Clone(),
+            Format = target.Object.Format,
+            ViewerName = target.Object.ViewerName,
+            ViewerVersion = target.Object.ViewerVersion,
+            CreatedAt = target.Object.CreatedAt,
+            Metadata = new Dictionary<string, string>(target.Object.Metadata)
+        };
+
+        await MessageBus!.PublishAsync("selfemulating.rollback.complete", new PluginMessage
+        {
+            Type = "selfemulating.rollback.complete",
+            SourcePluginId = Id,
+            Payload = new Dictionary<string, object>
+            {
+                ["objectId"] = objectId,
+                ["snapshotId"] = target.SnapshotId,
+                ["restoredObject"] = restored,
+                ["restoredFrom"] = target.CreatedAt
+            }
+        });
+
+        _context?.LogInfo($"Rolled back object {objectId} to snapshot {target.SnapshotId}");
+    }
+
+    /// <summary>
+    /// Handles replay requests: replays an object through all its snapshots chronologically,
+    /// executing each version's viewer to produce output per version.
+    /// </summary>
+    private async Task HandleReplayRequestAsync(PluginMessage message)
+    {
+        var objectId = message.Payload.TryGetValue("objectId", out var idObj) ? idObj as string : null;
+
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _context?.LogError("Replay request missing objectId");
+            return;
+        }
+
+        if (!_snapshots.TryGetValue(objectId, out var snapList))
+        {
+            _context?.LogError($"No snapshots found for object {objectId}");
+            return;
+        }
+
+        List<WasmViewer.SelfEmulatingObjectSnapshot> orderedSnapshots;
+        lock (snapList)
+        {
+            orderedSnapshots = snapList.OrderBy(s => s.CreatedAt).ToList();
+        }
+
+        var replayResults = new List<Dictionary<string, object>>();
+
+        foreach (var snapshot in orderedSnapshots)
+        {
+            try
+            {
+                var output = _runtime != null
+                    ? await _runtime.ExecuteViewerAsync(snapshot.Object)
+                    : Array.Empty<byte>();
+
+                replayResults.Add(new Dictionary<string, object>
+                {
+                    ["snapshotId"] = snapshot.SnapshotId,
+                    ["createdAt"] = snapshot.CreatedAt,
+                    ["viewerVersion"] = snapshot.Object.ViewerVersion,
+                    ["output"] = output,
+                    ["success"] = true
+                });
+            }
+            catch (Exception ex)
+            {
+                replayResults.Add(new Dictionary<string, object>
+                {
+                    ["snapshotId"] = snapshot.SnapshotId,
+                    ["createdAt"] = snapshot.CreatedAt,
+                    ["viewerVersion"] = snapshot.Object.ViewerVersion,
+                    ["error"] = ex.Message,
+                    ["success"] = false
+                });
+            }
+        }
+
+        await MessageBus!.PublishAsync("selfemulating.replay.complete", new PluginMessage
+        {
+            Type = "selfemulating.replay.complete",
+            SourcePluginId = Id,
+            Payload = new Dictionary<string, object>
+            {
+                ["objectId"] = objectId,
+                ["snapshotCount"] = orderedSnapshots.Count,
+                ["results"] = replayResults
+            }
+        });
+
+        _context?.LogInfo($"Replayed {orderedSnapshots.Count} snapshots for object {objectId}");
+    }
+
+    /// <summary>
     /// 86.2: Format detection based on magic numbers and file signatures.
     /// </summary>
     private static string DetectFormat(byte[] data)
@@ -204,6 +402,10 @@ public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
         metadata["ViewerBundling"] = true;
         metadata["FormatAutoDetection"] = true;
         metadata["SandboxedExecution"] = true;
+        metadata["SnapshotSupport"] = true;
+        metadata["RollbackSupport"] = true;
+        metadata["ReplaySupport"] = true;
+        metadata["LifecycleOperations"] = new[] { "snapshot", "rollback", "replay" };
         return metadata;
     }
 

@@ -292,3 +292,15 @@ public sealed class SelfEmulatingObject
     public required DateTime CreatedAt { get; init; }
     public required Dictionary<string, string> Metadata { get; init; }
 }
+
+/// <summary>
+/// Snapshot of a SelfEmulatingObject at a point in time for rollback/replay.
+/// </summary>
+public sealed class SelfEmulatingObjectSnapshot
+{
+    public required string SnapshotId { get; init; }
+    public required string ObjectId { get; init; }
+    public required SelfEmulatingObject Object { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public string? Description { get; init; }
+}

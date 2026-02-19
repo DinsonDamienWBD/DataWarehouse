@@ -1106,7 +1106,29 @@ Plans:
 #### Phase 53: Security Wiring
 **Goal**: Fix ALL 50 penetration test findings from the v4.5 pentest report. Wire the AccessEnforcementInterceptor, implement IAuthenticatedMessageBus, add inter-node authentication to all distributed protocols, enforce plugin isolation, fix all TLS certificate validation. Raise security posture from 38/100 to 95+/100.
 **Depends on**: Phase 52
-**Plans**: 14-16 plans
+**Plans**: 11 plans
+
+Plans:
+- [ ] 53-01-PLAN.md — Wire AccessEnforcementInterceptor into kernel (AUTH-01, AUTH-08, AUTH-09, AUTH-10, BUS-01, BUS-05)
+- [ ] 53-02-PLAN.md — Secure plugin loading and isolation (ISO-02, ISO-01, ISO-04, ISO-05, INFRA-01)
+- [ ] 53-03-PLAN.md — Fix TLS bypasses and Dashboard auth (NET-01, NET-02, NET-03, NET-06, AUTH-02, AUTH-04, AUTH-05)
+- [ ] 53-04-PLAN.md — Raft consensus authentication and mTLS (DIST-01, DIST-02, AUTH-06, DIST-05)
+- [ ] 53-05-PLAN.md — SWIM/CRDT/mDNS/Federation authentication (DIST-03, DIST-04, DIST-06, DIST-07, DIST-08, DIST-09)
+- [ ] 53-06-PLAN.md — Message bus rate limiting and authentication (BUS-02, BUS-03, BUS-04, BUS-06)
+- [ ] 53-07-PLAN.md — Path traversal, VDE symlink, API key fixes (D01, D02, D03, AUTH-03, AUTH-07)
+- [ ] 53-08-PLAN.md — MQTT/WebSocket/GraphQL/CoAP protocol hardening (NET-04, NET-05, NET-07, NET-08)
+- [ ] 53-09-PLAN.md — Audit logging, PBKDF2, identity hardening (INFRA-02, INFRA-03, INFRA-04, D04, AUTH-11, AUTH-12, AUTH-13, ISO-06)
+- [ ] 53-10-PLAN.md — Remaining low/info findings (RECON-05, RECON-09, ISO-05, ISO-03, INFRA-06, RECON-06)
+- [ ] 53-11-PLAN.md — Verification sweep (confirm all 50 findings resolved)
+
+**Success Criteria**:
+  1. All 8 CRITICAL findings resolved (AUTH-01, ISO-01, BUS-01, DIST-01, DIST-02, NET-01, NET-02, ISO-02)
+  2. All 20 HIGH findings resolved or mitigated
+  3. All 16 MEDIUM findings resolved
+  4. All 8 LOW and 4 INFO findings addressed
+  5. Security posture score >= 90/100 (up from 38/100)
+  6. Full solution builds with 0 errors, 0 warnings, all tests passing
+  7. Verification report confirming each finding status
 
 #### Phase 54: Feature Gap Closure
 **Goal**: Close ALL remaining non-100% features from the 3,549 identified in the gap extraction. Quick wins (80-99%) first, then medium (50-79%), then major (<50%). Target: 0 features below 100%.
