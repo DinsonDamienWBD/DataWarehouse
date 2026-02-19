@@ -231,6 +231,105 @@ namespace DataWarehouse.SDK.Utilities
                 Timestamp = DateTime.UtcNow
             };
         }
+
+        /// <summary>
+        /// ISO-06 (CVSS 4.8): Allowed types for payload values to prevent type confusion attacks.
+        /// Only serializable, known-safe types are permitted.
+        /// Complex objects that could be used for deserialization attacks are rejected.
+        /// </summary>
+        private static readonly HashSet<Type> AllowedPayloadTypes = new()
+        {
+            typeof(string),
+            typeof(int),
+            typeof(long),
+            typeof(double),
+            typeof(float),
+            typeof(decimal),
+            typeof(bool),
+            typeof(byte[]),
+            typeof(DateTime),
+            typeof(DateTimeOffset),
+            typeof(Guid),
+            typeof(List<string>),
+            typeof(string[]),
+            typeof(Dictionary<string, string>),
+            // Allow CommandIdentity specifically (used in Identity-carrying messages)
+            typeof(DataWarehouse.SDK.Security.CommandIdentity),
+        };
+
+        /// <summary>
+        /// ISO-06: Validates that a payload value is a known-safe type.
+        /// Returns true if the type is allowed, false if it could be used for type confusion.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <returns>True if the value type is allowed in message payloads.</returns>
+        public static bool IsAllowedPayloadType(object? value)
+        {
+            if (value == null)
+                return true;
+
+            var type = value.GetType();
+
+            // Direct type match
+            if (AllowedPayloadTypes.Contains(type))
+                return true;
+
+            // Allow primitive types and enums
+            if (type.IsPrimitive || type.IsEnum)
+                return true;
+
+            // Allow Dictionary<string, object> (nested payloads) -- values checked recursively
+            if (type == typeof(Dictionary<string, object>))
+                return true;
+
+            // Allow IReadOnlyList<string> and similar
+            if (value is IReadOnlyList<string> || value is IEnumerable<string>)
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// ISO-06: Validates all values in a payload dictionary.
+        /// Throws <see cref="ArgumentException"/> if any value has a disallowed type.
+        /// </summary>
+        /// <param name="payload">The payload to validate.</param>
+        /// <exception cref="ArgumentException">Thrown when a payload value has an unsafe type.</exception>
+        public static void ValidatePayloadTypes(Dictionary<string, object>? payload)
+        {
+            if (payload == null) return;
+
+            foreach (var (key, value) in payload)
+            {
+                if (!IsAllowedPayloadType(value))
+                {
+                    throw new ArgumentException(
+                        $"Payload key '{key}' contains disallowed type '{value?.GetType().FullName}'. " +
+                        "Only serializable, known-safe types are permitted in message payloads (ISO-06). " +
+                        "Allowed types: string, int, long, double, float, decimal, bool, byte[], " +
+                        "DateTime, DateTimeOffset, Guid, List<string>, string[], Dictionary<string, string>.");
+                }
+
+                // Recursively validate nested dictionaries
+                if (value is Dictionary<string, object> nested)
+                {
+                    ValidatePayloadTypes(nested);
+                }
+            }
+        }
+
+        /// <summary>
+        /// ISO-06: Creates a new PluginMessage with validated payload types.
+        /// Rejects complex objects that could be used for type confusion attacks.
+        /// </summary>
+        public static PluginMessage CreateValidated(
+            string type,
+            Dictionary<string, object>? payload = null,
+            string? correlationId = null)
+        {
+            ValidatePayloadTypes(payload);
+            return Create(type, payload, correlationId);
+        }
     }
 
 }

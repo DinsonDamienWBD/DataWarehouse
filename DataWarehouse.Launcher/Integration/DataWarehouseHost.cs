@@ -618,11 +618,11 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
 
         var passwordBytes = Encoding.UTF8.GetBytes(config.AdminPassword);
 
-        // Use PBKDF2 with SHA256, 100000 iterations, 32 bytes output
+        // D04 (CVSS 3.7): Use PBKDF2 with SHA256, 600000 iterations per NIST SP 800-63B
         var hashBytes = Rfc2898DeriveBytes.Pbkdf2(
             passwordBytes,
             salt,
-            100000,
+            600_000,
             HashAlgorithmName.SHA256,
             32);
         var hashBase64 = Convert.ToBase64String(hashBytes);

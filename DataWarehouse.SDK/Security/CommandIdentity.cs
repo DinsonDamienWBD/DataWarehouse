@@ -74,6 +74,19 @@ public sealed record CommandIdentity
     // e.g., ["user:alice", "ai:gemini-user", "ai:claude-system"]
     public IReadOnlyList<string> DelegationChain { get; init; } = Array.Empty<string>();
 
+    /// <summary>
+    /// AUTH-13 (CVSS 4.3): Current depth in the delegation chain.
+    /// Enforced by <see cref="MaxDelegationDepth"/>.
+    /// </summary>
+    public int DelegationDepth { get; init; }
+
+    /// <summary>
+    /// AUTH-13: Maximum allowed delegation chain depth.
+    /// Prevents unbounded delegation chains that could be used for privilege escalation
+    /// or resource exhaustion attacks.
+    /// </summary>
+    public const int MaxDelegationDepth = 10;
+
     // Enforcement: this is the principal whose permissions are checked
     // ALWAYS equals OnBehalfOfPrincipalId — never ActorId
     public string EffectivePrincipalId => OnBehalfOfPrincipalId;
@@ -82,11 +95,30 @@ public sealed record CommandIdentity
     /// Creates a new CommandIdentity with an additional delegate appended to the chain.
     /// Used when an AI agent delegates to another AI agent.
     /// The OnBehalfOfPrincipalId remains the ORIGINAL user — it never changes.
+    /// AUTH-13: Enforces maximum delegation depth to prevent unbounded chains.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the delegation chain depth would exceed <see cref="MaxDelegationDepth"/>.
+    /// </exception>
     public CommandIdentity WithDelegation(string delegateActorId)
     {
+        ArgumentNullException.ThrowIfNull(delegateActorId);
+
+        var newDepth = DelegationDepth + 1;
+        if (newDepth > MaxDelegationDepth)
+        {
+            throw new InvalidOperationException(
+                $"Delegation chain depth limit exceeded ({MaxDelegationDepth}). " +
+                $"Current chain has {DelegationChain.Count} delegates. " +
+                "This limit prevents unbounded delegation chains (AUTH-13).");
+        }
+
         var newChain = new List<string>(DelegationChain) { delegateActorId };
-        return this with { DelegationChain = newChain.AsReadOnly() };
+        return this with
+        {
+            DelegationChain = newChain.AsReadOnly(),
+            DelegationDepth = newDepth
+        };
     }
 
     /// <summary>
@@ -148,21 +180,44 @@ public sealed record CommandIdentity
     /// Creates identity for an AI agent acting on behalf of a user.
     /// The access control check will use the USER's permissions, not the AI's.
     /// </summary>
+    /// <summary>
+    /// Creates identity for an AI agent acting on behalf of a user.
+    /// The access control check will use the USER's permissions, not the AI's.
+    /// AUTH-11: Validates agentId is not null or empty.
+    /// AUTH-13: Enforces delegation chain depth limit.
+    /// </summary>
     public static CommandIdentity ForAiAgent(
         string agentId,
-        CommandIdentity onBehalfOf) => new()
+        CommandIdentity onBehalfOf)
     {
-        ActorId = $"ai:{agentId}",
-        ActorType = ActorType.AiAgent,
-        OnBehalfOfPrincipalId = onBehalfOf.OnBehalfOfPrincipalId,
-        PrincipalType = onBehalfOf.PrincipalType,
-        TenantId = onBehalfOf.TenantId,
-        InstanceId = onBehalfOf.InstanceId,
-        GroupIds = onBehalfOf.GroupIds,
-        Roles = onBehalfOf.Roles,
-        AuthenticationMethod = onBehalfOf.AuthenticationMethod,
-        AuthenticatedAt = onBehalfOf.AuthenticatedAt,
-        SessionId = onBehalfOf.SessionId,
-        DelegationChain = new List<string>(onBehalfOf.DelegationChain) { $"ai:{agentId}" }.AsReadOnly()
-    };
+        ArgumentNullException.ThrowIfNull(agentId);
+        ArgumentNullException.ThrowIfNull(onBehalfOf);
+
+        if (string.IsNullOrWhiteSpace(agentId))
+            throw new ArgumentException("AI agent identity must not be empty (AUTH-11).", nameof(agentId));
+
+        var newDepth = onBehalfOf.DelegationDepth + 1;
+        if (newDepth > MaxDelegationDepth)
+        {
+            throw new InvalidOperationException(
+                $"Delegation chain depth limit exceeded ({MaxDelegationDepth}) when creating AI agent identity (AUTH-13).");
+        }
+
+        return new()
+        {
+            ActorId = $"ai:{agentId}",
+            ActorType = ActorType.AiAgent,
+            OnBehalfOfPrincipalId = onBehalfOf.OnBehalfOfPrincipalId,
+            PrincipalType = onBehalfOf.PrincipalType,
+            TenantId = onBehalfOf.TenantId,
+            InstanceId = onBehalfOf.InstanceId,
+            GroupIds = onBehalfOf.GroupIds,
+            Roles = onBehalfOf.Roles,
+            AuthenticationMethod = onBehalfOf.AuthenticationMethod,
+            AuthenticatedAt = onBehalfOf.AuthenticatedAt,
+            SessionId = onBehalfOf.SessionId,
+            DelegationChain = new List<string>(onBehalfOf.DelegationChain) { $"ai:{agentId}" }.AsReadOnly(),
+            DelegationDepth = newDepth
+        };
+    }
 }

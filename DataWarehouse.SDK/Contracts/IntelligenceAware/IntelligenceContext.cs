@@ -347,5 +347,49 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 CreatedAt = DateTimeOffset.UtcNow,
                 CorrelationId = CorrelationId ?? ContextId
             };
+
+        /// <summary>
+        /// AUTH-11 (CVSS 3.8): Validates that the identity is present and valid for AI agent operations.
+        /// Throws if identity is null or missing required fields when an AI operation requires identity.
+        /// Call this at operation boundaries before executing AI agent actions.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when Identity is null or the identity does not contain a valid principal.
+        /// </exception>
+        public void ValidateIdentityForAiOperation()
+        {
+            if (Identity == null)
+            {
+                throw new InvalidOperationException(
+                    "AI agent operation requires a valid CommandIdentity. " +
+                    "Identity is null -- ensure the IntelligenceContext is created with a proper identity chain (AUTH-11).");
+            }
+
+            if (string.IsNullOrWhiteSpace(Identity.OnBehalfOfPrincipalId))
+            {
+                throw new InvalidOperationException(
+                    "AI agent operation requires a valid OnBehalfOfPrincipalId. " +
+                    "The principal ID is empty -- the originating user identity must be established (AUTH-11).");
+            }
+
+            if (Identity.ActorType == DataWarehouse.SDK.Security.ActorType.AiAgent &&
+                string.IsNullOrWhiteSpace(Identity.ActorId))
+            {
+                throw new InvalidOperationException(
+                    "AI agent actor must have a non-empty ActorId for audit trail purposes (AUTH-11).");
+            }
+        }
+
+        /// <summary>
+        /// AUTH-11: Creates a copy with a validated identity, ensuring the identity is not null.
+        /// </summary>
+        /// <param name="identity">The CommandIdentity to set. Must not be null.</param>
+        /// <returns>A new context with the specified identity.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when identity is null.</exception>
+        public IntelligenceContext WithIdentity(DataWarehouse.SDK.Security.CommandIdentity identity)
+        {
+            ArgumentNullException.ThrowIfNull(identity);
+            return this with { Identity = identity };
+        }
     }
 }

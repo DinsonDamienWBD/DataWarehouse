@@ -32,6 +32,17 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
     // Rate limiting: userId -> (attempt count, window start)
     private readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new();
 
+    /// <summary>
+    /// D04 (CVSS 3.7): PBKDF2 iteration count per NIST SP 800-63B minimum recommendation.
+    /// Increased from 100,000 to 600,000 for resistance against GPU-accelerated brute force.
+    /// </summary>
+    private const int Pbkdf2Iterations = 600_000;
+
+    /// <summary>
+    /// Legacy iteration count for backward compatibility during hash migration.
+    /// </summary>
+    private const int LegacyPbkdf2Iterations = 100_000;
+
     // SSO provider handlers
     private readonly ConcurrentDictionary<string, ISsoProviderHandler> _ssoProviders = new();
 
@@ -515,10 +526,11 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(salt);
 
+        // D04: Use NIST-recommended 600K iterations
         var hash = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
-            100000,
+            Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             32);
 
@@ -527,14 +539,28 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
 
     private static bool VerifyPassword(string password, byte[] storedHash, byte[] salt)
     {
+        // D04: Try current iteration count first
         var hash = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
-            100000,
+            Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             32);
 
-        return CryptographicOperations.FixedTimeEquals(hash, storedHash);
+        if (CryptographicOperations.FixedTimeEquals(hash, storedHash))
+            return true;
+
+        // Backward compatibility: try legacy 100K iterations for hashes
+        // created before the NIST upgrade. On next password change,
+        // the hash will be auto-upgraded to 600K iterations.
+        var legacyHash = Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(password),
+            salt,
+            LegacyPbkdf2Iterations,
+            HashAlgorithmName.SHA256,
+            32);
+
+        return CryptographicOperations.FixedTimeEquals(legacyHash, storedHash);
     }
 
     private static string HashApiKey(string apiKey)
