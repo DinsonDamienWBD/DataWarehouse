@@ -1067,11 +1067,11 @@ All executing agents MUST follow these rules:
 - [ ] **Phase 52: Clean House** (P1) — Eliminate ALL 428+ TODOs/FIXMEs/HACKs/placeholders/simulations/mockups across 195 files, replace 47 placeholder tests, fix mock transcoding, fix PNG compression, fix stub cloud SDKs
 - [ ] **Phase 53: Security Wiring** (P2) — Fix ALL 50 pentest findings, wire AccessEnforcementInterceptor, implement IAuthenticatedMessageBus, fix 13 TLS bypasses, path traversal, plugin isolation, inter-node auth. Target: 95+/100 security score
 - [ ] **Phase 54: Feature Gap Closure** (P3) — Close ALL 3,549 feature gaps: 1,155 quick wins (80-99%), 631 medium (50-79%), 1,763 major (<50%) across 17 domains. Target: 0 features below 100%
-- [ ] **Phase 55: Universal Tag System** (P4) — Tag schema registry, polymorphic values, per-tag ACL, propagation, policy engine, CRDT tags, ORSet fix, indexing at 1B scale, tag management, search by tag, sort by tag, group by tag, update/move/delete by tag, tag analysis, tag cleanup, batch tag features
+- [ ] **Phase 55: Universal Tag System** (P4) — Tag schema registry, polymorphic values (10 types), per-tag ACL, propagation engine, policy engine, CRDT-based versioning, ORSet pruning (P0-12), inverted index at 1B scale, query API with composable expressions. **Plans:** 11 plans in 6 waves
 - [ ] **Phase 56: Data Consciousness** (P4) — AI value/liability scoring, auto-archive, dark data discovery, lineage BFS wiring. **Plans:** 7 plans in 4 waves
 - [ ] **Phase 57: Compliance Passports & Sovereignty Mesh** (P4) — Per-object certification, sovereignty zones, cross-border protocol
 - [ ] **Phase 58: Zero-Gravity Storage** (P4) — CRUSH placement, VDE parallelism, SIMD bitmap, rebalancer, billing API
-- [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine
+- [ ] **Phase 59: Crypto Time-Locks & PQ Encryption** (P4) — Ransomware vaccination, CRYSTALS-Kyber/Dilithium/SPHINCS+, crypto-agility engine. **Plans:** 10 plans in 5 waves
 - [ ] **Phase 60: Semantic Sync** (P4) — AI-driven edge-cloud sync, summary-vs-raw routing, semantic conflict resolution
 - [ ] **Phase 61: Chaos Vaccination** (P4) — Fault injection, blast radius enforcement, immune response, vaccination schedule
 - [ ] **Phase 62: Carbon-Aware Tiering** (P4) — Energy measurement, carbon budgets, renewable-aware placement, GHG reporting
@@ -1165,3 +1165,44 @@ Wave 4 (Verification — depends on all):
   6. All existing tests pass with 0 failures
   7. Updated v5.0 Feature Verification Matrix produced
   8. Remaining gap inventory documented for follow-up phases
+
+#### Phase 55: Universal Tag System
+**Goal**: Implement a rich metadata tag system that attaches to every piece of data. Tags are the substrate for compliance passports, sovereignty mesh, placement optimizer, carbon-aware tiering, and data consciousness. Every StorageObjectMetadata gains a typed, versioned, policy-governed tag collection. Also fix ORSet unbounded growth (P0-12).
+**Depends on**: Phase 54
+**Plans**: 11 plans, 6 waves
+
+Wave 1 (Foundation — independent):
+- [ ] 55-01-PLAN.md — SDK tag type system (TagValue discriminated union, TagKey, TagCollection, TagSource, TagAcl)
+- [ ] 55-02-PLAN.md — Tag schema registry (TagSchema, versioning, TagSchemaValidator)
+- [ ] 55-03-PLAN.md — ORSet pruning/GC fix (P0-12: tombstone timestamps, causal stability, compaction)
+
+Wave 2 (Storage Integration — depends on Wave 1):
+- [ ] 55-04-PLAN.md — StorageObjectMetadata.Tags property, ITagAttachmentService, tag events
+- [ ] 55-05-PLAN.md — In-memory implementations (schema registry, tag store, attachment service)
+
+Wave 3 (Engines — depends on Wave 2):
+- [ ] 55-06-PLAN.md — Tag propagation engine (pipeline stages, rules, transform/copy/drop/merge)
+- [ ] 55-07-PLAN.md — Tag policy engine (mandatory tags, severity levels, violation events)
+
+Wave 4 (Indexing — depends on Wave 2):
+- [ ] 55-08-PLAN.md — Inverted tag index (sharded, 1B scale, 12 filter operators)
+- [ ] 55-09-PLAN.md — Tag query API (composable AND/OR/NOT expressions, aggregation)
+
+Wave 5 (CRDT Versioning — depends on Wave 1+2):
+- [ ] 55-10-PLAN.md — CRDT tag collection (version vectors, per-tag merge strategies, ORSet integration)
+
+Wave 6 (Verification — depends on all):
+- [ ] 55-11-PLAN.md — Service registration, health checks, full solution build verification
+
+**Success Criteria**:
+  1. TagValue has 11 concrete types (string, color, object, pointer, link, paragraph, number, list, tree, bool + abstract base)
+  2. StorageObjectMetadata.Tags property exists (nullable, backward compatible)
+  3. Tag schemas validated before writes (type, constraints, required)
+  4. Tag policies enforce mandatory rules with severity levels
+  5. Tags propagate through ingest->process->store->replicate pipeline
+  6. CRDT-based conflict resolution for concurrent multi-node tag writes
+  7. ORSet pruning bounds tombstone growth (P0-12 resolved)
+  8. Inverted index supports 12 filter operators with sharded storage
+  9. Query API supports composable AND/OR/NOT expressions with pagination
+  10. Full solution builds with 0 errors, all tests pass
+  11. ~20 files in DataWarehouse.SDK/Tags/
