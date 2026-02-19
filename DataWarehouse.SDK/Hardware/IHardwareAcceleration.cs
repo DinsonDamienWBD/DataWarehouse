@@ -45,7 +45,19 @@ namespace DataWarehouse.SDK.Hardware
         Tpm2 = 256,
 
         /// <summary>HSM PCIe - Hardware Security Module over PCIe for cryptographic operations.</summary>
-        HsmPcie = 512
+        HsmPcie = 512,
+
+        /// <summary>OpenCL - Cross-vendor GPU/CPU/FPGA compute acceleration.</summary>
+        OpenCL = 1024,
+
+        /// <summary>SYCL - Intel oneAPI heterogeneous compute (CPU+GPU+FPGA).</summary>
+        Sycl = 2048,
+
+        /// <summary>Triton - GPU kernel compilation for ML workloads.</summary>
+        Triton = 4096,
+
+        /// <summary>CANN - Huawei Ascend NPU acceleration.</summary>
+        Cann = 8192
     }
 
     /// <summary>
@@ -197,6 +209,15 @@ namespace DataWarehouse.SDK.Hardware
 
         /// <summary>OpenCL runtime (cross-vendor).</summary>
         OpenCL,
+
+        /// <summary>SYCL runtime (Intel oneAPI DPC++).</summary>
+        Sycl,
+
+        /// <summary>Triton GPU kernel compilation runtime.</summary>
+        Triton,
+
+        /// <summary>CANN runtime (Huawei Ascend NPU).</summary>
+        Cann,
 
         /// <summary>Apple Metal runtime.</summary>
         Metal
