@@ -603,14 +603,14 @@ public sealed class FlinkStreamProcessingStrategy : StreamingDataStrategyBase
     /// <summary>
     /// Restores a job from savepoint.
     /// </summary>
-    public Task<FlinkJob> RestoreFromSavepointAsync(
+    public async Task<FlinkJob> RestoreFromSavepointAsync(
         FlinkJobSpec spec,
         string savepointPath,
         CancellationToken ct = default)
     {
-        var job = SubmitJobAsync(spec, ct).Result;
+        var job = await SubmitJobAsync(spec, ct).ConfigureAwait(false);
         job.RestoredFromSavepoint = savepointPath;
-        return Task.FromResult(job);
+        return job;
     }
 
     /// <summary>

@@ -444,7 +444,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private PolicyEvaluationDetail EvaluatePolicyDetailedSync(PolicyDefinition policy, AccessContext context)
         {
             // Sync bridge: internal sync wrapper for policy evaluation
-            return Task.Run(() => EvaluatePolicyDetailedAsync(policy, context, CancellationToken.None)).Result;
+            return Task.Run(() => EvaluatePolicyDetailedAsync(policy, context, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         private async Task<RuleEvaluationResult> EvaluateRuleAsync(

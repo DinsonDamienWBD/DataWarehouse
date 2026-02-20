@@ -79,7 +79,7 @@ public static class PortableMediaDetector
     public static string? FindLocalLiveInstance(int[]? portsToCheck = null)
     {
         // Sync bridge: obsolete sync API wrapper
-        return Task.Run(() => FindLocalLiveInstanceAsync(portsToCheck)).Result;
+        return Task.Run(() => FindLocalLiveInstanceAsync(portsToCheck)).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>

@@ -89,7 +89,9 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
 
         // Convert to policy and update Instance level
         var policy = ConvertConfigurationToPolicy(config);
-        _configProvider.SetPolicyAsync(policy).Wait();
+        // SetConfiguration() is a synchronous interface. Task.Run avoids deadlocks on
+        // synchronization-context-bound threads.
+        Task.Run(() => _configProvider.SetPolicyAsync(policy)).ConfigureAwait(false).GetAwaiter().GetResult();
 
         _logger?.LogInformation("Instance-level pipeline policy updated: {Name}", config.Name);
     }

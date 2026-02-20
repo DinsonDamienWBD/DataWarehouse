@@ -154,7 +154,10 @@ public static class NativeInteropExports
         try
         {
             var handle = new InteropConnectionHandle(connectionString);
-            var result = handle.ConnectAsync().GetAwaiter().GetResult();
+            // Connect() is exported as a synchronous C ABI function (dw_connect).
+            // Cross-language callers cannot await. Task.Run avoids deadlocks on
+            // synchronization-context-bound threads.
+            var result = Task.Run(() => handle.ConnectAsync()).ConfigureAwait(false).GetAwaiter().GetResult();
             return result == InteropErrorCode.Ok
                 ? (InteropErrorCode.Ok, handle.HandleId)
                 : (result, 0);

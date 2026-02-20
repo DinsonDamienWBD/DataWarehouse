@@ -78,7 +78,8 @@ internal static class ReplicaFallbackChain
         var scored = new List<(string NodeId, double Score)>();
         foreach (var replicaId in replicas)
         {
-            var topology = topologyProvider.GetNodeTopologyAsync(replicaId).Result;
+            // Obsolete sync bridge — Task.Run avoids deadlocks on sync-context threads.
+            var topology = Task.Run(() => topologyProvider.GetNodeTopologyAsync(replicaId)).ConfigureAwait(false).GetAwaiter().GetResult();
             if (topology == null) continue;
 
             var score = ProximityCalculator.CalculateProximityScore(self, topology, RoutingPolicy.LatencyOptimized);

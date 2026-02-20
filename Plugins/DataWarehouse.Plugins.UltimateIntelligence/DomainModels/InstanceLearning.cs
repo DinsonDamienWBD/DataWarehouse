@@ -1003,17 +1003,22 @@ public sealed class TrainingScheduler
             if (schedule.ScheduledTime <= now && CheckResourceAvailability(schedule))
             {
                 // Trigger training (would call IncrementalTrainer in production)
-                _messageBus?.PublishAsync("intelligence.instance.training.triggered", new PluginMessage
+                // Timer callback cannot be async. Task.Run avoids deadlocks on
+                // synchronization-context-bound threads.
+                if (_messageBus != null)
                 {
-                    Type = "intelligence.instance.training.triggered",
-                    Source = "UltimateIntelligence",
-                    Payload = new Dictionary<string, object>
+                    Task.Run(() => _messageBus.PublishAsync("intelligence.instance.training.triggered", new PluginMessage
                     {
-                        ["ScheduleId"] = schedule.ScheduleId,
-                        ["ModelId"] = schedule.ModelId,
-                        ["Timestamp"] = DateTimeOffset.UtcNow
-                    }
-                }).Wait();
+                        Type = "intelligence.instance.training.triggered",
+                        Source = "UltimateIntelligence",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["ScheduleId"] = schedule.ScheduleId,
+                            ["ModelId"] = schedule.ModelId,
+                            ["Timestamp"] = DateTimeOffset.UtcNow
+                        }
+                    })).ConfigureAwait(false).GetAwaiter().GetResult();
+                }
 
                 // Update schedule if recurring
                 if (schedule.IsRecurring && schedule.RecurrenceIntervalHours.HasValue)

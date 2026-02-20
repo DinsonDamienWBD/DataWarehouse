@@ -161,7 +161,7 @@ public sealed class SemanticClusterIndex : ContextIndexBase
     }
 
     /// <inheritdoc/>
-    public override Task<IEnumerable<ContextNode>> GetChildrenAsync(string? parentId, int depth = 1, CancellationToken ct = default)
+    public override async Task<IEnumerable<ContextNode>> GetChildrenAsync(string? parentId, int depth = 1, CancellationToken ct = default)
     {
         var parent = parentId ?? RootClusterId;
         var children = _clusters.Values
@@ -174,13 +174,13 @@ public sealed class SemanticClusterIndex : ContextIndexBase
             var descendants = new List<ContextNode>(children);
             foreach (var child in children)
             {
-                var grandchildren = GetChildrenAsync(child.NodeId, depth - 1, ct).Result;
+                var grandchildren = await GetChildrenAsync(child.NodeId, depth - 1, ct).ConfigureAwait(false);
                 descendants.AddRange(grandchildren);
             }
-            return Task.FromResult<IEnumerable<ContextNode>>(descendants);
+            return descendants;
         }
 
-        return Task.FromResult<IEnumerable<ContextNode>>(children);
+        return children;
     }
 
     /// <inheritdoc/>

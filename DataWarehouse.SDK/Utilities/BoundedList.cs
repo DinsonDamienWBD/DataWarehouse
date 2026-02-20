@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Utilities
     /// to make room. Optionally auto-persists state via <see cref="IPluginStateStore"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
-    public sealed class BoundedList<T> : IEnumerable<T>, IDisposable
+    public sealed class BoundedList<T> : IEnumerable<T>, IDisposable, IAsyncDisposable
     {
         private readonly List<T> _items;
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
@@ -261,8 +261,26 @@ namespace DataWarehouse.SDK.Utilities
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         // -------------------------------------------------------------------------
-        // IDisposable
+        // IDisposable / IAsyncDisposable
         // -------------------------------------------------------------------------
+
+        /// <inheritdoc/>
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+
+            if (_pendingPersist && PersistenceEnabled)
+            {
+                try { await PersistAsync().ConfigureAwait(false); }
+                catch { /* Best-effort */ }
+            }
+
+            _lock.Dispose();
+        }
 
         /// <inheritdoc/>
         public void Dispose()
@@ -273,9 +291,12 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Dispose();
             _debounceTimer = null;
 
+            // Flush pending persist synchronously on dispose — Dispose() is synchronous.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            // Prefer DisposeAsync() for callers that can await.
             if (_pendingPersist && PersistenceEnabled)
             {
-                try { PersistAsync().GetAwaiter().GetResult(); }
+                try { Task.Run(() => PersistAsync()).ConfigureAwait(false).GetAwaiter().GetResult(); }
                 catch { /* Best-effort */ }
             }
 

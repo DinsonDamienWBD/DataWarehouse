@@ -169,13 +169,13 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase
     }
 
     /// <inheritdoc/>
-    public override Task<IEnumerable<ContextNode>> GetChildrenAsync(string? parentId, int depth = 1, CancellationToken ct = default)
+    public override async Task<IEnumerable<ContextNode>> GetChildrenAsync(string? parentId, int depth = 1, CancellationToken ct = default)
     {
         var parent = parentId ?? RootNodeId;
         var results = new List<ContextNode>();
 
         if (!_childIndex.TryGetValue(parent, out var childIds))
-            return Task.FromResult<IEnumerable<ContextNode>>(results);
+            return results;
 
         foreach (var childId in childIds)
         {
@@ -186,13 +186,13 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase
                 // Recursively get children if depth > 1
                 if (depth > 1)
                 {
-                    var grandchildren = GetChildrenAsync(childId, depth - 1, ct).Result;
+                    var grandchildren = await GetChildrenAsync(childId, depth - 1, ct).ConfigureAwait(false);
                     results.AddRange(grandchildren);
                 }
             }
         }
 
-        return Task.FromResult<IEnumerable<ContextNode>>(results);
+        return results;
     }
 
     /// <inheritdoc/>

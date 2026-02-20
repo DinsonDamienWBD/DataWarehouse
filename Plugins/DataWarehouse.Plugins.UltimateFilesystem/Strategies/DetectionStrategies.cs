@@ -65,10 +65,10 @@ public sealed class AutoDetectStrategy : FilesystemStrategyBase
         return Task.CompletedTask;
     }
 
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
     {
-        var result = DetectAsync(path, ct).Result;
-        return Task.FromResult(result ?? new FilesystemMetadata { FilesystemType = "unknown" });
+        var result = await DetectAsync(path, ct).ConfigureAwait(false);
+        return result ?? new FilesystemMetadata { FilesystemType = "unknown" };
     }
 }
 
@@ -146,10 +146,10 @@ public sealed class NtfsStrategy : FilesystemStrategyBase
         return Task.CompletedTask;
     }
 
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
     {
-        var result = DetectAsync(path, ct).Result;
-        return Task.FromResult(result ?? new FilesystemMetadata { FilesystemType = "NTFS" });
+        var result = await DetectAsync(path, ct).ConfigureAwait(false);
+        return result ?? new FilesystemMetadata { FilesystemType = "NTFS" };
     }
 }
 

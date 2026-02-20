@@ -27,7 +27,7 @@ namespace DataWarehouse.SDK.Utilities
     /// </summary>
     /// <typeparam name="TKey">The type of keys. Must be non-null.</typeparam>
     /// <typeparam name="TValue">The type of values.</typeparam>
-    public sealed class BoundedDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IDisposable
+    public sealed class BoundedDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IDisposable, IAsyncDisposable
         where TKey : notnull
     {
         // --- backing store ---
@@ -526,8 +526,26 @@ namespace DataWarehouse.SDK.Utilities
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         // -------------------------------------------------------------------------
-        // IDisposable
+        // IDisposable / IAsyncDisposable
         // -------------------------------------------------------------------------
+
+        /// <inheritdoc/>
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+
+            if (_pendingPersist && PersistenceEnabled)
+            {
+                try { await PersistAsync().ConfigureAwait(false); }
+                catch { /* Best-effort */ }
+            }
+
+            _lock.Dispose();
+        }
 
         /// <inheritdoc/>
         public void Dispose()
@@ -538,10 +556,12 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Dispose();
             _debounceTimer = null;
 
-            // Flush pending persist synchronously on dispose
+            // Flush pending persist synchronously on dispose — Dispose() is synchronous.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            // Prefer DisposeAsync() for callers that can await.
             if (_pendingPersist && PersistenceEnabled)
             {
-                try { PersistAsync().GetAwaiter().GetResult(); }
+                try { Task.Run(() => PersistAsync()).ConfigureAwait(false).GetAwaiter().GetResult(); }
                 catch { /* Best-effort */ }
             }
 

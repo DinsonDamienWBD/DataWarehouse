@@ -755,8 +755,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             _flushTimer?.Dispose();
             _retentionTimer?.Dispose();
 
-            // Sync dispose: must flush synchronously
-            ForceFlushAsync().Wait();
+            // Sync dispose: must flush synchronously. Task.Run avoids deadlocks on
+            // synchronization-context-bound threads.
+            Task.Run(() => ForceFlushAsync()).ConfigureAwait(false).GetAwaiter().GetResult();
 
             foreach (var destination in _destinations.OfType<IDisposable>())
             {

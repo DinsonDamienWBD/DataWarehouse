@@ -154,8 +154,8 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         try
         {
             _isProcessing = true;
-            // Sync bridge: Timer callback cannot be async
-            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).Wait();
+            // Sync bridge: Timer callback cannot be async. Task.Run avoids deadlocks.
+            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         finally
         {

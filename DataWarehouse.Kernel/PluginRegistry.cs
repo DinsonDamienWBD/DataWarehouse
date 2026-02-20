@@ -261,7 +261,7 @@ namespace DataWarehouse.Kernel
         {
             // Cannot be async: Called from sync context during plugin registration.
             // Using Task.Run to prevent sync context deadlock, then block safely.
-            return Task.Run(() => GetPluginMetadataAsync(plugin)).Result;
+            return Task.Run(() => GetPluginMetadataAsync(plugin)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
     }
 }

@@ -349,7 +349,7 @@ namespace DataWarehouse.Kernel.Storage
         public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
         {
             // Sync bridge: obsolete sync API wrapper
-            return Task.Run(() => HasAccessAsync(context, containerId, requiredLevel)).Result;
+            return Task.Run(() => HasAccessAsync(context, containerId, requiredLevel)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         #endregion

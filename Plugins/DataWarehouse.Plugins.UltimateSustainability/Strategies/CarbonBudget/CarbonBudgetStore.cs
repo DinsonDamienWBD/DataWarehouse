@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonBudgetEn
 /// and persists to a JSON file for durability across restarts.
 /// Thread-safe via SemaphoreSlim for file I/O and ConcurrentDictionary for memory access.
 /// </summary>
-public sealed class CarbonBudgetStore : IDisposable
+public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, MutableBudgetEntry> _budgets = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
@@ -255,7 +255,7 @@ public sealed class CarbonBudgetStore : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;
@@ -265,7 +265,26 @@ public sealed class CarbonBudgetStore : IDisposable
         // Final save if dirty
         if (_dirty)
         {
-            SaveAsync(CancellationToken.None).GetAwaiter().GetResult();
+            await SaveAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+
+        _fileLock.Dispose();
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _debounceSaveTimer?.Dispose();
+        _debounceSaveTimer = null;
+
+        // Final save if dirty — Dispose() is synchronous; use Task.Run to avoid
+        // deadlocks on synchronization-context-bound threads. Prefer DisposeAsync()
+        // for callers that can await.
+        if (_dirty)
+        {
+            Task.Run(() => SaveAsync(CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         _fileLock.Dispose();

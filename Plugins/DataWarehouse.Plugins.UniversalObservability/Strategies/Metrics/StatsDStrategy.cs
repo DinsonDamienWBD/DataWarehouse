@@ -129,7 +129,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     public void Increment(string name, IReadOnlyList<MetricLabel>? tags = null)
     {
         var metric = MetricValue.Counter(name, 1, tags);
-        MetricsAsyncCore(new[] { metric }, CancellationToken.None).Wait();
+        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -140,7 +140,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     public void Decrement(string name, IReadOnlyList<MetricLabel>? tags = null)
     {
         var metric = MetricValue.Counter(name, -1, tags);
-        MetricsAsyncCore(new[] { metric }, CancellationToken.None).Wait();
+        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -152,7 +152,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     public void Gauge(string name, double value, IReadOnlyList<MetricLabel>? tags = null)
     {
         var metric = MetricValue.Gauge(name, value, tags);
-        MetricsAsyncCore(new[] { metric }, CancellationToken.None).Wait();
+        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -164,7 +164,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     public void Timing(string name, double milliseconds, IReadOnlyList<MetricLabel>? tags = null)
     {
         var metric = MetricValue.Histogram(name, milliseconds, tags, "milliseconds");
-        MetricsAsyncCore(new[] { metric }, CancellationToken.None).Wait();
+        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     private void EnsureConfigured()

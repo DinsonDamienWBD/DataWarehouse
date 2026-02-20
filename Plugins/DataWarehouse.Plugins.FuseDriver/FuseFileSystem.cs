@@ -243,8 +243,9 @@ public sealed class FuseFileSystem : IDisposable
 
         if (data == null || data.Length == 0)
         {
-            // FUSE API requires synchronous callbacks
-            data = Task.Run(() => LoadFromStorageAsync(path)).Result;
+            // FUSE API requires synchronous callbacks — cannot be made async at this boundary.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            data = Task.Run(() => LoadFromStorageAsync(path)).ConfigureAwait(false).GetAwaiter().GetResult();
             if (data == null)
             {
                 return 0; // EOF
@@ -366,7 +367,7 @@ public sealed class FuseFileSystem : IDisposable
         if (handle.IsDirty && handle.Node != null)
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         return 0;
@@ -468,7 +469,7 @@ public sealed class FuseFileSystem : IDisposable
 
         // Delete from storage
         // FUSE API requires synchronous callbacks
-        Task.Run(() => DeleteFromStorageAsync(path)).Wait();
+        Task.Run(() => DeleteFromStorageAsync(path)).ConfigureAwait(false).GetAwaiter().GetResult();
 
         return 0;
     }
@@ -910,7 +911,7 @@ public sealed class FuseFileSystem : IDisposable
         if (handle.IsDirty)
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).ConfigureAwait(false).GetAwaiter().GetResult();
             handle.IsDirty = false;
         }
 
@@ -1685,7 +1686,7 @@ public sealed class FuseFileSystem : IDisposable
         foreach (var handle in _openHandles.Values.Where(h => h.IsDirty && h.Node != null))
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
+            Task.Run(() => SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>())).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         _openHandles.Clear();

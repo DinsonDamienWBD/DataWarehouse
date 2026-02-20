@@ -220,8 +220,8 @@ namespace DataWarehouse.Plugins.Raft
             meta["State"] = _state.ToString();
             meta["LeaderId"] = _leaderId ?? "none";
             meta["PeerCount"] = _peers.Count;
-            // Sync bridge: GetMetadata is synchronous in base class
-            meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).Result : 0;
+            // Sync bridge: GetMetadata is synchronous in base class. Task.Run avoids deadlocks.
+            meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).ConfigureAwait(false).GetAwaiter().GetResult() : 0;
             meta["CommitIndex"] = _commitIndex;
             return meta;
         }

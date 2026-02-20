@@ -644,8 +644,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 if (_disposed) return;
                 _disposed = true;
 
-                // Sync dispose: must stop synchronously
-                StopAsync().Wait();
+                // Sync dispose: must stop synchronously. Task.Run avoids deadlocks.
+                Task.Run(() => StopAsync()).ConfigureAwait(false).GetAwaiter().GetResult();
 
                 foreach (var strategy in _strategies.Values)
                 {

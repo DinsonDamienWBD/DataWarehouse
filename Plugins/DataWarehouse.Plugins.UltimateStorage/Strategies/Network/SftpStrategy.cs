@@ -942,7 +942,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task EnumerateFilesRecursiveAsync(string remotePath, string prefix, List<StorageObjectMetadata> results, CancellationToken ct)
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -963,7 +963,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         if (file.IsDirectory)
                         {
                             // Recursively enumerate subdirectory
-                            EnumerateFilesRecursiveAsync(file.FullName, prefix, results, ct).Wait(ct);
+                            await EnumerateFilesRecursiveAsync(file.FullName, prefix, results, ct).ConfigureAwait(false);
                         }
                         else
                         {
@@ -988,7 +988,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                                 continue;
 
                             // Load custom metadata if available
-                            var customMetadata = LoadMetadataFileAsync(fullPath, ct).Result;
+                            var customMetadata = await LoadMetadataFileAsync(fullPath, ct).ConfigureAwait(false);
 
                             results.Add(new StorageObjectMetadata
                             {
