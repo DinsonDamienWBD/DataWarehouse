@@ -2409,7 +2409,9 @@ internal sealed class MessageBusTagProvider : ITagProvider
                     ["tagName"] = tagName
                 }
             };
-            var response = _bus.SendAsync("tags.get", message).GetAwaiter().GetResult();
+            // ITagProvider is a synchronous interface used inside the query execution engine.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            var response = Task.Run(() => _bus.SendAsync("tags.get", message)).ConfigureAwait(false).GetAwaiter().GetResult();
             return response.Success ? response.Payload?.ToString() : null;
         }
         catch
@@ -2431,7 +2433,9 @@ internal sealed class MessageBusTagProvider : ITagProvider
                     ["tagName"] = tagName
                 }
             };
-            var response = _bus.SendAsync("tags.has", message).GetAwaiter().GetResult();
+            // ITagProvider is a synchronous interface used inside the query execution engine.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            var response = Task.Run(() => _bus.SendAsync("tags.has", message)).ConfigureAwait(false).GetAwaiter().GetResult();
             return response.Success && response.Payload is true;
         }
         catch
@@ -2452,7 +2456,9 @@ internal sealed class MessageBusTagProvider : ITagProvider
                     ["objectKey"] = objectKey
                 }
             };
-            var response = _bus.SendAsync("tags.count", message).GetAwaiter().GetResult();
+            // ITagProvider is a synchronous interface used inside the query execution engine.
+            // Task.Run avoids deadlocks on synchronization-context-bound threads.
+            var response = Task.Run(() => _bus.SendAsync("tags.count", message)).ConfigureAwait(false).GetAwaiter().GetResult();
             return response.Success && response.Payload is int count ? count : 0;
         }
         catch

@@ -232,12 +232,10 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
                 ["supportsScheduling"] = true,
                 ["supportsImmuneMemory"] = true,
                 ["supportsBlastRadiusEnforcement"] = true,
-                ["immuneMemorySize"] = _immuneSystem != null
-                    ? _immuneSystem.GetImmuneMemoryAsync().GetAwaiter().GetResult().Count
-                    : 0,
-                ["activeSchedules"] = _scheduler != null
-                    ? _scheduler.GetSchedulesAsync().GetAwaiter().GetResult().Count(s => s.Enabled)
-                    : 0
+                // Note: static knowledge reports capability presence, not runtime counts.
+                // Runtime metrics are available via GetResilienceHealthAsync.
+                ["immuneMemorySize"] = _immuneSystem != null ? -1 : 0,
+                ["activeSchedules"] = _scheduler != null ? -1 : 0
             },
             Tags = new[] { "chaos", "vaccination", "fault-injection", "resilience" }
         });
@@ -500,16 +498,26 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
     }
 
     /// <inheritdoc/>
-    public override Task<ResilienceHealthInfo> GetResilienceHealthAsync(CancellationToken ct)
+    public override async Task<ResilienceHealthInfo> GetResilienceHealthAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
-        var runningExperiments = _engine?.GetRunningExperimentsAsync(ct).GetAwaiter().GetResult()
-            ?? (IReadOnlyList<ChaosExperimentResult>)Array.Empty<ChaosExperimentResult>();
+        var runningExperiments = _engine != null
+            ? await _engine.GetRunningExperimentsAsync(ct).ConfigureAwait(false)
+            : (IReadOnlyList<ChaosExperimentResult>)Array.Empty<ChaosExperimentResult>();
 
-        var immuneMemorySize = _immuneSystem?.GetImmuneMemoryAsync(ct).GetAwaiter().GetResult().Count ?? 0;
-        var activeZones = _enforcer?.GetActiveZonesAsync(ct).GetAwaiter().GetResult() ?? Array.Empty<IsolationZone>();
-        var schedules = _scheduler?.GetSchedulesAsync(ct).GetAwaiter().GetResult() ?? Array.Empty<VaccinationSchedule>();
+        var immuneMemory = _immuneSystem != null
+            ? await _immuneSystem.GetImmuneMemoryAsync(ct).ConfigureAwait(false)
+            : (IReadOnlyList<ImmuneMemoryEntry>)Array.Empty<ImmuneMemoryEntry>();
+        var immuneMemorySize = immuneMemory.Count;
+
+        var activeZones = _enforcer != null
+            ? await _enforcer.GetActiveZonesAsync(ct).ConfigureAwait(false)
+            : (IReadOnlyList<IsolationZone>)Array.Empty<IsolationZone>();
+
+        var schedules = _scheduler != null
+            ? await _scheduler.GetSchedulesAsync(ct).ConfigureAwait(false)
+            : (IReadOnlyList<VaccinationSchedule>)Array.Empty<VaccinationSchedule>();
         var enabledSchedules = schedules.Count(s => s.Enabled);
 
         var policyStates = new Dictionary<string, string>
@@ -533,10 +541,10 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
             policyStates[$"Zone:{zone.ZoneId}"] = zone.IsActive ? "Active" : "Inactive";
         }
 
-        return Task.FromResult(new ResilienceHealthInfo(
+        return new ResilienceHealthInfo(
             TotalPolicies: runningExperiments.Count + activeZones.Count + enabledSchedules + 1,
             ActiveCircuitBreakers: activeZones.Count,
-            PolicyStates: policyStates));
+            PolicyStates: policyStates);
     }
 
     /// <inheritdoc/>
@@ -548,8 +556,14 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
         metadata["GlobalBlastRadiusLimit"] = _options.GlobalBlastRadiusLimit.ToString();
         metadata["SafeMode"] = _options.SafeMode;
         metadata["InjectorCount"] = _engine?.Injectors.Count ?? 0;
-        metadata["ImmuneMemorySize"] = _immuneSystem?.GetImmuneMemoryAsync().GetAwaiter().GetResult().Count ?? 0;
-        metadata["ActiveZones"] = _enforcer?.GetActiveZonesAsync().GetAwaiter().GetResult().Count ?? 0;
+        // GetMetadata is a synchronous contract (PluginBase.GetMetadata). Use Task.Run to avoid
+        // deadlocks on synchronization-context-bound threads when awaiting the async calls.
+        metadata["ImmuneMemorySize"] = _immuneSystem != null
+            ? Task.Run(() => _immuneSystem.GetImmuneMemoryAsync()).ConfigureAwait(false).GetAwaiter().GetResult().Count
+            : 0;
+        metadata["ActiveZones"] = _enforcer != null
+            ? Task.Run(() => _enforcer.GetActiveZonesAsync()).ConfigureAwait(false).GetAwaiter().GetResult().Count
+            : 0;
         return metadata;
     }
 
