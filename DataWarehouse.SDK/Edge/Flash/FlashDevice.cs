@@ -1,5 +1,4 @@
 using DataWarehouse.SDK.Contracts;
-using Microsoft.Win32.SafeHandles;
 
 namespace DataWarehouse.SDK.Edge.Flash;
 
@@ -77,7 +76,6 @@ public interface IFlashDevice : IAsyncDisposable
 internal sealed class LinuxMtdFlashDevice : IFlashDevice
 {
     private readonly string _devicePath; // /dev/mtd0
-    private SafeFileHandle? _handle;
     private readonly int _eraseBlockSize;
     private readonly long _totalBlocks;
 
@@ -134,7 +132,7 @@ internal sealed class LinuxMtdFlashDevice : IFlashDevice
 
     public ValueTask DisposeAsync()
     {
-        _handle?.Dispose();
+        // Stub: real implementation would close the MTD file handle here
         return ValueTask.CompletedTask;
     }
 }

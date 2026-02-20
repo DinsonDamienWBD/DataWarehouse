@@ -25,7 +25,19 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<IReadOnlyList<PeerInfo>> DiscoverPeersAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            // In single-node mode there are no peers; no peer events are raised.
+            // OnPeerEvent would be raised here when peers join or leave (none in single-node).
             return Task.FromResult<IReadOnlyList<PeerInfo>>(Array.Empty<PeerInfo>());
+        }
+
+        /// <summary>
+        /// Raises a peer event. Used by the host process to notify subscribers when a
+        /// peer joins or leaves in multi-node scenarios that reuse the in-memory transport.
+        /// </summary>
+        /// <param name="peerEvent">The peer event to raise.</param>
+        public void RaisePeerEvent(PeerEvent peerEvent)
+        {
+            OnPeerEvent?.Invoke(peerEvent);
         }
 
         /// <inheritdoc />

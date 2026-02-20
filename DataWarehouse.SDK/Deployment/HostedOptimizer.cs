@@ -99,8 +99,11 @@ public sealed class HostedOptimizer
         }
         else
         {
-            // Step 3: Double-WAL bypass (when safe)
-            await DisableOsJournalingAsync(context.FilesystemType, vdeContainerPath, ct);
+            // Step 3: Double-WAL bypass (when safe) -- Linux and Windows only
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsWindows())
+            {
+                await DisableOsJournalingAsync(context.FilesystemType, vdeContainerPath, ct);
+            }
         }
 
         // Step 4: I/O alignment configuration
@@ -215,7 +218,11 @@ public sealed class HostedOptimizer
 
     private async Task ConfigureIoAlignmentAsync(string vdeContainerPath, CancellationToken ct)
     {
-        var blockSize = await FilesystemDetector.GetFilesystemBlockSizeAsync(vdeContainerPath, ct);
+        long? blockSize = null;
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsWindows())
+        {
+            blockSize = await FilesystemDetector.GetFilesystemBlockSizeAsync(vdeContainerPath, ct);
+        }
 
         if (blockSize.HasValue)
         {

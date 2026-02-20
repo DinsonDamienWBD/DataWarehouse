@@ -28,7 +28,7 @@ public abstract class LowLatencyStoragePluginBase : Hierarchy.DataPipelinePlugin
     public new bool IsIntelligenceAvailable { get; protected set; }
 
     /// <summary>Intelligence capabilities (explicit interface implementation to avoid name conflict with HardwareCapabilities).</summary>
-    private IntelligenceCapabilities _intelligenceCapabilities;
+    private IntelligenceCapabilities _intelligenceCapabilities = new();
     IntelligenceCapabilities IIntelligenceAware.AvailableCapabilities => _intelligenceCapabilities;
 
     public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)

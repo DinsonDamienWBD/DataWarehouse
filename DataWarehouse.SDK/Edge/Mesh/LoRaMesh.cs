@@ -90,6 +90,11 @@ public sealed class LoRaMesh : IMeshNetwork
         // 4. Send via LoRa radio (e.g., SPI write to SX1276 TX buffer)
         // 5. Wait for ACK from next hop
 
+        // Stub: loopback to simulate receipt on single-node
+        OnMessageReceived?.Invoke(this, new MeshMessageReceivedEventArgs(
+            SourceNodeId: destinationNodeId,
+            Payload: payload));
+
         return Task.CompletedTask;
     }
 
@@ -117,6 +122,7 @@ public sealed class LoRaMesh : IMeshNetwork
             Routes = new Dictionary<int, int[]>()
         };
 
+        OnTopologyChanged?.Invoke(this, new MeshTopologyChangedEventArgs(topology));
         return Task.FromResult(topology);
     }
 

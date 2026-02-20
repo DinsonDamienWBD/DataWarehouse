@@ -213,6 +213,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     ///   <item><description>Parallels: HKLM\SOFTWARE\Parallels</description></item>
     /// </list>
     /// </remarks>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static HypervisorType DetectWindowsHypervisor()
     {
         // Check Hyper-V registry key

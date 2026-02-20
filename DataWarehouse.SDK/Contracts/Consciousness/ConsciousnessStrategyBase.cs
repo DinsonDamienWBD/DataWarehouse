@@ -81,7 +81,6 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     {
         private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private bool _initialized;
-        private bool _disposed;
         private DateTime? _healthCacheExpiry;
         private ConsciousnessHealthStatus? _cachedHealth;
 

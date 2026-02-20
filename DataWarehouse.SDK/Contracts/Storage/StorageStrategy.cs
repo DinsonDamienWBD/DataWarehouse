@@ -718,7 +718,7 @@ namespace DataWarehouse.SDK.Contracts.Storage
 
                     await Task.Delay(delay, ct);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Non-transient exception or max retries exceeded
                     sw.Stop();

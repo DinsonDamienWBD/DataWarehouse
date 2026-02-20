@@ -470,11 +470,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     {
         private readonly IPlatformCapabilityRegistry _registry;
         private IntPtr _instance;
-        private IntPtr _physicalDevice;
         private IntPtr _device;
-        private IntPtr _computeQueue;
         private IntPtr _commandPool;
-        private uint _computeQueueFamily;
         private int _deviceCount;
         private bool _isAvailable;
         private bool _initialized;

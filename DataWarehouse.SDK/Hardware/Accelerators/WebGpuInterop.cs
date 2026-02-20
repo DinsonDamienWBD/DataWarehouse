@@ -384,7 +384,6 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly IPlatformCapabilityRegistry _registry;
         private IntPtr _instance;
         private IntPtr _device;
-        private IntPtr _queue;
         private bool _isAvailable;
         private bool _initialized;
         private long _operationsCompleted;

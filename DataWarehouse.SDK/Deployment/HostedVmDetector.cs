@@ -84,9 +84,13 @@ public sealed class HostedVmDetector : IDeploymentDetector
                 // VM info retrieval failed, continue with partial detection
             }
 
-            // Step 2: Detect filesystem type
+            // Step 2: Detect filesystem type (supported on Linux, Windows, macOS)
             var currentDirectory = Environment.CurrentDirectory;
-            var filesystemType = await FilesystemDetector.DetectFilesystemTypeAsync(currentDirectory, ct);
+            string? filesystemType = null;
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+            {
+                filesystemType = await FilesystemDetector.DetectFilesystemTypeAsync(currentDirectory, ct);
+            }
 
             // Step 3: Construct DeploymentContext
             var metadata = new Dictionary<string, string>();

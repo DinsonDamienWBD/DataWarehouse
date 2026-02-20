@@ -343,7 +343,6 @@ public sealed class LoadBalancingManager
     private long _totalRequests;
     private long _requestsLastMinute;
     private DateTime _lastMetricsReset = DateTime.UtcNow;
-    private int _activeNodes;
 
     public LoadBalancingManager(LoadBalancingConfig? defaultConfig = null)
     {
