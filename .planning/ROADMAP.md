@@ -1492,10 +1492,10 @@ Wave 4 (Final gate — depends on all):
 
 ## Milestone: v6.0 Intelligent Policy Engine & Composable VDE
 
-> 16 phases (68-83) | 146 requirements across 17 categories | 73 plans | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing last
-> Design documents: .planning/v6.0-DESIGN-DISCUSSION.md (12 architectural decisions), .planning/v6.0-VDE-FORMAT-v2.0-SPEC.md, .planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md
+> 22 phases (68-89) | 294 requirements across 25 categories | 145 plans | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing, deployment modes, competitive edge, adaptive index engine, VDE scalable internals, dynamic subsystem scaling, ecosystem compatibility last
+> Design documents: .planning/v6.0-DESIGN-DISCUSSION.md (21 architectural decisions), .planning/v6.0-VDE-FORMAT-v2.0-SPEC.md, .planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md
 
-**Milestone Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.0 format with 18 named regions, runtime VDE composition, three-tier performance model, AI-driven policy intelligence, authority chain with 3-of-5 quorum, and full OS integration for the .dwvd extension.
+**Milestone Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.0 format with 18 named regions, runtime VDE composition, three-tier performance model, AI-driven policy intelligence, authority chain with 3-of-5 quorum, and full OS integration for the .dwvd extension. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration into install mode, fix all CLI stubs, and test all deployment modes.
 
 **Ordering Rationale:** SDK contracts gate everything (Phase 68). Policy persistence is independent of cascade logic and must exist before cascade can store results (Phase 69). Cascade engine depends on both SDK and persistence (Phase 70). VDE format and regions are independent of policy engine: format first (71), then foundational regions (72), then operational regions (73), then identity/tamper (74). Authority chain requires SDK foundation (Phase 75). Performance optimization requires cascade engine (Phase 76). AI intelligence requires authority chain and performance (Phase 77). Online module addition requires VDE format (Phase 78). OS integration is independent (Phase 79). Three-tier verification requires all VDE work (Phase 80). Migration requires VDE format and cascade (Phase 81). Plugin consolidation is intentionally late because it can break things (Phase 82). Integration testing is the final gate (Phase 83).
 
@@ -1518,6 +1518,12 @@ Phase 68 (SDK Foundation)
     +---> Phase 81 (Migration) -- depends on Phase 71 + Phase 70
     +---> Phase 82 (Plugin Consolidation) -- depends on all implementation
     +---> Phase 83 (Integration Testing) -- depends on all phases above
+    +---> Phase 84 (Deployment Topology & CLI Modes) -- depends on Phase 79 (OS Integration) + Phase 71 (VDE Format)
+    +---> Phase 85 (Competitive Edge) -- depends on Phase 71 (VDE Format) + Phase 83 (Integration Testing)
+    +---> Phase 86 (Adaptive Index Engine) -- depends on Phase 71 (VDE Format) + Phase 85 (Competitive Edge)
+    +---> Phase 87 (VDE Scalable Internals) -- depends on Phase 71 (VDE Format) + Phase 86 (Adaptive Index Engine)
+    +---> Phase 88 (Dynamic Subsystem Scaling) -- depends on Phase 68 (SDK Foundation) + Phase 87 (VDE Scalable Internals)
+    +---> Phase 89 (Ecosystem Compatibility) -- depends on Phase 83 (Integration Testing) + Phase 88 (Dynamic Subsystem Scaling)
 ```
 
 ### Phases
@@ -1538,20 +1544,28 @@ Phase 68 (SDK Foundation)
 - [ ] **Phase 81: Backward Compatibility & Migration** -- v1.0 format auto-detect, dw migrate command, v5.0 config migration, safe defaults (AI off, no multi-level without admin config)
 - [ ] **Phase 82: Plugin Consolidation Audit** -- Review 17 non-Ultimate plugins, identify merge candidates, execute merges, verify build/tests
 - [ ] **Phase 83: Integration Testing** -- PolicyEngine unit tests (~200), per-feature multi-level tests (~280), cross-feature tests (~50), AI behavior tests (~100), performance tests (~30), VDE/tamper/migration tests
+- [ ] **Phase 84: Deployment Topology & CLI Modes** -- DW-only/VDE-only/DW+VDE deployment selector, VDE Composer CLI+GUI, shell handler registration via install mode, fix CLI stubs (ServerCommands, sync-over-async), GUI mode wizard, deployment mode tests
+- [ ] **Phase 85: Competitive Edge** -- VDE-native block export for NAS/SAN protocols, native AD/Kerberos, TLA+ formal verification, OS-level security hardening, streaming SQL engine, deterministic I/O, variable-width addressing, ML pipeline integration, native Delta Lake/Iceberg operations
+- [ ] **Phase 86: Adaptive Index Engine** -- Replace B-tree with morphing ART→Bε-tree→Forest index, Bw-Tree lock-free paths, Masstree hot-path namespace, Disruptor message bus, extendible hashing inode table, native HNSW+PQ vector search, Hilbert curve engine, ALEX learned index, io_uring, trained Zstd dictionaries, SIMD hot paths, Bloofi distributed filter, Clock-SI transactions, persistent extent tree
+- [ ] **Phase 87: VDE Scalable Internals** -- Allocation groups, ARC 3-tier cache, variable-width inodes (compact/standard/extended), extent-based addressing, sub-block packing, MVCC, SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums, extent-aware snapshots/replication, online defragmentation
+- [ ] **Phase 88: Dynamic Subsystem Scaling** -- SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), fix critical bugs (streaming stubs, resilience no-op, blockchain int cast), migrate all 60 plugins from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for all subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
+- [ ] **Phase 89: Ecosystem Compatibility** -- Verify existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies; fix gaps; wire PostgreSQL protocol to SQL engine; multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto); Terraform provider + Pulumi bridge; Helm chart; Jepsen distributed correctness testing; connection pooling SDK contract
 
 ### Phase Details
 
 #### Phase 68: SDK Foundation
 **Goal**: All policy engine SDK contracts are defined and every plugin is policy-aware -- without these contracts nothing else in v6.0 can be built.
 **Depends on**: Phases 52-67 (v5.0 complete)
-**Requirements**: SDKF-01, SDKF-02, SDKF-03, SDKF-04, SDKF-05, SDKF-06, SDKF-07, SDKF-08, SDKF-09, SDKF-10, SDKF-11, SDKF-12
+**Requirements**: SDKF-01, SDKF-02, SDKF-03, SDKF-04, SDKF-05, SDKF-06, SDKF-07, SDKF-08, SDKF-09, SDKF-10, SDKF-11, SDKF-12, MRES-01, MRES-02, MRES-03, MRES-04, MRES-09, MRES-10
 **Success Criteria** (what must be TRUE):
   1. IPolicyEngine, IEffectivePolicy, IPolicyStore, IPolicyPersistence interfaces compile and are in SDK with XML docs
   2. PluginBase has PolicyContext property -- every existing plugin inherits it without modification
   3. IntelligenceAwarePluginBase exposes IAiHook, ObservationEmitter, RecommendationReceiver -- compiles clean
   4. UltimateIntelligencePlugin inherits PluginBase directly (NOT IntelligenceAwarePluginBase) -- verified by analyzer
   5. All 5 enums (PolicyLevel, CascadeStrategy, AiAutonomyLevel, OperationalProfile presets, QuorumAction) present in SDK with all values documented
-  6. Full solution builds with 0 errors, 0 warnings after SDK changes
+  6. MetadataResidencyMode, WriteStrategy, ReadStrategy, CorruptionAction enums present in SDK with all values documented
+  7. IMetadataResidencyResolver interface: resolves residency mode per feature per metadata type, supports per-field fallback within a single inode
+  8. Full solution builds with 0 errors, 0 warnings after SDK changes
 **Plans**: 4 plans
 
 Plans:
@@ -1609,7 +1623,7 @@ Plans:
 #### Phase 71: VDE Format v2.0
 **Goal**: The DWVD v2.0 binary format exists on disk -- superblock, region directory, block trailer, module manifest, and composable inode layout -- so all subsequent region and VDE work has a concrete format to target.
 **Depends on**: Phase 68 (SDK Foundation)
-**Requirements**: VDEF-01, VDEF-02, VDEF-03, VDEF-04, VDEF-05, VDEF-06, VDEF-07, VDEF-08, VDEF-09, VDEF-10, VDEF-11, VDEF-12, VDEF-13, VDEF-14, VDEF-15, VDEF-16, VDEF-17, VDEF-18
+**Requirements**: VDEF-01, VDEF-02, VDEF-03, VDEF-04, VDEF-05, VDEF-06, VDEF-07, VDEF-08, VDEF-09, VDEF-10, VDEF-11, VDEF-12, VDEF-13, VDEF-14, VDEF-15, VDEF-16, VDEF-17, VDEF-18, MRES-05, MRES-11
 **Success Criteria** (what must be TRUE):
   1. A DWVD v2.0 file opens with correct magic signature ("DWVD" + version + "dw://" anchor) readable by the format parser
   2. Superblock Group (primary + mirror) serializes and deserializes with all fields intact
@@ -1768,7 +1782,7 @@ Plans:
 #### Phase 78: Online Module Addition
 **Goal**: Users can add a new VDE module to a running VDE without downtime by choosing between three clearly-explained options -- and any option leaves the VDE in a valid state.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 72 (VDE Regions Foundation)
-**Requirements**: OMOD-01, OMOD-02, OMOD-03, OMOD-04, OMOD-05, OMOD-06, OMOD-07, VADV-02
+**Requirements**: OMOD-01, OMOD-02, OMOD-03, OMOD-04, OMOD-05, OMOD-06, OMOD-07, VADV-02, MRES-06, MRES-07
 **Success Criteria** (what must be TRUE):
   1. Option 1 (online region addition from free space) completes without dismounting the VDE and is WAL-journaled
   2. Option 2 (inode field via padding bytes) claims reserved padding bytes with lazy initialization -- no inode table rebuild needed
@@ -1865,7 +1879,7 @@ Plans:
 #### Phase 83: Integration Testing
 **Goal**: The complete v6.0 feature set is verified by an independently-run test suite -- every policy level, every AI behavior, every format feature, every tamper response, and every migration path has test coverage.
 **Depends on**: Phases 68-82 (all v6.0 phases complete)
-**Requirements**: INTG-01, INTG-02, INTG-03, INTG-04, INTG-05, INTG-06, INTG-07, INTG-08
+**Requirements**: INTG-01, INTG-02, INTG-03, INTG-04, INTG-05, INTG-06, INTG-07, INTG-08, MRES-12
 **Success Criteria** (what must be TRUE):
   1. PolicyEngine unit tests: 200+ tests covering all contracts, cascade strategies, and edge cases
   2. Per-feature multi-level tests: 280+ tests confirming correct effective policy at each level for all 94 features
@@ -1884,27 +1898,291 @@ Plans:
 - [ ] 83-04-PLAN.md -- Performance benchmark suite (~30 tests): three-tier timing validation, MaterializedPolicyCache efficiency, BloomFilter accuracy
 - [ ] 83-05-PLAN.md -- VDE format tests (all 19 modules, 7 profiles) + tamper detection tests (all 5 levels) + migration tests (10 VDE configurations)
 
+#### Phase 84: Deployment Topology & CLI Modes
+**Goal**: CLI and GUI support three deployment topologies (DW-only, VDE-only, DW+VDE) with the VDE Composer integrated into install mode (mode c). All existing CLI stubs are replaced with real implementations. Shell handler and file extension registration happen automatically during install. All modes and topologies have integration test coverage.
+**Depends on**: Phase 79 (File Extension & OS Integration), Phase 71 (VDE Format v2.0)
+**Requirements**: DPLY-01, DPLY-02, DPLY-03, DPLY-04, DPLY-05, DPLY-06, DPLY-07, DPLY-08, DPLY-09, DPLY-10, DPLY-11, DPLY-12, DPLY-13, MRES-08
+**Success Criteria** (what must be TRUE):
+  1. `dw install --topology dw-only|vde-only|dw+vde` correctly deploys only the selected components; VDE-only runs a slim host without full DW kernel
+  2. DW-only deployment connects to remote VDE over network; VDE-only deployment accepts remote DW connections — verified by cross-host test
+  3. `dw vde create --modules security,tags,replication` creates a composable VDE with only the selected modules active (uses Phase 71 format)
+  4. GUI has a mode-selection page at startup (connect/live/install) and a VDE Composer wizard for module selection in install mode
+  5. Install mode (mode c) automatically registers `.dwvd` shell handlers and file extensions on Windows/Linux/macOS (uses Phase 79 registration)
+  6. `ServerCommands.ShowStatusAsync()` returns real server status (uptime, connections, version) from the running instance via HTTP API
+  7. `ServerCommands.StartServerAsync()`/`StopServerAsync()` perform real server lifecycle management (no `Task.Delay` stubs)
+  8. CLI `Program.cs` uses `await FindLocalLiveInstanceAsync()` instead of the obsolete sync wrapper
+  9. Integration tests exist for: mode a (connect to local + remote), mode b (live/embedded start + auto-detection), mode c (install with each topology), VDE composer flow, and shell handler registration verification
+**Plans**: 6 plans
+
+Plans:
+- [ ] 84-01-PLAN.md -- Deployment topology model: `DeploymentTopology` enum (DwOnly, VdeOnly, DwPlusVde), topology selection in InstallCommand, slim VDE-only host binary, DW-only remote VDE connection
+- [ ] 84-02-PLAN.md -- VDE Composer CLI: `dw vde create` command with `--modules` flag, module validation against ModuleManifest, integration with creation profiles from Phase 71
+- [ ] 84-03-PLAN.md -- VDE Composer GUI: mode-selection startup page (connect/live/install), VDE module selection wizard, topology preview, deployment progress view
+- [ ] 84-04-PLAN.md -- Shell handler & file extension registration in install flow: Windows registry entries, Linux freedesktop MIME + udev rules, macOS UTI, `.dw` script extension, secondary extensions
+- [ ] 84-05-PLAN.md -- CLI stub fixes: real ServerCommands.ShowStatusAsync() via InstanceManager HTTP API, real Start/Stop server lifecycle, fix sync-over-async FindLocalLiveInstance in Program.cs
+- [ ] 84-06-PLAN.md -- Deployment mode integration tests: mode a/b/c with all topologies, VDE composer end-to-end, shell handler registration verification, cross-host DW↔VDE connectivity test
+
+#### Phase 85: Competitive Edge
+**Goal**: Close all competitive gaps identified against ~80 storage/data products. Add VDE-native protocol fast paths, formal verification, OS-level security, streaming SQL, deterministic I/O, yottabyte addressing, and native lakehouse table operations. Many features ALREADY EXIST as plugin strategies — this phase adds VDE-native integration (Tier 1) and fills genuine gaps.
+**Depends on**: Phase 71 (VDE Format v2.0), Phase 83 (Integration Testing — competitive edge is post-integration)
+**Requirements**: EDGE-01, EDGE-02, EDGE-03, EDGE-04, EDGE-05, EDGE-06, EDGE-07, EDGE-08, EDGE-09, EDGE-10, EDGE-11, EDGE-12, EDGE-13
+**Success Criteria** (what must be TRUE):
+  1. SMB/NFS/iSCSI/FC/NVMe-oF strategies have a zero-copy VDE block export path — benchmark shows >2x throughput vs current plugin-mediated path
+  2. Active Directory authentication works end-to-end: SPNEGO negotiation, Kerberos ticket validation, AD group mapping to DW roles
+  3. TLA+ models exist for WAL crash recovery, Raft consensus, B-Tree split/merge, and VDE superblock update — all pass TLC model checker
+  4. TLA+ models run in CI (or as a manual verification step with documented invocation)
+  5. Linux process runs under seccomp-bpf; untrusted plugin code runs in sandboxed namespace; ASLR verification passes at startup
+  6. Streaming SQL engine processes windowed aggregations and materialized views at 1M+ events/sec per node with exactly-once semantics
+  7. Deterministic I/O mode pre-allocates all buffers and provides WCET annotations on critical paths
+  8. 128-bit block addressing compiles and is forward-compatible (VDE v2.0 format reserves address space; activation requires config flag)
+  9. ML pipeline stores feature data in VDE Intelligence Cache region; model versioning tracks lineage
+  10. Delta Lake/Iceberg transaction logs stored natively in VDE; time-travel queries use VDE snapshot mechanism
+**Plans**: 8 plans
+
+Plans:
+- [ ] 85-01-PLAN.md -- VDE-native block export: zero-copy I/O path for SMB/NFS/iSCSI/FC/NVMe-oF strategies, direct VDE region reads, bypass plugin layer on hot path
+- [ ] 85-02-PLAN.md -- Native AD/Kerberos: SPNEGO negotiation, Kerberos ticket validator, AD group-to-role mapper, service principal management (extends existing LDAP strategy)
+- [ ] 85-03-PLAN.md -- TLA+ formal verification: WAL crash recovery model, Raft consensus model, B-Tree split/merge model, VDE superblock update model, CI integration via TLC
+- [ ] 85-04-PLAN.md -- OS-level security hardening: seccomp-bpf profile, plugin namespace isolation, W^X verification, ASLR check, AppArmor/SELinux profile generation, Windows job objects
+- [ ] 85-05-PLAN.md -- Streaming SQL engine: continuous query parser, windowed aggregations (tumbling/hopping/session), materialized views, stream-table joins, watermark handling, backpressure
+- [ ] 85-06-PLAN.md -- Deterministic I/O mode: pre-allocated buffer pools, WCET annotations, deadline scheduler, bounded-latency path verification, safety certification traceability matrix
+- [ ] 85-07-PLAN.md -- Yottabyte addressing: 128-bit block address type (backward-compatible with 64-bit), dynamic inode table growth, exabyte VDE capacity, trillion-object support via multi-level indirect addressing
+- [ ] 85-08-PLAN.md -- ML pipeline + native lakehouse: in-VDE feature store, model versioning in Intelligence Cache, Delta Lake/Iceberg transaction log in VDE, time-travel via VDE snapshots, atomic multi-table commits
+
+Wave structure:
+```
+Wave 1: 85-01 (VDE block export) + 85-02 (AD/Kerberos) + 85-03 (TLA+) + 85-04 (OS security) -- parallel, independent
+Wave 2: 85-05 (Streaming SQL) + 85-06 (Deterministic I/O) + 85-07 (Yottabyte addressing) -- parallel, independent
+Wave 3: 85-08 (ML pipeline + lakehouse) -- depends on Phase 71 VDE regions
+```
+
+#### Phase 86: Adaptive Index Engine
+**Goal**: Build a living, self-morphing index that transparently transitions across a continuous spectrum of data structures — from direct pointers (1 object) through ART, Bε-trees, learned indexes, and distributed probabilistic routing (trillions of objects). The index morphs BOTH directions: forward as data grows, backward as data shrinks. The index itself is parallelized via striping, mirroring, sharding, and tiering — like RAID for indexes. Native io_uring and CUDA HNSW provide maximum hardware utilization.
+**Depends on**: Phase 71 (VDE Format v2.0), Phase 85 (Competitive Edge — variable-width addressing must exist)
+**Requirements**: AIE-01 through AIE-27
+**Success Criteria** (what must be TRUE):
+  1. A new VDE starts at Level 0 (direct pointer). Inserting 100 objects auto-morphs to Level 1 (sorted array). Inserting 10K auto-morphs to Level 2 (ART). Each transition is invisible to the caller — zero API changes, zero downtime.
+  2. Bε-tree (Level 3) write benchmark shows ≥10x fewer I/Os than current B-tree on sequential insert of 10M keys.
+  3. ALEX learned overlay (Level 4) achieves O(1) point lookups for ≥90% of queries on skewed access patterns; auto-retrains when hit rate drops below threshold.
+  4. Bε-tree Forest (Level 5) splits automatically at configurable threshold; each shard can be at a DIFFERENT morph level; Hilbert-partitioned with learned routing O(1).
+  5. Distributed routing (Level 6) scales to 10T+ objects across cluster; Bloofi reduces cross-node queries by ≥80%.
+  6. **Backward morphing works**: insert 1M objects (morphs to Level 3), then delete 999,000 objects → system morphs back to Level 1 (sorted array). Verified by test.
+  7. IndexMorphAdvisor makes autonomous decisions based on real metrics (object count, R/W ratio, latency, entropy); all decisions logged; admin can override via policy.
+  8. Index Striping: 4-stripe index shows ≥2.5x read throughput over single-stripe on NVMe with 4+ queues.
+  9. Index Sharding: adjacent shards at different morph levels function correctly (shard A = Bε-tree, shard B = sorted array).
+  10. Index Tiering: hot keys in ART L1 serve with ≤1μs; warm keys in Bε-tree L2 serve with ≤100μs; cold keys from archive L3 serve with ≤10ms.
+  11. io_uring on Linux: ≥5x throughput improvement over async file I/O with registered buffers; NVMe passthrough via `IORING_OP_URING_CMD` on raw block device; graceful fallback on non-Linux.
+  12. HNSW+PQ GPU path: ILGPU-compiled C# kernels achieve ≥5x speedup over CPU SIMD path on NVIDIA GPU; transparent fallback: GPU → SIMD → scalar.
+  13. Disruptor message bus sustains ≥10M msgs/sec per publisher; latency P99 < 10μs.
+  14. Extendible hashing inode table grows from 1K to 1B+ inodes without rebuild; O(1) amortized lookup.
+  15. Every morph transition is WAL-journaled, copy-on-write, background, cancellable, and crash-safe.
+  16. Legacy B-tree v1.0 VDEs open correctly; `dw migrate` upgrades to Bε-tree.
+**Plans**: 16 plans
+
+Plans:
+- [ ] 86-01-PLAN.md -- Morphing spectrum Levels 0-2: Direct Pointer Array, Sorted Array, ART (Node4/16/48/256, SIMD Node16, path compression); IAdaptiveIndex interface; Level selection logic
+- [ ] 86-02-PLAN.md -- Morphing spectrum Level 3: Bε-tree core (ε=0.5 message buffers, batched flush cascade, tombstone propagation, on-disk format); ART as L0 write buffer with flush protocol
+- [ ] 86-03-PLAN.md -- Morphing spectrum Level 4: ALEX learned overlay on Bε-tree (gapped array leaves, CDF model training, incremental retrain, hit-rate monitoring, automatic activation/deactivation)
+- [ ] 86-04-PLAN.md -- Morphing spectrum Level 5: Sharded Bε-tree Forest (Hilbert curve partitioner, learned shard routing, auto-split/merge, per-shard independent morph level tracking)
+- [ ] 86-05-PLAN.md -- Morphing spectrum Level 6: Distributed Probabilistic Routing (Bloofi hierarchical bloom, CRUSH shard placement, Clock-SI snapshot isolation, cross-node AIE coordination)
+- [ ] 86-06-PLAN.md -- IndexMorphAdvisor: autonomous decision engine (metrics collection, threshold self-tuning, latency regression auto-revert), IndexMorphPolicy (admin override), VDE Audit Log integration
+- [ ] 86-07-PLAN.md -- Bidirectional morphing + zero-downtime transitions: forward morph protocol, backward morph protocol (compaction + demotion), WAL-journaled CoW transitions, crash recovery, cancellation, progress observability
+- [ ] 86-08-PLAN.md -- Index RAID: Striping (N-way parallel read/write, auto-tuned N), Mirroring (M copies, sync/async, rebuild), Sharding (per-shard AIE, boundary auto-adjustment), Tiering (L1 ART / L2 Bε-tree / L3 learned, count-min sketch promotion/demotion)
+- [ ] 86-09-PLAN.md -- Bw-Tree lock-free metadata cache: mapping table, delta record chain, CAS updates, epoch-based GC; Masstree hot-path namespace: 8-byte key slicing, optimistic readers
+- [ ] 86-10-PLAN.md -- Disruptor message bus: pre-allocated ring, cache-line padding, sequence barriers, wait strategies; replaces Channel<T> on hot paths; Channel<T> preserved as fallback
+- [ ] 86-11-PLAN.md -- Extendible hashing inode table: directory/bucket structure, dynamic growth, on-disk persistence in VDE region, migration from fixed linear array, trillion-object support
+- [ ] 86-12-PLAN.md -- io_uring native integration: `[LibraryImport]` bindings to `liburing.so`, NativeMemory.AlignedAlloc pre-pinned pages, ring-per-thread, registered buffers, SQPoll, NVMe passthrough (`IORING_OP_URING_CMD`), graceful non-Linux fallback
+- [ ] 86-13-PLAN.md -- HNSW + PQ with GPU: CPU path (C# HNSW + Vector256/Avx2 SIMD distance + PQ ADC tables), GPU path (ILGPU C#→PTX batch distance + parallel traversal), cuVS optional path (`[LibraryImport("libcuvs")]`), VDE Intelligence Cache storage, transparent fallback chain
+- [ ] 86-14-PLAN.md -- Hilbert curve engine + trained Zstd dictionaries: Hilbert SFC implementation (3-11x over Z-order), ZstdNet dictionary trainer, Compression Dictionary Region storage, auto-retrain
+- [ ] 86-15-PLAN.md -- SIMD acceleration: Vector256/Avx2 bloom probe, ART Node16 search, cosine/dot-product/euclidean, XxHash, bitmap scanning; runtime `Avx2.IsSupported` detection with scalar fallback; persistent extent tree checkpointing
+- [ ] 86-16-PLAN.md -- AIE integration tests + legacy compatibility: full morph spectrum test (insert → Level 6 → delete → Level 0), Index RAID tests, backward morph tests, v1.0 B-tree migration, performance benchmarks (each level vs current B-tree)
+
+Wave structure:
+```
+Wave 1: 86-01 (Levels 0-2) + 86-02 (Level 3 Bε-tree) + 86-09 (Bw-Tree + Masstree) -- parallel, core structures
+Wave 2: 86-03 (Level 4 Learned) + 86-04 (Level 5 Forest) + 86-10 (Disruptor) + 86-11 (Extendible hash inode) -- parallel, depends on Wave 1
+Wave 3: 86-05 (Level 6 Distributed) + 86-06 (MorphAdvisor) + 86-07 (Bidirectional morph) + 86-08 (Index RAID) -- parallel, depends on Waves 1-2
+Wave 4: 86-12 (io_uring) + 86-13 (HNSW+PQ+GPU) + 86-14 (Hilbert+Zstd) + 86-15 (SIMD+extent tree) -- parallel, depends on Wave 1
+Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
+```
+
+#### Phase 87: VDE Scalable Internals
+**Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale.
+**Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
+**Requirements**: VOPT-01 through VOPT-28
+**Success Criteria** (what must be TRUE):
+  1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
+  2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
+  3. Compact inode: objects ≤48 bytes use ZERO block allocations; storage overhead = 64 bytes per object (vs 256 bytes + 4KB block today).
+  4. Indirect blocks WORK: files up to 64GB using indirect/double-indirect/triple-indirect blocks with 4KB block size. The NotSupportedException is eliminated.
+  5. Extent-based addressing: 1TB contiguous file stored with ≤64 extent descriptors (vs ~268M indirect pointers in current design).
+  6. MVCC: concurrent reader and writer on same object — reader sees consistent snapshot, writer commits without blocking reader. Read Committed, Snapshot Isolation, Serializable all pass correctness tests.
+  7. Columnar VDE region: analytical query (SELECT SUM(amount) WHERE region='EU') on 100M rows is ≥10x faster in columnar format than row format.
+  8. Zone maps: selective query (WHERE timestamp > X) on 1B rows skips ≥90% of extents via min/max metadata.
+  9. SIMD SQL execution: SUM/AVG on float[] column is ≥4x faster with Vector256/Avx2 vs scalar loop.
+  10. Persistent roaring bitmap tag index: tag query (tag=X AND tag=Y) on 1M tagged objects returns in ≤1ms; index survives VDE close/reopen.
+  11. Per-extent encryption: encrypting 1MB extent (256 × 4KB blocks) is ≥100x faster than 256 individual block encryptions due to single IV + bulk AES-NI.
+  12. Hierarchical checksums: corruption in one block of a 1GB file detected and localized via Merkle tree binary search in ≤20 I/O operations.
+  13. Extent-aware CoW snapshots: snapshot of 1TB VDE with 1M files creates ≤10MB of snapshot metadata (vs ~4GB with per-block tracking).
+  14. Online defragmentation: background defrag compacts fragmented allocation groups while VDE serves normal read/write operations without downtime.
+**Plans**: 14 plans
+
+Plans:
+- [ ] 87-01-PLAN.md -- Allocation groups: AllocationGroup struct, AllocationGroupDescriptorTable VDE region, per-group bitmap and lock, first-fit/best-fit policy, dynamic group creation as VDE grows (VOPT-01, VOPT-02)
+- [ ] 87-02-PLAN.md -- ARC cache L1: AdaptiveReplacementCache<TKey,TValue> with T1/T2/B1/B2 lists, ghost-list-driven adaptation, auto-sizing from available RAM, replace DefaultCacheManager hot paths (VOPT-03)
+- [ ] 87-03-PLAN.md -- ARC cache L2 + L3: memory-mapped VDE region access via MemoryMappedFile, NVMe read cache with write-through, tiered cache coordinator selecting L1→L2→L3 (VOPT-04, VOPT-05)
+- [ ] 87-04-PLAN.md -- Variable-width inodes: CompactInode64 (inline data ≤48 bytes), fix Standard256 indirect blocks (NotSupportedException), ExtendedInode512 (xattrs, nanosecond timestamps, version chain), InodeLayoutDescriptor in superblock (VOPT-06, VOPT-07, VOPT-08, VOPT-10)
+- [ ] 87-05-PLAN.md -- Extent-based addressing: ExtentTree (start block + length), inline storage ≤4 extents in inode, overflow to extent block, replace direct+indirect pointer model; sub-block packing for small objects (VOPT-09, VOPT-11)
+- [ ] 87-06-PLAN.md -- MVCC core: WAL-based version tracking, VersionChainHead in inode, MVCC Region for old versions, snapshot acquisition/release, version visibility check (VOPT-12)
+- [ ] 87-07-PLAN.md -- MVCC GC + isolation levels: background vacuum (incremental, concurrent), Read Committed / Snapshot Isolation / Serializable with predicate locks, configurable retention window (VOPT-13, VOPT-14)
+- [ ] 87-08-PLAN.md -- SQL OLTP optimization: prepared query cache (fingerprint-based), merge join for sorted Bε-tree scans, index-only scans (VOPT-15)
+- [ ] 87-09-PLAN.md -- SQL OLAP: columnar VDE region with RLE + dictionary encoding, zone maps (per-extent min/max/null_count), predicate pushdown into storage scan (VOPT-16, VOPT-17, VOPT-20)
+- [ ] 87-10-PLAN.md -- SIMD SQL + spill-to-disk: Vector256/Avx2 in ColumnarEngine for aggregations and predicates, spill-to-temp-region for over-budget aggregations, runtime capability detection (VOPT-18, VOPT-19)
+- [ ] 87-11-PLAN.md -- Persistent roaring bitmap tag index: Roaring bitmap implementation (array/bitset/run containers), persistent storage in Tag Index region, tag bloom filter per allocation group, Bε-tree sub-index for high-cardinality tags (VOPT-21, VOPT-22)
+- [ ] 87-12-PLAN.md -- Per-extent encryption + compression: extent-level AES-GCM (single IV per extent), extent-level compression with per-extent dictionary, backward compat with per-block mode (VOPT-23, VOPT-24)
+- [ ] 87-13-PLAN.md -- Hierarchical checksums + extent-aware CoW: per-block XxHash64 + per-extent CRC32C + per-object Merkle root, binary-search corruption localization, extent-level CoW snapshots, extent-level replication delta (VOPT-25, VOPT-26, VOPT-27)
+- [ ] 87-14-PLAN.md -- Online defragmentation + integration tests: background extent compaction within allocation groups, WAL-journaled, I/O budget; end-to-end tests covering all VOPT requirements at small (1MB) and large (1TB+) scales (VOPT-28)
+
+Wave structure:
+```
+Wave 1: 87-01 (Allocation groups) + 87-02 (ARC L1) + 87-04 (Variable inodes) -- parallel, foundational
+Wave 2: 87-03 (ARC L2/L3) + 87-05 (Extent addressing) + 87-06 (MVCC core) + 87-11 (Roaring bitmaps) -- parallel, depends on Wave 1
+Wave 3: 87-07 (MVCC GC) + 87-08 (SQL OLTP) + 87-09 (SQL OLAP) + 87-12 (Per-extent crypto) -- parallel, depends on Wave 2
+Wave 4: 87-10 (SIMD SQL) + 87-13 (Checksums + CoW) -- parallel, depends on Wave 3
+Wave 5: 87-14 (Defrag + integration tests) -- depends on ALL prior waves
+```
+
+#### Phase 88: Dynamic Subsystem Scaling
+**Goal**: Every DW subsystem dynamically grows and shrinks. All 60 plugins migrate from unbounded in-memory state to bounded adaptive caches with persistent backing stores. All `Max*` limits become runtime-reconfigurable via the configuration hierarchy. Critical bugs in streaming, resilience, and blockchain are fixed. No subsystem loses state on restart. No subsystem exhausts memory under load.
+**Depends on**: Phase 68 (SDK Foundation — policy-aware plugins), Phase 87 (VDE Scalable Internals — ARC cache, persistent stores)
+**Requirements**: DSCL-01 through DSCL-27
+**Success Criteria** (what must be TRUE):
+  1. SDK scaling contract exists: `BoundedCache<K,V>` with LRU/ARC/TTL eviction, `IPersistentBackingStore` with file/VDE/DB implementations, `IScalingPolicy` with runtime reconfiguration, `IBackpressureAware`.
+  2. All `Max*` limits across all plugins are reconfigurable at runtime via configuration hierarchy without restart.
+  3. **Streaming works**: `PublishAsync`/`SubscribeAsync` produce and consume real events; ScalabilityConfig drives actual auto-scaling.
+  4. **Resilience works**: `ExecuteWithResilienceAsync` actually applies circuit breaker/bulkhead/retry logic from the strategy.
+  5. **Blockchain scales**: `List<Block>` replaced with segmented store; VDEs with >2B blocks work (no int cast); journal sharded.
+  6. **Raft scales**: segmented log store; connection pooling; multi-Raft group support.
+  7. **Message bus scales**: persistent queue option; topic partitioning; backpressure signaling; ≥1M msgs/sec with Disruptor hot path.
+  8. DataCatalog, Governance, Lineage, DataMesh: all entity state persisted; no data loss on restart; bounded caches with eviction.
+  9. All 60 plugins: no unbounded `ConcurrentDictionary` for entity state; every plugin uses `BoundedCache` + backing store.
+  10. Replication: per-namespace strategy selection; WAL-backed queue; streaming conflict comparison.
+  11. Search: proper inverted index with pagination (not ConcurrentDictionary iteration).
+  12. Database storage: streaming retrieval (not `MemoryStream.ToArray()`); paginated queries.
+  13. ACL: externalized audit log; parallel strategy evaluation.
+  14. No subsystem exhausts memory when handling 10x its design load — backpressure engages gracefully.
+**Plans**: 14 plans
+
+Plans:
+- [ ] 88-01-PLAN.md -- SDK scaling contract: `IScalableSubsystem`, `BoundedCache<K,V>` (LRU/ARC/TTL eviction, ghost-list adaptation, auto-sizing), `IPersistentBackingStore` (file/VDE/DB implementations), `IScalingPolicy`, `IBackpressureAware` (DSCL-01, DSCL-02, DSCL-03)
+- [ ] 88-02-PLAN.md -- Critical fix: Streaming — implement `PublishAsync`/`SubscribeAsync` in UltimateStreamingData; wire ScalabilityConfig to auto-scaling; checkpoint storage; backpressure (DSCL-10)
+- [ ] 88-03-PLAN.md -- Critical fix: Resilience — fix `ExecuteWithResilienceAsync` to apply strategy logic; dynamic circuit breaker/bulkhead options; adaptive thresholds; distributed state sharing (DSCL-12)
+- [ ] 88-04-PLAN.md -- Critical fix: Blockchain — segmented mmap'd block store; fix long→int cast; sharded journal; per-tier locks; bounded caches (DSCL-04)
+- [ ] 88-05-PLAN.md -- Consensus scaling — multi-Raft groups; segmented log store; connection pooling; dynamic election timeouts (DSCL-07)
+- [ ] 88-06-PLAN.md -- Message bus scaling — runtime reconfiguration; persistent WAL-backed queue; topic partitioning; backpressure; Disruptor hot-path integration (DSCL-08)
+- [ ] 88-07-PLAN.md -- Replication + AEDS scaling — per-namespace strategy selection; WAL-backed replication queue; streaming conflict comparison; AEDS bounded caches and partitioned jobs (DSCL-05, DSCL-09)
+- [ ] 88-08-PLAN.md -- Data intelligence scaling — DataCatalog persistent store + LRU cache; Governance persistent store + TTL cache + parallel evaluation; Lineage persistent graph + partitioning; DataMesh persistent store + federation (DSCL-13, DSCL-14, DSCL-15, DSCL-16)
+- [ ] 88-09-PLAN.md -- Security + Compliance scaling — ACL ring buffer audit log + parallel evaluation; Compliance parallel checks + TTL cache; TamperProof per-tier locks + bounded caches (DSCL-11, DSCL-25, DSCL-26)
+- [ ] 88-10-PLAN.md -- Compute + Pipeline scaling — WASM configurable MaxPages/MaxConcurrent + instance pooling + persistence; Pipeline depth limits + concurrent transactions + state limits (DSCL-06, DSCL-23)
+- [ ] 88-11-PLAN.md -- Storage + I/O scaling — Database streaming retrieval + pagination; Filesystem dynamic I/O scheduling + queue depths; Backup dynamic MaxConcurrentJobs + crash recovery; DataFabric runtime MaxNodes + dynamic topology (DSCL-20, DSCL-21, DSCL-22, DSCL-24)
+- [ ] 88-12-PLAN.md -- Encryption + Compression + Search scaling — adaptive compression buffers + parallel chunks; runtime hardware re-detection + dynamic migrations; inverted index + pagination + vector sharding (DSCL-17, DSCL-18, DSCL-19)
+- [ ] 88-13-PLAN.md -- Universal plugin migration — audit all 60 plugins for unbounded ConcurrentDictionary entity stores; migrate each to BoundedCache + IPersistentBackingStore; verify no state loss on restart; verify all Max* limits reconfigurable (DSCL-27)
+- [ ] 88-14-PLAN.md -- Dynamic scaling integration tests — stress test each subsystem at 10x design load; verify backpressure engages; verify persistence survives kill/restart; verify runtime limit reconfiguration; measure memory ceiling under load
+
+Wave structure:
+```
+Wave 1: 88-01 (SDK contract) -- must come first, all others depend on it
+Wave 2: 88-02 (Streaming fix) + 88-03 (Resilience fix) + 88-04 (Blockchain fix) -- parallel, critical bugs
+Wave 3: 88-05 (Consensus) + 88-06 (Message bus) + 88-07 (Replication+AEDS) + 88-08 (Data intelligence) -- parallel, major subsystems
+Wave 4: 88-09 (Security+Compliance) + 88-10 (Compute+Pipeline) + 88-11 (Storage+I/O) + 88-12 (Crypto+Search) -- parallel, remaining subsystems
+Wave 5: 88-13 (Universal migration audit) + 88-14 (Integration tests) -- depends on ALL prior waves
+```
+
+#### Phase 89: Ecosystem Compatibility
+**Goal**: DW speaks the data world's languages. PostgreSQL clients connect natively. Python/Java/Go/Rust/JS SDKs let every ecosystem use DW. Parquet/Arrow/ORC work correctly for interop. Terraform/Helm deploy DW in one command. Jepsen proves distributed correctness. No adoption friction from missing ecosystem integration.
+**Depends on**: Phase 83 (Integration Testing — core system must work before ecosystem wiring), Phase 88 (Dynamic Subsystem Scaling — systems must be production-ready before external exposure)
+**Requirements**: ECOS-01 through ECOS-18
+**Success Criteria** (what must be TRUE):
+  1. `psql -h localhost -p 5432 -U admin -d datawarehouse` connects, runs SQL, returns results. Tested with psql, pgAdmin, DBeaver, SQLAlchemy (Python), npgsql (.NET), JDBC (Java).
+  2. `CREATE TABLE t (id INT, name TEXT); INSERT INTO t VALUES (1, 'test'); SELECT * FROM t;` works end-to-end through PostgreSQL wire protocol → SqlParserEngine → VDE storage → result back to client.
+  3. Parquet round-trip: write from pandas → read in DW → write from DW → read in pandas. All data types preserved. Row group statistics populate zone maps.
+  4. Arrow IPC: zero-copy read verified (no intermediate buffer allocation). Arrow Flight serves data at ≥1GB/s on localhost.
+  5. Python SDK: `pip install datawarehouse` → `dw.connect()` → `dw.store()` → `dw.query("SELECT ...")` → `dw.tag()` works. Tested in Jupyter notebook.
+  6. Java SDK: Maven dependency → JDBC driver connects via PostgreSQL wire protocol. Spark reads/writes DW tables.
+  7. Go SDK: `go get` → Terraform provider uses SDK to manage DW resources. `terraform apply` creates a VDE.
+  8. `helm install dw datawarehouse/datawarehouse` deploys a working DW cluster on Kubernetes.
+  9. Jepsen report: DW passes linearizability, snapshot isolation, and Raft correctness tests under network partitions and process kills. Report published.
+  10. Connection pooling: all inter-node communication uses pooled connections. No per-RPC socket creation. Pool health-checked.
+**Plans**: 14 plans
+
+Plans:
+- [ ] 89-01-PLAN.md -- Verify PostgreSQL wire protocol: audit `PostgreSqlProtocolStrategy.cs` (964 lines) for completeness; test with psql, pgAdmin, DBeaver, SQLAlchemy, npgsql, JDBC; fix startup handshake, auth, simple/extended query, COPY, error handling, SSL; implement missing message types (ECOS-01)
+- [ ] 89-02-PLAN.md -- PostgreSQL → SQL engine integration: wire `PostgreSqlProtocolStrategy` to `SqlParserEngine` → `CostBasedQueryPlanner` → `QueryExecutionEngine`; type mapping (PostgreSQL OIDs → DW ColumnDataType); `\d` catalog queries; prepared statements; BEGIN/COMMIT/ROLLBACK → MVCC (ECOS-02)
+- [ ] 89-03-PLAN.md -- Verify Parquet/Arrow/ORC: audit `ParquetCompatibleWriter.cs` (666 lines), `ParquetStrategy.cs`, `ArrowStrategy.cs`, `OrcStrategy.cs`; test round-trip with pandas/PyArrow/Spark; column pruning, row group skipping, compression codecs, all data types; fix gaps (ECOS-03, ECOS-04, ECOS-05)
+- [ ] 89-04-PLAN.md -- Parquet/Arrow VDE integration: VDE columnar regions use Arrow memory format; zero-copy Parquet→Arrow→VDE and VDE→Parquet paths; zone maps from Parquet row group statistics; Arrow Flight protocol strategy (ECOS-06)
+- [ ] 89-05-PLAN.md -- SDK `.proto` definitions: protobuf service definitions for all DW operations (Store/Retrieve/Query/Tag/Search/Stream/Admin); proto versioning strategy; code generation pipeline for all languages (ECOS-12)
+- [ ] 89-06-PLAN.md -- Python SDK: gRPC client generated from `.proto`; idiomatic Python wrapper (context managers, generators, type hints); pandas integration; PyPI packaging; Jupyter notebook examples; test suite (ECOS-07)
+- [ ] 89-07-PLAN.md -- Java SDK + JDBC driver: gRPC client from `.proto`; JDBC driver wrapping PostgreSQL wire protocol; Maven Central publishing; Spark connector; test suite (ECOS-08)
+- [ ] 89-08-PLAN.md -- Go SDK: gRPC client from `.proto`; idiomatic Go patterns (context.Context, error returns); pkg.go.dev module; used by Terraform provider; test suite (ECOS-09)
+- [ ] 89-09-PLAN.md -- Rust + JavaScript SDKs: Rust gRPC client (tonic) on crates.io; TypeScript gRPC-web client on npm; test suites (ECOS-10, ECOS-11)
+- [ ] 89-10-PLAN.md -- Terraform provider: `terraform-provider-datawarehouse` in Go; resources for instances, VDEs, users, policies, plugins, replication; data sources for status, capabilities; Terraform Registry publishing; acceptance tests (ECOS-13)
+- [ ] 89-11-PLAN.md -- Pulumi provider + Helm chart: Pulumi bridge from Terraform provider; Helm chart (StatefulSet, PVC, ConfigMap, Secret, Service, Ingress); single-node and clustered modes; `helm test`; Pulumi examples in Python/TS/Go/C# (ECOS-14, ECOS-15)
+- [ ] 89-12-PLAN.md -- Connection pooling: `IConnectionPool<TConnection>` SDK contract; TCP pool (Raft, replication, fabric), gRPC channel pool, HTTP/2 pool; configurable min/max/idle/health; per-node limits; replace all per-call socket creation (ECOS-18)
+- [ ] 89-13-PLAN.md -- Jepsen test harness: Docker-based multi-node deployment; fault injection (partition, kill, clock skew, disk corruption); workload generators (register, set, list-append, bank); Elle consistency checker integration (ECOS-16)
+- [ ] 89-14-PLAN.md -- Jepsen test execution: linearizability tests, Raft correctness under partition, CRDT convergence, WAL crash recovery, MVCC snapshot isolation, DVV replication consistency, split-brain prevention; generate and publish Jepsen report (ECOS-17)
+
+Wave structure:
+```
+Wave 1: 89-01 (Verify PostgreSQL) + 89-03 (Verify Parquet/Arrow/ORC) + 89-05 (Proto definitions) + 89-12 (Connection pooling) -- parallel, foundational verification & infrastructure
+Wave 2: 89-02 (PostgreSQL→SQL engine) + 89-04 (Parquet/Arrow VDE integration) + 89-06 (Python SDK) + 89-08 (Go SDK) -- parallel, depends on Wave 1
+Wave 3: 89-07 (Java SDK + JDBC) + 89-09 (Rust + JS SDKs) + 89-10 (Terraform provider) -- parallel, depends on Wave 2 (Go SDK for Terraform)
+Wave 4: 89-11 (Pulumi + Helm) + 89-13 (Jepsen harness) -- parallel, depends on Wave 3
+Wave 5: 89-14 (Jepsen execution + report) -- depends on ALL prior waves
+```
+
 ### Progress
 
-**Execution Order:** 68 -> 69 -> 70 -> 71 -> 72 -> 73 -> 74 -> 75 -> 76 -> 77 -> 78 -> 79 -> 80 -> 81 -> 82 -> 83
+**Execution Order:** 68 -> 69 -> 70 -> 71 -> 72 -> 73 -> 74 -> 75 -> 76 -> 77 -> 78 -> 79 -> 80 -> 81 -> 82 -> 83 -> 84 -> 85 -> 86 -> 87 -> 88 -> 89
 
 | Phase | Plans | Status | Completed |
 |-------|-------|--------|-----------|
 | 68. SDK Foundation | 0/4 | Not started | - |
-| 69. Policy Persistence | 0/4 | Not started | - |
-| 70. Cascade Resolution Engine | 0/5 | Not started | - |
+| 69. Policy Persistence | 0/5 | Not started | - |
+| 70. Cascade Resolution Engine | 0/6 | Not started | - |
 | 71. VDE Format v2.0 | 0/6 | Not started | - |
 | 72. VDE Regions -- Foundation | 0/5 | Not started | - |
-| 73. VDE Regions -- Operations | 0/4 | Not started | - |
+| 73. VDE Regions -- Operations | 0/5 | Not started | - |
 | 74. VDE Identity & Tamper Detection | 0/4 | Not started | - |
 | 75. Authority Chain & Emergency Override | 0/4 | Not started | - |
-| 76. Performance Optimization | 0/4 | Not started | - |
+| 76. Performance Optimization | 0/5 | Not started | - |
 | 77. AI Policy Intelligence | 0/5 | Not started | - |
-| 78. Online Module Addition | 0/4 | Not started | - |
+| 78. Online Module Addition | 0/5 | Not started | - |
 | 79. File Extension & OS Integration | 0/4 | Not started | - |
 | 80. Three-Tier Performance Verification | 0/4 | Not started | - |
 | 81. Backward Compatibility & Migration | 0/3 | Not started | - |
 | 82. Plugin Consolidation Audit | 0/3 | Not started | - |
 | 83. Integration Testing | 0/5 | Not started | - |
+| 84. Deployment Topology & CLI Modes | 0/6 | Not started | - |
+| 85. Competitive Edge | 0/8 | Not started | - |
+| 86. Adaptive Index Engine | 0/16 | Not started | - |
+| 87. VDE Scalable Internals | 0/14 | Not started | - |
+| 88. Dynamic Subsystem Scaling | 0/14 | Not started | - |
+| 89. Ecosystem Compatibility | 0/14 | Not started | - |
 
-**Total v6.0:** 0/73 plans complete
+**Total v6.0:** 0/145 plans complete
+
+### Phase 65.1: Deep Semantic Audit & PluginBase Persistence (INSERTED)
+
+**Goal:** Discover and eliminate ALL remaining silent stubs, implement automatic persistence in PluginBase, delete all obsolete code, migrate all plugins to bounded collections, fix all sync-over-async patterns.
+**Depends on:** Phase 65
+**Plans:** 8 plans in 5 waves
+
+Plans:
+- [ ] 65.1-01-PLAN.md -- IPluginStateStore, IPersistentBackingStore, DefaultPluginStateStore
+- [ ] 65.1-02-PLAN.md -- BoundedDictionary, BoundedList, BoundedQueue
+- [ ] 65.1-03-PLAN.md -- PluginBase persistence integration
+- [ ] 65.1-04-PLAN.md -- Deep semantic audit analyzer script
+- [ ] 65.1-05-PLAN.md -- Fix critical stubs (UltimateStreamingData, UltimateResilience)
+- [ ] 65.1-06-PLAN.md -- Fix all sync-over-async patterns
+- [ ] 65.1-07-PLAN.md -- Migrate ConcurrentDictionary, delete obsolete code, fix remaining findings
+- [ ] 65.1-08-PLAN.md -- Verification sweep (re-audit, build, tests)
