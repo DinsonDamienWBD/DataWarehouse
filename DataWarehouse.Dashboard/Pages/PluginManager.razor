@@ -1,0 +1,451 @@
+@page "/plugin-manager"
+@using DataWarehouse.Dashboard.Services
+@inject DashboardApiClient ApiClient
+@inject ILogger<PluginManager> Logger
+@implements IDisposable
+
+<PageTitle>Plugin Manager - DataWarehouse</PageTitle>
+
+@if (_error != null)
+{
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <div>@_error</div>
+    </div>
+}
+
+<div class="row g-4">
+    <!-- Plugin List -->
+    <div class="@(_selectedPlugin != null ? "col-xl-5" : "col-12")">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0"><i class="bi bi-plug me-2"></i>Plugins</h5>
+                    <span class="badge bg-primary">@_filteredPlugins.Count of @_plugins.Count</span>
+                </div>
+                <!-- Search and Filters -->
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control form-control-sm" placeholder="Search plugins..."
+                               @bind="_searchQuery" @bind:event="oninput" @bind:after="ApplyFilters" />
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" @bind="_categoryFilter" @bind:after="ApplyFilters">
+                            <option value="">All Categories</option>
+                            @foreach (var cat in _categories)
+                            {
+                                <option value="@cat">@cat</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" @bind="_healthFilter" @bind:after="ApplyFilters">
+                            <option value="">All Health</option>
+                            <option value="Healthy">Healthy</option>
+                            <option value="Degraded">Degraded</option>
+                            <option value="Unhealthy">Unhealthy</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" style="max-height: 600px; overflow-y: auto;">
+                    @foreach (var plugin in _filteredPlugins)
+                    {
+                        <button type="button"
+                                class="list-group-item list-group-item-action @(_selectedPluginId == plugin.Id ? "active" : "")"
+                                @onclick="() => SelectPlugin(plugin.Id)">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">@plugin.Name</h6>
+                                    <small class="@(_selectedPluginId == plugin.Id ? "" : "text-muted")">
+                                        v@(plugin.Version) &middot; @plugin.Category
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge @GetHealthBadgeClass(plugin.Health)">@plugin.Health</span>
+                                    <br />
+                                    <small class="@(_selectedPluginId == plugin.Id ? "" : "text-muted")">
+                                        @plugin.StrategyCount strategies
+                                    </small>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(plugin.Description))
+                            {
+                                <small class="@(_selectedPluginId == plugin.Id ? "text-white-50" : "text-muted") d-block mt-1"
+                                       style="font-size: 0.75rem;">
+                                    @TruncateDescription(plugin.Description, 80)
+                                </small>
+                            }
+                        </button>
+                    }
+                    @if (!_filteredPlugins.Any())
+                    {
+                        <div class="text-center text-muted py-4">
+                            @if (_loading)
+                            {
+                                <div class="spinner-border spinner-border-sm me-2"></div>
+                                <span>Loading plugins...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-search" style="font-size: 2rem;"></i>
+                                <p class="mb-0 mt-2">No plugins match your filters</p>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Detail Panel -->
+    @if (_selectedPlugin != null)
+    {
+        <div class="col-xl-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">@_selectedPlugin.Name</h5>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => _selectedPlugin = null">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (_detailLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            Loading details...
+                        </div>
+                    }
+                    else if (_pluginDetail != null)
+                    {
+                        <!-- Plugin Info -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded p-2 text-center">
+                                    <small class="text-muted d-block">Version</small>
+                                    <strong>@_pluginDetail.Version</strong>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded p-2 text-center">
+                                    <small class="text-muted d-block">Status</small>
+                                    <span class="badge @GetStatusBadgeClass(_pluginDetail.Status)">@_pluginDetail.Status</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded p-2 text-center">
+                                    <small class="text-muted d-block">Health</small>
+                                    <span class="badge @GetHealthBadgeClass(_pluginDetail.Health)">@_pluginDetail.Health</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded p-2 text-center">
+                                    <small class="text-muted d-block">Memory</small>
+                                    <strong>@FormatBytes(_pluginDetail.MemoryUsageBytes)</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_pluginDetail.Description))
+                        {
+                            <p class="text-muted">@_pluginDetail.Description</p>
+                        }
+
+                        <!-- Tabs for strategies, config, capabilities -->
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link @(_detailTab == "strategies" ? "active" : "")"
+                                        @onclick='() => _detailTab = "strategies"'>
+                                    Strategies (@_pluginDetail.Strategies.Count)
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(_detailTab == "config" ? "active" : "")"
+                                        @onclick='() => _detailTab = "config"'>
+                                    Configuration (@_pluginDetail.Configuration.Count)
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(_detailTab == "capabilities" ? "active" : "")"
+                                        @onclick='() => _detailTab = "capabilities"'>
+                                    Capabilities (@_pluginDetail.Capabilities.Count)
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content pt-3">
+                            @if (_detailTab == "strategies")
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Active</th>
+                                                <th>Avg Latency</th>
+                                                <th>Invocations</th>
+                                                <th>Errors</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var strategy in _pluginDetail.Strategies)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <strong>@strategy.Name</strong>
+                                                        @if (!string.IsNullOrEmpty(strategy.Description))
+                                                        {
+                                                            <br /><small class="text-muted">@strategy.Description</small>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (strategy.IsActive)
+                                                        {
+                                                            <span class="badge bg-success">Active</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-secondary">Inactive</span>
+                                                        }
+                                                    </td>
+                                                    <td>@strategy.AverageLatencyMs.ToString("F1") ms</td>
+                                                    <td>@strategy.InvocationCount.ToString("N0")</td>
+                                                    <td>
+                                                        <span class="@(strategy.ErrorCount > 0 ? "text-danger" : "")">
+                                                            @strategy.ErrorCount.ToString("N0")
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                            @if (!_pluginDetail.Strategies.Any())
+                                            {
+                                                <tr>
+                                                    <td colspan="5" class="text-center text-muted py-2">
+                                                        No strategies registered
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else if (_detailTab == "config")
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Key</th>
+                                                <th>Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var kvp in _pluginDetail.Configuration)
+                                            {
+                                                <tr>
+                                                    <td><code>@kvp.Key</code></td>
+                                                    <td>
+                                                        @if (IsSensitiveKey(kvp.Key))
+                                                        {
+                                                            <span class="text-muted">********</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            @kvp.Value
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                            @if (!_pluginDetail.Configuration.Any())
+                                            {
+                                                <tr>
+                                                    <td colspan="2" class="text-center text-muted py-2">
+                                                        No configuration entries
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else if (_detailTab == "capabilities")
+                            {
+                                <div class="row g-2">
+                                    @foreach (var cap in _pluginDetail.Capabilities)
+                                    {
+                                        <div class="col-auto">
+                                            <span class="badge bg-info text-dark">@cap</span>
+                                        </div>
+                                    }
+                                    @if (!_pluginDetail.Capabilities.Any())
+                                    {
+                                        <div class="col-12 text-center text-muted py-2">
+                                            No capabilities registered
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (_pluginDetail.Dependencies.Any())
+                                {
+                                    <hr />
+                                    <h6>Dependencies</h6>
+                                    <ul class="list-unstyled">
+                                        @foreach (var dep in _pluginDetail.Dependencies)
+                                        {
+                                            <li><i class="bi bi-arrow-return-right me-1"></i> @dep</li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PluginInfoDto> _plugins = new();
+    private List<PluginInfoDto> _filteredPlugins = new();
+    private List<string> _categories = new();
+    private PluginDetailDto? _pluginDetail;
+    private PluginInfoDto? _selectedPlugin;
+    private string? _selectedPluginId;
+    private string _searchQuery = string.Empty;
+    private string _categoryFilter = string.Empty;
+    private string _healthFilter = string.Empty;
+    private string _detailTab = "strategies";
+    private string? _error;
+    private bool _loading = true;
+    private bool _detailLoading;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cts = new CancellationTokenSource();
+        await LoadPluginsAsync();
+    }
+
+    private async Task LoadPluginsAsync()
+    {
+        try
+        {
+            _loading = true;
+            _plugins = (await ApiClient.GetPluginsAsync(_cts?.Token ?? default)).ToList();
+            _categories = _plugins.Select(p => p.Category).Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+            ApplyFilters();
+            _error = null;
+        }
+        catch (DashboardApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = "Failed to load plugins.";
+            Logger.LogError(ex, "Error loading plugins");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredPlugins = _plugins.Where(p =>
+        {
+            if (!string.IsNullOrEmpty(_searchQuery) &&
+                !p.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) &&
+                !p.Id.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) &&
+                !p.Description.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!string.IsNullOrEmpty(_categoryFilter) &&
+                !p.Category.Equals(_categoryFilter, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!string.IsNullOrEmpty(_healthFilter) &&
+                !p.Health.Equals(_healthFilter, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return true;
+        }).OrderBy(p => p.Name).ToList();
+    }
+
+    private async Task SelectPlugin(string pluginId)
+    {
+        _selectedPluginId = pluginId;
+        _selectedPlugin = _plugins.FirstOrDefault(p => p.Id == pluginId);
+        _detailTab = "strategies";
+        _detailLoading = true;
+
+        try
+        {
+            _pluginDetail = await ApiClient.GetPluginDetailAsync(pluginId, _cts?.Token ?? default);
+        }
+        catch (DashboardApiException ex)
+        {
+            _error = $"Failed to load plugin details: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            _error = "Failed to load plugin details.";
+            Logger.LogError(ex, "Error loading plugin detail for {PluginId}", pluginId);
+        }
+        finally
+        {
+            _detailLoading = false;
+        }
+    }
+
+    private static bool IsSensitiveKey(string key)
+    {
+        var lower = key.ToLowerInvariant();
+        return lower.Contains("password") || lower.Contains("secret") ||
+               lower.Contains("token") || lower.Contains("key") ||
+               lower.Contains("credential") || lower.Contains("apikey");
+    }
+
+    private static string TruncateDescription(string text, int maxLength)
+    {
+        if (text.Length <= maxLength) return text;
+        return text[..maxLength] + "...";
+    }
+
+    private static string GetHealthBadgeClass(string health) => health.ToLowerInvariant() switch
+    {
+        "healthy" => "bg-success",
+        "degraded" => "bg-warning text-dark",
+        "unhealthy" or "critical" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string GetStatusBadgeClass(string status) => status.ToLowerInvariant() switch
+    {
+        "active" or "running" => "bg-success",
+        "loaded" or "initialized" => "bg-info",
+        "disabled" or "stopped" => "bg-secondary",
+        "error" or "faulted" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) return "N/A";
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:F1} {sizes[order]}";
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

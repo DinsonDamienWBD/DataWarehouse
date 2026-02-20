@@ -1,0 +1,379 @@
+@page "/query-explorer"
+@using DataWarehouse.Dashboard.Services
+@inject DashboardApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@inject ILogger<QueryExplorer> Logger
+@implements IDisposable
+
+<PageTitle>Query Explorer - DataWarehouse</PageTitle>
+
+<div class="row g-4">
+    <!-- SQL Editor -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-code-square me-2"></i>SQL Editor</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="ClearEditor"
+                            disabled="@_executing">
+                        <i class="bi bi-eraser"></i> Clear
+                    </button>
+                    <button class="btn btn-sm btn-primary" @onclick="ExecuteQuery"
+                            disabled="@(_executing || string.IsNullOrWhiteSpace(_sql))">
+                        @if (_executing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Executing...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-play-fill me-1"></i>
+                            <span>Execute (Ctrl+Enter)</span>
+                        }
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="position-relative">
+                    <!-- Line numbers overlay -->
+                    <div class="position-absolute top-0 start-0 text-end pe-2 pt-3 ps-2 text-muted user-select-none"
+                         style="width: 40px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.875rem; line-height: 1.5;">
+                        @for (int i = 1; i <= Math.Max(1, _sql.Split('\n').Length); i++)
+                        {
+                            <div>@i</div>
+                        }
+                    </div>
+                    <textarea class="form-control border-0 rounded-0"
+                              @bind="_sql"
+                              @bind:event="oninput"
+                              @onkeydown="HandleKeyDown"
+                              @ref="_textAreaRef"
+                              rows="8"
+                              placeholder="Enter SQL query..."
+                              spellcheck="false"
+                              style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.875rem; line-height: 1.5; padding-left: 48px; resize: vertical; tab-size: 4;">
+                    </textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Display -->
+    @if (_queryError != null)
+    {
+        <div class="col-12">
+            <div class="alert alert-danger d-flex align-items-start" role="alert">
+                <i class="bi bi-x-circle me-2 mt-1"></i>
+                <div>
+                    <strong>Query Error:</strong>
+                    <pre class="mb-0 mt-1" style="font-size: 0.85rem; white-space: pre-wrap;">@_queryError</pre>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Results -->
+    @if (_queryResult != null && _queryResult.Success)
+    {
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-table me-2"></i>Results</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <small class="text-muted">
+                            @_queryResult.RowCount rows &middot;
+                            @_queryResult.ExecutionTimeMs.ToString("F1") ms &middot;
+                            @FormatBytes(_queryResult.BytesScanned) scanned
+                        </small>
+                        @if (!string.IsNullOrEmpty(_queryResult.ExecutionPlan))
+                        {
+                            <button class="btn btn-sm btn-outline-info" @onclick="ToggleExecutionPlan">
+                                <i class="bi bi-diagram-3 me-1"></i>
+                                @(_showExecutionPlan ? "Hide" : "Show") Plan
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (_showExecutionPlan && !string.IsNullOrEmpty(_queryResult.ExecutionPlan))
+                {
+                    <div class="card-body border-bottom bg-light">
+                        <h6><i class="bi bi-diagram-3 me-1"></i>Execution Plan</h6>
+                        <pre class="mb-0 p-2 bg-white border rounded" style="font-size: 0.8rem; max-height: 300px; overflow: auto;">@_queryResult.ExecutionPlan</pre>
+                    </div>
+                }
+
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px; overflow: auto;">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="text-muted" style="width: 40px;">#</th>
+                                    @foreach (var col in _queryResult.Columns)
+                                    {
+                                        <th>@col</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    int rowNum = 0;
+                                }
+                                @foreach (var row in _queryResult.Rows)
+                                {
+                                    rowNum++;
+                                    <tr>
+                                        <td class="text-muted">@rowNum</td>
+                                        @foreach (var cell in row)
+                                        {
+                                            <td>
+                                                @if (cell == null)
+                                                {
+                                                    <span class="text-muted fst-italic">NULL</span>
+                                                }
+                                                else
+                                                {
+                                                    @cell.ToString()
+                                                }
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                                @if (!_queryResult.Rows.Any())
+                                {
+                                    <tr>
+                                        <td colspan="@(_queryResult.Columns.Count + 1)" class="text-center text-muted py-3">
+                                            Query returned no rows
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Query History -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Query History</h5>
+                @if (_queryHistory.Any())
+                {
+                    <button class="btn btn-sm btn-outline-danger" @onclick="ClearHistory">
+                        <i class="bi bi-trash me-1"></i>Clear
+                    </button>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    @foreach (var entry in _queryHistory)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action"
+                                @onclick="() => LoadHistoryEntry(entry)">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <code class="small" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">
+                                    @TruncateSql(entry.Sql, 100)
+                                </code>
+                                <div class="text-end">
+                                    @if (entry.Success)
+                                    {
+                                        <span class="badge bg-success">@entry.RowCount rows</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Error</span>
+                                    }
+                                    <br />
+                                    <small class="text-muted">@entry.ExecutedAt.ToString("HH:mm:ss") &middot; @entry.ExecutionTimeMs.ToString("F0") ms</small>
+                                </div>
+                            </div>
+                        </button>
+                    }
+                    @if (!_queryHistory.Any())
+                    {
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-clock" style="font-size: 1.5rem;"></i>
+                            <p class="mb-0 mt-1 small">No query history yet</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _sql = string.Empty;
+    private QueryResultDto? _queryResult;
+    private string? _queryError;
+    private bool _executing;
+    private bool _showExecutionPlan;
+    private List<QueryHistoryEntry> _queryHistory = new();
+    private ElementReference _textAreaRef;
+    private CancellationTokenSource? _cts;
+
+    private const int MaxHistoryEntries = 20;
+    private const string HistoryStorageKey = "dw_query_history";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadHistoryFromStorageAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e is { CtrlKey: true, Key: "Enter" })
+        {
+            await ExecuteQuery();
+        }
+    }
+
+    private async Task ExecuteQuery()
+    {
+        if (string.IsNullOrWhiteSpace(_sql) || _executing) return;
+
+        _executing = true;
+        _queryError = null;
+        _queryResult = null;
+        _showExecutionPlan = false;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+
+        try
+        {
+            _queryResult = await ApiClient.ExecuteQueryAsync(_sql.Trim(), _cts.Token);
+
+            if (!_queryResult.Success && !string.IsNullOrEmpty(_queryResult.Error))
+            {
+                _queryError = _queryResult.Error;
+            }
+
+            // Add to history
+            var historyEntry = new QueryHistoryEntry
+            {
+                Sql = _sql.Trim(),
+                ExecutedAt = DateTime.Now,
+                Success = _queryResult.Success,
+                RowCount = _queryResult.RowCount,
+                ExecutionTimeMs = _queryResult.ExecutionTimeMs
+            };
+
+            _queryHistory.Insert(0, historyEntry);
+            if (_queryHistory.Count > MaxHistoryEntries)
+                _queryHistory.RemoveRange(MaxHistoryEntries, _queryHistory.Count - MaxHistoryEntries);
+
+            await SaveHistoryToStorageAsync();
+        }
+        catch (DashboardApiException ex)
+        {
+            _queryError = ex.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            _queryError = "Query execution was cancelled or timed out.";
+        }
+        catch (Exception ex)
+        {
+            _queryError = "Unexpected error executing query.";
+            Logger.LogError(ex, "Error executing query");
+        }
+        finally
+        {
+            _executing = false;
+        }
+    }
+
+    private void ClearEditor()
+    {
+        _sql = string.Empty;
+        _queryResult = null;
+        _queryError = null;
+        _showExecutionPlan = false;
+    }
+
+    private void LoadHistoryEntry(QueryHistoryEntry entry)
+    {
+        _sql = entry.Sql;
+    }
+
+    private void ToggleExecutionPlan()
+    {
+        _showExecutionPlan = !_showExecutionPlan;
+    }
+
+    private async Task ClearHistory()
+    {
+        _queryHistory.Clear();
+        await SaveHistoryToStorageAsync();
+    }
+
+    private async Task LoadHistoryFromStorageAsync()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", HistoryStorageKey);
+            if (!string.IsNullOrEmpty(json))
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<List<QueryHistoryEntry>>(json);
+                if (entries != null)
+                    _queryHistory = entries;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Could not load query history from localStorage");
+        }
+    }
+
+    private async Task SaveHistoryToStorageAsync()
+    {
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(_queryHistory);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", HistoryStorageKey, json);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Could not save query history to localStorage");
+        }
+    }
+
+    private static string TruncateSql(string sql, int maxLength)
+    {
+        var singleLine = sql.Replace("\n", " ").Replace("\r", "");
+        if (singleLine.Length <= maxLength) return singleLine;
+        return singleLine[..maxLength] + "...";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) return "0 B";
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:F1} {sizes[order]}";
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private sealed class QueryHistoryEntry
+    {
+        public string Sql { get; set; } = string.Empty;
+        public DateTime ExecutedAt { get; set; }
+        public bool Success { get; set; }
+        public int RowCount { get; set; }
+        public double ExecutionTimeMs { get; set; }
+    }
+}
