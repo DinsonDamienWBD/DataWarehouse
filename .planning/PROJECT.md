@@ -110,13 +110,51 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 | Strategy pattern throughout | Consistent extensibility model | 140+ base classes |
 | Message bus communication | Plugin isolation, no direct references | Zero cross-plugin imports |
 
-## Current Milestone: v2.0 SDK Hardening & Distributed Infrastructure
+## Completed Milestones
 
-**Goal:** Clean up, optimize, and harden the SDK to pass hyperscale/military-level code review — refactor base class hierarchies, add distributed infrastructure contracts, enforce security best practices throughout.
+- **v1.0** (2026-02-11): Production Readiness — 21 phases, 116 plans, 863 commits, 1.1M LOC, 60 plugins
+- **v2.0** (2026-02-16): SDK Hardening & Distributed Infrastructure — 10 phases, 56 plans
+- **v3.0** (2026-02-17): Universal Platform — 10 phases, 64 plans
+- **v4.0-v4.4** (2026-02-18): Feature Verification & Hardening — 10 phases, ~50 plans, 5 fix rounds
+- **v4.5** (2026-02-19): Certification Authority — NOT CERTIFIED (50 pentest findings, security 38/100)
+- **v5.0** (IN PROGRESS): 10 Differentiators + Universal Tags + Security Wiring + Feature Gaps — Phases 52-65 COMPLETE, 66-67 remaining
 
-**Approach:** Verify first, implement only where code deviates from plan. Much of the base class hierarchy and plugin isolation already exists from v1.0.
+See `.planning/MILESTONES.md` for full history.
 
-**Source:** `SDK_REFACTOR_PLAN.md` + hyperscale/military additions
+## Current Milestone: v6.0 — Intelligent Policy Engine & Composable VDE
+
+**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins.
+
+**Target features:**
+- Multi-level policy hierarchy (Block → Chunk → Object → Container → VDE) with cascade resolution
+- Operational profiles (Speed/Balanced/Standard/Strict/Paranoid) with per-feature intensity sliders
+- Performance optimization (MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate)
+- AI-driven policy intelligence (auto-tuning, anomaly-based adjustment, predictive optimization)
+- Composable DWVD v2.0 format (19 modules, runtime VDE composition, three-tier performance model)
+- dw:// namespace integration with Ed25519-signed authority
+- External tamper detection with configurable response levels
+- .dwvd file extension with OS registration (Windows/Linux/macOS)
+- Plugin consolidation audit (17 non-Ultimate plugins reviewed for merge or standalone justification)
+- Authority chain: Admin → AI Emergency → Super Admin Quorum (3-of-5 multi-key)
+
+**Design documents:**
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 12 architectural decisions
+- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
+- `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
+
+**Key decisions (see design discussion for full details):**
+1. Policy at Plugin level, not Strategy level
+2. AI integration through IntelligenceAwarePluginBase (UltimateIntelligence excluded)
+3. Quorum failsafe enables AI management of ALL policies
+4. Pluggable persistence (not TamperProof-mandatory)
+5. Custom VDE format (not VHDX/VMDK)
+6. Policy data embedded in VDE with cryptographic binding
+7. VDE-level policy outside user capacity
+8. Composable VDE — spec is max envelope, user selects modules
+9. dw:// namespace embedded in VDE
+10. External tamper detection with 5 response levels
+11. File extension `.dwvd` with full OS integration
+12. Plugin consolidation audit as late v6.0 phase
 
 ---
-*Last updated: 2026-02-11 — v2.0 milestone started*
+*Last updated: 2026-02-20 — v6.0 milestone started*
