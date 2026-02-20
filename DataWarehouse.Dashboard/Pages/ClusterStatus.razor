@@ -1,0 +1,421 @@
+@page "/cluster-status"
+@using DataWarehouse.Dashboard.Services
+@inject DashboardApiClient ApiClient
+@inject ILogger<ClusterStatus> Logger
+@implements IDisposable
+
+<PageTitle>Cluster Status - DataWarehouse</PageTitle>
+
+@if (_error != null)
+{
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <div>
+            <strong>API Connection Issue:</strong> @_error
+            <br /><small class="text-muted">Auto-retry every 5 seconds.</small>
+        </div>
+    </div>
+}
+
+@if (_loading && _clusterStatus == null)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mt-2">Loading cluster status...</p>
+    </div>
+}
+else if (_clusterStatus != null)
+{
+    <!-- Node Topology -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Node Topology</h5>
+                    <span class="badge bg-primary">@_clusterStatus.Nodes.Count nodes</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Address</th>
+                                    <th>Role</th>
+                                    <th>Health</th>
+                                    <th>Last Heartbeat</th>
+                                    <th>Uptime</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var node in _clusterStatus.Nodes)
+                                {
+                                    <tr class="@(node.IsLocal ? "table-active" : "")">
+                                        <td>
+                                            <strong>@node.NodeId</strong>
+                                            @if (node.IsLocal)
+                                            {
+                                                <span class="badge bg-info ms-1">Local</span>
+                                            }
+                                        </td>
+                                        <td><code>@node.Address</code></td>
+                                        <td>
+                                            <span class="badge @GetRoleBadgeClass(node.Role)">
+                                                @node.Role
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetHealthBadgeClass(node.Health)">
+                                                @node.Health
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @{
+                                                var timeSinceHeartbeat = DateTime.UtcNow - node.LastHeartbeat;
+                                            }
+                                            <span class="@(timeSinceHeartbeat.TotalSeconds > 30 ? "text-danger" : "text-muted")">
+                                                @FormatTimeAgo(node.LastHeartbeat)
+                                            </span>
+                                        </td>
+                                        <td>@FormatUptime(node.Uptime)</td>
+                                    </tr>
+                                }
+                                @if (!_clusterStatus.Nodes.Any())
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-3">
+                                            No cluster nodes detected (single-node mode)
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raft Status & Replication -->
+    <div class="row g-4 mb-4">
+        <!-- Raft Status -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-arrows-angle-contract me-2"></i>Raft Consensus</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Current Term</div>
+                                <div class="h4 mb-0">@_clusterStatus.Raft.CurrentTerm</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Leader</div>
+                                <div class="h5 mb-0">
+                                    @if (!string.IsNullOrEmpty(_clusterStatus.Raft.LeaderId))
+                                    {
+                                        <span class="text-success">@_clusterStatus.Raft.LeaderId</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-warning">No Leader</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Log Index</div>
+                                <div class="h4 mb-0">@_clusterStatus.Raft.LogIndex.ToString("N0")</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Commit Index</div>
+                                <div class="h4 mb-0">@_clusterStatus.Raft.CommitIndex.ToString("N0")</div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">State</div>
+                                <div class="h5 mb-0">
+                                    <span class="badge @GetRaftStateBadgeClass(_clusterStatus.Raft.State)">
+                                        @_clusterStatus.Raft.State
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Replication Status -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-arrow-repeat me-2"></i>Replication Status</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Node</th>
+                                    <th>Lag</th>
+                                    <th>Last Sync</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rep in _clusterStatus.Replication)
+                                {
+                                    <tr>
+                                        <td><strong>@rep.NodeId</strong></td>
+                                        <td>
+                                            <span class="@(rep.ReplicationLag > 100 ? "text-danger fw-bold" : rep.ReplicationLag > 10 ? "text-warning" : "text-success")">
+                                                @rep.ReplicationLag.ToString("N0") entries
+                                            </span>
+                                        </td>
+                                        <td class="text-muted small">@FormatTimeAgo(rep.LastSyncTime)</td>
+                                        <td>
+                                            <span class="badge @GetReplicationStatusClass(rep.Status)">
+                                                @rep.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!_clusterStatus.Replication.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3">
+                                            No replication peers
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRDT Sync & SWIM Membership -->
+    <div class="row g-4">
+        <!-- CRDT Sync -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-union me-2"></i>CRDT Sync Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Total Merges</div>
+                                <div class="h4 mb-0">@_clusterStatus.CrdtSync.MergeCount.ToString("N0")</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Pending</div>
+                                <div class="h4 mb-0 @(_clusterStatus.CrdtSync.PendingMerges > 0 ? "text-warning" : "text-success")">
+                                    @_clusterStatus.CrdtSync.PendingMerges
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Status</div>
+                                <div class="h5 mb-0">
+                                    <span class="badge @GetSyncStatusClass(_clusterStatus.CrdtSync.Status)">
+                                        @_clusterStatus.CrdtSync.Status
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted small text-center">
+                                Last merge: @FormatTimeAgo(_clusterStatus.CrdtSync.LastMergeTime)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SWIM Membership -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>SWIM Membership</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Members</div>
+                                <div class="h4 mb-0">@_clusterStatus.SwimMembership.MemberCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Healthy</div>
+                                <div class="h4 mb-0 text-success">@_clusterStatus.SwimMembership.HealthyCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-3 text-center">
+                                <div class="text-muted small">Suspect</div>
+                                <div class="h4 mb-0 @(_clusterStatus.SwimMembership.SuspectCount > 0 ? "text-danger" : "text-success")">
+                                    @_clusterStatus.SwimMembership.SuspectCount
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>Gossip round: #@_clusterStatus.SwimMembership.GossipRoundNumber.ToString("N0")</span>
+                                <span>Last gossip: @FormatTimeAgo(_clusterStatus.SwimMembership.LastGossipRound)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="text-muted small mt-3 text-end">
+    Auto-refreshes every 5 seconds
+</div>
+
+@code {
+    private ClusterStatusDto? _clusterStatus;
+    private string? _error;
+    private bool _loading = true;
+    private PeriodicTimer? _refreshTimer;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cts = new CancellationTokenSource();
+        await RefreshDataAsync();
+        _ = AutoRefreshLoopAsync(_cts.Token);
+    }
+
+    private async Task AutoRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        _refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await _refreshTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await RefreshDataAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal disposal
+        }
+    }
+
+    private async Task RefreshDataAsync()
+    {
+        try
+        {
+            _loading = true;
+            _clusterStatus = await ApiClient.GetClusterStatusAsync();
+            _error = null;
+        }
+        catch (DashboardApiException ex)
+        {
+            _error = ex.Message;
+            Logger.LogWarning(ex, "Failed to refresh cluster status");
+        }
+        catch (Exception ex)
+        {
+            _error = "Unexpected error loading cluster data.";
+            Logger.LogError(ex, "Unexpected error refreshing cluster status");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string GetHealthBadgeClass(string health) => health.ToLowerInvariant() switch
+    {
+        "healthy" => "bg-success",
+        "degraded" => "bg-warning text-dark",
+        "unhealthy" or "critical" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string GetRoleBadgeClass(string role) => role.ToLowerInvariant() switch
+    {
+        "leader" => "bg-primary",
+        "follower" => "bg-success",
+        "candidate" => "bg-warning text-dark",
+        "learner" => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private static string GetRaftStateBadgeClass(string state) => state.ToLowerInvariant() switch
+    {
+        "leader" => "bg-primary",
+        "follower" => "bg-success",
+        "candidate" => "bg-warning text-dark",
+        "shutdown" or "stopped" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string GetReplicationStatusClass(string status) => status.ToLowerInvariant() switch
+    {
+        "synced" or "up-to-date" or "synchronized" => "bg-success",
+        "catching-up" or "syncing" => "bg-warning text-dark",
+        "lagging" or "behind" => "bg-danger",
+        "disconnected" => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private static string GetSyncStatusClass(string status) => status.ToLowerInvariant() switch
+    {
+        "synced" or "synchronized" or "converged" => "bg-success",
+        "merging" or "syncing" => "bg-warning text-dark",
+        "diverged" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string FormatUptime(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1) return $"{(int)ts.TotalDays}d {ts.Hours}h";
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m {ts.Seconds}s";
+    }
+
+    private static string FormatTimeAgo(DateTime utcTime)
+    {
+        if (utcTime == default) return "Never";
+        var elapsed = DateTime.UtcNow - utcTime;
+        if (elapsed.TotalSeconds < 5) return "Just now";
+        if (elapsed.TotalSeconds < 60) return $"{(int)elapsed.TotalSeconds}s ago";
+        if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes}m ago";
+        if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours}h ago";
+        return $"{(int)elapsed.TotalDays}d ago";
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _refreshTimer?.Dispose();
+    }
+}

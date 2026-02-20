@@ -137,6 +137,9 @@ builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 builder.Services.AddSingleton<DataWarehouse.Dashboard.Controllers.IBackupService, DataWarehouse.Dashboard.Controllers.InMemoryBackupService>();
 
+// Add Launcher API client for dashboard pages
+builder.Services.AddHttpClient<DashboardApiClient>();
+
 // Add hosted services for background monitoring
 builder.Services.AddHostedService<HealthMonitorService>();
 builder.Services.AddHostedService<DashboardBroadcastService>();
