@@ -345,8 +345,10 @@ internal sealed class EdgeDataSynchronizerImpl : EC.IEdgeDataSynchronizer
     private readonly BoundedDictionary<string, EC.SyncStatus> _syncStatus = new BoundedDictionary<string, EC.SyncStatus>(1000);
     private readonly BoundedDictionary<string, EC.SyncSchedule> _schedules = new BoundedDictionary<string, EC.SyncSchedule>(1000);
 
+#pragma warning disable CS0067
     public event EventHandler<EC.SyncCompletedEventArgs>? SyncCompleted;
     public event EventHandler<EC.SyncConflictEventArgs>? ConflictDetected;
+#pragma warning restore CS0067
 
     public EdgeDataSynchronizerImpl(IMessageBus? messageBus) => _messageBus = messageBus;
 
@@ -499,7 +501,9 @@ internal sealed class EdgeCloudCommunicatorImpl : EC.IEdgeCloudCommunicator
     private readonly BoundedDictionary<string, EC.CommunicationChannel> _channels = new BoundedDictionary<string, EC.CommunicationChannel>(1000);
     private readonly BoundedDictionary<string, EC.ConnectionStatus> _connectionStatus = new BoundedDictionary<string, EC.ConnectionStatus>(1000);
 
+#pragma warning disable CS0067
     public event EventHandler<EC.CloudMessageReceivedEventArgs>? CloudMessageReceived;
+#pragma warning restore CS0067
 
     public EdgeCloudCommunicatorImpl(IMessageBus? messageBus) => _messageBus = messageBus;
 
@@ -621,7 +625,9 @@ internal sealed class EdgeSecurityManagerImpl : EC.IEdgeSecurityManager
     private readonly BoundedDictionary<string, string> _tokens = new BoundedDictionary<string, string>(1000);
     private readonly BoundedDictionary<string, EC.SecurityPolicy> _policies = new BoundedDictionary<string, EC.SecurityPolicy>(1000);
 
+#pragma warning disable CS0067
     public event EventHandler<EC.SecurityIncidentEventArgs>? SecurityIncidentDetected;
+#pragma warning restore CS0067
 
     public EdgeSecurityManagerImpl(IMessageBus? messageBus) => _messageBus = messageBus;
 
@@ -683,7 +689,9 @@ internal sealed class EdgeResourceManagerImpl : EC.IEdgeResourceManager
     private readonly BoundedDictionary<string, EC.ResourceAllocation> _allocations = new BoundedDictionary<string, EC.ResourceAllocation>(1000);
     private readonly BoundedDictionary<string, EC.ResourceLimits> _limits = new BoundedDictionary<string, EC.ResourceLimits>(1000);
 
+#pragma warning disable CS0067
     public event EventHandler<EC.ResourceThresholdEventArgs>? ResourceThresholdExceeded;
+#pragma warning restore CS0067
 
     public EdgeResourceManagerImpl(IMessageBus? messageBus) => _messageBus = messageBus;
 
@@ -742,7 +750,9 @@ internal sealed class MultiEdgeOrchestratorImpl : EC.IMultiEdgeOrchestrator
     private readonly BoundedDictionary<string, EC.WorkloadDefinition> _workloads = new BoundedDictionary<string, EC.WorkloadDefinition>(1000);
     private readonly BoundedDictionary<string, EC.OrchestrationPolicy> _policies = new BoundedDictionary<string, EC.OrchestrationPolicy>(1000);
 
+#pragma warning disable CS0067
     public event EventHandler<EC.TopologyChangedEventArgs>? TopologyChanged;
+#pragma warning restore CS0067
 
     public MultiEdgeOrchestratorImpl(IMessageBus? messageBus, EC.IEdgeNodeManager nodeManager)
     {

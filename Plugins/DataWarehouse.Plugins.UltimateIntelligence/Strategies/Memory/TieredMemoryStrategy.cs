@@ -276,7 +276,7 @@ public sealed record TierStatistics
 public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwareMemoryStrategy
 {
     private readonly InMemoryTieredMemorySystem _memorySystem;
-    private EvolvingContextManager? _evolutionManager;
+    private EvolvingContextManager? _evolutionManager = null;
     private AIContextRegenerator? _regenerator;
 
     /// <inheritdoc/>

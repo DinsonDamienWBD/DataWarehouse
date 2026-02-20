@@ -9,7 +9,6 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
     private long _currentIops;
     private long _currentBandwidth;
     private readonly long _maxIops = 100000;
-    private readonly long _maxBandwidth = 1L * 1024 * 1024 * 1024; // 1 GB/s
 
     public override string StrategyId => "io-deadline";
     public override string DisplayName => "Deadline I/O Scheduler";

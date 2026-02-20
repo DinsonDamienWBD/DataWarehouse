@@ -296,7 +296,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
         // In production, parse composite key format
-        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
+        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
@@ -533,7 +533,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
 
     private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
-        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
+        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
@@ -744,6 +744,6 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
 
     private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
-        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
+        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }

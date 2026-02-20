@@ -160,13 +160,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
             string? prefix,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            throw new NotSupportedException(
+            ThrowListingNotSupported(
                 "Media catalog not available. This operation requires:\n" +
                 "- Page allocation table\n" +
                 "- Media index database\n\n" +
                 "Future implementation would scan allocation table for all keys matching prefix.");
-
-            await Task.CompletedTask;
             yield break;
         }
 

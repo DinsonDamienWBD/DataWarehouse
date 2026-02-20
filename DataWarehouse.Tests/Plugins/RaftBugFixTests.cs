@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // RaftConsensusPlugin is obsolete; these tests intentionally test the legacy plugin
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -461,3 +462,4 @@ namespace DataWarehouse.Tests.Plugins
         #endregion
     }
 }
+#pragma warning restore CS0618

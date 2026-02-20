@@ -77,13 +77,10 @@ public sealed class CsvStrategy : DataFormatStrategyBase
             var rows = new List<string[]>();
             using var reader = new StreamReader(input, leaveOpen: true);
 
-            while (!reader.EndOfStream)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct)) != null)
             {
-                var line = await reader.ReadLineAsync(ct);
-                if (line != null)
-                {
-                    rows.Add(ParseCsvLine(line, delimiter));
-                }
+                rows.Add(ParseCsvLine(line, delimiter));
             }
 
             var bytesProcessed = input.Position - startPosition;

@@ -128,8 +128,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                         throw new InvalidOperationException($"Credentials file not found at path: {_credentialsPath}");
                     }
 
-                    // Use FromFile to avoid deprecated FromStream method
-                    _credential = GoogleCredential.FromFile(_credentialsPath);
+                    var serviceAccountCred = await CredentialFactory.FromFileAsync<ServiceAccountCredential>(_credentialsPath, ct);
+                    _credential = serviceAccountCred.ToGoogleCredential();
                 }
                 else
                 {

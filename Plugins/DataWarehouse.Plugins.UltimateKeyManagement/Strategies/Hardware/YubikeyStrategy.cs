@@ -456,7 +456,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 var pinPolicy = PivPinPolicy.Once;
 
                 // Generate key pair
+#pragma warning disable CS0618 // PivSession.GenerateKeyPair is obsolete; migration to typed key API is tracked separately
                 var publicKey = pivSession.GenerateKeyPair(slot, algorithm, pinPolicy, touchPolicy);
+#pragma warning restore CS0618
 
                 _currentKeyId = keyId;
 

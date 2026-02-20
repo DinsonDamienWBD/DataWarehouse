@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
@@ -166,8 +167,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (!context.EnvironmentAttributes.TryGetValue("KerberosTicket", out var ticketObj) ||
                 ticketObj is not byte[] ticket)
             {
-                // Try Windows identity from environment
-                if (context.EnvironmentAttributes.TryGetValue("WindowsIdentity", out var identityObj) &&
+                // Try Windows identity from environment (Windows-only)
+                if (OperatingSystem.IsWindows() &&
+                    context.EnvironmentAttributes.TryGetValue("WindowsIdentity", out var identityObj) &&
                     identityObj is WindowsIdentity identity)
                 {
                     IncrementCounter("kerberos.windows_identity");
@@ -197,6 +199,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             };
         }
 
+        [SupportedOSPlatform("windows")]
         private AccessDecision ValidateWindowsIdentity(WindowsIdentity identity)
         {
             if (!identity.IsAuthenticated)

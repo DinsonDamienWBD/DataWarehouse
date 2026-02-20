@@ -146,6 +146,7 @@ namespace DataWarehouse.Tests.Transcoding
                 });
 
             // Should eventually fall back to package (either FFmpeg fails or not available)
+            _ = packageWriterCalled; // May or may not be called depending on FFmpeg availability
             Assert.NotNull(result);
         }
 

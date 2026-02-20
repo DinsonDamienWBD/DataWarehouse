@@ -4,14 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Security;
-
-// Import PQC types from BouncyCastle
-using Org.BouncyCastle.Pqc.Crypto.Crystals.Dilithium;
-using Org.BouncyCastle.Pqc.Crypto.SphincsPlus;
-
-// Note: Falcon is not yet available in BouncyCastle 2.6.2
-// The FalconStrategy throws NotSupportedException until library support is added
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
@@ -119,23 +115,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 if (key.Length > 0)
                 {
                     // Use provided private key
-                    var privateKeyParams = new DilithiumPrivateKeyParameters(
-                        DilithiumParameters.Dilithium3, key, null);
+                    var privateKeyParams = MLDsaPrivateKeyParameters.FromEncoding(
+                        MLDsaParameters.ml_dsa_65, key);
                     keyPair = new AsymmetricCipherKeyPair(null, privateKeyParams);
                 }
                 else
                 {
                     // Generate new key pair
-                    var keyGenParams = new DilithiumKeyGenerationParameters(_secureRandom, DilithiumParameters.Dilithium3);
-                    var keyPairGenerator = new DilithiumKeyPairGenerator();
+                    var keyGenParams = new MLDsaKeyGenerationParameters(_secureRandom, MLDsaParameters.ml_dsa_65);
+                    var keyPairGenerator = new MLDsaKeyPairGenerator();
                     keyPairGenerator.Init(keyGenParams);
                     keyPair = keyPairGenerator.GenerateKeyPair();
                 }
 
                 // Sign the data
-                var signer = new DilithiumSigner();
+                var signer = new MLDsaSigner(MLDsaParameters.ml_dsa_65, true);
                 signer.Init(true, keyPair.Private);
-                var signature = signer.GenerateSignature(plaintext);
+                signer.BlockUpdate(plaintext, 0, plaintext.Length);
+                var signature = signer.GenerateSignature();
 
                 // Build result: [Signature Length:4][Signature][Original Data]
                 using var ms = new System.IO.MemoryStream();
@@ -169,11 +166,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 // Verify signature using public key (provided in 'key' parameter)
-                var publicKeyParams = new DilithiumPublicKeyParameters(DilithiumParameters.Dilithium3, key);
-                var verifier = new DilithiumSigner();
+                var publicKeyParams = MLDsaPublicKeyParameters.FromEncoding(MLDsaParameters.ml_dsa_65, key);
+                var verifier = new MLDsaSigner(MLDsaParameters.ml_dsa_65, true);
                 verifier.Init(false, publicKeyParams);
+                verifier.BlockUpdate(data, 0, data.Length);
 
-                if (!verifier.VerifySignature(data, signature))
+                if (!verifier.VerifySignature(signature))
                 {
                     throw new CryptographicException("ML-DSA signature verification failed. Data may be tampered.");
                 }
@@ -188,12 +186,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new DilithiumKeyGenerationParameters(_secureRandom, DilithiumParameters.Dilithium3);
-            var keyPairGenerator = new DilithiumKeyPairGenerator();
+            var keyGenParams = new MLDsaKeyGenerationParameters(_secureRandom, MLDsaParameters.ml_dsa_65);
+            var keyPairGenerator = new MLDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
 
-            var privateKey = ((DilithiumPrivateKeyParameters)keyPair.Private).GetEncoded();
+            var privateKey = ((MLDsaPrivateKeyParameters)keyPair.Private).GetEncoded();
             return privateKey;
         }
     }
@@ -280,22 +278,23 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
                 if (key.Length > 0)
                 {
-                    var privateKeyParams = new SphincsPlusPrivateKeyParameters(
-                        SphincsPlusParameters.shake_128f, key);
+                    var privateKeyParams = SlhDsaPrivateKeyParameters.FromEncoding(
+                        SlhDsaParameters.slh_dsa_shake_128f, key);
                     keyPair = new AsymmetricCipherKeyPair(null, privateKeyParams);
                 }
                 else
                 {
-                    var keyGenParams = new SphincsPlusKeyGenerationParameters(
-                        _secureRandom, SphincsPlusParameters.shake_128f);
-                    var keyPairGenerator = new SphincsPlusKeyPairGenerator();
+                    var keyGenParams = new SlhDsaKeyGenerationParameters(
+                        _secureRandom, SlhDsaParameters.slh_dsa_shake_128f);
+                    var keyPairGenerator = new SlhDsaKeyPairGenerator();
                     keyPairGenerator.Init(keyGenParams);
                     keyPair = keyPairGenerator.GenerateKeyPair();
                 }
 
-                var signer = new SphincsPlusSigner();
+                var signer = new SlhDsaSigner(SlhDsaParameters.slh_dsa_shake_128f, true);
                 signer.Init(true, keyPair.Private);
-                var signature = signer.GenerateSignature(plaintext);
+                signer.BlockUpdate(plaintext, 0, plaintext.Length);
+                var signature = signer.GenerateSignature();
 
                 using var ms = new System.IO.MemoryStream();
                 using var writer = new System.IO.BinaryWriter(ms);
@@ -326,12 +325,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var signature = reader.ReadBytes(signatureLength);
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var publicKeyParams = new SphincsPlusPublicKeyParameters(
-                    SphincsPlusParameters.shake_128f, key);
-                var verifier = new SphincsPlusSigner();
+                var publicKeyParams = SlhDsaPublicKeyParameters.FromEncoding(
+                    SlhDsaParameters.slh_dsa_shake_128f, key);
+                var verifier = new SlhDsaSigner(SlhDsaParameters.slh_dsa_shake_128f, true);
                 verifier.Init(false, publicKeyParams);
+                verifier.BlockUpdate(data, 0, data.Length);
 
-                if (!verifier.VerifySignature(data, signature))
+                if (!verifier.VerifySignature(signature))
                 {
                     throw new CryptographicException("SLH-DSA signature verification failed. Data may be tampered.");
                 }
@@ -345,13 +345,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new SphincsPlusKeyGenerationParameters(
-                _secureRandom, SphincsPlusParameters.shake_128f);
-            var keyPairGenerator = new SphincsPlusKeyPairGenerator();
+            var keyGenParams = new SlhDsaKeyGenerationParameters(
+                _secureRandom, SlhDsaParameters.slh_dsa_shake_128f);
+            var keyPairGenerator = new SlhDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
 
-            var privateKey = ((SphincsPlusPrivateKeyParameters)keyPair.Private).GetEncoded();
+            var privateKey = ((SlhDsaPrivateKeyParameters)keyPair.Private).GetEncoded();
             return privateKey;
         }
     }

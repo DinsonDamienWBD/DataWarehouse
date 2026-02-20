@@ -23,7 +23,6 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     private readonly HttpClient _httpClient;
     private string _cgroupPath = "/sys/fs/cgroup";
     private string _kubeletUrl = "http://localhost:10255";
-    private string _dockerSocket = "/var/run/docker.sock";
     private string _containerId = "";
     private string _podName = "";
     private string _namespace = "default";

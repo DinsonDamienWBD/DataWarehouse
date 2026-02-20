@@ -41,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         // Statistics
         private long _totalReplicationWrites;
         private long _totalReplicationReads;
-        private long _totalConflicts;
+        private long _totalConflicts = 0;
         private long _totalFailovers;
         private long _totalSyncOperations;
         private long _totalAsyncOperations;

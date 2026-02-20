@@ -19,6 +19,8 @@ public sealed class NavigationService
         _logger = logger;
     }
 
+    private static Page? GetMainPage() => Application.Current?.Windows.FirstOrDefault()?.Page;
+
     /// <summary>
     /// Navigates to a new page.
     /// </summary>
@@ -28,9 +30,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                await Application.Current.MainPage.Navigation.PushAsync(page, animated);
+                await GetMainPage()!.Navigation.PushAsync(page, animated);
                 _logger.LogDebug("Navigated to {PageType}", page.GetType().Name);
             }
             else
@@ -53,9 +55,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                var page = await Application.Current.MainPage.Navigation.PopAsync(animated);
+                var page = await GetMainPage()!.Navigation.PopAsync(animated);
                 _logger.LogDebug("Navigated back from {PageType}", page?.GetType().Name ?? "unknown");
                 return page;
             }
@@ -80,9 +82,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                await Application.Current.MainPage.Navigation.PopToRootAsync(animated);
+                await GetMainPage()!.Navigation.PopToRootAsync(animated);
                 _logger.LogDebug("Navigated to root");
             }
             else
@@ -105,9 +107,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                await Application.Current.MainPage.Navigation.PushModalAsync(page, animated);
+                await GetMainPage()!.Navigation.PushModalAsync(page, animated);
                 _logger.LogDebug("Presented modal {PageType}", page.GetType().Name);
             }
             else
@@ -130,9 +132,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                var page = await Application.Current.MainPage.Navigation.PopModalAsync(animated);
+                var page = await GetMainPage()!.Navigation.PopModalAsync(animated);
                 _logger.LogDebug("Dismissed modal {PageType}", page?.GetType().Name ?? "unknown");
                 return page;
             }
@@ -157,9 +159,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                return Application.Current.MainPage.Navigation.NavigationStack;
+                return GetMainPage()!.Navigation.NavigationStack;
             }
             else
             {
@@ -182,9 +184,9 @@ public sealed class NavigationService
     {
         try
         {
-            if (Application.Current?.MainPage?.Navigation != null)
+            if (GetMainPage()?.Navigation != null)
             {
-                return Application.Current.MainPage.Navigation.ModalStack;
+                return GetMainPage()!.Navigation.ModalStack;
             }
             else
             {

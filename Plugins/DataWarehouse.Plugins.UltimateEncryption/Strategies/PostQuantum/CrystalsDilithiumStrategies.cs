@@ -6,59 +6,63 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Pqc.Crypto.Crystals.Dilithium;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Security;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
     /// <summary>
     /// Shared helper for CRYSTALS-Dilithium signature operations across all security levels.
-    /// Provides sign, verify, and key generation using BouncyCastle's Dilithium implementation.
+    /// Provides sign, verify, and key generation using BouncyCastle's ML-DSA implementation.
     /// All operations are thread-safe and production-ready.
     /// </summary>
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     internal static class DilithiumSignatureHelper
     {
         /// <summary>
-        /// Signs data using a Dilithium private key at the specified parameter level.
+        /// Signs data using an ML-DSA private key at the specified parameter level.
         /// </summary>
         /// <param name="data">The data to sign.</param>
         /// <param name="privateKey">The encoded private key bytes.</param>
-        /// <param name="parameters">The Dilithium parameter set (Dilithium2/3/5).</param>
+        /// <param name="parameters">The ML-DSA parameter set (ml_dsa_44/65/87).</param>
         /// <returns>The digital signature bytes.</returns>
         /// <exception cref="CryptographicException">Thrown when signing fails.</exception>
-        public static byte[] Sign(byte[] data, byte[] privateKey, DilithiumParameters parameters)
+        public static byte[] Sign(byte[] data, byte[] privateKey, MLDsaParameters parameters)
         {
             try
             {
-                var privateKeyParams = new DilithiumPrivateKeyParameters(parameters, privateKey, null);
-                var signer = new DilithiumSigner();
+                var privateKeyParams = MLDsaPrivateKeyParameters.FromEncoding(parameters, privateKey);
+                var signer = new MLDsaSigner(parameters, true);
                 signer.Init(true, privateKeyParams);
-                return signer.GenerateSignature(data);
+                signer.BlockUpdate(data, 0, data.Length);
+                return signer.GenerateSignature();
             }
             catch (Exception ex) when (ex is not CryptographicException)
             {
                 throw new CryptographicException(
-                    $"Dilithium signing failed with parameter set {parameters}: {ex.Message}", ex);
+                    $"ML-DSA signing failed with parameter set {parameters}: {ex.Message}", ex);
             }
         }
 
         /// <summary>
-        /// Verifies a Dilithium signature against the provided data and public key.
+        /// Verifies an ML-DSA signature against the provided data and public key.
         /// </summary>
         /// <param name="data">The original signed data.</param>
         /// <param name="signature">The signature to verify.</param>
         /// <param name="publicKey">The encoded public key bytes.</param>
-        /// <param name="parameters">The Dilithium parameter set (Dilithium2/3/5).</param>
+        /// <param name="parameters">The ML-DSA parameter set (ml_dsa_44/65/87).</param>
         /// <returns>True if the signature is valid; false otherwise.</returns>
-        public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, DilithiumParameters parameters)
+        public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, MLDsaParameters parameters)
         {
             try
             {
-                var publicKeyParams = new DilithiumPublicKeyParameters(parameters, publicKey);
-                var verifier = new DilithiumSigner();
+                var publicKeyParams = MLDsaPublicKeyParameters.FromEncoding(parameters, publicKey);
+                var verifier = new MLDsaSigner(parameters, true);
                 verifier.Init(false, publicKeyParams);
-                return verifier.VerifySignature(data, signature);
+                verifier.BlockUpdate(data, 0, data.Length);
+                return verifier.VerifySignature(signature);
             }
             catch
             {
@@ -67,21 +71,21 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         }
 
         /// <summary>
-        /// Generates a Dilithium key pair at the specified parameter level.
+        /// Generates an ML-DSA key pair at the specified parameter level.
         /// </summary>
-        /// <param name="parameters">The Dilithium parameter set (Dilithium2/3/5).</param>
+        /// <param name="parameters">The ML-DSA parameter set (ml_dsa_44/65/87).</param>
         /// <param name="random">A secure random number generator.</param>
         /// <returns>A tuple of (publicKey, privateKey) as encoded byte arrays.</returns>
         public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(
-            DilithiumParameters parameters, SecureRandom random)
+            MLDsaParameters parameters, SecureRandom random)
         {
-            var keyGenParams = new DilithiumKeyGenerationParameters(random, parameters);
-            var keyPairGenerator = new DilithiumKeyPairGenerator();
+            var keyGenParams = new MLDsaKeyGenerationParameters(random, parameters);
+            var keyPairGenerator = new MLDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
 
-            var publicKey = ((DilithiumPublicKeyParameters)keyPair.Public).GetEncoded();
-            var privateKey = ((DilithiumPrivateKeyParameters)keyPair.Private).GetEncoded();
+            var publicKey = ((MLDsaPublicKeyParameters)keyPair.Public).GetEncoded();
+            var privateKey = ((MLDsaPrivateKeyParameters)keyPair.Private).GetEncoded();
 
             return (publicKey, privateKey);
         }
@@ -186,14 +190,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 if (key.Length > 0)
                 {
                     // Use provided private key to sign
-                    signature = DilithiumSignatureHelper.Sign(plaintext, key, DilithiumParameters.Dilithium2);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, key, MLDsaParameters.ml_dsa_44);
                 }
                 else
                 {
                     // Generate ephemeral key pair and sign
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        DilithiumParameters.Dilithium2, _secureRandom);
-                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, DilithiumParameters.Dilithium2);
+                        MLDsaParameters.ml_dsa_44, _secureRandom);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_44);
                 }
 
                 // Build result: [Signature Length:4][Signature][Original Data]
@@ -228,7 +232,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 // Verify signature using public key (provided in 'key' parameter)
-                if (!DilithiumSignatureHelper.Verify(data, signature, key, DilithiumParameters.Dilithium2))
+                if (!DilithiumSignatureHelper.Verify(data, signature, key, MLDsaParameters.ml_dsa_44))
                 {
                     throw new CryptographicException(
                         "CRYSTALS-Dilithium-2 signature verification failed. Data may be tampered.");
@@ -244,7 +248,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                DilithiumParameters.Dilithium2, _secureRandom);
+                MLDsaParameters.ml_dsa_44, _secureRandom);
             return privateKey;
         }
 
@@ -253,7 +257,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(DilithiumParameters.Dilithium2, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_44, _secureRandom);
         }
     }
 
@@ -355,13 +359,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
                 if (key.Length > 0)
                 {
-                    signature = DilithiumSignatureHelper.Sign(plaintext, key, DilithiumParameters.Dilithium3);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, key, MLDsaParameters.ml_dsa_65);
                 }
                 else
                 {
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        DilithiumParameters.Dilithium3, _secureRandom);
-                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, DilithiumParameters.Dilithium3);
+                        MLDsaParameters.ml_dsa_65, _secureRandom);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_65);
                 }
 
                 using var ms = new System.IO.MemoryStream();
@@ -393,7 +397,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var signature = reader.ReadBytes(signatureLength);
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                if (!DilithiumSignatureHelper.Verify(data, signature, key, DilithiumParameters.Dilithium3))
+                if (!DilithiumSignatureHelper.Verify(data, signature, key, MLDsaParameters.ml_dsa_65))
                 {
                     throw new CryptographicException(
                         "CRYSTALS-Dilithium-3 signature verification failed. Data may be tampered.");
@@ -409,7 +413,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                DilithiumParameters.Dilithium3, _secureRandom);
+                MLDsaParameters.ml_dsa_65, _secureRandom);
             return privateKey;
         }
 
@@ -418,7 +422,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(DilithiumParameters.Dilithium3, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_65, _secureRandom);
         }
     }
 
@@ -520,13 +524,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
                 if (key.Length > 0)
                 {
-                    signature = DilithiumSignatureHelper.Sign(plaintext, key, DilithiumParameters.Dilithium5);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, key, MLDsaParameters.ml_dsa_87);
                 }
                 else
                 {
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        DilithiumParameters.Dilithium5, _secureRandom);
-                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, DilithiumParameters.Dilithium5);
+                        MLDsaParameters.ml_dsa_87, _secureRandom);
+                    signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_87);
                 }
 
                 using var ms = new System.IO.MemoryStream();
@@ -558,7 +562,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var signature = reader.ReadBytes(signatureLength);
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                if (!DilithiumSignatureHelper.Verify(data, signature, key, DilithiumParameters.Dilithium5))
+                if (!DilithiumSignatureHelper.Verify(data, signature, key, MLDsaParameters.ml_dsa_87))
                 {
                     throw new CryptographicException(
                         "CRYSTALS-Dilithium-5 signature verification failed. Data may be tampered.");
@@ -574,7 +578,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                DilithiumParameters.Dilithium5, _secureRandom);
+                MLDsaParameters.ml_dsa_87, _secureRandom);
             return privateKey;
         }
 
@@ -583,7 +587,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(DilithiumParameters.Dilithium5, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_87, _secureRandom);
         }
     }
 }

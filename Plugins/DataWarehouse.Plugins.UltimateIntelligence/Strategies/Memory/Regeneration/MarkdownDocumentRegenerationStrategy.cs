@@ -368,7 +368,6 @@ public sealed class MarkdownDocumentRegenerationStrategy : RegenerationStrategyB
             elements.Add((cb.Position, "codeblock", cb));
 
         // Add paragraphs and other content
-        var currentPos = 0;
         foreach (var element in elements.OrderBy(e => e.Position))
         {
             // Add any paragraphs before this element

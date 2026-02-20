@@ -138,7 +138,6 @@ internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Auto-generate resolvers from metadata and execute via message bus
         if (MessageBus != null)
         {
-            var routingKey = "hasura.data_query";
             // Message bus dispatch would happen here
         }
 
@@ -159,7 +158,6 @@ internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Execute aggregation query via message bus
         if (MessageBus != null)
         {
-            var routingKey = "hasura.aggregation_query";
             // Message bus dispatch would happen here
         }
 
@@ -183,7 +181,6 @@ internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Set up real-time subscription via message bus
         if (MessageBus != null)
         {
-            var routingKey = "hasura.subscription";
             // Message bus subscription would be established here
         }
 

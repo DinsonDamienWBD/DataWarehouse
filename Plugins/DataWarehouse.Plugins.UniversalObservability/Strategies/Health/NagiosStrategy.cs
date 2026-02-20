@@ -12,8 +12,6 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
     private string _nagiosUrl = "http://localhost/nagios";
-    private string _nscaHost = "localhost";
-    private int _nscaPort = 5667;
     private string _username = "";
     private string _password = "";
     private string _hostname = "";

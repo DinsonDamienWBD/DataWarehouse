@@ -14,8 +14,8 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
     private int _processId;
     private int _secretKey;
     private string _serverVersion = "";
-    private StreamReader? _reader;
-    private StreamWriter? _writer;
+    private StreamReader? _reader = null;
+    private StreamWriter? _writer = null;
 
     /// <inheritdoc/>
     public override string StrategyId => "cockroachdb-pgwire";

@@ -347,7 +347,6 @@ public sealed class OfflineCatalogSyncService
 {
     private readonly BoundedDictionary<string, CatalogEntry> _localCatalog = new BoundedDictionary<string, CatalogEntry>(1000);
     private readonly List<SyncConflict> _conflicts = new();
-    private int _compactionThreshold = 100;
 
     /// <summary>
     /// Adds or updates an entry in the local catalog.

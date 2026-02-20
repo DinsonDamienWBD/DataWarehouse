@@ -176,7 +176,7 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
                 .Select(c => c.CoreId)
                 .ToArray();
 
-            if (activeCores.Length > 0)
+            if (activeCores.Length > 0 && (OperatingSystem.IsWindows() || OperatingSystem.IsLinux()))
             {
                 long affinityMask = 0;
                 foreach (var core in activeCores)

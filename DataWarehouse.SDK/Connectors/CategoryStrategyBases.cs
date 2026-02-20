@@ -599,5 +599,16 @@ namespace DataWarehouse.SDK.Connectors
             string prompt,
             Dictionary<string, object>? options = null,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// Helper for async-iterator overrides that do not support streaming.
+        /// Throws <see cref="NotSupportedException"/> with <paramref name="message"/>.
+        /// Annotated <see cref="System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute"/> so the
+        /// compiler treats the call site as a terminal statement, allowing <c>yield break</c>
+        /// after it without triggering CS0162.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        protected static void ThrowStreamingNotSupported(string message)
+            => throw new NotSupportedException(message);
     }
 }

@@ -54,7 +54,7 @@ public sealed class FfmpegExecutor
             _ffmpegPath = ffmpegPath ?? FindFfmpeg();
             IsAvailable = true;
         }
-        catch (FfmpegNotFoundException ex)
+        catch (FfmpegNotFoundException)
         {
             _ffmpegPath = string.Empty;
             IsAvailable = false;

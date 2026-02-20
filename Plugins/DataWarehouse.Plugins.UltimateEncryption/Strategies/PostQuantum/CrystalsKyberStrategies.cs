@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecureRandom secureRandom,
             Func<byte[]> generateIv)
         {
-            var recipientPublicKey = new NtruPublicKeyParameters(ntruParameters, recipientPublicKeyBytes);
+            var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(ntruParameters, recipientPublicKeyBytes);
 
             var kemGenerator = new NtruKemGenerator(secureRandom);
             var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             var tag = reader.ReadBytes(16);
             var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-            var privateKeyParams = new NtruPrivateKeyParameters(ntruParameters, privateKeyBytes);
+            var privateKeyParams = NtruPrivateKeyParameters.FromEncoding(ntruParameters, privateKeyBytes);
             var kemExtractor = new NtruKemExtractor(privateKeyParams);
             var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 

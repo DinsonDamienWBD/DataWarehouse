@@ -22,7 +22,6 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     private string _apiKey = "";
     private string _site = "datadoghq.com";
     private string _service = "datawarehouse";
-    private readonly int _batchSize = 100;
 
     /// <inheritdoc/>
     public override string StrategyId => "datadog";

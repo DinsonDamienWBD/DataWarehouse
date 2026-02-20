@@ -138,7 +138,6 @@ type Metadata {
         // Resolve entities via message bus
         if (MessageBus != null)
         {
-            var routingKey = "federation.resolve_entities";
             // Message bus dispatch would happen here
         }
 
@@ -169,7 +168,6 @@ type Metadata {
         // Route to message bus for federated query execution
         if (MessageBus != null)
         {
-            var routingKey = "federation.query";
             // Message bus dispatch would happen here
         }
 

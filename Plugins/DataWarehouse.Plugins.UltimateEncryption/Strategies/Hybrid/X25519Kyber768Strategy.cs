@@ -257,7 +257,7 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
             x25519Agreement.CalculateAgreement(senderX25519Public, classicalSecret, 0);
 
             // Step 6: Decapsulate KEM to get PQ secret
-            var kemPrivateKey = new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, ntruPrivateKeyBytes);
+            var kemPrivateKey = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPrivateKeyBytes);
             var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 

@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 using Amazon.S3;
 using Amazon.Runtime;
+using Amazon.Runtime.Credentials;
 using Amazon;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
@@ -54,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             else
             {
                 // Fall back to environment/instance credentials
-                credentials = FallbackCredentialsFactory.GetCredentials();
+                credentials = DefaultAWSCredentialsIdentityResolver.GetCredentials(null);
             }
 
             // Create S3 client configuration

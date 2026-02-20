@@ -202,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
             string? prefix,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            throw new NotSupportedException(
+            ThrowListingNotSupported(
                 "Neural storage catalog not available. This operation requires:\n" +
                 "- Neural pattern index database\n" +
                 "- Associative memory mapping\n\n" +
@@ -211,8 +211,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
                 "- 'List all memories related to project X'\n" +
                 "- 'Find patterns similar to this concept'\n" +
                 "Using natural associative properties of neural storage.");
-
-            await Task.CompletedTask;
             yield break;
         }
 

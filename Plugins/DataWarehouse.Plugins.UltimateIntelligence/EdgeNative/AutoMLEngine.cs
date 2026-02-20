@@ -177,10 +177,9 @@ public sealed class SchemaExtractionService
 
         // Read sample rows
         var rowCount = 0;
-        while (!reader.EndOfStream && rowCount < SampleRowCount && !ct.IsCancellationRequested)
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) != null && rowCount < SampleRowCount && !ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(ct);
-            if (line == null) break;
 
             var values = line.Split(',');
             var row = new Dictionary<string, object?>();

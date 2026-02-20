@@ -47,8 +47,6 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
 
     // Statistics
     private long _totalOperations;
-    private long _totalBytesManaged;
-    private long _totalFailures;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.datamanagement.ultimate";
@@ -253,8 +251,8 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         metadata["IndexingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Indexing).Count;
         metadata["VersioningStrategies"] = GetStrategiesByCategory(DataManagementCategory.Versioning).Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
-        metadata["TotalBytesManaged"] = Interlocked.Read(ref _totalBytesManaged);
-        metadata["TotalFailures"] = Interlocked.Read(ref _totalFailures);
+        metadata["TotalBytesManaged"] = 0L;
+        metadata["TotalFailures"] = 0L;
         return metadata;
     }
 
@@ -451,8 +449,8 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
-        message.Payload["totalBytesManaged"] = Interlocked.Read(ref _totalBytesManaged);
-        message.Payload["totalFailures"] = Interlocked.Read(ref _totalFailures);
+        message.Payload["totalBytesManaged"] = 0L;
+        message.Payload["totalFailures"] = 0L;
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["activePolicies"] = _policies.Count;
 

@@ -30,7 +30,6 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private int _sdu = 8192;
     private int _tdu = 32767;
-    private string _serverVersion = "";
     private byte[] _sessionKey = [];
     private int _sequenceNumber;
 
@@ -575,7 +574,6 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort CpQrydta = 0x241B; // Query Answer Set Data
     private const ushort CpSqlcard = 0x2408; // SQL Communications Area Reply Data
 
-    private string _serverVersion = "";
     private string _rdbName = "";
     private int _correlationId;
 

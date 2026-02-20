@@ -903,6 +903,8 @@ namespace DataWarehouse.Tests.Security
             });
 
             // Assert - handler registered, strategy remains operational
+            _ = lockdownTriggered; // Handler not triggered in this test; flag is captured for handler closure only
+            _ = lockdownSubjectId;
             _strategy.GetActiveCanaries().Should().NotBeNull("strategy should remain functional after handler registration");
         }
 

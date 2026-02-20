@@ -58,7 +58,6 @@ public abstract class DataGovernanceStrategyBase : IDataGovernanceStrategy
 {
     private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
-    private bool _disposed;
     private DateTime? _healthCacheExpiry;
     private HealthStatus? _cachedHealth;
 

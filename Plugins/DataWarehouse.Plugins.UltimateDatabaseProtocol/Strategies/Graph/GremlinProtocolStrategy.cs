@@ -13,7 +13,6 @@ public sealed class GremlinProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private ClientWebSocket? _webSocket;
     private readonly Guid _sessionId = Guid.NewGuid();
-    private string _serverVersion = "";
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase

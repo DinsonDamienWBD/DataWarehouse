@@ -701,9 +701,9 @@ public sealed class RESTChannel : IntelligenceChannelBase
             using var reader = new StreamReader(stream);
 
             var index = 0;
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null && !ct.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
                 if (string.IsNullOrEmpty(line))
                 {
                     continue;
@@ -808,7 +808,6 @@ public sealed class GRPCChannel : IntelligenceChannelBase
     private readonly GRPCChannelOptions _options;
     private readonly BoundedDictionary<string, GRPCCallState> _activeCalls = new BoundedDictionary<string, GRPCCallState>(1000);
     private IGRPCClientAdapter? _clientAdapter;
-    private Task? _streamingTask;
     private CancellationTokenSource? _streamingCts;
 
     /// <inheritdoc/>

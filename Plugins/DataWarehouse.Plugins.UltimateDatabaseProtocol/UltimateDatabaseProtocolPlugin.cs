@@ -45,8 +45,8 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
 
     // Statistics
     private long _totalConnections;
-    private long _totalQueries;
-    private long _totalTransactions;
+    private long _totalQueries = 0;
+    private long _totalTransactions = 0;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.protocol.ultimate";

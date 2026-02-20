@@ -47,7 +47,6 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     // Statistics
     private long _totalOperations;
     private long _totalEventsProcessed;
-    private long _totalFailures;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.streaming.ultimate";
@@ -217,7 +216,7 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     {
         TotalOperations = Interlocked.Read(ref _totalOperations),
         TotalEventsProcessed = Interlocked.Read(ref _totalEventsProcessed),
-        TotalFailures = Interlocked.Read(ref _totalFailures),
+        TotalFailures = 0,
         RegisteredStrategies = _registry.Count,
         ActivePolicies = _policies.Count,
         UsageByStrategy = _usageStats.ToDictionary(k => k.Key, v => v.Value)

@@ -89,7 +89,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
         // CXL memory pooling
         private readonly BoundedDictionary<int, CxlMemoryPool> _cxlPools = new BoundedDictionary<int, CxlMemoryPool>(1000);
-        private int _currentNumaNode = 0;
 
         // NUMA topology (simplified)
         private readonly BoundedDictionary<int, NumaNode> _numaTopology = new BoundedDictionary<int, NumaNode>(1000);
@@ -810,7 +809,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // - libnuma APIs
 
             // Simplified: assume single NUMA node
-            _currentNumaNode = 0;
             _numaTopology.TryAdd(0, new NumaNode
             {
                 NodeId = 0,

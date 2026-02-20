@@ -904,7 +904,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// <summary>
         /// Gets or creates a LUN mapping for a storage key.
         /// </summary>
-        private async Task<(FcLunMapping lunMapping, long offset)> GetOrCreateLunMappingAsync(
+        private Task<(FcLunMapping lunMapping, long offset)> GetOrCreateLunMappingAsync(
             string key,
             CancellationToken ct)
         {
@@ -916,9 +916,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Calculate offset within LUN (simplified - would need allocation table)
             var offset = (long)(Math.Abs(keyHash) % (lunMapping.SizeBytes / _blockSize)) * _blockSize;
 
-            return (lunMapping, offset);
-
-            await Task.CompletedTask; // Keep async signature
+            return Task.FromResult((lunMapping, offset));
         }
 
         /// <summary>

@@ -170,7 +170,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                 if (pos + MinMatchLength <= input.Length)
                 {
                     uint hash = ComputeHash(input, pos);
-                    int matchPos = -1;
                     int matchLen = 0;
 
                     if (hashTable.TryGetValue(hash, out int candidatePos))

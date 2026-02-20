@@ -20,7 +20,6 @@ public class MessageBusTests
     public async Task Subscribe_ShouldReceivePublishedMessage()
     {
         var bus = CreateBus();
-        PluginMessage? received = null;
         var tcs = new TaskCompletionSource<PluginMessage>();
 
         bus.Subscribe("test.topic", msg =>

@@ -201,7 +201,6 @@ internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, DateTimeOffset> _sessionLastActivity = new BoundedDictionary<string, DateTimeOffset>(1000);
     private readonly BoundedDictionary<string, long> _sequenceNumbers = new BoundedDictionary<string, long>(1000);
     private long _totalNotifications;
-    private long _totalErrors;
 
     /// <inheritdoc/>
     public override string StrategyId => "streaming-opc-ua";

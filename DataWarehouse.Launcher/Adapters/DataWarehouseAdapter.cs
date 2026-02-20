@@ -17,7 +17,7 @@ public sealed class DataWarehouseAdapter : IKernelAdapter
     private ILogger<DataWarehouseAdapter> _logger = NullLogger<DataWarehouseAdapter>.Instance;
     private KernelState _state = KernelState.Uninitialized;
     private DateTime _startedAt;
-    private long _operationsProcessed;
+    private long _operationsProcessed = 0;
 
     public string KernelId => _kernel?.KernelId ?? "";
 

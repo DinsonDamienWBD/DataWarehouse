@@ -248,7 +248,6 @@ internal sealed class ModbusStreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, ConcurrentQueue<ModbusReadResult>> _dataQueues = new BoundedDictionary<string, ConcurrentQueue<ModbusReadResult>>(1000);
     private readonly BoundedDictionary<string, ushort[]> _registerState = new BoundedDictionary<string, ushort[]>(1000);
     private long _totalPolls;
-    private long _totalErrors;
 
     /// <inheritdoc/>
     public override string StrategyId => "streaming-modbus";

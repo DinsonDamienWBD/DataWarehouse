@@ -106,7 +106,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 // Parse recipient's public key from key parameter
-                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps2048509, key);
+                var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048509, key);
 
                 // Encapsulate to derive shared secret
                 var kemGenerator = new NtruKemGenerator(_secureRandom);
@@ -172,7 +172,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 // Decapsulate using private key
-                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps2048509, key);
+                var privateKeyParams = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048509, key);
                 var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
@@ -294,7 +294,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps2048677, key);
+                var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, key);
                 var kemGenerator = new NtruKemGenerator(_secureRandom);
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
@@ -351,7 +351,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, key);
+                var privateKeyParams = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, key);
                 var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
@@ -471,7 +471,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps4096821, key);
+                var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps4096821, key);
                 var kemGenerator = new NtruKemGenerator(_secureRandom);
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
@@ -528,7 +528,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps4096821, key);
+                var privateKeyParams = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps4096821, key);
                 var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 

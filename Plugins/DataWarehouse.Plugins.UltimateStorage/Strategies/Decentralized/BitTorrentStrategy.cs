@@ -614,7 +614,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
                 // Collect statistics
                 var totalPeers = 0;
-                var totalSeeds = 0;
                 var activeTorrents = 0;
 
                 foreach (var manager in _torrents.Values)
@@ -855,8 +854,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 Progress = manager.Progress,
                 DownloadRate = manager.Monitor.DownloadRate,
                 UploadRate = manager.Monitor.UploadRate,
-                TotalDownloaded = manager.Monitor.DataBytesDownloaded,
-                TotalUploaded = manager.Monitor.DataBytesUploaded,
+                TotalDownloaded = manager.Monitor.DataBytesReceived,
+                TotalUploaded = manager.Monitor.DataBytesSent,
                 TotalPeers = manager.Peers.Available,
                 TotalSeeds = 0, // Not directly available in MonoTorrent 3.0
                 TotalLeechers = 0, // Not directly available in MonoTorrent 3.0

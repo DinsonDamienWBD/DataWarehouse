@@ -19,7 +19,6 @@ public sealed class MacOsSpecific : IDisposable
     private readonly FuseConfig _config;
     private readonly IKernelContext? _kernelContext;
     private readonly BoundedDictionary<string, FinderInfo> _finderInfoCache = new BoundedDictionary<string, FinderInfo>(1000);
-    private nint _fsEventsStream;
     private Thread? _fsEventsThread;
     private CancellationTokenSource? _fsEventsCts;
     private bool _disposed;
@@ -111,7 +110,6 @@ public sealed class MacOsSpecific : IDisposable
         // Note: In production, this would use CoreServices/FSEvents.h to create an FSEventStream.
         // The _fsEventsStream handle would hold the native stream reference.
         // For now, we mark the stream as active with a sentinel value.
-        _fsEventsStream = 1; // non-zero = stream active
         _kernelContext?.LogInfo($"FSEvents stream created for: {string.Join(", ", paths)}");
         return true;
     }
@@ -549,7 +547,7 @@ public sealed class MacOsSpecific : IDisposable
         _fsEventsCts?.Cancel();
         _fsEventsThread?.Join(TimeSpan.FromSeconds(2));
         _fsEventsCts?.Dispose();
-        _fsEventsStream = 0; // Release native stream reference
+        // Release native stream reference
 
         _finderInfoCache.Clear();
     }

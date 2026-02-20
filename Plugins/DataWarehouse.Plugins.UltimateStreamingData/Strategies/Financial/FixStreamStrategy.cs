@@ -265,7 +265,6 @@ internal sealed class FixStreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, FixSession> _sessions = new BoundedDictionary<string, FixSession>(1000);
     private readonly BoundedDictionary<string, ConcurrentQueue<FixMessage>> _messageQueues = new BoundedDictionary<string, ConcurrentQueue<FixMessage>>(1000);
     private long _totalMessages;
-    private long _totalErrors;
 
     /// <inheritdoc/>
     public override string StrategyId => "streaming-fix";

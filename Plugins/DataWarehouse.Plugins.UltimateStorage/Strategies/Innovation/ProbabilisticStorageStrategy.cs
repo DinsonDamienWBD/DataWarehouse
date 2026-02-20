@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, StructureMetadata> _structureMetadata = new BoundedDictionary<string, StructureMetadata>(1000);
         private long _totalQueriesServed;
         private long _approximateQueriesServed;
-        private long _exactQueriesServed;
+        private long _exactQueriesServed = 0;
         private long _totalSpaceSaved;
 
         public override string StrategyId => "probabilistic-storage";

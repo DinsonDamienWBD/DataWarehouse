@@ -294,9 +294,9 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
         var sampleRows = new List<IReadOnlyList<object?>>();
 
         // Read sample rows for type inference (up to 100 rows)
-        for (int i = 0; i < 100 && !reader.EndOfStream; i++)
+        string? line;
+        for (int i = 0; i < 100 && (line = await reader.ReadLineAsync(ct)) != null; i++)
         {
-            var line = await reader.ReadLineAsync(ct);
             if (!string.IsNullOrEmpty(line))
             {
                 var values = ParseCsvLine(line);
@@ -369,9 +369,9 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
         var headers = new HashSet<string>();
         var sampleRows = new List<IReadOnlyList<object?>>();
 
-        for (int i = 0; i < 100 && !reader.EndOfStream; i++)
+        string? line;
+        for (int i = 0; i < 100 && (line = await reader.ReadLineAsync(ct)) != null; i++)
         {
-            var line = await reader.ReadLineAsync(ct);
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             using var doc = JsonDocument.Parse(line);
@@ -876,9 +876,9 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
                     var headers = ParseCsvLine(headerLine);
                     bytesRead += Encoding.UTF8.GetByteCount(headerLine);
 
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
-                        var line = await reader.ReadLineAsync(ct);
                         if (string.IsNullOrEmpty(line)) continue;
 
                         bytesRead += Encoding.UTF8.GetByteCount(line);
@@ -915,9 +915,9 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
             case VirtualTableFormat.NdJson:
                 using (var reader = new StreamReader(stream, Encoding.UTF8))
                 {
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
-                        var line = await reader.ReadLineAsync(ct);
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         bytesRead += Encoding.UTF8.GetByteCount(line);
@@ -2317,9 +2317,9 @@ internal sealed class PluginDataSourceProvider : IDataSourceProvider
 
                     var headers = headerLine.Split(',').Select(h => h.Trim().Trim('"')).ToList();
 
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
-                        var line = await reader.ReadLineAsync(ct);
                         if (string.IsNullOrEmpty(line)) continue;
 
                         var values = line.Split(',');
@@ -2350,9 +2350,9 @@ internal sealed class PluginDataSourceProvider : IDataSourceProvider
             case VirtualTableFormat.NdJson:
                 using (var reader = new StreamReader(stream, Encoding.UTF8))
                 {
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
-                        var line = await reader.ReadLineAsync(ct);
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         using var doc = JsonDocument.Parse(line);

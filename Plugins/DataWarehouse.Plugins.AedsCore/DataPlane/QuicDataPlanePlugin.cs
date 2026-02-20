@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using System.Net.Quic;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Utilities;
@@ -33,6 +34,9 @@ namespace DataWarehouse.Plugins.AedsCore.DataPlane;
 /// 60 seconds idle or 100 streams opened to prevent resource exhaustion.
 /// </para>
 /// </remarks>
+[SupportedOSPlatform("linux")]
+[SupportedOSPlatform("macOS")]
+[SupportedOSPlatform("windows")]
 public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
 {
     private readonly ILogger<QuicDataPlanePlugin> _logger;
@@ -425,6 +429,9 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
     /// <summary>
     /// Connection pool for managing QUIC connections to a specific server.
     /// </summary>
+    [SupportedOSPlatform("linux")]
+    [SupportedOSPlatform("macOS")]
+    [SupportedOSPlatform("windows")]
     private class QuicConnectionPool : IAsyncDisposable
     {
         private readonly string _serverUrl;

@@ -157,7 +157,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Route to data layer via message bus
         if (MessageBus != null)
         {
-            var routingKey = "prisma.find_many";
             // Message bus dispatch would happen here
         }
 
@@ -189,7 +188,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.find_unique";
             // Message bus dispatch would happen here
         }
 
@@ -214,7 +212,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.create";
             // Message bus dispatch would happen here
         }
 
@@ -240,7 +237,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.update";
             // Message bus dispatch would happen here
         }
 
@@ -266,7 +262,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.delete";
             // Message bus dispatch would happen here
         }
 
@@ -290,7 +285,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.upsert";
             // Message bus dispatch would happen here
         }
 
@@ -315,7 +309,6 @@ internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     {
         if (MessageBus != null)
         {
-            var routingKey = "prisma.query";
             // Message bus dispatch would happen here
         }
 

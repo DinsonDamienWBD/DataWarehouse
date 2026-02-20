@@ -256,7 +256,7 @@ public class LiveMigrationEngine
             {
                 throw; // Don't retry cancellations
             }
-            catch (Exception ex) when (attempt < job.MaxRetries)
+            catch (Exception) when (attempt < job.MaxRetries)
             {
                 // Exponential backoff before retry
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));

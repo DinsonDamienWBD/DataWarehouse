@@ -108,8 +108,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                         throw new InvalidOperationException($"Credentials file not found at path: {_credentialsPath}");
                     }
 
-                    using var credentialStream = File.OpenRead(_credentialsPath);
-                    _credential = GoogleCredential.FromStream(credentialStream);
+                    var serviceAccountCred = await CredentialFactory.FromFileAsync<ServiceAccountCredential>(_credentialsPath, ct);
+                    _credential = serviceAccountCred.ToGoogleCredential();
                 }
                 else
                 {

@@ -34,7 +34,6 @@ public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposabl
     private long _totalRequests;
     private long _successfulRequests;
     private long _failedRequests;
-    private long _circuitBreaks;
     private double _totalLatencyMs;
 
     /// <inheritdoc/>
@@ -314,7 +313,7 @@ public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposabl
         metadata["TotalRequests"] = Interlocked.Read(ref _totalRequests);
         metadata["SuccessfulRequests"] = Interlocked.Read(ref _successfulRequests);
         metadata["FailedRequests"] = Interlocked.Read(ref _failedRequests);
-        metadata["CircuitBreaks"] = Interlocked.Read(ref _circuitBreaks);
+        metadata["CircuitBreaks"] = 0L;
         metadata["AvgLatencyMs"] = _totalRequests > 0 ? _totalLatencyMs / _totalRequests : 0;
         return metadata;
     }
@@ -423,7 +422,7 @@ public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposabl
             ["totalRequests"] = Interlocked.Read(ref _totalRequests),
             ["successfulRequests"] = Interlocked.Read(ref _successfulRequests),
             ["failedRequests"] = Interlocked.Read(ref _failedRequests),
-            ["circuitBreaks"] = Interlocked.Read(ref _circuitBreaks),
+            ["circuitBreaks"] = 0L,
             ["avgLatencyMs"] = _totalRequests > 0 ? _totalLatencyMs / _totalRequests : 0,
             ["registeredServices"] = _registeredServices.Count
         };

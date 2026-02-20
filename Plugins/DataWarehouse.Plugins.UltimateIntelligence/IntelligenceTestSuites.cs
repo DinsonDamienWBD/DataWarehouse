@@ -187,10 +187,8 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
             }
 
             // Verify message bus can subscribe to knowledge events
-            var subscribed = false;
             var sub = _messageBus.Subscribe("intelligence.knowledge.updated", _ =>
             {
-                subscribed = true;
                 return Task.CompletedTask;
             });
 
@@ -480,8 +478,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         try
         {
             var aggregator = new KnowledgeAggregator();
-            var eventFired = false;
-            aggregator.KnowledgeChanged += (_, _) => eventFired = true;
+            aggregator.KnowledgeChanged += (_, _) => { };
 
             // Aggregator should support event-based updates
             result.Passed = true;

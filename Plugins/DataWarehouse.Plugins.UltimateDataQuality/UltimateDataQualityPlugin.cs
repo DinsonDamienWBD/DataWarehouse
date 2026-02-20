@@ -44,9 +44,6 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
     // Statistics
     private long _totalRecordsProcessed;
-    private long _totalIssuesFound;
-    private long _totalCorrections;
-    private long _totalDuplicates;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.dataquality.ultimate";
@@ -251,9 +248,9 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         metadata["MonitoringStrategies"] = GetStrategiesByCategory(DataQualityCategory.Monitoring).Count;
         metadata["ReportingStrategies"] = GetStrategiesByCategory(DataQualityCategory.Reporting).Count;
         metadata["TotalRecordsProcessed"] = Interlocked.Read(ref _totalRecordsProcessed);
-        metadata["TotalIssuesFound"] = Interlocked.Read(ref _totalIssuesFound);
-        metadata["TotalCorrections"] = Interlocked.Read(ref _totalCorrections);
-        metadata["TotalDuplicates"] = Interlocked.Read(ref _totalDuplicates);
+        metadata["TotalIssuesFound"] = 0L;
+        metadata["TotalCorrections"] = 0L;
+        metadata["TotalDuplicates"] = 0L;
         return metadata;
     }
 
@@ -429,9 +426,9 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalRecordsProcessed"] = Interlocked.Read(ref _totalRecordsProcessed);
-        message.Payload["totalIssuesFound"] = Interlocked.Read(ref _totalIssuesFound);
-        message.Payload["totalCorrections"] = Interlocked.Read(ref _totalCorrections);
-        message.Payload["totalDuplicates"] = Interlocked.Read(ref _totalDuplicates);
+        message.Payload["totalIssuesFound"] = 0L;
+        message.Payload["totalCorrections"] = 0L;
+        message.Payload["totalDuplicates"] = 0L;
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["activePolicies"] = _policies.Count;
 

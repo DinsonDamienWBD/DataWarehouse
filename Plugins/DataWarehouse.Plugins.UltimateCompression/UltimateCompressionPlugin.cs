@@ -58,10 +58,6 @@ namespace DataWarehouse.Plugins.UltimateCompression
         private ICompressionStrategy? _activeStrategy;
 
         // Statistics tracking
-        private long _totalCompressions;
-        private long _totalDecompressions;
-        private long _totalBytesCompressed;
-        private long _totalBytesDecompressed;
 
         /// <inheritdoc/>
         public override string Id => "com.datawarehouse.compression.ultimate";

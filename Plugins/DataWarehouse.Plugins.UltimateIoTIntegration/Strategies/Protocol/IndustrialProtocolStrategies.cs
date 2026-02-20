@@ -338,7 +338,9 @@ public class Iec104ProtocolStrategy : ProtocolStrategyBase
 {
     private readonly BoundedDictionary<string, Iec104ConnectionState> _connections = new BoundedDictionary<string, Iec104ConnectionState>(1000);
     private int _sendSequence;
+#pragma warning disable CS0649 // _recvSequence starts at 0 (valid IEC 104 initial state); incremented on receive acknowledgment
     private int _recvSequence;
+#pragma warning restore CS0649
 
     public override string StrategyId => "iec104";
     public override string StrategyName => "IEC 60870-5-104 Protocol";

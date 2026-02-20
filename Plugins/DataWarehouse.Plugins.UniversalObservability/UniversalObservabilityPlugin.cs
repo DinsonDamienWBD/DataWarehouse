@@ -37,7 +37,6 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
     private long _totalMetricsRecorded;
     private long _totalLogsRecorded;
     private long _totalSpansRecorded;
-    private long _totalAlertsTriggered;
     private long _totalHealthChecks;
 
     /// <inheritdoc/>

@@ -404,7 +404,6 @@ internal sealed class StructuredDataChunker : IContentChunker
     public List<ContentChunk> Chunk(byte[] data, DeduplicationContext context)
     {
         var chunks = new List<ContentChunk>();
-        int offset = 0;
         int depth = 0;
         int chunkStart = 0;
 

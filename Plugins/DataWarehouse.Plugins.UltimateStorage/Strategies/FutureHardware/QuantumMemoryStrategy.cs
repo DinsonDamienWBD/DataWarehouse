@@ -168,13 +168,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
             string? prefix,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            throw new NotSupportedException(
+            ThrowListingNotSupported(
                 "Quantum memory catalog not available. This operation requires:\n" +
                 "- Qubit allocation database\n" +
                 "- Quantum state metadata tracking\n\n" +
                 "Future implementation would enumerate all stored keys matching prefix.");
-
-            await Task.CompletedTask;
             yield break;
         }
 

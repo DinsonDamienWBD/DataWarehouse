@@ -74,9 +74,9 @@ public sealed class TomlStrategy : DataFormatStrategyBase
             var currentSection = "";
             var sectionData = new Dictionary<string, string>();
 
-            while (!reader.EndOfStream)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct)) != null)
             {
-                var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#'))
                     continue;
 

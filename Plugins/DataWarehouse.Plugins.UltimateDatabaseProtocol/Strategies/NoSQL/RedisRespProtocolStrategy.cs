@@ -37,8 +37,6 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
 
     // Connection state
     private string _serverVersion = "";
-    private int _protocolVersion = 2;
-    private int _dbIndex;
     private bool _inTransaction;
     private readonly List<string> _transactionQueue = new();
     private StreamReader? _reader;
@@ -93,7 +91,6 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await SendCommandInternalAsync(["HELLO", "3"], ct);
             if (response is Dictionary<string, object> helloResponse)
             {
-                _protocolVersion = 3;
                 if (helloResponse.TryGetValue("version", out var version))
                     _serverVersion = version?.ToString() ?? "";
             }
@@ -101,7 +98,6 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         catch
         {
             // Server doesn't support RESP3, fall back to RESP2
-            _protocolVersion = 2;
 
             // Get server info
             try

@@ -38,7 +38,6 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private int _maxFailedAttempts = 5;
         private TimeSpan _sessionTimeout = TimeSpan.FromMinutes(30);
         private TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);
-        private double _riskThresholdMultiplier = 1.0;
         private string? _trustBrokerEndpoint;
         private string? _policyEngineEndpoint;
         private int _devicePostureCheckIntervalMs = 60000; // 1 minute default

@@ -3237,6 +3237,7 @@
           "Google.Protobuf": "[3.33.5, )",
           "Grpc.Net.Client": "[2.76.0, )",
           "Ipfs.Http.Client": "[0.33.0, )",
+          "Microsoft.Data.SqlClient": "[5.2.2, )",
           "Minio": "[7.0.0, )",
           "MongoDB.Driver": "[3.6.0, )",
           "MongoDB.Driver.GridFS": "[2.30.0, )",

@@ -241,7 +241,6 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, Hl7Acknowledgment> _ackLog = new BoundedDictionary<string, Hl7Acknowledgment>(1000);
     private long _totalMessages;
     private long _totalAcks;
-    private long _totalErrors;
 
     /// <inheritdoc/>
     public override string StrategyId => "streaming-hl7";

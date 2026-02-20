@@ -1103,8 +1103,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 return null;
             }
-
-            await Task.CompletedTask; // Keep async signature
         }
 
         #endregion

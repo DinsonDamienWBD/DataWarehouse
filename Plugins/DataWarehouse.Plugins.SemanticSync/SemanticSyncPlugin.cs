@@ -662,7 +662,9 @@ internal sealed class NullAIProvider : IAIProvider
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         throw new NotSupportedException("AI provider is not available in this deployment.");
-        yield break; // Required for async enumerable
+#pragma warning disable CS0162 // Unreachable code -- required for async iterator method to satisfy compiler
+        yield break;
+#pragma warning restore CS0162
     }
 
     /// <inheritdoc/>

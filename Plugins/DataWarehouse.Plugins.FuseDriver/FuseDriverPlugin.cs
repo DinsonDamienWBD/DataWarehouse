@@ -45,7 +45,6 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
     private IDisposable? _messageSubscription;
     private Thread? _fuseThread;
     private CancellationTokenSource? _cts;
-    private nint _fuseHandle;
     private bool _isMounted;
     private bool _disposed;
 
@@ -278,7 +277,6 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
             };
             _fuseThread.Start();
 
-            _fuseHandle = 1; // Non-zero sentinel indicating active FUSE session handle
             _isMounted = true;
             _kernelContext?.LogInfo($"Filesystem mounted at {_config.MountPoint}");
 
@@ -329,7 +327,6 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
             _cacheManager = null;
             _operations = null;
 
-            _fuseHandle = 0; // Release FUSE session handle
             _isMounted = false;
             _kernelContext?.LogInfo("Filesystem unmounted");
 

@@ -24,7 +24,6 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "DataWarehouse", "Models");
     private string _executionProvider = "CPU"; // CPU, CUDA, DirectML
-    private int _sessionPoolSize = 4;
     private bool _useMemoryMapping = true;
 
     public OnnxInferenceStrategy() : base(new MediaCapabilities(
@@ -559,7 +558,6 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
 {
     private string _modelPath = "";
     private string _language = "auto"; // auto-detect or ISO 639-1 code
-    private int _beamSize = 5;
 
     public SpeechToTextStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>

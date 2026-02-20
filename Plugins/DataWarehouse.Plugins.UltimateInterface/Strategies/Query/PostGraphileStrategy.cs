@@ -109,7 +109,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
         // Auto-generate query from schema metadata
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.all_items";
             // Message bus dispatch would happen here
         }
 
@@ -150,7 +149,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
     {
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.item_by_id";
             // Message bus dispatch would happen here
         }
 
@@ -175,7 +173,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
     {
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.create";
             // Message bus dispatch would happen here
         }
 
@@ -203,7 +200,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
     {
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.update";
             // Message bus dispatch would happen here
         }
 
@@ -231,7 +227,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
     {
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.delete";
             // Message bus dispatch would happen here
         }
 
@@ -258,7 +253,6 @@ internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase,
     {
         if (MessageBus != null)
         {
-            var routingKey = "postgraphile.query";
             // Message bus dispatch would happen here
         }
 

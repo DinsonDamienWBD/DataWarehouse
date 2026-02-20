@@ -44,7 +44,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
 
     private volatile bool _auditEnabled = true;
     private long _totalOperations;
-    private long _totalBytesProcessed;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.datalake.ultimate";
@@ -215,7 +214,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         metadata["LineageRecords"] = _lineage.Count;
         metadata["AccessPolicies"] = _policies.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
-        metadata["TotalBytesProcessed"] = Interlocked.Read(ref _totalBytesProcessed);
+        metadata["TotalBytesProcessed"] = 0L;
         return metadata;
     }
 
@@ -417,7 +416,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
-        message.Payload["totalBytesProcessed"] = Interlocked.Read(ref _totalBytesProcessed);
+        message.Payload["totalBytesProcessed"] = 0L;
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["catalogEntries"] = _catalog.Count;
         message.Payload["lineageRecords"] = _lineage.Count;

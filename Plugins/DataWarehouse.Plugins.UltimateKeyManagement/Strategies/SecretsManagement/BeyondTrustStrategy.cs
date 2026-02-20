@@ -25,7 +25,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
     {
         private readonly HttpClient _httpClient;
         private BeyondTrustConfig _config = new();
-        private string? _currentKeyId;
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -86,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         public override Task<string> GetCurrentKeyIdAsync()
         {
-            return Task.FromResult(_currentKeyId ?? "default");
+            return Task.FromResult("default");
         }
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
@@ -207,7 +206,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                     KeyId = keyId,
                     CreatedAt = DateTime.UtcNow,
                     Version = 1,
-                    IsActive = keyId == _currentKeyId,
+                    IsActive = false,
                     Metadata = new Dictionary<string, object>
                     {
                         ["AccountName"] = accountName,

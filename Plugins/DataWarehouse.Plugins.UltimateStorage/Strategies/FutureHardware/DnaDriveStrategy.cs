@@ -158,14 +158,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
             string? prefix,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            throw new NotSupportedException(
+            ThrowListingNotSupported(
                 "DNA sample catalog not available. This operation requires:\n" +
                 "- Sample inventory database\n" +
                 "- Metadata tracking system\n\n" +
                 "Future implementation would query catalog for all samples matching prefix.");
-
-            // Required to satisfy compiler for async iterator
-            await Task.CompletedTask;
             yield break;
         }
 

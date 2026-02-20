@@ -117,9 +117,8 @@ public class ClusterFormationIntegrationTests
         // Arrange & Act
         var config = new RaftConfiguration { BasePort = 0 };
 
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // RaftConsensusPlugin is obsolete; this test intentionally tests the legacy plugin and verifies its obsolete status
         using var plugin = new RaftConsensusPlugin(config);
-#pragma warning restore CS0618
 
         // Assert
         plugin.Id.Should().Be("datawarehouse.raft");
@@ -129,6 +128,7 @@ public class ClusterFormationIntegrationTests
         var obsoleteAttr = typeof(RaftConsensusPlugin)
             .GetCustomAttributes(typeof(ObsoleteAttribute), false)
             .FirstOrDefault();
+#pragma warning restore CS0618
 
         obsoleteAttr.Should().NotBeNull("RaftConsensusPlugin should be marked obsolete");
     }

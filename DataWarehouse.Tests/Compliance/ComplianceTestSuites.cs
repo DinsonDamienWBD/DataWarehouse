@@ -133,9 +133,11 @@ namespace DataWarehouse.Tests.Compliance
             // Must not allow weak protocols
 #pragma warning disable CA5397 // Testing that deprecated protocols are NOT allowed
 #pragma warning disable SYSLIB0039 // TLS 1.0/1.1 referenced intentionally in compliance test
+#pragma warning disable CS0618 // SslProtocols.Ssl3 referenced intentionally to verify it is rejected
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Ssl3));
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls));
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls11));
+#pragma warning restore CS0618
 #pragma warning restore SYSLIB0039
 #pragma warning restore CA5397
         }

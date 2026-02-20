@@ -78,7 +78,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
         // Multipath I/O configuration
         private readonly List<string> _alternativeTargets = new();
-        private int _currentPathIndex = 0;
         private bool _enableMpio = false;
 
         // Performance and diagnostics

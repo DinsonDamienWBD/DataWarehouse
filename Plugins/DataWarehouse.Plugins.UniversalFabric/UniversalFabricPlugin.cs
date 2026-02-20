@@ -43,7 +43,6 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
     private readonly AddressRouter _router = new();
     private readonly BoundedDictionary<string, HealthStatus> _healthCache = new BoundedDictionary<string, HealthStatus>(1000);
     private readonly List<IDisposable> _subscriptions = new();
-    private volatile bool _initialized;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.storage.universal-fabric";
@@ -91,7 +90,6 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
             }, ct).ConfigureAwait(false);
         }
 
-        _initialized = true;
     }
 
     /// <summary>

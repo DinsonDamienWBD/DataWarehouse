@@ -223,7 +223,6 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, long> _sequenceCounters = new BoundedDictionary<string, long>(1000);
     private long _totalRecordsPut;
     private long _totalRecordsRead;
-    private long _totalThrottles;
 
     /// <inheritdoc/>
     public override string StrategyId => "streaming-kinesis";

@@ -151,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fall back to default constellation
                 InitializeDefaultConstellation();

@@ -322,7 +322,6 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
         writer.Write(newData.Length);
 
         // Find matching and differing regions
-        int oldPos = 0;
         int newPos = 0;
 
         while (newPos < newData.Length)

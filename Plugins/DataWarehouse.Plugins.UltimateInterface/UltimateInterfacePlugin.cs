@@ -67,15 +67,14 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
     private volatile string _defaultStrategyId = "rest";
     private volatile bool _auditEnabled = true;
     private volatile bool _autoFailoverEnabled = true;
-    private volatile int _maxRetries = 3;
     private volatile int _defaultPort = 8080;
 
     // Statistics
     private long _totalRequests;
-    private long _totalResponses;
-    private long _totalBytesReceived;
-    private long _totalBytesSent;
-    private long _totalFailures;
+    private long _totalResponses = 0;
+    private long _totalBytesReceived = 0;
+    private long _totalBytesSent = 0;
+    private long _totalFailures = 0;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.interface.ultimate";

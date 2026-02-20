@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
@@ -111,8 +110,8 @@ public sealed class AsconStrategy : EncryptionStrategyBase
             {
                 var nonce = GenerateIv();
 
-                // Initialize ASCON cipher in AEAD mode (AsconEngine is IAeadCipher, not IBlockCipher)
-                var cipher = new AsconEngine(AsconEngine.AsconParameters.ascon128);
+                // Initialize ASCON cipher in AEAD mode (AsconAead128 is IAeadCipher)
+                var cipher = new AsconAead128();
                 var parameters = new AeadParameters(
                     new KeyParameter(key),
                     TagSize * 8,
@@ -149,8 +148,8 @@ public sealed class AsconStrategy : EncryptionStrategyBase
             {
                 var (nonce, encryptedData, _) = SplitCiphertext(ciphertext);
 
-                // Initialize ASCON cipher in AEAD mode (AsconEngine is IAeadCipher, not IBlockCipher)
-                var cipher = new AsconEngine(AsconEngine.AsconParameters.ascon128);
+                // Initialize ASCON cipher in AEAD mode (AsconAead128 is IAeadCipher)
+                var cipher = new AsconAead128();
                 var parameters = new AeadParameters(
                     new KeyParameter(key),
                     TagSize * 8,

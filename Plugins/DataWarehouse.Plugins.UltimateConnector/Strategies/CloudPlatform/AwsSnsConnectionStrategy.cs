@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.Runtime;
+using Amazon.Runtime.Credentials;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using DataWarehouse.SDK.Connectors;
@@ -44,7 +45,7 @@ public sealed class AwsSnsConnectionStrategy : SaaSConnectionStrategyBase
         if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             credentials = new BasicAWSCredentials(accessKey, secretKey);
         else
-            credentials = FallbackCredentialsFactory.GetCredentials();
+            credentials = DefaultAWSCredentialsIdentityResolver.GetCredentials(null);
 
         var snsConfig = new AmazonSimpleNotificationServiceConfig
         {

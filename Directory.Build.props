@@ -23,22 +23,11 @@
     <!-- NuGet lock files for reproducible builds -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 
-    <!-- Suppress warnings that are informational in a plugin-based architecture:
-         CS0618: Obsolete API usage (intentional in backward-compat plugin code)
-         CS0649: Field never assigned (plugin stub fields initialized at runtime)
-         CS0219: Variable assigned but never used (reserved for future use in plugins)
-         CS0414: Field assigned but never read (configuration fields for runtime use)
-         CS0169: Field never used (metrics/counter fields for observability)
-         CS0162: Unreachable code (protocol strategy fallback paths)
-         CS0067: Event never used (plugin lifecycle events)
-         CS0168: Variable declared but never used (catch block variables)
-         CA1416: Platform compatibility (plugins handle platform checks at runtime)
-         CA1418: Platform unsupported guard (same as CA1416)
-         CA2024: Channel read/write (intentional async patterns in connectors)
-         NU1608: Dependency constraint violations from upstream packages
-                 (e.g., Nethereum requires older M.E.L.Abstractions,
-                  AWSSDK.SecurityToken requires AWSSDK.Core <4.0) -->
-    <NoWarn>$(NoWarn);CS0618;CS0649;CS0219;CS0414;CS0169;CS0162;CS0067;CS0168;CA1416;CA1418;CA2024;NU1608</NoWarn>
+    <!-- NU1608: Dependency constraint violations from upstream NuGet packages
+         (e.g., Nethereum requires older M.E.L.Abstractions,
+          AWSSDK.SecurityToken requires AWSSDK.Core <4.0)
+         All other CS/CA diagnostics have been resolved — zero suppressions needed. -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -431,7 +431,7 @@ public class WasiNnGpuBridge
             {
                 return await ExecuteOnGpuAsync(modelPath, input, options, ct);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 _gpuFailureCount++;
 

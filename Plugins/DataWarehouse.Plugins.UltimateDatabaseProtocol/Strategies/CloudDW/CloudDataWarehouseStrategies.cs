@@ -1148,8 +1148,6 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
     private const byte TdsLogin7 = 16;
     private const byte TdsSqlBatch = 1;
 
-    private byte _tdsVersion = 0x74; // TDS 7.4
-    private string _serverVersion = "";
     private uint _packetSize = 4096;
 
     /// <inheritdoc/>

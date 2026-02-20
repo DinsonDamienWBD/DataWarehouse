@@ -6,14 +6,16 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Pqc.Crypto.SphincsPlus;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Security;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
     /// <summary>
     /// Shared helper for SPHINCS+ signature operations across all security levels.
-    /// Provides sign, verify, and key generation using BouncyCastle's SPHINCS+ implementation.
+    /// Provides sign, verify, and key generation using BouncyCastle's SLH-DSA implementation.
     /// SPHINCS+ is a stateless hash-based signature scheme providing conservative security assumptions.
     /// All operations are thread-safe and production-ready.
     /// </summary>
@@ -21,45 +23,47 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     internal static class SphincsPlusSignatureHelper
     {
         /// <summary>
-        /// Signs data using a SPHINCS+ private key at the specified parameter level.
+        /// Signs data using an SLH-DSA private key at the specified parameter level.
         /// </summary>
         /// <param name="data">The data to sign.</param>
         /// <param name="privateKey">The encoded private key bytes.</param>
-        /// <param name="parameters">The SPHINCS+ parameter set (shake_128f/192f/256f).</param>
+        /// <param name="parameters">The SLH-DSA parameter set.</param>
         /// <returns>The digital signature bytes.</returns>
         /// <exception cref="CryptographicException">Thrown when signing fails.</exception>
-        public static byte[] Sign(byte[] data, byte[] privateKey, SphincsPlusParameters parameters)
+        public static byte[] Sign(byte[] data, byte[] privateKey, SlhDsaParameters parameters)
         {
             try
             {
-                var privateKeyParams = new SphincsPlusPrivateKeyParameters(parameters, privateKey);
-                var signer = new SphincsPlusSigner();
+                var privateKeyParams = SlhDsaPrivateKeyParameters.FromEncoding(parameters, privateKey);
+                var signer = new SlhDsaSigner(parameters, true);
                 signer.Init(true, privateKeyParams);
-                return signer.GenerateSignature(data);
+                signer.BlockUpdate(data, 0, data.Length);
+                return signer.GenerateSignature();
             }
             catch (Exception ex) when (ex is not CryptographicException)
             {
                 throw new CryptographicException(
-                    $"SPHINCS+ signing failed with parameter set {parameters}: {ex.Message}", ex);
+                    $"SLH-DSA signing failed with parameter set {parameters}: {ex.Message}", ex);
             }
         }
 
         /// <summary>
-        /// Verifies a SPHINCS+ signature against the provided data and public key.
+        /// Verifies an SLH-DSA signature against the provided data and public key.
         /// </summary>
         /// <param name="data">The original signed data.</param>
         /// <param name="signature">The signature to verify.</param>
         /// <param name="publicKey">The encoded public key bytes.</param>
-        /// <param name="parameters">The SPHINCS+ parameter set (shake_128f/192f/256f).</param>
+        /// <param name="parameters">The SLH-DSA parameter set.</param>
         /// <returns>True if the signature is valid; false otherwise.</returns>
-        public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, SphincsPlusParameters parameters)
+        public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, SlhDsaParameters parameters)
         {
             try
             {
-                var publicKeyParams = new SphincsPlusPublicKeyParameters(parameters, publicKey);
-                var verifier = new SphincsPlusSigner();
+                var publicKeyParams = SlhDsaPublicKeyParameters.FromEncoding(parameters, publicKey);
+                var verifier = new SlhDsaSigner(parameters, true);
                 verifier.Init(false, publicKeyParams);
-                return verifier.VerifySignature(data, signature);
+                verifier.BlockUpdate(data, 0, data.Length);
+                return verifier.VerifySignature(signature);
             }
             catch
             {
@@ -68,21 +72,21 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         }
 
         /// <summary>
-        /// Generates a SPHINCS+ key pair at the specified parameter level.
+        /// Generates an SLH-DSA key pair at the specified parameter level.
         /// </summary>
-        /// <param name="parameters">The SPHINCS+ parameter set (shake_128f/192f/256f).</param>
+        /// <param name="parameters">The SLH-DSA parameter set.</param>
         /// <param name="random">A secure random number generator.</param>
         /// <returns>A tuple of (publicKey, privateKey) as encoded byte arrays.</returns>
         public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(
-            SphincsPlusParameters parameters, SecureRandom random)
+            SlhDsaParameters parameters, SecureRandom random)
         {
-            var keyGenParams = new SphincsPlusKeyGenerationParameters(random, parameters);
-            var keyPairGenerator = new SphincsPlusKeyPairGenerator();
+            var keyGenParams = new SlhDsaKeyGenerationParameters(random, parameters);
+            var keyPairGenerator = new SlhDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
 
-            var publicKey = ((SphincsPlusPublicKeyParameters)keyPair.Public).GetEncoded();
-            var privateKey = ((SphincsPlusPrivateKeyParameters)keyPair.Private).GetEncoded();
+            var publicKey = ((SlhDsaPublicKeyParameters)keyPair.Public).GetEncoded();
+            var privateKey = ((SlhDsaPrivateKeyParameters)keyPair.Private).GetEncoded();
 
             return (publicKey, privateKey);
         }
@@ -192,14 +196,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 if (key.Length > 0)
                 {
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, key, SphincsPlusParameters.shake_128f);
+                        plaintext, key, SlhDsaParameters.slh_dsa_shake_128f);
                 }
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SphincsPlusParameters.shake_128f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, privateKey, SphincsPlusParameters.shake_128f);
+                        plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_128f);
                 }
 
                 using var ms = new System.IO.MemoryStream();
@@ -232,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 if (!SphincsPlusSignatureHelper.Verify(
-                    data, signature, key, SphincsPlusParameters.shake_128f))
+                    data, signature, key, SlhDsaParameters.slh_dsa_shake_128f))
                 {
                     throw new CryptographicException(
                         "SPHINCS+-SHAKE-128f signature verification failed. Data may be tampered.");
@@ -248,7 +252,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_128f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
             return privateKey;
         }
 
@@ -258,7 +262,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_128f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
         }
     }
 
@@ -362,14 +366,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 if (key.Length > 0)
                 {
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, key, SphincsPlusParameters.shake_192f);
+                        plaintext, key, SlhDsaParameters.slh_dsa_shake_192f);
                 }
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SphincsPlusParameters.shake_192f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, privateKey, SphincsPlusParameters.shake_192f);
+                        plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_192f);
                 }
 
                 using var ms = new System.IO.MemoryStream();
@@ -402,7 +406,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 if (!SphincsPlusSignatureHelper.Verify(
-                    data, signature, key, SphincsPlusParameters.shake_192f))
+                    data, signature, key, SlhDsaParameters.slh_dsa_shake_192f))
                 {
                     throw new CryptographicException(
                         "SPHINCS+-SHAKE-192f signature verification failed. Data may be tampered.");
@@ -418,7 +422,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_192f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
             return privateKey;
         }
 
@@ -428,7 +432,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_192f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
         }
     }
 
@@ -533,14 +537,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 if (key.Length > 0)
                 {
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, key, SphincsPlusParameters.shake_256f);
+                        plaintext, key, SlhDsaParameters.slh_dsa_shake_256f);
                 }
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SphincsPlusParameters.shake_256f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
                     signature = SphincsPlusSignatureHelper.Sign(
-                        plaintext, privateKey, SphincsPlusParameters.shake_256f);
+                        plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_256f);
                 }
 
                 using var ms = new System.IO.MemoryStream();
@@ -573,7 +577,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var data = reader.ReadBytes((int)(ms.Length - ms.Position));
 
                 if (!SphincsPlusSignatureHelper.Verify(
-                    data, signature, key, SphincsPlusParameters.shake_256f))
+                    data, signature, key, SlhDsaParameters.slh_dsa_shake_256f))
                 {
                     throw new CryptographicException(
                         "SPHINCS+-SHAKE-256f signature verification failed. Data may be tampered.");
@@ -589,7 +593,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_256f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
             return privateKey;
         }
 
@@ -599,7 +603,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SphincsPlusParameters.shake_256f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
         }
     }
 }

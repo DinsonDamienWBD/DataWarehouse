@@ -27,8 +27,6 @@ public partial class App : Application
 
         // Subscribe to theme changes
         _themeManager.ThemeChanged += OnThemeChanged;
-
-        MainPage = new MainPage();
     }
 
     /// <summary>
@@ -38,20 +36,16 @@ public partial class App : Application
     /// <returns>A new Window instance configured for DataWarehouse.</returns>
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var window = base.CreateWindow(activationState);
-
-        if (window != null)
+        var window = new Window(new MainPage())
         {
-            window.Title = "DataWarehouse";
-            window.MinimumWidth = 1024;
-            window.MinimumHeight = 768;
+            Title = "DataWarehouse",
+            MinimumWidth = 1024,
+            MinimumHeight = 768,
+            Width = 1400,
+            Height = 900
+        };
 
-            // Set initial window size
-            window.Width = 1400;
-            window.Height = 900;
-        }
-
-        return window!;
+        return window;
     }
 
     /// <summary>

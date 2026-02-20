@@ -175,9 +175,14 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                     CompletedAt = DateTimeOffset.UtcNow
                 };
 
+                if (finalStatus == JobStatus.Completed || finalStatus == JobStatus.PartiallyCompleted)
+                    Interlocked.Increment(ref _totalJobsProcessed);
+                else
+                    Interlocked.Increment(ref _totalJobsFailed);
+
                 _logger.LogInformation(
-                    "Job {JobId} completed with status {Status} (delivered: {Delivered}, failed: {Failed})",
-                    jobId, finalStatus, delivered, failed);
+                    "Job {JobId} completed with status {Status} (delivered: {Delivered}, failed: {Failed}, totalProcessed: {TotalProcessed}, totalFailed: {TotalFailed})",
+                    jobId, finalStatus, delivered, failed, Interlocked.Read(ref _totalJobsProcessed), Interlocked.Read(ref _totalJobsFailed));
             }
             finally
             {
@@ -208,6 +213,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception during job {JobId} processing", jobId);
+            Interlocked.Increment(ref _totalJobsFailed);
 
             await _lock.WaitAsync(CancellationToken.None);
             try

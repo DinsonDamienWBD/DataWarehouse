@@ -522,6 +522,18 @@ namespace DataWarehouse.Plugins.UltimateStorage
         }
 
         #endregion
+
+        /// <summary>
+        /// Helper for async-iterator overrides (e.g. <c>ListAsyncCore</c>) that do not support
+        /// listing operations. Throws <see cref="NotSupportedException"/> with
+        /// <paramref name="message"/>. Annotated with
+        /// <see cref="System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute"/> so that a
+        /// <c>yield break</c> after the call site is not flagged as unreachable (CS0162),
+        /// while still satisfying the async-iterator yield requirement (CS8420).
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        protected static void ThrowListingNotSupported(string message)
+            => throw new NotSupportedException(message);
     }
 
     #region Supporting Types
@@ -654,6 +666,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
             var seconds = Uptime.TotalSeconds;
             return seconds > 0 ? GetTotalDataTransfer() / seconds : 0;
         }
+
     }
 
     #endregion

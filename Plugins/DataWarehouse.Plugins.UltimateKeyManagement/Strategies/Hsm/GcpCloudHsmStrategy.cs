@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Security;
 using Google.Api.Gax;
+using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Kms.V1;
 using Google.Protobuf;
 using System.Security.Cryptography;
@@ -114,9 +115,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             if (!string.IsNullOrEmpty(_config.ServiceAccountJson))
             {
                 // Use explicit service account credentials
+#pragma warning disable CS0618 // GoogleCredential.FromJson is deprecated; migration to CredentialFactory is tracked separately
+                var credential = GoogleCredential.FromJson(_config.ServiceAccountJson);
+#pragma warning restore CS0618
                 var builder = new KeyManagementServiceClientBuilder
                 {
-                    JsonCredentials = _config.ServiceAccountJson
+                    Credential = credential
                 };
                 _kmsClient = await builder.BuildAsync(cancellationToken);
             }

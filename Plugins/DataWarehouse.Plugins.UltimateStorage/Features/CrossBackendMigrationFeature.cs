@@ -31,7 +31,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         // Configuration
         private int _maxParallelMigrations = 4;
-        private int _streamBufferSize = 81920; // 80KB
 
         // Statistics
         private long _totalMigrations;

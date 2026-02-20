@@ -825,7 +825,6 @@ public sealed class BtrfsOperations : FilesystemOperationsBase
         }
 
         // Feature flags
-        uint compatFlags = 0;
         ulong incompatFlags = 0x01 | 0x02; // MIXED_BACKREF + DEFAULT_SUBVOL
 
         if (options.EnableCompression)

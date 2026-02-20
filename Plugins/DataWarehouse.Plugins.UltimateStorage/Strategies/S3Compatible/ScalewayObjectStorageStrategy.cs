@@ -862,15 +862,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             EnsureInitialized();
             ValidateKey(key);
 
-            var request = new PutACLRequest
+            var request = new PutObjectAclRequest
             {
                 BucketName = _bucket,
                 Key = key,
-                CannedACL = acl
+                ACL = acl
             };
 
             await ExecuteWithRetryAsync(async () =>
-                await _s3Client!.PutACLAsync(request, ct), ct);
+                await _s3Client!.PutObjectAclAsync(request, ct), ct);
         }
 
         /// <summary>

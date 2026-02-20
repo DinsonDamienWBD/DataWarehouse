@@ -1047,7 +1047,6 @@ public abstract class IntelligenceGatewayBase : IIntelligenceGateway, IProviderR
     private long _totalTokensUsed;
     private long _totalLatencyTicks;
     private readonly DateTime _startTime = DateTime.UtcNow;
-    private int _roundRobinIndex;
     private bool _disposed;
 
     /// <summary>

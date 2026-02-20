@@ -30,8 +30,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         private const int MaxInputSize = 100 * 1024 * 1024; // 100MB
 
         private int _dictionarySize = 8 * 1024 * 1024; // 8MB default
-        private bool _solidMode = false;
-        private bool _headerEncryption = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SevenZipStrategy"/> class

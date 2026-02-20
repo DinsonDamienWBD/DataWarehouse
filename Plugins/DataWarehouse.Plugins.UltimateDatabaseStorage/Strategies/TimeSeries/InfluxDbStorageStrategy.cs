@@ -72,10 +72,10 @@ public sealed class InfluxDbStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task ConnectCoreAsync(CancellationToken ct)
     {
-        var health = await _client!.HealthAsync();
-        if (health.Status != HealthCheck.StatusEnum.Pass)
+        var isHealthy = await _client!.PingAsync();
+        if (!isHealthy)
         {
-            throw new InvalidOperationException($"InfluxDB health check failed: {health.Message}");
+            throw new InvalidOperationException("InfluxDB ping check failed: server not reachable");
         }
     }
 
@@ -310,8 +310,7 @@ public sealed class InfluxDbStorageStrategy : DatabaseStorageStrategyBase
     {
         try
         {
-            var health = await _client!.HealthAsync();
-            return health.Status == HealthCheck.StatusEnum.Pass;
+            return await _client!.PingAsync();
         }
         catch
         {

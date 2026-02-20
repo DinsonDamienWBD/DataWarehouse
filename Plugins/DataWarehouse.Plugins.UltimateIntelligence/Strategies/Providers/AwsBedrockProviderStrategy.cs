@@ -117,9 +117,9 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) != null && !ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(ct);
             if (string.IsNullOrEmpty(line))
                 continue;
 

@@ -58,7 +58,6 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
     private long _totalRebuilds;
     private long _totalScrubs;
     private long _totalVerifications;
-    private long _totalFailures;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.raid.ultimate";

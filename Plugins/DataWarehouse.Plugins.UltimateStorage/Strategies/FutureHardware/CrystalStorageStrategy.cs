@@ -177,13 +177,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
             string? prefix,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            throw new NotSupportedException(
+            ThrowListingNotSupported(
                 "Crystal storage catalog not available. This operation requires:\n" +
                 "- Voxel allocation database\n" +
                 "- Crystal index system\n\n" +
                 "Future implementation would enumerate all stored keys from allocation table.");
-
-            await Task.CompletedTask;
             yield break;
         }
 

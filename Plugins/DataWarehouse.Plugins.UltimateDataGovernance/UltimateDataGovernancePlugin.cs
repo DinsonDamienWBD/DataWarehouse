@@ -41,7 +41,6 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     private volatile bool _auditEnabled = true;
     private volatile bool _autoEnforcementEnabled = true;
     private long _totalOperations;
-    private long _policyViolations;
     private long _complianceChecks;
 
     /// <inheritdoc/>
@@ -217,7 +216,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         metadata["DataOwnerships"] = _ownerships.Count;
         metadata["DataClassifications"] = _classifications.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
-        metadata["PolicyViolations"] = Interlocked.Read(ref _policyViolations);
+        metadata["PolicyViolations"] = 0L;
         metadata["ComplianceChecks"] = Interlocked.Read(ref _complianceChecks);
         return metadata;
     }
@@ -418,7 +417,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
-        message.Payload["policyViolations"] = Interlocked.Read(ref _policyViolations);
+        message.Payload["policyViolations"] = 0L;
         message.Payload["complianceChecks"] = Interlocked.Read(ref _complianceChecks);
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["activePolicies"] = _policies.Count;

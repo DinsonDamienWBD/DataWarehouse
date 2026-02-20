@@ -131,7 +131,6 @@ public class StreamingIngestionStrategy : SensorIngestionStrategyBase
 public class BatchIngestionStrategy : SensorIngestionStrategyBase
 {
     private readonly ConcurrentBag<TelemetryMessage> _batch = new();
-    private readonly int _batchSize = 1000;
 
     public override string StrategyId => "batch-ingestion";
     public override string StrategyName => "Batch Ingestion";

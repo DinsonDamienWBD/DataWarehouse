@@ -456,7 +456,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             int position = 0;
             const ulong rollingHashMask = 0xFFF; // For target chunk size ~512
-            const ulong polynomial = 0x3DA3358B4DC173; // Rabin polynomial
 
             while (position < data.Length)
             {

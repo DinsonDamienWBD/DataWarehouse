@@ -71,7 +71,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHrss701, key);
+                var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHrss701, key);
                 var kemGenerator = new NtruKemGenerator(_secureRandom);
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHrss701, key);
+                var privateKeyParams = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHrss701, key);
                 var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 

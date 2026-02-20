@@ -87,7 +87,9 @@ public class PluginSmokeTests : IDisposable
         new object[] { "UltimateReplication", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateReplication.UltimateReplicationPlugin()), "replication" },
         new object[] { "UltimateRAID", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateRAID.UltimateRaidPlugin()), "raid" },
         new object[] { "UltimateConsensus", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateConsensus.UltimateConsensusPlugin()), "consensus" },
+#pragma warning disable CS0618 // RaftConsensusPlugin is obsolete; included in smoke tests to verify legacy plugin still instantiates
         new object[] { "RaftConsensus", new Func<PluginBase>(() => new DataWarehouse.Plugins.Raft.RaftConsensusPlugin()), "raft" },
+#pragma warning restore CS0618
 
         // === Platform Plugins ===
         new object[] { "UltimateMicroservices", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateMicroservices.UltimateMicroservicesPlugin()), "microservices" },

@@ -226,7 +226,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             private readonly Stream _output;
             private uint _low;
             private uint _high = 0xFFFFFFFF;
-            private int _pendingBits;
 
             public ArithmeticEncoder(Stream output)
             {

@@ -138,7 +138,6 @@ internal sealed class RelayStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         // Route to message bus for execution
         if (MessageBus != null)
         {
-            var routingKey = "relay.query";
             // Message bus dispatch would happen here
         }
 

@@ -890,10 +890,10 @@ internal class ScopeMetrics
     public required string Scope { get; init; }
     public long EntryCount;
     public long TotalBytes;
-    public double ComplexityScore;
-    public int ConsolidationCount;
+    public double ComplexityScore = 0;
+    public int ConsolidationCount = 0;
     public int RefinementCount;
-    public double AccessRate;
+    public double AccessRate = 0;
     public DateTimeOffset FirstEntry { get; init; }
     public DateTimeOffset LastActivity;
     public DateTimeOffset? LastRefinement;

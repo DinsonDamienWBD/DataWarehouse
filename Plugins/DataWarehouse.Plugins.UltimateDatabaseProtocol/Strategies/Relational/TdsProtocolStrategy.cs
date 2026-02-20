@@ -115,7 +115,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     // Protocol state
     private int _packetId;
-    private int _spid;
+    private int _spid = 0;
     private string _serverVersion = "";
     private string _instanceName = "";
     private bool _encryptionRequired;
@@ -292,7 +292,6 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var serverName = CurrentParameters?.Host ?? "";
         var interfaceLibrary = "DataWarehouse";
         var language = "";
-        var attachDbFile = "";
 
         // Offsets and lengths
         var fixedLength = 94; // TDS 7.4 fixed portion

@@ -40,7 +40,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private long _totalRaidReads;
         private long _totalRaidRebuilds;
         private long _totalBackendFailures;
-        private long _totalRecoveryOperations;
 
         /// <summary>
         /// Initializes a new instance of the RaidIntegrationFeature.

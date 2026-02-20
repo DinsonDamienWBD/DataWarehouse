@@ -8,6 +8,7 @@ using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Amazon.Runtime.Credentials;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 
@@ -59,7 +60,7 @@ public sealed class DynamoDbConnectionStrategy : DatabaseConnectionStrategyBase
         }
         else
         {
-            credentials = FallbackCredentialsFactory.GetCredentials();
+            credentials = DefaultAWSCredentialsIdentityResolver.GetCredentials(null);
         }
 
         var dynamoConfig = new AmazonDynamoDBConfig

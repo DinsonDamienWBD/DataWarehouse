@@ -169,7 +169,6 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Read response
         var rows = new List<IReadOnlyDictionary<string, object?>>();
-        long rowsAffected = 0;
 
         while (true)
         {

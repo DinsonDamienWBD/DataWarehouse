@@ -41,7 +41,6 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
     private string _currentDatabase = "admin";
     private int _maxWireVersion;
     private int _minWireVersion;
-    private bool _compressionSupported;
     private string[]? _compressionMethods;
 
     /// <inheritdoc/>

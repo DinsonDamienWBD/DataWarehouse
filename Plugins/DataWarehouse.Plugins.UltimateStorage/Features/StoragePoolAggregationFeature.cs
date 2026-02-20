@@ -32,7 +32,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         // Statistics
         private long _totalPoolCreations;
         private long _totalObjectPlacements;
-        private long _totalRebalanceOperations;
 
         /// <summary>
         /// Initializes a new instance of the StoragePoolAggregationFeature.

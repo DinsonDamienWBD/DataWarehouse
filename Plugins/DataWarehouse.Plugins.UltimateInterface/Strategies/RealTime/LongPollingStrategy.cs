@@ -248,7 +248,7 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
     private sealed class ClientState
     {
         public string ClientId { get; }
-        private TaskCompletionSource<bool>? _waitHandle;
+        private TaskCompletionSource<bool>? _waitHandle = null;
 
         public ClientState(string clientId)
         {

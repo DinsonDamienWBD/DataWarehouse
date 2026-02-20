@@ -29,7 +29,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         private const long MaxUncompressedSize = 4L * 1024 * 1024 * 1024; // 4GB for standard ZIP
         private const int MaxInputSize = 100 * 1024 * 1024; // 100MB per entry
 
-        private SDK.Contracts.Compression.CompressionLevel _compressionMethod = SDK.Contracts.Compression.CompressionLevel.Default;
         private int _maxEntryCount = MaxEntryCount;
         private long _maxUncompressedSize = MaxUncompressedSize;
 

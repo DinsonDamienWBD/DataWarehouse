@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 using Google.Cloud.Storage.V1;
+using Google.Apis.Auth.OAuth2;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 {
@@ -45,8 +46,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 
             if (!string.IsNullOrEmpty(credentialsPath) && File.Exists(credentialsPath))
             {
-                // Use service account credentials from file
-                var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(credentialsPath);
+                // Use service account credentials from file via non-deprecated CredentialFactory
+                var serviceAccountCredential = await CredentialFactory.FromFileAsync<ServiceAccountCredential>(credentialsPath, ct);
+                var credential = serviceAccountCredential.ToGoogleCredential();
                 storageClient = await StorageClient.CreateAsync(credential);
             }
             else

@@ -19,7 +19,6 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     private string _token = "";
     private string _org = "datawarehouse";
     private string _bucket = "metrics";
-    private int _precision = 3; // milliseconds
 
     /// <inheritdoc/>
     public override string StrategyId => "influxdb";

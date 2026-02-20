@@ -25,7 +25,6 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
     private readonly BoundedDictionary<string, long> _matchIndex = new BoundedDictionary<string, long>(1000);
     private readonly List<(long term, object command)> _log = new();
     private long _commitIndex;
-    private long _lastApplied;
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly object _stateLock = new();
 
@@ -428,7 +427,9 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
 /// </summary>
 public sealed class PbftConsensusStrategy : ResilienceStrategyBase
 {
+#pragma warning disable CS0649 // _viewNumber starts at 0 (valid PBFT initial state); incremented during view changes
     private long _viewNumber;
+#pragma warning restore CS0649
     private long _sequenceNumber;
     private readonly BoundedDictionary<long, (object request, int prepareCount, int commitCount)> _pending = new BoundedDictionary<long, (object request, int prepareCount, int commitCount)>(1000);
     private readonly BoundedDictionary<long, object> _committed = new BoundedDictionary<long, object>(1000);

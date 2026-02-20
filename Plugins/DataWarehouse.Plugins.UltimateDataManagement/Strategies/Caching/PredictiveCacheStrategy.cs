@@ -65,7 +65,6 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
     private readonly object _patternLock = new();
 
     private IMessageBus? _messageBus;
-    private volatile bool _intelligenceAvailable;
     private IntelligenceCapabilities _capabilities = IntelligenceCapabilities.None;
     private readonly List<IDisposable> _subscriptions = new();
 
@@ -482,7 +481,6 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
 
         var availableSub = _messageBus.Subscribe(IntelligenceTopics.Available, msg =>
         {
-            _intelligenceAvailable = true;
             if (msg.Payload.TryGetValue("capabilities", out var cap) && cap is long capLong)
             {
                 _capabilities = (IntelligenceCapabilities)capLong;
@@ -493,7 +491,6 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
 
         var unavailableSub = _messageBus.Subscribe(IntelligenceTopics.Unavailable, _ =>
         {
-            _intelligenceAvailable = false;
             return Task.CompletedTask;
         });
         _subscriptions.Add(unavailableSub);
