@@ -219,14 +219,6 @@ public sealed class SecurityManager : IDisposable
         return result2;
     }
 
-    /// <summary>
-    /// Encrypts data for storage on device (synchronous wrapper).
-    /// </summary>
-    [Obsolete("Use EncryptDataAsync instead")]
-    public byte[] EncryptData(byte[] data, byte[] deviceKey)
-    {
-        return Task.Run(() => EncryptDataAsync(data, deviceKey)).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
 
     /// <summary>
     /// Decrypts data from device.
@@ -283,14 +275,6 @@ public sealed class SecurityManager : IDisposable
         return plaintext;
     }
 
-    /// <summary>
-    /// Decrypts data from device (synchronous wrapper).
-    /// </summary>
-    [Obsolete("Use DecryptDataAsync instead")]
-    public byte[] DecryptData(byte[] encryptedData, byte[] deviceKey)
-    {
-        return Task.Run(() => DecryptDataAsync(encryptedData, deviceKey)).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
 
     #endregion
 

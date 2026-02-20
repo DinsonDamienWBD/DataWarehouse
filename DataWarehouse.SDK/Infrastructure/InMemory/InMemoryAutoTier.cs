@@ -56,6 +56,14 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<TierMigrationResult> MigrateAsync(TierMigrationRequest request, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnTierEvent?.Invoke(new TierEvent
+            {
+                EventType = TierEventType.MigrationCompleted,
+                DataKey = request.DataKey,
+                FromTier = request.SourceTier,
+                ToTier = request.TargetTier,
+                Timestamp = DateTimeOffset.UtcNow
+            });
             return Task.FromResult(TierMigrationResult.Ok(
                 request.DataKey, request.SourceTier, request.TargetTier, TimeSpan.Zero));
         }

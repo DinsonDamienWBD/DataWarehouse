@@ -153,9 +153,23 @@ namespace DataWarehouse.SDK.Hardware
             _debounceTimer?.Dispose();
             _debounceTimer = new Timer(_ =>
             {
-                // Fire change event after debounce period
-                // Note: We can't easily determine device details from /dev alone,
-                // so this is a simplified notification
+                // Fire change event after debounce period.
+                // Device details from /dev path are limited; notify with a generic device entry.
+                var changeType = e.ChangeType == WatcherChangeTypes.Created
+                    ? HardwareChangeType.Added
+                    : HardwareChangeType.Removed;
+                OnHardwareChanged?.Invoke(this, new HardwareChangeEventArgs
+                {
+                    Device = new HardwareDevice
+                    {
+                        DeviceId = Path.GetFileName(e.FullPath),
+                        Name = Path.GetFileName(e.FullPath),
+                        Type = HardwareDeviceType.BlockDevice,
+                        DevicePath = e.FullPath,
+                        Properties = System.Collections.Immutable.ImmutableDictionary<string, string>.Empty
+                    },
+                    ChangeType = changeType
+                });
             }, null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
         }
 

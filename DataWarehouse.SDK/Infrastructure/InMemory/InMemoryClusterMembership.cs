@@ -52,6 +52,12 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task JoinAsync(ClusterJoinRequest request, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnMembershipChanged?.Invoke(new ClusterMembershipEvent
+            {
+                EventType = ClusterMembershipEventType.NodeJoined,
+                Node = _self,
+                Timestamp = DateTimeOffset.UtcNow
+            });
             return Task.CompletedTask;
         }
 
@@ -59,6 +65,13 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task LeaveAsync(string reason, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnMembershipChanged?.Invoke(new ClusterMembershipEvent
+            {
+                EventType = ClusterMembershipEventType.NodeLeft,
+                Node = _self,
+                Timestamp = DateTimeOffset.UtcNow,
+                Reason = reason
+            });
             return Task.CompletedTask;
         }
 

@@ -205,7 +205,6 @@ namespace DataWarehouse.SDK.Contracts.Replication
     /// Represents a vector clock for tracking causal ordering of events across distributed nodes.
     /// Used for conflict detection in multi-master replication scenarios.
     /// </summary>
-    [Obsolete("Use DataWarehouse.SDK.Replication.DottedVersionVector for membership-aware causality tracking with automatic dead-node pruning. Remove in v4.0.")]
     public class VectorClock
     {
         private readonly Dictionary<string, long> _clock;

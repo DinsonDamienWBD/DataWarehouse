@@ -36,6 +36,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<ScalingResult> ScaleOutAsync(ScaleOutRequest request, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnScalingEvent?.Invoke(new ScalingEvent { EventType = ScalingEventType.ScaleOutFailed, Action = ScalingAction.NoAction, NodesAffected = 0, Timestamp = DateTimeOffset.UtcNow });
             return Task.FromResult(ScalingResult.Error("Scaling not available in single-node mode. Deploy in cluster mode to enable auto-scaling."));
         }
 
@@ -43,6 +44,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<ScalingResult> ScaleInAsync(ScaleInRequest request, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnScalingEvent?.Invoke(new ScalingEvent { EventType = ScalingEventType.ScaleInFailed, Action = ScalingAction.NoAction, NodesAffected = 0, Timestamp = DateTimeOffset.UtcNow });
             return Task.FromResult(ScalingResult.Error("Scaling not available in single-node mode."));
         }
 

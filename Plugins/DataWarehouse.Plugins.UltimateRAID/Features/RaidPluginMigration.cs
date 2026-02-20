@@ -400,66 +400,6 @@ public sealed class MigrationEntry
 }
 
 /// <summary>
-/// Legacy RAID strategy adapter for backward compatibility.
-/// This adapter enables old RAID plugin API calls to work during the transition period.
-/// </summary>
-/// <remarks>
-/// <b>DEPRECATED:</b> This adapter is part of the migration infrastructure. Use UltimateRAID strategies
-/// directly instead of routing through legacy adapters. Old plugin directories will be removed in Phase 18.
-/// </remarks>
-[Obsolete("Legacy RAID plugins have been absorbed into UltimateRAID. Use IRaidStrategy implementations directly. Old plugins will be removed in Phase 18.")]
-public sealed class LegacyRaidStrategyAdapter
-{
-    private readonly string _legacyId;
-    private readonly string _ultimateId;
-
-    public LegacyRaidStrategyAdapter(string legacyId, string ultimateId)
-    {
-        _legacyId = legacyId;
-        _ultimateId = ultimateId;
-    }
-
-    public string LegacyId => _legacyId;
-    public string UltimateId => _ultimateId;
-
-    /// <summary>
-    /// Translates legacy API call to Ultimate RAID API.
-    /// </summary>
-    public async Task<object> TranslateCallAsync(
-        string method,
-        object[] parameters,
-        CancellationToken cancellationToken = default)
-    {
-        // Translate legacy method calls to Ultimate RAID equivalents
-        return method.ToLower() switch
-        {
-            "write" => await TranslateWriteAsync(parameters, cancellationToken),
-            "read" => await TranslateReadAsync(parameters, cancellationToken),
-            "rebuild" => await TranslateRebuildAsync(parameters, cancellationToken),
-            _ => throw new NotSupportedException($"Method {method} not supported in adapter")
-        };
-    }
-
-    private Task<object> TranslateWriteAsync(object[] parameters, CancellationToken ct)
-    {
-        // Map legacy write parameters to Ultimate RAID format
-        return Task.FromResult<object>(new { success = true });
-    }
-
-    private Task<object> TranslateReadAsync(object[] parameters, CancellationToken ct)
-    {
-        // Map legacy read parameters to Ultimate RAID format
-        return Task.FromResult<object>(new { data = Array.Empty<byte>() });
-    }
-
-    private Task<object> TranslateRebuildAsync(object[] parameters, CancellationToken ct)
-    {
-        // Map legacy rebuild parameters to Ultimate RAID format
-        return Task.FromResult<object>(new { success = true });
-    }
-}
-
-/// <summary>
 /// Deprecation notice generator for legacy RAID plugins.
 /// Provides migration guidance for each deprecated plugin.
 /// </summary>

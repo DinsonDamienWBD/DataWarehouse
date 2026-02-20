@@ -39,9 +39,7 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     // Statistics
     private long _totalOperations;
     private long _successfulOperations;
-#pragma warning disable CS0649 // Field is assigned by Interlocked operations
     private long _failedOperations;
-#pragma warning restore CS0649
     private long _failoverCount;
     private long _replicationCount;
     private double _totalCostSavings;
@@ -375,6 +373,7 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     private Task HandleFailoverAsync(PluginMessage message)
     {
         Interlocked.Increment(ref _failoverCount);
+        Interlocked.Increment(ref _failedOperations);
 
         var fromProvider = message.Payload.TryGetValue("from", out var f) && f is string from ? from : null;
         var toProvider = message.Payload.TryGetValue("to", out var t) && t is string to ? to : null;

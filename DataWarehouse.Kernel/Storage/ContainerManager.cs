@@ -342,16 +342,6 @@ namespace DataWarehouse.Kernel.Storage
             return level >= requiredLevel;
         }
 
-        /// <summary>
-        /// Checks if a subject has at least the specified access level (synchronous wrapper).
-        /// </summary>
-        [Obsolete("Use HasAccessAsync for async context")]
-        public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
-        {
-            // Sync bridge: obsolete sync API wrapper
-            return Task.Run(() => HasAccessAsync(context, containerId, requiredLevel)).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
         #endregion
 
         #region Quota Management

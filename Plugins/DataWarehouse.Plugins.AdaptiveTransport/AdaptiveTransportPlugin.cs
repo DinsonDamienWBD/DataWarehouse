@@ -55,9 +55,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     private TransportProtocol _currentProtocol = TransportProtocol.Tcp;
     private bool _isRunning;
     private long _totalBytesSent;
-#pragma warning disable CS0649 // Field is never assigned to - reserved for future receive functionality
     private long _totalBytesReceived;
-#pragma warning restore CS0649
     private long _totalSwitches;
     private BandwidthAwareSyncMonitor? _bandwidthMonitor;
     private DateTime _lastHealthCheck = DateTime.MinValue;
@@ -780,6 +778,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
                 try
                 {
                     var result = await client.ReceiveAsync(timeoutCts.Token);
+                    Interlocked.Add(ref _totalBytesReceived, result.Buffer.Length);
                     // ACK format: [Type:1][Sequence:4]
                     if (result.Buffer.Length >= 5 && result.Buffer[0] == 0x01) // ACK type
                     {

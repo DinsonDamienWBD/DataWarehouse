@@ -29,6 +29,12 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<SyncResult> SyncAsync(SyncRequest request, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            OnSyncEvent?.Invoke(new SyncEvent
+            {
+                EventType = SyncEventType.SyncCompleted,
+                TargetNodeId = request.TargetNodeId,
+                Timestamp = DateTimeOffset.UtcNow
+            });
             return Task.FromResult(SyncResult.Ok(0, 0, TimeSpan.Zero));
         }
 

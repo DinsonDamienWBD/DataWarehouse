@@ -530,17 +530,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         public string GeneratePresignedUrl(string key, TimeSpan expiresIn)
         {
             ValidateKey(key);
-
-            if (_useSignatureV4)
-            {
-                return GeneratePresignedUrlV4(key, expiresIn);
-            }
-            else
-            {
-                // Log deprecation warning
-                System.Diagnostics.Debug.WriteLine("WARNING: AWS Signature Version 2 is deprecated. Consider migrating to Signature Version 4 by setting 'UseSignatureV4' to true.");
-                return GeneratePresignedUrlV2(key, expiresIn);
-            }
+            return GeneratePresignedUrlV4(key, expiresIn);
         }
 
         /// <summary>
@@ -593,24 +583,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
             // Build final URL
             return $"{endpoint}?{canonicalQueryString}&X-Amz-Signature={signature}";
-        }
-
-        /// <summary>
-        /// Generates a presigned URL using AWS Signature Version 2 (deprecated).
-        /// </summary>
-        [Obsolete("AWS Signature Version 2 is deprecated. Use Signature Version 4 instead.")]
-        private string GeneratePresignedUrlV2(string key, TimeSpan expiresIn)
-        {
-            var expires = DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds();
-            var endpoint = GetEndpointUrl(key);
-
-            // AWS Signature Version 2 (simplified for presigned URLs)
-            var stringToSign = $"GET\n\n\n{expires}\n/{_bucket}/{key}";
-
-            using var hmac = new HMACSHA1(Encoding.UTF8.GetBytes(_secretAccessKey));
-            var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
-
-            return $"{endpoint}?AWSAccessKeyId={_accessKeyId}&Expires={expires}&Signature={Uri.EscapeDataString(signature)}";
         }
 
         /// <summary>

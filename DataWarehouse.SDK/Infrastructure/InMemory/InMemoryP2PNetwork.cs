@@ -51,6 +51,8 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task SpreadAsync(GossipMessage message, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            // In single-node mode, gossip loops back to local node only
+            OnGossipReceived?.Invoke(message);
             return Task.CompletedTask;
         }
 

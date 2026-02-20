@@ -25,7 +25,6 @@ internal static class ReplicaFallbackChain
 {
     /// <summary>
     /// Asynchronously builds a fallback chain for a failed replica.
-    /// Preferred over <see cref="Build"/> to avoid sync-over-async topology lookups.
     /// </summary>
     /// <param name="failedNodeId">The node ID that failed to serve the read.</param>
     /// <param name="allReplicas">All replica node IDs for the object.</param>
@@ -58,35 +57,4 @@ internal static class ReplicaFallbackChain
         return scored.OrderByDescending(x => x.Score).Select(x => x.NodeId).ToList();
     }
 
-    /// <summary>
-    /// Builds a fallback chain for a failed replica (synchronous).
-    /// </summary>
-    /// <remarks>
-    /// This method uses blocking synchronous calls to topology provider.
-    /// Prefer <see cref="BuildAsync"/> in async contexts to avoid threadpool starvation.
-    /// </remarks>
-    [Obsolete("Use BuildAsync instead. This method uses sync-over-async which can cause threadpool starvation.")]
-    public static List<string> Build(
-        string failedNodeId,
-        IReadOnlyList<string> allReplicas,
-        NodeTopology self,
-        ITopologyProvider topologyProvider)
-    {
-        var replicas = allReplicas.Where(id => id != failedNodeId).ToList();
-
-        // Score replicas by proximity
-        var scored = new List<(string NodeId, double Score)>();
-        foreach (var replicaId in replicas)
-        {
-            // Obsolete sync bridge — Task.Run avoids deadlocks on sync-context threads.
-            var topology = Task.Run(() => topologyProvider.GetNodeTopologyAsync(replicaId)).ConfigureAwait(false).GetAwaiter().GetResult();
-            if (topology == null) continue;
-
-            var score = ProximityCalculator.CalculateProximityScore(self, topology, RoutingPolicy.LatencyOptimized);
-            scored.Add((replicaId, score));
-        }
-
-        // Sort by score descending (highest score = nearest replica)
-        return scored.OrderByDescending(x => x.Score).Select(x => x.NodeId).ToList();
-    }
 }

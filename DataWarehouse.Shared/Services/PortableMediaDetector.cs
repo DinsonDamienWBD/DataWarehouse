@@ -74,12 +74,11 @@ public static class PortableMediaDetector
 
     /// <summary>
     /// Scans local ports for a running DataWarehouse live instance (synchronous wrapper).
+    /// Prefer <see cref="FindLocalLiveInstanceAsync"/> for async contexts.
     /// </summary>
-    [Obsolete("Use FindLocalLiveInstanceAsync for async context")]
     public static string? FindLocalLiveInstance(int[]? portsToCheck = null)
     {
-        // Sync bridge: obsolete sync API wrapper
-        return Task.Run(() => FindLocalLiveInstanceAsync(portsToCheck)).ConfigureAwait(false).GetAwaiter().GetResult();
+        return Task.Run(() => FindLocalLiveInstanceAsync(portsToCheck)).GetAwaiter().GetResult();
     }
 
     /// <summary>

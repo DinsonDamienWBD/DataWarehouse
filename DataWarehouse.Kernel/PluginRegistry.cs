@@ -213,7 +213,7 @@ namespace DataWarehouse.Kernel
             // If any plugin explicitly declares operating mode preference, prefer it
             var modePreferred = candidates.FirstOrDefault(p =>
             {
-                var metadata = GetPluginMetadata(p);
+                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
                 if (metadata.TryGetValue("PreferredMode", out var mode))
                 {
                     return mode.ToString()?.Equals(_operatingMode.ToString(), StringComparison.OrdinalIgnoreCase) == true;
@@ -226,7 +226,7 @@ namespace DataWarehouse.Kernel
             // Otherwise select by quality level
             var ordered = candidates.OrderByDescending(p =>
             {
-                var metadata = GetPluginMetadata(p);
+                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
                 if (metadata.TryGetValue("QualityLevel", out var ql) && ql is int quality)
                 {
                     return quality;
@@ -256,12 +256,5 @@ namespace DataWarehouse.Kernel
             }
         }
 
-        [Obsolete("Use GetPluginMetadataAsync instead")]
-        private Dictionary<string, object> GetPluginMetadata(IPlugin plugin)
-        {
-            // Cannot be async: Called from sync context during plugin registration.
-            // Using Task.Run to prevent sync context deadlock, then block safely.
-            return Task.Run(() => GetPluginMetadataAsync(plugin)).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
     }
 }
