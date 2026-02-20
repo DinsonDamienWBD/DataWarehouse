@@ -1,5 +1,8 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Query;
+using QueryJoinType = DataWarehouse.SDK.Contracts.Query.JoinType;
+using PlanNode = DataWarehouse.SDK.Contracts.QueryPlanNode;
+using QueryPlanNode = DataWarehouse.SDK.Contracts.QueryPlanNode;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -52,8 +55,8 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
     };
 
     // Virtual table registry with schema caching
-    private readonly ConcurrentDictionary<string, VirtualTableSchema> _tableRegistry = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, CachedTableData> _tableDataCache = new(StringComparer.OrdinalIgnoreCase);
+    internal readonly ConcurrentDictionary<string, VirtualTableSchema> _tableRegistry = new(StringComparer.OrdinalIgnoreCase);
+    internal readonly ConcurrentDictionary<string, CachedTableData> _tableDataCache = new(StringComparer.OrdinalIgnoreCase);
 
     // Query plan and result cache (LRU-style with capacity limit)
     private readonly QueryCache _queryCache = new(maxEntries: 1000);
@@ -62,7 +65,7 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
     private readonly ConcurrentDictionary<string, PartitionMetadata> _partitionMetadata = new(StringComparer.OrdinalIgnoreCase);
 
     // File read callback for reading data from storage
-    private Func<string, CancellationToken, Task<Stream?>>? _fileReader;
+    internal Func<string, CancellationToken, Task<Stream?>>? _fileReader;
 
     // Statistics
     private long _totalQueriesExecuted;
@@ -1166,11 +1169,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
             result = join.JoinType switch
             {
-                JoinType.Inner => ExecuteHashJoin(result, rightData, join, false, false),
-                JoinType.Left => ExecuteHashJoin(result, rightData, join, true, false),
-                JoinType.Right => ExecuteHashJoin(result, rightData, join, false, true),
-                JoinType.Full => ExecuteHashJoin(result, rightData, join, true, true),
-                JoinType.Cross => ExecuteCrossJoin(result, rightData),
+                QueryJoinType.Inner => ExecuteHashJoin(result, rightData, join, false, false),
+                QueryJoinType.Left => ExecuteHashJoin(result, rightData, join, true, false),
+                QueryJoinType.Right => ExecuteHashJoin(result, rightData, join, false, true),
+                QueryJoinType.Full => ExecuteHashJoin(result, rightData, join, true, true),
+                QueryJoinType.Cross => ExecuteCrossJoin(result, rightData),
                 _ => result
             };
         }
@@ -1621,16 +1624,16 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
         var startTime = DateTime.UtcNow;
         var parsed = ParseSqlQuery(sql);
 
-        var nodes = new List<QueryPlanNode>();
+        var nodes = new List<PlanNode>();
 
         // Build plan tree
         foreach (var table in parsed.Tables)
         {
-            nodes.Add(new QueryPlanNode
+            nodes.Add(new PlanNode
             {
                 Operation = "TableScan",
                 EstimatedCost = 1.0,
-                EstimatedRows = _tableDataCache.TryGetValue(table, out var cache) ? cache.RowCount : 1000,
+                EstimatedRows = _tableDataCache.TryGetValue(table, out var cache) ? cache.RowCount : 1000L,
                 Properties = new Dictionary<string, object>
                 {
                     ["Table"] = table,
@@ -1641,11 +1644,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
         if (!string.IsNullOrEmpty(parsed.WhereClause))
         {
-            nodes.Add(new QueryPlanNode
+            nodes.Add(new PlanNode
             {
                 Operation = "Filter",
                 EstimatedCost = 0.1,
-                EstimatedRows = 100,
+                EstimatedRows = 100L,
                 Properties = new Dictionary<string, object>
                 {
                     ["Predicate"] = parsed.WhereClause,
@@ -1656,11 +1659,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
         foreach (var join in parsed.Joins)
         {
-            nodes.Add(new QueryPlanNode
+            nodes.Add(new PlanNode
             {
                 Operation = $"HashJoin ({join.JoinType})",
                 EstimatedCost = 2.0,
-                EstimatedRows = 500,
+                EstimatedRows = 500L,
                 Properties = new Dictionary<string, object>
                 {
                     ["LeftColumn"] = join.LeftColumn,
@@ -1671,11 +1674,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
         if (parsed.GroupByColumns.Count > 0)
         {
-            nodes.Add(new QueryPlanNode
+            nodes.Add(new PlanNode
             {
                 Operation = "Aggregate",
                 EstimatedCost = 0.5,
-                EstimatedRows = 50,
+                EstimatedRows = 50L,
                 Properties = new Dictionary<string, object>
                 {
                     ["GroupBy"] = string.Join(", ", parsed.GroupByColumns),
@@ -1686,11 +1689,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
         if (parsed.OrderByColumns.Count > 0)
         {
-            nodes.Add(new QueryPlanNode
+            nodes.Add(new PlanNode
             {
                 Operation = "Sort",
                 EstimatedCost = 0.3,
-                EstimatedRows = 100,
+                EstimatedRows = 100L,
                 Properties = new Dictionary<string, object>
                 {
                     ["OrderBy"] = string.Join(", ", parsed.OrderByColumns.Select(o => o.Column + (o.Descending ? " DESC" : "")))
@@ -1698,11 +1701,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
             });
         }
 
-        var rootNode = new QueryPlanNode
+        var rootNode = new PlanNode
         {
             Operation = "Project",
             EstimatedCost = 0.1,
-            EstimatedRows = 100,
+            EstimatedRows = 100L,
             Children = nodes,
             Properties = new Dictionary<string, object>
             {
@@ -1869,11 +1872,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
             var joinType = joinTypeStr switch
             {
-                "LEFT " or "LEFT OUTER " => JoinType.Left,
-                "RIGHT " or "RIGHT OUTER " => JoinType.Right,
-                "FULL OUTER " => JoinType.Full,
-                "CROSS " => JoinType.Cross,
-                _ => JoinType.Inner
+                "LEFT " or "LEFT OUTER " => QueryJoinType.Left,
+                "RIGHT " or "RIGHT OUTER " => QueryJoinType.Right,
+                "FULL OUTER " => QueryJoinType.Full,
+                "CROSS " => QueryJoinType.Cross,
+                _ => QueryJoinType.Inner
             };
 
             query.Tables.Add(rightTable);
@@ -1902,7 +1905,7 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
             {
                 query.Joins.Add(new JoinInfo
                 {
-                    JoinType = JoinType.Cross,
+                    JoinType = QueryJoinType.Cross,
                     RightTable = query.Tables[i]
                 });
             }
@@ -2604,7 +2607,7 @@ internal enum SqlQueryType
 /// </summary>
 internal class JoinInfo
 {
-    public JoinType JoinType { get; init; }
+    public QueryJoinType JoinType { get; init; }
     public string RightTable { get; init; } = string.Empty;
     public string LeftColumn { get; init; } = string.Empty;
     public string RightColumn { get; init; } = string.Empty;
