@@ -215,13 +215,152 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| SDKF-01 | Phase 68 | Pending |
+| SDKF-02 | Phase 68 | Pending |
+| SDKF-03 | Phase 68 | Pending |
+| SDKF-04 | Phase 68 | Pending |
+| SDKF-05 | Phase 68 | Pending |
+| SDKF-06 | Phase 68 | Pending |
+| SDKF-07 | Phase 68 | Pending |
+| SDKF-08 | Phase 68 | Pending |
+| SDKF-09 | Phase 68 | Pending |
+| SDKF-10 | Phase 68 | Pending |
+| SDKF-11 | Phase 68 | Pending |
+| SDKF-12 | Phase 68 | Pending |
+| CASC-01 | Phase 70 | Pending |
+| CASC-02 | Phase 70 | Pending |
+| CASC-03 | Phase 70 | Pending |
+| CASC-04 | Phase 70 | Pending |
+| CASC-05 | Phase 70 | Pending |
+| CASC-06 | Phase 70 | Pending |
+| CASC-07 | Phase 70 | Pending |
+| CASC-08 | Phase 70 | Pending |
+| PERF-01 | Phase 76 | Pending |
+| PERF-02 | Phase 76 | Pending |
+| PERF-03 | Phase 76 | Pending |
+| PERF-04 | Phase 76 | Pending |
+| PERF-05 | Phase 76 | Pending |
+| PERF-06 | Phase 76 | Pending |
+| PERF-07 | Phase 76 | Pending |
+| AIPI-01 | Phase 77 | Pending |
+| AIPI-02 | Phase 77 | Pending |
+| AIPI-03 | Phase 77 | Pending |
+| AIPI-04 | Phase 77 | Pending |
+| AIPI-05 | Phase 77 | Pending |
+| AIPI-06 | Phase 77 | Pending |
+| AIPI-07 | Phase 77 | Pending |
+| AIPI-08 | Phase 77 | Pending |
+| AIPI-09 | Phase 77 | Pending |
+| AIPI-10 | Phase 77 | Pending |
+| AIPI-11 | Phase 77 | Pending |
+| AUTH-01 | Phase 75 | Pending |
+| AUTH-02 | Phase 75 | Pending |
+| AUTH-03 | Phase 75 | Pending |
+| AUTH-04 | Phase 75 | Pending |
+| AUTH-05 | Phase 75 | Pending |
+| AUTH-06 | Phase 75 | Pending |
+| AUTH-07 | Phase 75 | Pending |
+| AUTH-08 | Phase 75 | Pending |
+| AUTH-09 | Phase 75 | Pending |
+| PERS-01 | Phase 69 | Pending |
+| PERS-02 | Phase 69 | Pending |
+| PERS-03 | Phase 69 | Pending |
+| PERS-04 | Phase 69 | Pending |
+| PERS-05 | Phase 69 | Pending |
+| PERS-06 | Phase 69 | Pending |
+| PERS-07 | Phase 69 | Pending |
+| VDEF-01 | Phase 71 | Pending |
+| VDEF-02 | Phase 71 | Pending |
+| VDEF-03 | Phase 71 | Pending |
+| VDEF-04 | Phase 71 | Pending |
+| VDEF-05 | Phase 71 | Pending |
+| VDEF-06 | Phase 71 | Pending |
+| VDEF-07 | Phase 71 | Pending |
+| VDEF-08 | Phase 71 | Pending |
+| VDEF-09 | Phase 71 | Pending |
+| VDEF-10 | Phase 71 | Pending |
+| VDEF-11 | Phase 71 | Pending |
+| VDEF-12 | Phase 71 | Pending |
+| VDEF-13 | Phase 71 | Pending |
+| VDEF-14 | Phase 71 | Pending |
+| VDEF-15 | Phase 71 | Pending |
+| VDEF-16 | Phase 71 | Pending |
+| VDEF-17 | Phase 71 | Pending |
+| VDEF-18 | Phase 71 | Pending |
+| VREG-01 | Phase 72 | Pending |
+| VREG-02 | Phase 72 | Pending |
+| VREG-03 | Phase 72 | Pending |
+| VREG-04 | Phase 72 | Pending |
+| VREG-05 | Phase 72 | Pending |
+| VREG-06 | Phase 72 | Pending |
+| VREG-07 | Phase 72 | Pending |
+| VREG-08 | Phase 72 | Pending |
+| VREG-09 | Phase 72 | Pending |
+| VREG-10 | Phase 73 | Pending |
+| VREG-11 | Phase 73 | Pending |
+| VREG-12 | Phase 73 | Pending |
+| VREG-13 | Phase 73 | Pending |
+| VREG-14 | Phase 73 | Pending |
+| VREG-15 | Phase 73 | Pending |
+| VREG-16 | Phase 73 | Pending |
+| VREG-17 | Phase 73 | Pending |
+| VREG-18 | Phase 73 | Pending |
+| VTMP-01 | Phase 74 | Pending |
+| VTMP-02 | Phase 74 | Pending |
+| VTMP-03 | Phase 74 | Pending |
+| VTMP-04 | Phase 74 | Pending |
+| VTMP-05 | Phase 74 | Pending |
+| VTMP-06 | Phase 74 | Pending |
+| VTMP-07 | Phase 74 | Pending |
+| VTMP-08 | Phase 74 | Pending |
+| VTMP-09 | Phase 74 | Pending |
+| VTMP-10 | Phase 74 | Pending |
+| OMOD-01 | Phase 78 | Pending |
+| OMOD-02 | Phase 78 | Pending |
+| OMOD-03 | Phase 78 | Pending |
+| OMOD-04 | Phase 78 | Pending |
+| OMOD-05 | Phase 78 | Pending |
+| OMOD-06 | Phase 78 | Pending |
+| OMOD-07 | Phase 78 | Pending |
+| FEXT-01 | Phase 79 | Pending |
+| FEXT-02 | Phase 79 | Pending |
+| FEXT-03 | Phase 79 | Pending |
+| FEXT-04 | Phase 79 | Pending |
+| FEXT-05 | Phase 79 | Pending |
+| FEXT-06 | Phase 79 | Pending |
+| FEXT-07 | Phase 79 | Pending |
+| FEXT-08 | Phase 79 | Pending |
+| TIER-01 | Phase 80 | Pending |
+| TIER-02 | Phase 80 | Pending |
+| TIER-03 | Phase 80 | Pending |
+| TIER-04 | Phase 80 | Pending |
+| TIER-05 | Phase 80 | Pending |
+| PLUG-01 | Phase 82 | Pending |
+| PLUG-02 | Phase 82 | Pending |
+| PLUG-03 | Phase 82 | Pending |
+| PLUG-04 | Phase 82 | Pending |
+| PLUG-05 | Phase 82 | Pending |
+| PLUG-06 | Phase 82 | Pending |
+| MIGR-01 | Phase 81 | Pending |
+| MIGR-02 | Phase 81 | Pending |
+| MIGR-03 | Phase 81 | Pending |
+| MIGR-04 | Phase 81 | Pending |
+| MIGR-05 | Phase 81 | Pending |
+| MIGR-06 | Phase 81 | Pending |
+| INTG-01 | Phase 83 | Pending |
+| INTG-02 | Phase 83 | Pending |
+| INTG-03 | Phase 83 | Pending |
+| INTG-04 | Phase 83 | Pending |
+| INTG-05 | Phase 83 | Pending |
+| INTG-06 | Phase 83 | Pending |
+| INTG-07 | Phase 83 | Pending |
+| INTG-08 | Phase 83 | Pending |
 
 **Coverage:**
-- v6.0 requirements: 120 total
-- Mapped to phases: TBD
-- Unmapped: TBD
+- v6.0 requirements: 140 total (SDKF:12, CASC:8, PERF:7, AIPI:11, AUTH:9, PERS:7, VDEF:18, VREG:18, VTMP:10, OMOD:7, FEXT:8, TIER:5, PLUG:6, MIGR:6, INTG:8)
+- Mapped to phases: 140
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after design discussion*
+*Last updated: 2026-02-20 after roadmap creation*
