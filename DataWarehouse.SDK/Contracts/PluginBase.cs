@@ -1,12 +1,12 @@
 ﻿using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
+using DataWarehouse.SDK.Contracts.Persistence;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Linq;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 
@@ -23,8 +23,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Knowledge cache for performance optimization.
         /// Maps knowledge topic to cached KnowledgeObject.
+        /// Initialized lazily in InitializeAsync after the StateStore is available
+        /// so that cache entries can be auto-persisted.
         /// </summary>
-        private readonly ConcurrentDictionary<string, KnowledgeObject> _knowledgeCache = new();
+        private BoundedDictionary<string, KnowledgeObject>? _knowledgeCache;
 
         /// <summary>
         /// Capability registry reference for capability registration.
@@ -72,6 +74,18 @@ namespace DataWarehouse.SDK.Contracts
         /// Set during initialization via InitializeAsync.
         /// </summary>
         protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// State store for persisting plugin state. Initialized during InitializeAsync.
+        /// Plugins get this for free — no additional code needed for basic state persistence.
+        /// Override <see cref="CreateCustomStateStore"/> to supply a custom backend.
+        /// </summary>
+        protected IPluginStateStore? StateStore { get; private set; }
+
+        /// <summary>
+        /// Tracked bounded collections for automatic disposal when this plugin is disposed.
+        /// </summary>
+        private readonly List<IDisposable> _trackedCollections = new();
 
         /// <summary>
         /// Maximum number of entries in the knowledge cache.
@@ -225,6 +239,20 @@ namespace DataWarehouse.SDK.Contracts
         public virtual async Task InitializeAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+
+            // Initialize state persistence infrastructure (MessageBus must be injected first
+            // via InjectKernelServices before InitializeAsync is called by the kernel).
+            StateStore = CreateCustomStateStore();
+
+            // Initialize knowledge cache with a bounded dictionary now that StateStore is available.
+            // This gives LRU eviction and optional auto-persistence for free.
+            var cache = new BoundedDictionary<string, KnowledgeObject>(
+                MaxKnowledgeCacheSize > 0 ? MaxKnowledgeCacheSize : 10_000,
+                StateStore,
+                Id,
+                "knowledge-cache");
+            _trackedCollections.Add(cache);
+            _knowledgeCache = cache;
 
             // Trigger the existing handshake flow which registers capabilities and knowledge
             await OnHandshakeAsync(new HandshakeRequest
@@ -723,8 +751,9 @@ namespace DataWarehouse.SDK.Contracts
 
                 await MessageBus.PublishAsync("intelligence.knowledge.register", message, ct);
 
-                // Cache the registered knowledge
-                _knowledgeCache[knowledge.Topic] = knowledge;
+                // Cache the registered knowledge (null-safe: cache available after InitializeAsync)
+                if (_knowledgeCache != null)
+                    _knowledgeCache[knowledge.Topic] = knowledge;
             }
             catch (Exception)
             {
@@ -1012,6 +1041,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <returns>Cached knowledge object, or null if not found.</returns>
         protected KnowledgeObject? GetCachedKnowledge(string topic)
         {
+            if (_knowledgeCache == null) return null;
             _knowledgeCache.TryGetValue(topic, out var knowledge);
             return knowledge;
         }
@@ -1023,17 +1053,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="knowledge">Knowledge object to cache.</param>
         protected void CacheKnowledge(string topic, KnowledgeObject knowledge)
         {
-            // Enforce bounded cache size
-            if (MaxKnowledgeCacheSize > 0 && !_knowledgeCache.ContainsKey(topic) && _knowledgeCache.Count >= MaxKnowledgeCacheSize)
-            {
-                // Evict oldest entry (first key in dictionary -- approximate LRU)
-                var firstKey = _knowledgeCache.Keys.FirstOrDefault();
-                if (firstKey != null)
-                {
-                    _knowledgeCache.TryRemove(firstKey, out _);
-                }
-            }
-            _knowledgeCache[topic] = knowledge;
+            // BoundedDictionary handles LRU eviction automatically — no manual eviction needed.
+            // Guard for pre-InitializeAsync calls (cache is null until InitializeAsync completes).
+            if (_knowledgeCache != null)
+                _knowledgeCache[topic] = knowledge;
         }
 
         /// <summary>
@@ -1041,7 +1064,7 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         protected void ClearKnowledgeCache()
         {
-            _knowledgeCache.Clear();
+            _knowledgeCache?.Clear();
         }
 
         /// <summary>
@@ -1111,6 +1134,141 @@ namespace DataWarehouse.SDK.Contracts
 
         #endregion
 
+        #region State Persistence
+
+        /// <summary>
+        /// Override to provide a custom state store implementation.
+        /// The default creates a <see cref="DefaultPluginStateStore"/> that routes all operations
+        /// through the message bus to whatever storage backend is currently configured.
+        /// Return <c>null</c> to disable automatic state persistence.
+        /// </summary>
+        /// <returns>An <see cref="IPluginStateStore"/> instance, or <c>null</c> to disable persistence.</returns>
+        protected virtual IPluginStateStore? CreateCustomStateStore()
+            => MessageBus != null ? new DefaultPluginStateStore(MessageBus) : null;
+
+        /// <summary>
+        /// Called before state is persisted via <see cref="SaveStateAsync"/>.
+        /// Override to perform validation, encryption, or transformation of data before storage.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        protected virtual Task OnBeforeStatePersistAsync(CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        /// <summary>
+        /// Called after state is successfully persisted via <see cref="SaveStateAsync"/>.
+        /// Override to emit metrics, logs, or notifications after storage completes.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        protected virtual Task OnAfterStatePersistAsync(CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        /// <summary>
+        /// Saves arbitrary binary state for this plugin using the state store.
+        /// Calls <see cref="OnBeforeStatePersistAsync"/> before and <see cref="OnAfterStatePersistAsync"/> after.
+        /// No-op when no state store is configured.
+        /// </summary>
+        /// <param name="key">State key scoped to this plugin's namespace.</param>
+        /// <param name="data">Raw binary payload to persist.</param>
+        /// <param name="ct">Cancellation token.</param>
+        protected async Task SaveStateAsync(string key, byte[] data, CancellationToken ct = default)
+        {
+            if (StateStore == null) return;
+            await OnBeforeStatePersistAsync(ct).ConfigureAwait(false);
+            await StateStore.SaveAsync(Id, key, data, ct).ConfigureAwait(false);
+            await OnAfterStatePersistAsync(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Loads previously saved state for this plugin from the state store.
+        /// Returns <c>null</c> when no state store is configured or the key does not exist.
+        /// </summary>
+        /// <param name="key">State key scoped to this plugin's namespace.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Stored bytes, or <c>null</c> if not found or persistence is disabled.</returns>
+        protected async Task<byte[]?> LoadStateAsync(string key, CancellationToken ct = default)
+            => StateStore != null ? await StateStore.LoadAsync(Id, key, ct).ConfigureAwait(false) : null;
+
+        /// <summary>
+        /// Deletes a previously saved state entry for this plugin.
+        /// No-op when no state store is configured or the key does not exist.
+        /// </summary>
+        /// <param name="key">State key scoped to this plugin's namespace.</param>
+        /// <param name="ct">Cancellation token.</param>
+        protected async Task DeleteStateAsync(string key, CancellationToken ct = default)
+        {
+            if (StateStore != null)
+                await StateStore.DeleteAsync(Id, key, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all state keys previously stored for this plugin.
+        /// Returns an empty list when no state store is configured.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        protected async Task<IReadOnlyList<string>> ListStateKeysAsync(CancellationToken ct = default)
+            => StateStore != null
+                ? await StateStore.ListKeysAsync(Id, ct).ConfigureAwait(false)
+                : Array.Empty<string>();
+
+        // -------------------------------------------------------------------------
+        // Bounded collection factory methods
+        // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// Creates a bounded dictionary that is automatically tracked by this plugin's lifecycle.
+        /// The dictionary uses LRU eviction when capacity is exceeded and optionally auto-persists
+        /// changes through the plugin's <see cref="StateStore"/>.
+        /// </summary>
+        /// <typeparam name="TKey">The type of keys. Must be non-null.</typeparam>
+        /// <typeparam name="TValue">The type of values.</typeparam>
+        /// <param name="collectionName">
+        /// Logical name used as the state key for auto-persistence (e.g., "pending-writes").
+        /// </param>
+        /// <param name="maxCapacity">Maximum number of entries before LRU eviction triggers.</param>
+        /// <returns>A new <see cref="BoundedDictionary{TKey,TValue}"/> instance.</returns>
+        protected BoundedDictionary<TKey, TValue> CreateBoundedDictionary<TKey, TValue>(
+            string collectionName, int maxCapacity) where TKey : notnull
+        {
+            var dict = new BoundedDictionary<TKey, TValue>(
+                maxCapacity, StateStore, Id, $"collection.{collectionName}");
+            _trackedCollections.Add(dict);
+            return dict;
+        }
+
+        /// <summary>
+        /// Creates a bounded list that is automatically tracked by this plugin's lifecycle.
+        /// When capacity is exceeded the oldest entry is removed.
+        /// Optionally auto-persists through the plugin's <see cref="StateStore"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of elements.</typeparam>
+        /// <param name="collectionName">Logical name used as the state key for auto-persistence.</param>
+        /// <param name="maxCapacity">Maximum number of elements.</param>
+        /// <returns>A new <see cref="BoundedList{T}"/> instance.</returns>
+        protected BoundedList<T> CreateBoundedList<T>(string collectionName, int maxCapacity)
+        {
+            var list = new BoundedList<T>(maxCapacity, StateStore, Id, $"collection.{collectionName}");
+            _trackedCollections.Add(list);
+            return list;
+        }
+
+        /// <summary>
+        /// Creates a bounded queue that is automatically tracked by this plugin's lifecycle.
+        /// When capacity is exceeded the oldest entry is dequeued.
+        /// Optionally auto-persists through the plugin's <see cref="StateStore"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of elements.</typeparam>
+        /// <param name="collectionName">Logical name used as the state key for auto-persistence.</param>
+        /// <param name="maxCapacity">Maximum number of elements.</param>
+        /// <returns>A new <see cref="BoundedQueue{T}"/> instance.</returns>
+        protected BoundedQueue<T> CreateBoundedQueue<T>(string collectionName, int maxCapacity)
+        {
+            var queue = new BoundedQueue<T>(maxCapacity, StateStore, Id, $"collection.{collectionName}");
+            _trackedCollections.Add(queue);
+            return queue;
+        }
+
+        #endregion
+
         #region IDisposable / IAsyncDisposable
 
         /// <summary>
@@ -1144,8 +1302,12 @@ namespace DataWarehouse.SDK.Contracts
                 }
                 _knowledgeSubscriptions.Clear();
 
-                // Clear knowledge cache
-                _knowledgeCache.Clear();
+                // Dispose all tracked bounded collections (includes _knowledgeCache)
+                foreach (var collection in _trackedCollections)
+                {
+                    try { collection.Dispose(); } catch { /* Swallow during cleanup */ }
+                }
+                _trackedCollections.Clear();
 
                 // Clear registration tracking
                 _registeredCapabilityIds.Clear();
