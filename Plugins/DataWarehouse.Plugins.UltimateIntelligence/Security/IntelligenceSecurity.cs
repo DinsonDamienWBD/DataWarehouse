@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Security;
 
@@ -160,8 +161,8 @@ public sealed record ThrottleStatus
 /// </summary>
 public sealed class InstancePermissions
 {
-    private readonly ConcurrentDictionary<string, Dictionary<string, IntelligencePermissionLevel>> _permissions = new();
-    private readonly ConcurrentDictionary<string, IntelligencePermissionLevel> _defaultPermissions = new();
+    private readonly BoundedDictionary<string, Dictionary<string, IntelligencePermissionLevel>> _permissions = new BoundedDictionary<string, Dictionary<string, IntelligencePermissionLevel>>(1000);
+    private readonly BoundedDictionary<string, IntelligencePermissionLevel> _defaultPermissions = new BoundedDictionary<string, IntelligencePermissionLevel>(1000);
     private readonly object _lockObject = new();
 
     /// <summary>
@@ -283,9 +284,9 @@ public sealed class InstancePermissions
 /// </summary>
 public sealed class UserPermissions
 {
-    private readonly ConcurrentDictionary<string, UserPermissionProfile> _userProfiles = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _userRoles = new();
-    private readonly ConcurrentDictionary<string, IntelligencePermissionLevel> _rolePermissions = new();
+    private readonly BoundedDictionary<string, UserPermissionProfile> _userProfiles = new BoundedDictionary<string, UserPermissionProfile>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _userRoles = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, IntelligencePermissionLevel> _rolePermissions = new BoundedDictionary<string, IntelligencePermissionLevel>(1000);
 
     /// <summary>
     /// Creates or updates a user permission profile.
@@ -493,8 +494,8 @@ public sealed record UserPermissionProfile
 /// </summary>
 public sealed class CommandWhitelist
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _userWhitelists = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _roleWhitelists = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _userWhitelists = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _roleWhitelists = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly HashSet<string> _globalWhitelist = new();
     private readonly HashSet<string> _globalBlacklist = new();
     private readonly object _lockObject = new();
@@ -675,8 +676,8 @@ public sealed class CommandWhitelist
 /// </summary>
 public sealed class DomainRestrictions
 {
-    private readonly ConcurrentDictionary<string, List<DomainRestriction>> _userRestrictions = new();
-    private readonly ConcurrentDictionary<string, List<DomainRestriction>> _globalRestrictions = new();
+    private readonly BoundedDictionary<string, List<DomainRestriction>> _userRestrictions = new BoundedDictionary<string, List<DomainRestriction>>(1000);
+    private readonly BoundedDictionary<string, List<DomainRestriction>> _globalRestrictions = new BoundedDictionary<string, List<DomainRestriction>>(1000);
     private readonly HashSet<string> _sensitivedomains = new();
     private readonly object _lockObject = new();
 
@@ -844,8 +845,8 @@ public sealed class DomainRestrictions
 /// </summary>
 public sealed class QueryRateLimiter
 {
-    private readonly ConcurrentDictionary<string, SlidingWindowCounter> _counters = new();
-    private readonly ConcurrentDictionary<string, RateLimitConfig> _configs = new();
+    private readonly BoundedDictionary<string, SlidingWindowCounter> _counters = new BoundedDictionary<string, SlidingWindowCounter>(1000);
+    private readonly BoundedDictionary<string, RateLimitConfig> _configs = new BoundedDictionary<string, RateLimitConfig>(1000);
     private readonly RateLimitConfig _defaultConfig;
 
     /// <summary>
@@ -1023,14 +1024,14 @@ internal sealed class SlidingWindowCounter
 /// </summary>
 public sealed class CostLimiter
 {
-    private readonly ConcurrentDictionary<string, CostTracker> _trackers = new();
-    private readonly ConcurrentDictionary<string, CostLimitConfig> _configs = new();
+    private readonly BoundedDictionary<string, CostTracker> _trackers = new BoundedDictionary<string, CostTracker>(1000);
+    private readonly BoundedDictionary<string, CostLimitConfig> _configs = new BoundedDictionary<string, CostLimitConfig>(1000);
     private readonly CostLimitConfig _defaultConfig;
 
     /// <summary>
     /// Cost per 1000 tokens by model.
     /// </summary>
-    public ConcurrentDictionary<string, decimal> ModelCosts { get; } = new()
+    public BoundedDictionary<string, decimal> ModelCosts { get; } = new(1000)
     {
         ["gpt-4"] = 0.03m,
         ["gpt-4-turbo"] = 0.01m,

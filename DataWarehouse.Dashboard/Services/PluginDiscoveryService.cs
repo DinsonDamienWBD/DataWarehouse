@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace DataWarehouse.Dashboard.Services;
@@ -163,7 +162,7 @@ public enum PluginChangeType
 /// </summary>
 public class PluginDiscoveryService : IPluginDiscoveryService
 {
-    private readonly ConcurrentDictionary<string, PluginInfo> _plugins = new();
+    private readonly BoundedDictionary<string, PluginInfo> _plugins = new BoundedDictionary<string, PluginInfo>(1000);
     private readonly ILogger<PluginDiscoveryService> _logger;
     private readonly IKernelHostService? _kernelHost;
     private readonly string _pluginsDirectory;

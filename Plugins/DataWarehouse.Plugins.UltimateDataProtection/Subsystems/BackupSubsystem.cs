@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using DataWarehouse.Plugins.UltimateDataProtection.Catalog;
 using DataWarehouse.Plugins.UltimateDataProtection.Validation;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
 {
@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
         private readonly DataProtectionStrategyRegistry _registry;
         private readonly BackupCatalog _catalog;
         private readonly BackupValidator _validator;
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeOperations = new();
+        private readonly BoundedDictionary<string, CancellationTokenSource> _activeOperations = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
         /// <summary>
         /// Creates a new backup subsystem.

@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -9,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -51,7 +51,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly IClusterMembership _membership;
         private readonly GossipReplicatorConfiguration _config;
         private readonly Channel<GossipMessage> _pendingChannel;
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _seenMessages = new();
+        private readonly BoundedDictionary<string, DateTimeOffset> _seenMessages = new BoundedDictionary<string, DateTimeOffset>(1000);
         private readonly SemaphoreSlim _seenCleanupLock = new(1, 1);
         private readonly CancellationTokenSource _cts = new();
         private Task? _cleanupTask;

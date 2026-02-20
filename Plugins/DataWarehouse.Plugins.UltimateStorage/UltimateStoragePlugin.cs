@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
@@ -47,8 +46,8 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDataTerminal, IDisposable
 {
     private readonly StorageStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, StorageHealthStatus> _healthStatus = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, StorageHealthStatus> _healthStatus = new BoundedDictionary<string, StorageHealthStatus>(1000);
     private bool _disposed;
 
     // Configuration

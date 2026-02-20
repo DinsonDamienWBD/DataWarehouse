@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication
 {
@@ -13,9 +13,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
     /// </summary>
     public sealed class ReplicationStrategyRegistry
     {
-        private readonly ConcurrentDictionary<string, EnhancedReplicationStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
-        private readonly ConcurrentDictionary<ConsistencyModel, List<string>> _byConsistencyModel = new();
-        private readonly ConcurrentDictionary<string, List<string>> _byCapability = new();
+        private readonly BoundedDictionary<string, EnhancedReplicationStrategyBase> _strategies = new BoundedDictionary<string, EnhancedReplicationStrategyBase>(1000);
+        private readonly BoundedDictionary<ConsistencyModel, List<string>> _byConsistencyModel = new BoundedDictionary<ConsistencyModel, List<string>>(1000);
+        private readonly BoundedDictionary<string, List<string>> _byCapability = new BoundedDictionary<string, List<string>>(1000);
 
         /// <summary>
         /// Gets all registered strategy names.

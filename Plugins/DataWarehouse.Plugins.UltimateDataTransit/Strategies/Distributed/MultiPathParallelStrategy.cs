@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit.Strategies.Distributed;
 
@@ -62,7 +62,7 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
     /// <summary>
     /// Thread-safe storage of active transfer states keyed by transfer ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, TransferState> _transferStates = new();
+    private readonly BoundedDictionary<string, TransferState> _transferStates = new BoundedDictionary<string, TransferState>(1000);
 
     /// <summary>
     /// Semaphore for exclusive access during segment rebalancing operations.

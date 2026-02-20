@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSDKPorts;
 
@@ -96,8 +96,8 @@ public sealed class TypeMapping
 /// <summary>Base class for SDK port strategies.</summary>
 public abstract class SDKPortStrategyBase
 {
-    protected readonly ConcurrentDictionary<string, SDKMethod> _registeredMethods = new();
-    protected readonly ConcurrentDictionary<string, TypeMapping> _typeMappings = new();
+    protected readonly BoundedDictionary<string, SDKMethod> _registeredMethods = new BoundedDictionary<string, SDKMethod>(1000);
+    protected readonly BoundedDictionary<string, TypeMapping> _typeMappings = new BoundedDictionary<string, TypeMapping>(1000);
 
     public abstract SDKPortCharacteristics Characteristics { get; }
     public string StrategyId => Characteristics.StrategyName.Replace(" ", "");

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Scalability;
 
@@ -12,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Scalability;
 /// </summary>
 public sealed class PartitioningStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PartitionManager> _managers = new();
+    private readonly BoundedDictionary<string, PartitionManager> _managers = new BoundedDictionary<string, PartitionManager>(1000);
 
     public override string StrategyId => "scale-partitioning";
     public override string DisplayName => "Stream Partitioning";
@@ -46,7 +47,7 @@ public sealed class PartitioningStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
 
         var managerId = $"part-{Guid.NewGuid():N}";
-        var partitions = new ConcurrentDictionary<int, PartitionState>();
+        var partitions = new BoundedDictionary<int, PartitionState>(1000);
 
         for (int i = 0; i < config.PartitionCount; i++)
         {
@@ -197,7 +198,7 @@ internal sealed class PartitionManager
     public required string ManagerId { get; init; }
     public required string StreamId { get; init; }
     public required PartitionConfig Config { get; init; }
-    public required ConcurrentDictionary<int, PartitionState> Partitions { get; init; }
+    public required BoundedDictionary<int, PartitionState> Partitions { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public long RoundRobinCounter;
 }
@@ -242,7 +243,7 @@ public sealed record PartitionStats
 /// </summary>
 public sealed class AutoScalingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AutoScaler> _scalers = new();
+    private readonly BoundedDictionary<string, AutoScaler> _scalers = new BoundedDictionary<string, AutoScaler>(1000);
 
     public override string StrategyId => "scale-autoscaling";
     public override string DisplayName => "Auto-Scaling";
@@ -546,7 +547,7 @@ public sealed record ScalingEvent
 /// </summary>
 public sealed class BackpressureStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BackpressureController> _controllers = new();
+    private readonly BoundedDictionary<string, BackpressureController> _controllers = new BoundedDictionary<string, BackpressureController>(1000);
 
     public override string StrategyId => "scale-backpressure";
     public override string DisplayName => "Backpressure Control";
@@ -846,7 +847,7 @@ public sealed record BackpressureStats
 /// </summary>
 public sealed class LoadBalancingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LoadBalancer> _balancers = new();
+    private readonly BoundedDictionary<string, LoadBalancer> _balancers = new BoundedDictionary<string, LoadBalancer>(1000);
 
     public override string StrategyId => "scale-loadbalancing";
     public override string DisplayName => "Load Balancing";
@@ -880,7 +881,7 @@ public sealed class LoadBalancingStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
 
         var balancerId = $"lb-{Guid.NewGuid():N}";
-        var workers = new ConcurrentDictionary<string, WorkerState>();
+        var workers = new BoundedDictionary<string, WorkerState>(1000);
 
         foreach (var worker in config.Workers)
         {
@@ -1099,7 +1100,7 @@ internal sealed class LoadBalancer
     public required string BalancerId { get; init; }
     public required string Name { get; init; }
     public required LoadBalanceConfig Config { get; init; }
-    public required ConcurrentDictionary<string, WorkerState> Workers { get; init; }
+    public required BoundedDictionary<string, WorkerState> Workers { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public long RoundRobinCounter;
 }

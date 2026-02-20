@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.SchemaEvolution;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.SchemaEvoluti
 /// </summary>
 public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaVersion> _schemas = new();
-    private readonly ConcurrentDictionary<string, List<SchemaVersion>> _versionHistory = new();
+    private readonly BoundedDictionary<string, SchemaVersion> _schemas = new BoundedDictionary<string, SchemaVersion>(1000);
+    private readonly BoundedDictionary<string, List<SchemaVersion>> _versionHistory = new BoundedDictionary<string, List<SchemaVersion>>(1000);
 
     public override string StrategyId => "schema-forward-compatible";
     public override string DisplayName => "Forward Compatible Schema";
@@ -153,8 +153,8 @@ public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBas
 /// </summary>
 public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaVersion> _schemas = new();
-    private readonly ConcurrentDictionary<string, List<SchemaVersion>> _versionHistory = new();
+    private readonly BoundedDictionary<string, SchemaVersion> _schemas = new BoundedDictionary<string, SchemaVersion>(1000);
+    private readonly BoundedDictionary<string, List<SchemaVersion>> _versionHistory = new BoundedDictionary<string, List<SchemaVersion>>(1000);
 
     public override string StrategyId => "schema-backward-compatible";
     public override string DisplayName => "Backward Compatible Schema";
@@ -269,8 +269,8 @@ public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBa
 /// </summary>
 public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaVersion> _schemas = new();
-    private readonly ConcurrentDictionary<string, List<SchemaVersion>> _versionHistory = new();
+    private readonly BoundedDictionary<string, SchemaVersion> _schemas = new BoundedDictionary<string, SchemaVersion>(1000);
+    private readonly BoundedDictionary<string, List<SchemaVersion>> _versionHistory = new BoundedDictionary<string, List<SchemaVersion>>(1000);
 
     public override string StrategyId => "schema-full-compatible";
     public override string DisplayName => "Full Compatible Schema";
@@ -407,8 +407,8 @@ public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaMigration> _migrations = new();
-    private readonly ConcurrentDictionary<string, MigrationExecution> _executions = new();
+    private readonly BoundedDictionary<string, SchemaMigration> _migrations = new BoundedDictionary<string, SchemaMigration>(1000);
+    private readonly BoundedDictionary<string, MigrationExecution> _executions = new BoundedDictionary<string, MigrationExecution>(1000);
 
     public override string StrategyId => "schema-migration";
     public override string DisplayName => "Schema Migration";
@@ -583,8 +583,8 @@ public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RegisteredSchema> _schemas = new();
-    private readonly ConcurrentDictionary<string, SchemaSubject> _subjects = new();
+    private readonly BoundedDictionary<string, RegisteredSchema> _schemas = new BoundedDictionary<string, RegisteredSchema>(1000);
+    private readonly BoundedDictionary<string, SchemaSubject> _subjects = new BoundedDictionary<string, SchemaSubject>(1000);
 
     public override string StrategyId => "schema-registry";
     public override string DisplayName => "Schema Registry";
@@ -676,7 +676,7 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
 
         _schemas.TryGetValue(key, out var schema);
         RecordOperation("GetSchema");
-        return Task.FromResult(schema);
+        return Task.FromResult<RegisteredSchema?>(schema);
     }
 
     /// <summary>

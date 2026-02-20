@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts;
@@ -31,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateFilesystem;
 public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
     private readonly FilesystemStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, FilesystemMetadata> _mountCache = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, FilesystemMetadata> _mountCache = new BoundedDictionary<string, FilesystemMetadata>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Configuration

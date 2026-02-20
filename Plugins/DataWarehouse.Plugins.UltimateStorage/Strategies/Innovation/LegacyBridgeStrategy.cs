@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _basePath = string.Empty;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, LegacyRecord> _records = new();
+        private readonly BoundedDictionary<string, LegacyRecord> _records = new BoundedDictionary<string, LegacyRecord>(1000);
 
         public override string StrategyId => "legacy-bridge";
         public override string Name => "Legacy Bridge (Mainframe/AS400)";

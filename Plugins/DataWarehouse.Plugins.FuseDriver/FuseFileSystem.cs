@@ -3,10 +3,10 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -21,9 +21,9 @@ public sealed class FuseFileSystem : IDisposable
     private readonly IStorageProvider? _storageProvider;
     private readonly FuseCacheManager _cacheManager;
     private readonly ExtendedAttributes _xattrStore;
-    private readonly ConcurrentDictionary<string, FuseNode> _nodeCache = new();
-    private readonly ConcurrentDictionary<ulong, OpenFileHandle> _openHandles = new();
-    private readonly ConcurrentDictionary<string, FileLockInfo> _locks = new();
+    private readonly BoundedDictionary<string, FuseNode> _nodeCache = new BoundedDictionary<string, FuseNode>(1000);
+    private readonly BoundedDictionary<ulong, OpenFileHandle> _openHandles = new BoundedDictionary<ulong, OpenFileHandle>(1000);
+    private readonly BoundedDictionary<string, FileLockInfo> _locks = new BoundedDictionary<string, FileLockInfo>(1000);
     private readonly PosixPermissions _rootPermissions;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 

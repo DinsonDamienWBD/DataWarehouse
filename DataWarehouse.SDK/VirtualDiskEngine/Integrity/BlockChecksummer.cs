@@ -1,9 +1,9 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.IO.Hashing;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 
@@ -20,7 +20,7 @@ public sealed class BlockChecksummer : IBlockChecksummer
 
     // Cache of recently verified blocks (key: block number, value: true if verified)
     // Avoids redundant re-verification on repeated reads
-    private readonly ConcurrentDictionary<long, bool> _verifiedCache = new();
+    private readonly BoundedDictionary<long, bool> _verifiedCache = new BoundedDictionary<long, bool>(1000);
 
     /// <summary>
     /// Initializes a new block checksummer.

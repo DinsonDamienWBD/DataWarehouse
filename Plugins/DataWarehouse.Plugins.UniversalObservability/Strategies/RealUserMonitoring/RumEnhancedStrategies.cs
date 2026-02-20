@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.RealUserMonitoring;
 
@@ -12,9 +12,9 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.RealUserMonito
 /// </summary>
 public sealed class SessionTrackingService
 {
-    private readonly ConcurrentDictionary<string, UserSession> _activeSessions = new();
-    private readonly ConcurrentDictionary<string, List<SessionEvent>> _sessionEvents = new();
-    private readonly ConcurrentDictionary<string, UserIdentity> _identifiedUsers = new();
+    private readonly BoundedDictionary<string, UserSession> _activeSessions = new BoundedDictionary<string, UserSession>(1000);
+    private readonly BoundedDictionary<string, List<SessionEvent>> _sessionEvents = new BoundedDictionary<string, List<SessionEvent>>(1000);
+    private readonly BoundedDictionary<string, UserIdentity> _identifiedUsers = new BoundedDictionary<string, UserIdentity>(1000);
     private readonly TimeSpan _sessionTimeout;
     private readonly int _maxSessionsPerUser;
 
@@ -181,8 +181,8 @@ public sealed class SessionTrackingService
 /// </summary>
 public sealed class FunnelAnalysisEngine
 {
-    private readonly ConcurrentDictionary<string, FunnelDefinition> _funnels = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, FunnelProgress>> _userProgress = new();
+    private readonly BoundedDictionary<string, FunnelDefinition> _funnels = new BoundedDictionary<string, FunnelDefinition>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, FunnelProgress>> _userProgress = new BoundedDictionary<string, BoundedDictionary<string, FunnelProgress>>(1000);
 
     /// <summary>
     /// Defines a conversion funnel with ordered steps.
@@ -213,7 +213,7 @@ public sealed class FunnelAnalysisEngine
         if (stepIndex < 0)
             return new FunnelStepResult { Recorded = false, Reason = "Step not in funnel" };
 
-        var userProgresses = _userProgress.GetOrAdd(funnelId, _ => new ConcurrentDictionary<string, FunnelProgress>());
+        var userProgresses = _userProgress.GetOrAdd(funnelId, _ => new BoundedDictionary<string, FunnelProgress>(1000));
         var progress = userProgresses.GetOrAdd(userId, _ => new FunnelProgress
         {
             FunnelId = funnelId,

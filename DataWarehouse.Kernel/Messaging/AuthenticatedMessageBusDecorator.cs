@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -23,8 +22,8 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly ILogger? _logger;
 
         // Per-topic authentication configuration
-        private readonly ConcurrentDictionary<string, MessageAuthenticationOptions> _topicAuth = new();
-        private readonly ConcurrentDictionary<string, (Regex Regex, MessageAuthenticationOptions Options)> _patternAuth = new();
+        private readonly BoundedDictionary<string, MessageAuthenticationOptions> _topicAuth = new BoundedDictionary<string, MessageAuthenticationOptions>(1000);
+        private readonly BoundedDictionary<string, (Regex Regex, MessageAuthenticationOptions Options)> _patternAuth = new BoundedDictionary<string, (Regex Regex, MessageAuthenticationOptions Options)>(1000);
 
         // Signing keys: current and previous (for key rotation grace period)
         private byte[] _currentKey = Array.Empty<byte>();
@@ -33,7 +32,7 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly object _keyLock = new();
 
         // Nonce cache for replay detection (bounded, time-windowed)
-        private readonly ConcurrentDictionary<string, DateTime> _nonceCache = new();
+        private readonly BoundedDictionary<string, DateTime> _nonceCache = new BoundedDictionary<string, DateTime>(1000);
         private readonly Timer _nonceCacheCleanupTimer;
 
         /// <summary>

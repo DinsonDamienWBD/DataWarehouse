@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -35,7 +34,7 @@ public sealed class ImmuneResponseSystem : IImmuneResponseSystem
     private readonly IMessageBus? _messageBus;
     private readonly FaultSignatureAnalyzer _signatureAnalyzer;
     private readonly RemediationExecutor _remediationExecutor;
-    private readonly ConcurrentDictionary<string, ImmuneMemoryEntry> _memory = new(StringComparer.Ordinal);
+    private readonly BoundedDictionary<string, ImmuneMemoryEntry> _memory = new BoundedDictionary<string, ImmuneMemoryEntry>(1000);
     private readonly SemaphoreSlim _memoryLock = new(1, 1);
 
     /// <summary>Maximum number of immune memory entries before LRU eviction kicks in.</summary>

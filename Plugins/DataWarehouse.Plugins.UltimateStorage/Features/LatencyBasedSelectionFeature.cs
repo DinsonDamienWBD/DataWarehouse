@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class LatencyBasedSelectionFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, BackendLatencyProfile> _latencyProfiles = new();
+        private readonly BoundedDictionary<string, BackendLatencyProfile> _latencyProfiles = new BoundedDictionary<string, BackendLatencyProfile>(1000);
         private readonly Timer _healthCheckTimer;
         private bool _disposed;
 

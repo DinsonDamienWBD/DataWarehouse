@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -73,8 +74,8 @@ public sealed class RaidMonitoring
 /// </summary>
 public sealed class RealTimeDashboard
 {
-    private readonly ConcurrentDictionary<string, ArrayStatus> _arrayStatuses = new();
-    private readonly ConcurrentDictionary<string, List<MetricDataPoint>> _liveMetrics = new();
+    private readonly BoundedDictionary<string, ArrayStatus> _arrayStatuses = new BoundedDictionary<string, ArrayStatus>(1000);
+    private readonly BoundedDictionary<string, List<MetricDataPoint>> _liveMetrics = new BoundedDictionary<string, List<MetricDataPoint>>(1000);
 
     public void UpdateArrayStatus(string arrayId, ArrayStatus status)
     {
@@ -122,7 +123,7 @@ public sealed class RealTimeDashboard
 /// </summary>
 public sealed class HistoricalMetrics
 {
-    private readonly ConcurrentDictionary<string, List<HistoricalDataPoint>> _history = new();
+    private readonly BoundedDictionary<string, List<HistoricalDataPoint>> _history = new BoundedDictionary<string, List<HistoricalDataPoint>>(1000);
 
     public void RecordMetric(string arrayId, string metricName, double value, Dictionary<string, string>? labels = null)
     {
@@ -187,7 +188,7 @@ public sealed class HistoricalMetrics
 /// </summary>
 public sealed class PrometheusExporter
 {
-    private readonly ConcurrentDictionary<string, PrometheusMetric> _metrics = new();
+    private readonly BoundedDictionary<string, PrometheusMetric> _metrics = new BoundedDictionary<string, PrometheusMetric>(1000);
 
     public void RegisterMetric(string name, MetricType type, string help, string[] labels)
     {
@@ -430,7 +431,7 @@ public sealed class RaidRestApi
 /// </summary>
 public sealed class ScheduledOperations
 {
-    private readonly ConcurrentDictionary<string, ScheduledOperation> _operations = new();
+    private readonly BoundedDictionary<string, ScheduledOperation> _operations = new BoundedDictionary<string, ScheduledOperation>(1000);
 
     public ScheduledOperation ScheduleOperation(
         string name,
@@ -610,7 +611,7 @@ public sealed class ComplianceReporter
 /// </summary>
 public sealed class IntegrityProof
 {
-    private readonly ConcurrentDictionary<string, IntegrityRecord> _records = new();
+    private readonly BoundedDictionary<string, IntegrityRecord> _records = new BoundedDictionary<string, IntegrityRecord>(1000);
 
     public IntegrityRecord CreateProof(string arrayId, byte[] dataHash)
     {
@@ -748,7 +749,7 @@ public sealed class PrometheusMetric
     public MetricType Type { get; set; }
     public string Help { get; set; } = string.Empty;
     public string[] Labels { get; set; } = Array.Empty<string>();
-    public ConcurrentDictionary<string, double> Values { get; set; } = new();
+    public BoundedDictionary<string, double> Values { get; set; } = new BoundedDictionary<string, double>(1000);
     public DateTime LastUpdate { get; set; }
 }
 

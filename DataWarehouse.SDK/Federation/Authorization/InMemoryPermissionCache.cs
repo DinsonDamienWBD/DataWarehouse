@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Authorization;
 
@@ -32,7 +33,7 @@ namespace DataWarehouse.SDK.Federation.Authorization;
 [SdkCompatibility("3.0.0", Notes = "Phase 34: In-memory permission cache with bounded size (FOS-03)")]
 internal sealed class InMemoryPermissionCache : IPermissionCache, IDisposable
 {
-    private readonly ConcurrentDictionary<string, PermissionCacheEntry> _cache;
+    private readonly BoundedDictionary<string, PermissionCacheEntry> _cache;
     private readonly PermissionCacheConfiguration _config;
     private readonly SemaphoreSlim _cleanupLock;
     private readonly PeriodicTimer _cleanupTimer;
@@ -52,7 +53,7 @@ internal sealed class InMemoryPermissionCache : IPermissionCache, IDisposable
     public InMemoryPermissionCache(PermissionCacheConfiguration? config = null)
     {
         _config = config ?? new PermissionCacheConfiguration();
-        _cache = new ConcurrentDictionary<string, PermissionCacheEntry>();
+        _cache = new BoundedDictionary<string, PermissionCacheEntry>(1000);
         _cleanupLock = new SemaphoreSlim(1, 1);
         _cleanupTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         _cleanupCts = new CancellationTokenSource();

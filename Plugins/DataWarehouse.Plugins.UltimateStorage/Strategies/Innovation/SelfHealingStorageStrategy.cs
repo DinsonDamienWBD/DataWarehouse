@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -41,10 +42,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableProactiveReplication = true;
         private double _corruptionThreshold = 0.01; // 1% corruption triggers repair
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, ObjectHealthRecord> _healthRecords = new();
-        private readonly ConcurrentDictionary<string, List<ReplicaInfo>> _replicas = new();
+        private readonly BoundedDictionary<string, ObjectHealthRecord> _healthRecords = new BoundedDictionary<string, ObjectHealthRecord>(1000);
+        private readonly BoundedDictionary<string, List<ReplicaInfo>> _replicas = new BoundedDictionary<string, List<ReplicaInfo>>(1000);
         private readonly ConcurrentQueue<RepairJob> _repairQueue = new();
-        private readonly ConcurrentDictionary<int, StorageNode> _nodes = new();
+        private readonly BoundedDictionary<int, StorageNode> _nodes = new BoundedDictionary<int, StorageNode>(1000);
         private Timer? _healthCheckTimer = null;
         private Timer? _scrubbingTimer = null;
         private Timer? _repairWorkerTimer = null;

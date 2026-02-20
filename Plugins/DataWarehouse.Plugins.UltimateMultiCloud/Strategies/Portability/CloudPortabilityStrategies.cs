@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Portability;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Portability;
 /// </summary>
 public sealed class ContainerAbstractionStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ContainerDeployment> _deployments = new();
+    private readonly BoundedDictionary<string, ContainerDeployment> _deployments = new BoundedDictionary<string, ContainerDeployment>(1000);
 
     public override string StrategyId => "portability-container-abstraction";
     public override string StrategyName => "Container Abstraction";
@@ -134,7 +134,7 @@ public sealed class ContainerAbstractionStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class ServerlessPortabilityStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ServerlessFunction> _functions = new();
+    private readonly BoundedDictionary<string, ServerlessFunction> _functions = new BoundedDictionary<string, ServerlessFunction>(1000);
 
     public override string StrategyId => "portability-serverless";
     public override string StrategyName => "Serverless Portability";
@@ -259,7 +259,7 @@ public sealed class ServerlessPortabilityStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class DataMigrationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MigrationJob> _jobs = new();
+    private readonly BoundedDictionary<string, MigrationJob> _jobs = new BoundedDictionary<string, MigrationJob>(1000);
 
     public override string StrategyId => "portability-data-migration";
     public override string StrategyName => "Data Migration";
@@ -377,7 +377,7 @@ public sealed class DataMigrationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class VendorAgnosticApiStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ApiMapping> _mappings = new();
+    private readonly BoundedDictionary<string, ApiMapping> _mappings = new BoundedDictionary<string, ApiMapping>(1000);
 
     public override string StrategyId => "portability-vendor-agnostic-api";
     public override string StrategyName => "Vendor-Agnostic API";
@@ -455,7 +455,7 @@ public sealed class VendorAgnosticApiStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class IaCPortabilityStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IaCTemplate> _templates = new();
+    private readonly BoundedDictionary<string, IaCTemplate> _templates = new BoundedDictionary<string, IaCTemplate>(1000);
 
     public override string StrategyId => "portability-iac";
     public override string StrategyName => "IaC Portability";
@@ -532,7 +532,7 @@ public sealed class IaCPortabilityStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class DatabasePortabilityStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DatabaseMapping> _mappings = new();
+    private readonly BoundedDictionary<string, DatabaseMapping> _mappings = new BoundedDictionary<string, DatabaseMapping>(1000);
 
     public override string StrategyId => "portability-database";
     public override string StrategyName => "Database Portability";

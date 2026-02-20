@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.IntelligentGovernance;
 
@@ -393,7 +393,7 @@ public sealed class PurgeApprovalWorkflowStrategy : ConsciousnessStrategyBase
     private const double HighLiabilityThreshold = 80.0;
     private static readonly TimeSpan RegulatoryAutoApproveHold = TimeSpan.FromHours(48);
 
-    private readonly ConcurrentDictionary<string, PurgeApproval> _approvals = new();
+    private readonly BoundedDictionary<string, PurgeApproval> _approvals = new BoundedDictionary<string, PurgeApproval>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "auto-purge-approval";
@@ -588,7 +588,7 @@ public sealed class AutoPurgeOrchestrator : ConsciousnessStrategyBase
     private readonly ToxicDataPurgeStrategy _toxicStrategy = new();
     private readonly RetentionExpiredPurgeStrategy _retentionStrategy = new();
     private readonly PurgeApprovalWorkflowStrategy _approvalWorkflow = new();
-    private readonly ConcurrentDictionary<string, PurgeDecision> _decisions = new();
+    private readonly BoundedDictionary<string, PurgeDecision> _decisions = new BoundedDictionary<string, PurgeDecision>(1000);
 
     /// <summary>
     /// The message bus topic this orchestrator subscribes to for purge recommendations.

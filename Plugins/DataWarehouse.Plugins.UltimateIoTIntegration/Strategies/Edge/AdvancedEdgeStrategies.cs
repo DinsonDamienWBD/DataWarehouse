@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Edge;
 
@@ -20,8 +21,8 @@ public sealed class EdgeCachingStrategy : EdgeIntegrationStrategyBase
     public override string Description => "Intelligent edge caching with LRU eviction, write-through/write-back, and TTL management";
     public override string[] Tags => new[] { "iot", "edge", "cache", "lru", "ttl", "performance" };
 
-    private readonly ConcurrentDictionary<string, EdgeCacheEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, long> _accessOrder = new();
+    private readonly BoundedDictionary<string, EdgeCacheEntry> _cache = new BoundedDictionary<string, EdgeCacheEntry>(1000);
+    private readonly BoundedDictionary<string, long> _accessOrder = new BoundedDictionary<string, long>(1000);
     private long _accessCounter;
     private readonly int _maxEntries;
     private readonly EdgeCacheMode _mode;
@@ -178,7 +179,7 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
     public override string[] Tags => new[] { "iot", "edge", "offline", "sync", "conflict-resolution", "delta" };
 
     private readonly ConcurrentQueue<OfflineOperation> _operationLog = new();
-    private readonly ConcurrentDictionary<string, long> _vectorClock = new();
+    private readonly BoundedDictionary<string, long> _vectorClock = new BoundedDictionary<string, long>(1000);
     private bool _isOnline;
     private DateTimeOffset _lastSyncTime = DateTimeOffset.MinValue;
 
@@ -464,8 +465,8 @@ public sealed class DataPrioritizationStrategy : EdgeIntegrationStrategyBase
     public override string Description => "Prioritizes edge data transmission based on criticality, freshness, and bandwidth availability";
     public override string[] Tags => new[] { "iot", "edge", "priority", "queue", "bandwidth", "qos" };
 
-    private readonly ConcurrentDictionary<DataTransferPriority, ConcurrentQueue<PrioritizedDataItem>> _queues = new();
-    private readonly ConcurrentDictionary<string, DataClassificationRule> _rules = new();
+    private readonly BoundedDictionary<DataTransferPriority, ConcurrentQueue<PrioritizedDataItem>> _queues = new BoundedDictionary<DataTransferPriority, ConcurrentQueue<PrioritizedDataItem>>(1000);
+    private readonly BoundedDictionary<string, DataClassificationRule> _rules = new BoundedDictionary<string, DataClassificationRule>(1000);
 
     public DataPrioritizationStrategy()
     {
@@ -605,8 +606,8 @@ public sealed class EdgeAnalyticsStrategy : EdgeIntegrationStrategyBase
     public override string Description => "Local analytics with windowed aggregation, anomaly detection, and trend analysis";
     public override string[] Tags => new[] { "iot", "edge", "analytics", "aggregation", "anomaly", "trend" };
 
-    private readonly ConcurrentDictionary<string, SlidingWindow> _windows = new();
-    private readonly ConcurrentDictionary<string, AnomalyDetector> _detectors = new();
+    private readonly BoundedDictionary<string, SlidingWindow> _windows = new BoundedDictionary<string, SlidingWindow>(1000);
+    private readonly BoundedDictionary<string, AnomalyDetector> _detectors = new BoundedDictionary<string, AnomalyDetector>(1000);
 
     /// <summary>Ingests a data point for a metric.</summary>
     public void Ingest(string metricId, double value, DateTimeOffset? timestamp = null)

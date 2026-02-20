@@ -1,19 +1,19 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
 {
     /// <summary>Exabyte-scale distributed indexing strategy for billion-object catalogs using distributed B-trees and bloom filters.</summary>
     public class ExascaleIndexingStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+        private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "exascale-indexing";
         public override string Name => "Exascale Indexing Strategy";

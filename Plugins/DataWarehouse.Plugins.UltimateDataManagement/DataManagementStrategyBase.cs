@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement;
 
@@ -388,8 +388,8 @@ public abstract class DataManagementStrategyBase : StrategyBase, IDataManagement
 /// </summary>
 public sealed class DataManagementStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataManagementStrategy> _strategies =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDataManagementStrategy> _strategies =
+        new(1000);
 
     /// <summary>
     /// Registers a strategy.

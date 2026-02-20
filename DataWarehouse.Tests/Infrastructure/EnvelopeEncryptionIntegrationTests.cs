@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Security;
 using Xunit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Infrastructure
 {
@@ -34,7 +35,7 @@ namespace DataWarehouse.Tests.Infrastructure
         /// </summary>
         private sealed class InMemoryKeyStore : IKeyStore
         {
-            private readonly ConcurrentDictionary<string, byte[]> _keys = new();
+            private readonly BoundedDictionary<string, byte[]> _keys = new BoundedDictionary<string, byte[]>(1000);
             private string _currentKeyId = "default-key";
 
             public Task<string> GetCurrentKeyIdAsync() => Task.FromResult(_currentKeyId);
@@ -79,8 +80,8 @@ namespace DataWarehouse.Tests.Infrastructure
         /// </summary>
         private sealed class InMemoryEnvelopeKeyStore : IEnvelopeKeyStore
         {
-            private readonly ConcurrentDictionary<string, byte[]> _keks = new();
-            private readonly ConcurrentDictionary<string, byte[]> _directKeys = new();
+            private readonly BoundedDictionary<string, byte[]> _keks = new BoundedDictionary<string, byte[]>(1000);
+            private readonly BoundedDictionary<string, byte[]> _directKeys = new BoundedDictionary<string, byte[]>(1000);
             private string _currentKeyId = "default-kek";
 
             public IReadOnlyList<string> SupportedWrappingAlgorithms =>

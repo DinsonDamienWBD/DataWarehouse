@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class ConnectionMetricsCollector : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, StrategyMetrics> _metrics = new();
+        private readonly BoundedDictionary<string, StrategyMetrics> _metrics = new BoundedDictionary<string, StrategyMetrics>(1000);
         private readonly IMessageBus? _messageBus;
         private readonly ILogger? _logger;
         private readonly Timer _publishTimer;
@@ -287,7 +287,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
         public long BytesReceived;
         public long TransferCount;
         public readonly ConcurrentQueue<double> LatencySamples = new();
-        public readonly ConcurrentDictionary<string, long> ErrorsByType = new();
+        public readonly BoundedDictionary<string, long> ErrorsByType = new BoundedDictionary<string, long>(1000);
         public readonly int MaxSamples = 1000;
     }
 }

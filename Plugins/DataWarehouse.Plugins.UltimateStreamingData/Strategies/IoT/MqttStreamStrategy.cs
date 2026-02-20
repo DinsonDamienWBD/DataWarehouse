@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -6,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 
@@ -27,10 +27,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 /// </summary>
 internal sealed class MqttStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, MqttTopicState> _topics = new();
-    private readonly ConcurrentDictionary<string, List<StreamMessage>> _topicMessages = new();
-    private readonly ConcurrentDictionary<string, StreamMessage> _retainedMessages = new();
-    private readonly ConcurrentDictionary<string, MqttSessionState> _sessions = new();
+    private readonly BoundedDictionary<string, MqttTopicState> _topics = new BoundedDictionary<string, MqttTopicState>(1000);
+    private readonly BoundedDictionary<string, List<StreamMessage>> _topicMessages = new BoundedDictionary<string, List<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, StreamMessage> _retainedMessages = new BoundedDictionary<string, StreamMessage>(1000);
+    private readonly BoundedDictionary<string, MqttSessionState> _sessions = new BoundedDictionary<string, MqttSessionState>(1000);
     private long _nextPacketId;
     private long _totalPublished;
 

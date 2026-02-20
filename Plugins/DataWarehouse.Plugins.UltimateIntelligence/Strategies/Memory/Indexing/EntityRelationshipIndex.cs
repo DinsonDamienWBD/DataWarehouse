@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -18,13 +18,13 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class EntityRelationshipIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, EntityNode> _entities = new();
-    private readonly ConcurrentDictionary<string, RelationshipEdge> _relationships = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _entityToContent = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _contentToEntities = new();
-    private readonly ConcurrentDictionary<string, ContentEntry> _content = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _outgoingEdges = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _incomingEdges = new();
+    private readonly BoundedDictionary<string, EntityNode> _entities = new BoundedDictionary<string, EntityNode>(1000);
+    private readonly BoundedDictionary<string, RelationshipEdge> _relationships = new BoundedDictionary<string, RelationshipEdge>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _entityToContent = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _contentToEntities = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, ContentEntry> _content = new BoundedDictionary<string, ContentEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _outgoingEdges = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _incomingEdges = new BoundedDictionary<string, HashSet<string>>(1000);
 
     private static readonly Regex EntityPattern = new(@"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", RegexOptions.Compiled);
     private static readonly string[] CommonRelationships = { "related_to", "part_of", "contains", "references", "similar_to", "depends_on" };

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.Dashboards;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 
@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 /// </summary>
 public sealed class DashboardTemplateService
 {
-    private readonly ConcurrentDictionary<string, DashboardTemplate> _templates = new();
+    private readonly BoundedDictionary<string, DashboardTemplate> _templates = new BoundedDictionary<string, DashboardTemplate>(1000);
 
     public DashboardTemplateService()
     {

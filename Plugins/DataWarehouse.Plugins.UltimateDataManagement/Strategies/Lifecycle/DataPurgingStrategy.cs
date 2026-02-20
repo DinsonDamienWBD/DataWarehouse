@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -270,9 +270,9 @@ public sealed class ComplianceVerification
 /// </summary>
 public sealed class DataPurgingStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LegalHold> _holds = new();
-    private readonly ConcurrentDictionary<string, PurgeAuditRecord> _auditTrail = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _relationships = new();
+    private readonly BoundedDictionary<string, LegalHold> _holds = new BoundedDictionary<string, LegalHold>(1000);
+    private readonly BoundedDictionary<string, PurgeAuditRecord> _auditTrail = new BoundedDictionary<string, PurgeAuditRecord>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _relationships = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly SemaphoreSlim _purgeLock = new(2, 2); // Limit concurrent purges
     private long _totalPurged;
     private long _totalBytesPurged;

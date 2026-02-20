@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -24,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class StoragePoolAggregationFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, StoragePool> _pools = new();
-        private readonly ConcurrentDictionary<string, string> _objectToPoolMapping = new(); // object key -> pool ID
+        private readonly BoundedDictionary<string, StoragePool> _pools = new BoundedDictionary<string, StoragePool>(1000);
+        private readonly BoundedDictionary<string, string> _objectToPoolMapping = new BoundedDictionary<string, string>(1000); // object key -> pool ID
         private bool _disposed;
 
         // Statistics

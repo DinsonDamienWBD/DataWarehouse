@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
 {
@@ -24,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
     /// </summary>
     public sealed class AdvancedHkdfStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _derivedKeys = new();
-        private readonly ConcurrentDictionary<string, byte[]> _salts = new();
+        private readonly BoundedDictionary<string, byte[]> _derivedKeys = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, byte[]> _salts = new BoundedDictionary<string, byte[]>(1000);
         private HashAlgorithmName _hashAlgorithm = HashAlgorithmName.SHA256;
         private int _derivedKeyLength = 32; // 256 bits default
         private byte[]? _masterIkm; // Input keying material
@@ -282,8 +282,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
     /// </summary>
     public sealed class KeyEscrowRecoveryStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, EscrowedKey> _escrowedKeys = new();
-        private readonly ConcurrentDictionary<string, List<RecoveryRequest>> _recoveryRequests = new();
+        private readonly BoundedDictionary<string, EscrowedKey> _escrowedKeys = new BoundedDictionary<string, EscrowedKey>(1000);
+        private readonly BoundedDictionary<string, List<RecoveryRequest>> _recoveryRequests = new BoundedDictionary<string, List<RecoveryRequest>>(1000);
         private int _recoveryThreshold = 2; // M-of-N
         private int _totalShares = 3;
         private TimeSpan _recoveryDelay = TimeSpan.FromHours(24);
@@ -522,7 +522,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
     /// </summary>
     public sealed class KeyAgreementStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _agreedKeys = new();
+        private readonly BoundedDictionary<string, byte[]> _agreedKeys = new BoundedDictionary<string, byte[]>(1000);
         private ECCurve _defaultCurve = ECCurve.NamedCurves.nistP384;
         private string _curveType = "P-384";
 
@@ -701,7 +701,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
     /// </summary>
     public sealed class KeyWrappingStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _wrappingKeys = new();
+        private readonly BoundedDictionary<string, byte[]> _wrappingKeys = new BoundedDictionary<string, byte[]>(1000);
         private string _defaultAlgorithm = "AES-KWP";
 
         public override string StrategyId => "key-wrapping";

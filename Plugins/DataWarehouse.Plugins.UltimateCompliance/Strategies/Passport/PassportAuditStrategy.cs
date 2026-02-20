@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -95,7 +96,7 @@ public sealed class PassportAuditStrategy : ComplianceStrategyBase
 
     private const int MaxGlobalQueueSize = 100_000;
 
-    private readonly ConcurrentDictionary<string, List<PassportAuditEvent>> _passportTrails = new();
+    private readonly BoundedDictionary<string, List<PassportAuditEvent>> _passportTrails = new BoundedDictionary<string, List<PassportAuditEvent>>(1000);
     private readonly ConcurrentQueue<PassportAuditEvent> _globalQueue = new();
     private long _globalQueueCount;
 

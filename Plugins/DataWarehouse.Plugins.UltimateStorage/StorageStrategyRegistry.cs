@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts.Storage;
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage;
 
@@ -42,7 +42,7 @@ public interface IStorageStrategyRegistry
 /// </summary>
 public sealed class StorageStrategyRegistry : IStorageStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IStorageStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IStorageStrategy> _strategies = new BoundedDictionary<string, IStorageStrategy>(1000);
     private volatile string _defaultStrategyId = "filesystem";
 
     /// <inheritdoc/>

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -128,7 +127,7 @@ public sealed record IntelligentRoutingConfig
 /// </remarks>
 internal sealed class IntelligentRoutingStream : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<int, PartitionLoadInfo> _partitionLoads = new();
+    private readonly BoundedDictionary<int, PartitionLoadInfo> _partitionLoads = new BoundedDictionary<int, PartitionLoadInfo>(1000);
     private readonly IMessageBus? _messageBus;
     private readonly IntelligentRoutingConfig _config;
     private long _roundRobinCounter;

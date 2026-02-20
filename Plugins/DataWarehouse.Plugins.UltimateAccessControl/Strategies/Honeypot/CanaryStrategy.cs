@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
 {
@@ -20,10 +21,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
     /// </summary>
     public sealed class CanaryStrategy : AccessControlStrategyBase, IDisposable
     {
-        private readonly ConcurrentDictionary<string, CanaryObject> _canaries = new();
-        private readonly ConcurrentDictionary<string, ExclusionRule> _exclusionRules = new();
+        private readonly BoundedDictionary<string, CanaryObject> _canaries = new BoundedDictionary<string, CanaryObject>(1000);
+        private readonly BoundedDictionary<string, ExclusionRule> _exclusionRules = new BoundedDictionary<string, ExclusionRule>(1000);
         private readonly ConcurrentQueue<CanaryAlert> _alertQueue = new();
-        private readonly ConcurrentDictionary<string, CanaryMetrics> _metrics = new();
+        private readonly BoundedDictionary<string, CanaryMetrics> _metrics = new BoundedDictionary<string, CanaryMetrics>(1000);
         private readonly List<IAlertChannel> _alertChannels = new();
         private readonly CanaryGenerator _generator;
         private readonly PlacementEngine _placementEngine;

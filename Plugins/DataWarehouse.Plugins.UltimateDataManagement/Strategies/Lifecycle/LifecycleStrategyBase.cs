@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -717,17 +717,17 @@ public abstract class LifecycleStrategyBase : DataManagementStrategyBase, ILifec
     /// <summary>
     /// Thread-safe collection of tracked objects.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, LifecycleDataObject> TrackedObjects = new();
+    protected readonly BoundedDictionary<string, LifecycleDataObject> TrackedObjects = new BoundedDictionary<string, LifecycleDataObject>(1000);
 
     /// <summary>
     /// Thread-safe collection of registered policies.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, LifecyclePolicy> Policies = new();
+    protected readonly BoundedDictionary<string, LifecyclePolicy> Policies = new BoundedDictionary<string, LifecyclePolicy>(1000);
 
     /// <summary>
     /// Thread-safe collection of pending actions.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, LifecycleDecision> PendingActions = new();
+    protected readonly BoundedDictionary<string, LifecycleDecision> PendingActions = new BoundedDictionary<string, LifecycleDecision>(1000);
 
     /// <summary>
     /// Lock for statistics updates.

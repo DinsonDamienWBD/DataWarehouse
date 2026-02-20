@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using DataWarehouse.Shared.Models;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared;
 
@@ -50,7 +51,7 @@ public sealed class CommandsChangedEventArgs : EventArgs
 /// </summary>
 public sealed class DynamicCommandRegistry
 {
-    private readonly ConcurrentDictionary<string, DynamicCommandDefinition> _commands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DynamicCommandDefinition> _commands = new BoundedDictionary<string, DynamicCommandDefinition>(1000);
 
     /// <summary>
     /// Raised when commands are added or removed from the registry.

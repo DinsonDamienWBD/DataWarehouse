@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards;
 
@@ -161,8 +161,8 @@ public sealed class DashboardStrategyStatistics
 /// </summary>
 public abstract class DashboardStrategyBase : IDashboardStrategy
 {
-    private readonly ConcurrentDictionary<string, Dashboard> _dashboardCache = new();
-    private readonly ConcurrentDictionary<string, HttpClient> _httpClientPool = new();
+    private readonly BoundedDictionary<string, Dashboard> _dashboardCache = new BoundedDictionary<string, Dashboard>(1000);
+    private readonly BoundedDictionary<string, HttpClient> _httpClientPool = new BoundedDictionary<string, HttpClient>(1000);
     private readonly DashboardStrategyStatistics _statistics = new();
     private readonly SemaphoreSlim _rateLimiter;
     private readonly object _statsLock = new();

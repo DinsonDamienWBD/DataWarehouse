@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience.Strategies.CircuitBreaker;
 
@@ -536,7 +537,7 @@ public sealed class CountBasedCircuitBreakerStrategy : ResilienceStrategyBase
 public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
 {
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
-    private readonly ConcurrentDictionary<long, (int successes, int failures)> _buckets = new();
+    private readonly BoundedDictionary<long, (int successes, int failures)> _buckets = new BoundedDictionary<long, (int successes, int failures)>(1000);
     private DateTimeOffset _openedAt = DateTimeOffset.MinValue;
     private readonly object _stateLock = new();
 

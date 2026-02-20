@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Storage.Fabric;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalFabric.S3Server;
 
@@ -24,7 +24,7 @@ internal sealed class MultipartUploadState
     public string? ContentType { get; init; }
     public IDictionary<string, string>? Metadata { get; init; }
     public DateTime Initiated { get; init; } = DateTime.UtcNow;
-    public ConcurrentDictionary<int, PartInfo> Parts { get; } = new();
+    public BoundedDictionary<int, PartInfo> Parts { get; } = new BoundedDictionary<int, PartInfo>(1000);
 }
 
 /// <summary>
@@ -70,13 +70,13 @@ public sealed class S3HttpServer : IS3CompatibleServer
     /// <summary>
     /// Tracks active multipart uploads keyed by upload ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, MultipartUploadState> _activeUploads = new();
+    private readonly BoundedDictionary<string, MultipartUploadState> _activeUploads = new BoundedDictionary<string, MultipartUploadState>(1000);
 
     /// <summary>
     /// In-memory bucket registry tracking known bucket names and creation dates.
     /// In production, this would be persisted; here it is backed by fabric namespace discovery.
     /// </summary>
-    private readonly ConcurrentDictionary<string, DateTime> _bucketRegistry = new();
+    private readonly BoundedDictionary<string, DateTime> _bucketRegistry = new BoundedDictionary<string, DateTime>(1000);
 
     /// <summary>
     /// Creates a new S3HttpServer backed by the specified storage fabric.

@@ -1,6 +1,6 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -17,13 +17,13 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class CompressedManifestIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, ManifestEntry> _entries = new();
+    private readonly BoundedDictionary<string, ManifestEntry> _entries = new BoundedDictionary<string, ManifestEntry>(1000);
     private readonly BloomFilter _existenceFilter;
-    private readonly ConcurrentDictionary<string, ulong[]> _minHashSignatures = new();
-    private readonly ConcurrentDictionary<string, HyperLogLog> _scopeCardinality = new();
-    private readonly ConcurrentDictionary<string, CompressedBitmap> _tagBitmaps = new();
-    private readonly ConcurrentDictionary<string, sbyte[]> _quantizedEmbeddings = new();
-    private readonly ConcurrentDictionary<string, int> _entryIdToIndex = new();
+    private readonly BoundedDictionary<string, ulong[]> _minHashSignatures = new BoundedDictionary<string, ulong[]>(1000);
+    private readonly BoundedDictionary<string, HyperLogLog> _scopeCardinality = new BoundedDictionary<string, HyperLogLog>(1000);
+    private readonly BoundedDictionary<string, CompressedBitmap> _tagBitmaps = new BoundedDictionary<string, CompressedBitmap>(1000);
+    private readonly BoundedDictionary<string, sbyte[]> _quantizedEmbeddings = new BoundedDictionary<string, sbyte[]>(1000);
+    private readonly BoundedDictionary<string, int> _entryIdToIndex = new BoundedDictionary<string, int>(1000);
     private int _nextIndex = 0;
 
     private const int BloomFilterSize = 10_000_000; // ~10MB for billions of entries
@@ -309,7 +309,7 @@ public sealed class CompressedManifestIndex : ContextIndexBase
 
         var byScope = _scopeCardinality.ToDictionary(
             kvp => kvp.Key,
-            kvp => (long)kvp.Value.Count());
+            kvp => kvp.Value.Count());
 
         return Task.FromResult(stats with
         {

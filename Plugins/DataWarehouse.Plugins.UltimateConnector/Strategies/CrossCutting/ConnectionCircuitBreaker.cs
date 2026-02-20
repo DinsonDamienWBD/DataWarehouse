@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 {
@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class ConnectionCircuitBreaker : IDisposable
     {
-        private readonly ConcurrentDictionary<string, CircuitState> _circuits = new();
+        private readonly BoundedDictionary<string, CircuitState> _circuits = new BoundedDictionary<string, CircuitState>(1000);
         private volatile bool _disposed;
 
         /// <summary>

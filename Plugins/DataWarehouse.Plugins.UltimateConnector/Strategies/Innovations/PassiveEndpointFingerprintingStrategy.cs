@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class PassiveEndpointFingerprintingStrategy : ConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, FingerprintState> _states = new();
+        private readonly BoundedDictionary<string, FingerprintState> _states = new BoundedDictionary<string, FingerprintState>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-passive-fingerprint";

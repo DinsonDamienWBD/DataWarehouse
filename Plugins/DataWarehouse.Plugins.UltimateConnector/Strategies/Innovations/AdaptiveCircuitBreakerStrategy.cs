@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class AdaptiveCircuitBreakerStrategy : ConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BreakerConnectionState> _states = new();
+        private readonly BoundedDictionary<string, BreakerConnectionState> _states = new BoundedDictionary<string, BreakerConnectionState>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-adaptive-breaker";

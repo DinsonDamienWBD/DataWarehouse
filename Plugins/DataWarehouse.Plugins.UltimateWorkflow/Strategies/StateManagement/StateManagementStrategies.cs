@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.StateManagement;
 
@@ -8,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.StateManagement;
 /// </summary>
 public sealed class CheckpointStateStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _checkpoints = new();
+    private readonly BoundedDictionary<string, byte[]> _checkpoints = new BoundedDictionary<string, byte[]>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -97,7 +98,7 @@ public sealed class CheckpointStateStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class EventSourcedStateStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<WorkflowEvent>> _eventLogs = new();
+    private readonly BoundedDictionary<string, List<WorkflowEvent>> _eventLogs = new BoundedDictionary<string, List<WorkflowEvent>>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -432,7 +433,7 @@ public sealed class DistributedStateStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
 
         var tasks = workflow.Tasks
             .Where(t => t.Dependencies.Count == 0)
@@ -454,7 +455,7 @@ public sealed class DistributedStateStrategy : WorkflowStrategyBase
         WorkflowTask task,
         WorkflowContext context,
         WorkflowDefinition workflow,
-        ConcurrentDictionary<string, TaskResult> completed,
+        BoundedDictionary<string, TaskResult> completed,
         CancellationToken cancellationToken)
     {
         var result = await ExecuteTaskAsync(task, context, cancellationToken);

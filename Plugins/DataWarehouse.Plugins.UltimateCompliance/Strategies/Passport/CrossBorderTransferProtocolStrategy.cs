@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -20,9 +20,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 /// </summary>
 public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase, ICrossBorderProtocol
 {
-    private readonly ConcurrentDictionary<string, TransferAgreementRecord> _agreements = new();
-    private readonly ConcurrentDictionary<string, List<CrossBorderTransferLog>> _transferLogs = new();
-    private readonly ConcurrentDictionary<string, TransferNegotiation> _pendingNegotiations = new();
+    private readonly BoundedDictionary<string, TransferAgreementRecord> _agreements = new BoundedDictionary<string, TransferAgreementRecord>(1000);
+    private readonly BoundedDictionary<string, List<CrossBorderTransferLog>> _transferLogs = new BoundedDictionary<string, List<CrossBorderTransferLog>>(1000);
+    private readonly BoundedDictionary<string, TransferNegotiation> _pendingNegotiations = new BoundedDictionary<string, TransferNegotiation>(1000);
     private readonly object _logLock = new();
 
     /// <inheritdoc/>

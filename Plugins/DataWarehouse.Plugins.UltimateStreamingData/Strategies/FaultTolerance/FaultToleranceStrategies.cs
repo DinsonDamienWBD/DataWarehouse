@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.FaultTolerance;
 
@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.FaultTolerance;
 /// </summary>
 public sealed class CheckpointStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CheckpointCoordinator> _coordinators = new();
+    private readonly BoundedDictionary<string, CheckpointCoordinator> _coordinators = new BoundedDictionary<string, CheckpointCoordinator>(1000);
 
     public override string StrategyId => "fault-checkpoint";
     public override string DisplayName => "Checkpoint Fault Tolerance";
@@ -52,7 +52,7 @@ public sealed class CheckpointStrategy : StreamingDataStrategyBase
             CoordinatorId = coordinatorId,
             JobId = jobId,
             Config = config,
-            Checkpoints = new ConcurrentDictionary<long, CheckpointMetadata>(),
+            Checkpoints = new BoundedDictionary<long, CheckpointMetadata>(1000),
             Status = CoordinatorStatus.Running,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -82,7 +82,7 @@ public sealed class CheckpointStrategy : StreamingDataStrategyBase
             JobId = coordinator.JobId,
             Status = CheckpointStatus.InProgress,
             TriggerTimestamp = DateTimeOffset.UtcNow,
-            Operators = new ConcurrentDictionary<string, OperatorCheckpoint>()
+            Operators = new BoundedDictionary<string, OperatorCheckpoint>(1000)
         };
 
         coordinator.Checkpoints[checkpointId] = checkpoint;
@@ -235,7 +235,7 @@ internal sealed class CheckpointCoordinator
     public required string CoordinatorId { get; init; }
     public required string JobId { get; init; }
     public required CheckpointConfig Config { get; init; }
-    public required ConcurrentDictionary<long, CheckpointMetadata> Checkpoints { get; init; }
+    public required BoundedDictionary<long, CheckpointMetadata> Checkpoints { get; init; }
     public CoordinatorStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; init; }
     public long NextCheckpointId;
@@ -257,7 +257,7 @@ public sealed class CheckpointMetadata
     public DateTimeOffset? CompletionTimestamp { get; set; }
     public TimeSpan? Duration { get; set; }
     public long StateSize { get; set; }
-    public ConcurrentDictionary<string, OperatorCheckpoint> Operators { get; init; } = new();
+    public BoundedDictionary<string, OperatorCheckpoint> Operators { get; init; } = new BoundedDictionary<string, OperatorCheckpoint>(1000);
     public string? FailureReason { get; set; }
 }
 
@@ -308,7 +308,7 @@ public sealed record CheckpointStats
 /// </summary>
 public sealed class RestartStrategyHandler : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RestartTracker> _trackers = new();
+    private readonly BoundedDictionary<string, RestartTracker> _trackers = new BoundedDictionary<string, RestartTracker>(1000);
 
     public override string StrategyId => "fault-restart";
     public override string DisplayName => "Restart Strategy Handler";
@@ -576,7 +576,7 @@ public sealed record RestartStats
 /// </summary>
 public sealed class WriteAheadLogStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WalStore> _stores = new();
+    private readonly BoundedDictionary<string, WalStore> _stores = new BoundedDictionary<string, WalStore>(1000);
 
     public override string StrategyId => "fault-wal";
     public override string DisplayName => "Write-Ahead Log";
@@ -863,7 +863,7 @@ public sealed record WalStats
 /// </summary>
 public sealed class IdempotentProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IdempotencyStore> _stores = new();
+    private readonly BoundedDictionary<string, IdempotencyStore> _stores = new BoundedDictionary<string, IdempotencyStore>(1000);
 
     public override string StrategyId => "fault-idempotent";
     public override string DisplayName => "Idempotent Processing";
@@ -902,7 +902,7 @@ public sealed class IdempotentProcessingStrategy : StreamingDataStrategyBase
             StoreId = storeId,
             Name = name,
             Config = config ?? new IdempotencyConfig(),
-            ProcessedIds = new ConcurrentDictionary<string, ProcessedRecord>(),
+            ProcessedIds = new BoundedDictionary<string, ProcessedRecord>(1000),
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -1059,7 +1059,7 @@ internal sealed class IdempotencyStore
     public required string StoreId { get; init; }
     public required string Name { get; init; }
     public required IdempotencyConfig Config { get; init; }
-    public required ConcurrentDictionary<string, ProcessedRecord> ProcessedIds { get; init; }
+    public required BoundedDictionary<string, ProcessedRecord> ProcessedIds { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }
 

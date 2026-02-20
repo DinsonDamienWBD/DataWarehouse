@@ -3,10 +3,10 @@
 
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -100,8 +100,8 @@ public interface IAuditTrailService
 /// </summary>
 public class AuditTrailService : IAuditTrailService
 {
-    private readonly ConcurrentDictionary<Guid, List<TamperProofAuditEntry>> _auditLog = new();
-    private readonly ConcurrentDictionary<Guid, object> _locks = new();
+    private readonly BoundedDictionary<Guid, List<TamperProofAuditEntry>> _auditLog = new BoundedDictionary<Guid, List<TamperProofAuditEntry>>(1000);
+    private readonly BoundedDictionary<Guid, object> _locks = new BoundedDictionary<Guid, object>(1000);
     private readonly ILogger<AuditTrailService> _logger;
     private readonly TamperProofConfiguration _config;
 

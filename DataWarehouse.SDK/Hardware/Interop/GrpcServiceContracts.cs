@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Hardware.Interop;
 
@@ -343,7 +343,7 @@ public sealed class StorageGrpcService : IStorageServiceContract
     private readonly Func<string, byte[], Dictionary<string, string>, Task<long>> _writeHandler;
     private readonly Func<string, Task<bool>> _deleteHandler;
     private readonly Func<string, Task<IEnumerable<(string Uri, long Size, DateTimeOffset Modified)>>> _listHandler;
-    private readonly ConcurrentDictionary<string, long> _versionTracker = new();
+    private readonly BoundedDictionary<string, long> _versionTracker = new BoundedDictionary<string, long>(1000);
     private long _nextVersion = 1;
 
     /// <summary>

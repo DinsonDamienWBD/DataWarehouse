@@ -1,4 +1,4 @@
-﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Concurrent;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Encryption
 {
@@ -393,7 +394,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// Thread-safe dictionary for tracking key access patterns (keyId -> access count).
         /// Used for audit trails and key rotation analysis.
         /// </summary>
-        protected readonly ConcurrentDictionary<string, long> KeyAccessLog = new();
+        protected readonly BoundedDictionary<string, long> KeyAccessLog = new BoundedDictionary<string, long>(1000);
 
         /// <summary>
         /// Optional key store registry for resolving key store instances.
@@ -1033,7 +1034,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
     /// </summary>
     public sealed class EncryptionStrategyRegistry : IEncryptionStrategyRegistry
     {
-        private readonly ConcurrentDictionary<string, IEncryptionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+        private readonly BoundedDictionary<string, IEncryptionStrategy> _strategies = new BoundedDictionary<string, IEncryptionStrategy>(1000);
         private volatile string _defaultStrategyId = "aes-256-gcm";
 
         /// <inheritdoc/>

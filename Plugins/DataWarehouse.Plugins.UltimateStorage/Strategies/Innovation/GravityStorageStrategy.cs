@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -31,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class GravityStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<LocationNode> _locations = new();
-        private readonly ConcurrentDictionary<string, ObjectLocationInfo> _objectLocations = new();
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, long>> _locationAccessCounts = new();
+        private readonly BoundedDictionary<string, ObjectLocationInfo> _objectLocations = new BoundedDictionary<string, ObjectLocationInfo>(1000);
+        private readonly BoundedDictionary<string, BoundedDictionary<string, long>> _locationAccessCounts = new BoundedDictionary<string, BoundedDictionary<string, long>>(1000);
         private int _migrationThreshold = 10;
         private bool _enableAutoMigration = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -80,7 +80,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         Weight = 1.0,
                         IsHealthy = true
                     });
-                    _locationAccessCounts[locationId] = new ConcurrentDictionary<string, long>();
+                    _locationAccessCounts[locationId] = new BoundedDictionary<string, long>(1000);
                 }
 
                 if (_enableAutoMigration)

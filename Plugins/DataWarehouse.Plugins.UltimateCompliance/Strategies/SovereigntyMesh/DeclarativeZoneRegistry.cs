@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 /// </summary>
 public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SovereigntyZone> _zones = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, SovereigntyZone> _zones = new BoundedDictionary<string, SovereigntyZone>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-zone-registry";
@@ -82,7 +83,7 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     {
         ct.ThrowIfCancellationRequested();
         _zones.TryGetValue(zoneId, out var zone);
-        return Task.FromResult(zone);
+        return Task.FromResult<SovereigntyZone?>(zone);
     }
 
     /// <summary>

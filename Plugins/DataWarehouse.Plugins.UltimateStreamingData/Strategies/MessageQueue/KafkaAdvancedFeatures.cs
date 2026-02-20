@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 
@@ -11,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 /// </summary>
 public sealed class KafkaConsumerGroupManager
 {
-    private readonly ConcurrentDictionary<string, ConsumerGroupState> _groups = new();
-    private readonly ConcurrentDictionary<string, ConsumerMemberState> _members = new();
+    private readonly BoundedDictionary<string, ConsumerGroupState> _groups = new BoundedDictionary<string, ConsumerGroupState>(1000);
+    private readonly BoundedDictionary<string, ConsumerMemberState> _members = new BoundedDictionary<string, ConsumerMemberState>(1000);
     private readonly object _rebalanceLock = new();
 
     /// <summary>Registers a new consumer in a consumer group and triggers rebalance.</summary>
@@ -200,8 +201,8 @@ public sealed record ConsumerGroupInfo
 /// </summary>
 public sealed class KafkaOffsetCommitManager
 {
-    private readonly ConcurrentDictionary<string, CommittedOffset> _committedOffsets = new();
-    private readonly ConcurrentDictionary<string, long> _pendingOffsets = new();
+    private readonly BoundedDictionary<string, CommittedOffset> _committedOffsets = new BoundedDictionary<string, CommittedOffset>(1000);
+    private readonly BoundedDictionary<string, long> _pendingOffsets = new BoundedDictionary<string, long>(1000);
     private readonly Timer? _autoCommitTimer;
     private readonly OffsetCommitStrategy _strategy;
 
@@ -323,7 +324,7 @@ public sealed record CommitResult
 /// </summary>
 public sealed class KafkaDeadLetterQueueRouter
 {
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<DeadLetterMessage>> _dlqTopics = new();
+    private readonly BoundedDictionary<string, ConcurrentQueue<DeadLetterMessage>> _dlqTopics = new BoundedDictionary<string, ConcurrentQueue<DeadLetterMessage>>(1000);
     private long _totalRouted;
     private readonly int _maxRetries;
 
@@ -417,7 +418,7 @@ public sealed record DeadLetterRouteResult
 /// </summary>
 public sealed class KafkaBackpressureManager
 {
-    private readonly ConcurrentDictionary<string, PartitionLagInfo> _partitionLag = new();
+    private readonly BoundedDictionary<string, PartitionLagInfo> _partitionLag = new BoundedDictionary<string, PartitionLagInfo>(1000);
     private volatile BackpressureState _state = BackpressureState.Normal;
     private readonly long _highWatermark;
     private readonly long _lowWatermark;
@@ -512,8 +513,8 @@ public sealed record BackpressureDecision
 /// </summary>
 public sealed class KafkaKTableStateStore
 {
-    private readonly ConcurrentDictionary<string, KTableEntry> _store = new();
-    private readonly ConcurrentDictionary<string, WindowedKTableEntry> _windowedStore = new();
+    private readonly BoundedDictionary<string, KTableEntry> _store = new BoundedDictionary<string, KTableEntry>(1000);
+    private readonly BoundedDictionary<string, WindowedKTableEntry> _windowedStore = new BoundedDictionary<string, WindowedKTableEntry>(1000);
     private long _version;
 
     /// <summary>Puts a key-value pair into the state store.</summary>
@@ -620,7 +621,7 @@ public sealed record WindowedKTableEntry
 /// </summary>
 public sealed class StreamingMetricsCollector
 {
-    private readonly ConcurrentDictionary<string, StreamingMetricCounter> _counters = new();
+    private readonly BoundedDictionary<string, StreamingMetricCounter> _counters = new BoundedDictionary<string, StreamingMetricCounter>(1000);
     private readonly ConcurrentQueue<StreamingMetricSample> _samples = new();
     private readonly int _maxSamples;
 
@@ -712,7 +713,7 @@ public sealed record StreamingMetricsSnapshot
 /// </summary>
 public sealed class KafkaTransactionCoordinator
 {
-    private readonly ConcurrentDictionary<string, TransactionState> _transactions = new();
+    private readonly BoundedDictionary<string, TransactionState> _transactions = new BoundedDictionary<string, TransactionState>(1000);
     private long _transactionIdCounter;
 
     /// <summary>Initializes a transactional producer.</summary>

@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
 {
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
     /// </summary>
     public sealed class DdosProtectionStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RateLimitEntry> _rateLimits = new();
+        private readonly BoundedDictionary<string, RateLimitEntry> _rateLimits = new BoundedDictionary<string, RateLimitEntry>(1000);
         private int _maxRequestsPerMinute = 100;
 
         public override string StrategyId => "network-ddos";

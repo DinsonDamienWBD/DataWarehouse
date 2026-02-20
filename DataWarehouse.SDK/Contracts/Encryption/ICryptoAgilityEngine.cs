@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Encryption
 {
@@ -189,7 +189,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
     /// This base class manages:
     /// </para>
     /// <list type="bullet">
-    ///   <item>Thread-safe migration plan storage via ConcurrentDictionary</item>
+    ///   <item>Thread-safe migration plan storage via BoundedDictionary</item>
     ///   <item>Plan creation with validation against PqcAlgorithmRegistry</item>
     ///   <item>Status reporting and active migration queries</item>
     ///   <item>Intelligence-aware capability declaration (Security/CryptoAgility)</item>
@@ -206,13 +206,13 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// <summary>
         /// Thread-safe storage for migration plans indexed by plan ID.
         /// </summary>
-        protected readonly ConcurrentDictionary<string, MigrationPlan> MigrationPlans = new(StringComparer.OrdinalIgnoreCase);
+        protected readonly BoundedDictionary<string, MigrationPlan> MigrationPlans = new BoundedDictionary<string, MigrationPlan>(1000);
 
         /// <summary>
         /// Known algorithm profiles from sources beyond PqcAlgorithmRegistry
         /// (e.g., classical algorithms registered at runtime).
         /// </summary>
-        protected readonly ConcurrentDictionary<string, AlgorithmProfile> KnownAlgorithms = new(StringComparer.OrdinalIgnoreCase);
+        protected readonly BoundedDictionary<string, AlgorithmProfile> KnownAlgorithms = new BoundedDictionary<string, AlgorithmProfile>(1000);
 
         /// <inheritdoc/>
         public override string FeatureCategory => "Security";

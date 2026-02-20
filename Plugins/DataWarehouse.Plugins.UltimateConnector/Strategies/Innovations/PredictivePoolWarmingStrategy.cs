@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class PredictivePoolWarmingStrategy : ConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PoolWarmingState> _states = new();
+        private readonly BoundedDictionary<string, PoolWarmingState> _states = new BoundedDictionary<string, PoolWarmingState>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-predictive-pool";

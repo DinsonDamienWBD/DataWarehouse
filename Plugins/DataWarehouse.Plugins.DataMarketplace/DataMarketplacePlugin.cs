@@ -3,7 +3,6 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -40,14 +39,14 @@ namespace DataWarehouse.Plugins.DataMarketplace;
 /// </summary>
 public sealed class DataMarketplacePlugin : PlatformPluginBase
 {
-    private readonly ConcurrentDictionary<string, DataListing> _listings = new();
-    private readonly ConcurrentDictionary<string, Subscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, License> _licenses = new();
-    private readonly ConcurrentDictionary<string, UsageRecord> _usageRecords = new();
-    private readonly ConcurrentDictionary<string, List<Review>> _reviews = new();
-    private readonly ConcurrentDictionary<string, Invoice> _invoices = new();
-    private readonly ConcurrentDictionary<string, SmartContract> _smartContracts = new();
-    private readonly ConcurrentDictionary<string, AccessGrant> _accessGrants = new();
+    private readonly BoundedDictionary<string, DataListing> _listings = new BoundedDictionary<string, DataListing>(1000);
+    private readonly BoundedDictionary<string, Subscription> _subscriptions = new BoundedDictionary<string, Subscription>(1000);
+    private readonly BoundedDictionary<string, License> _licenses = new BoundedDictionary<string, License>(1000);
+    private readonly BoundedDictionary<string, UsageRecord> _usageRecords = new BoundedDictionary<string, UsageRecord>(1000);
+    private readonly BoundedDictionary<string, List<Review>> _reviews = new BoundedDictionary<string, List<Review>>(1000);
+    private readonly BoundedDictionary<string, Invoice> _invoices = new BoundedDictionary<string, Invoice>(1000);
+    private readonly BoundedDictionary<string, SmartContract> _smartContracts = new BoundedDictionary<string, SmartContract>(1000);
+    private readonly BoundedDictionary<string, AccessGrant> _accessGrants = new BoundedDictionary<string, AccessGrant>(1000);
     private readonly SemaphoreSlim _meteringLock = new(1, 1);
     private readonly Timer _accessEnforcementTimer;
     private readonly Timer _billingCycleTimer;

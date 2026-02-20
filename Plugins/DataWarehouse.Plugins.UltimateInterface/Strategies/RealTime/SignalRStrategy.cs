@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 
@@ -33,9 +34,9 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 /// </remarks>
 internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, SignalRConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, SignalRHub> _hubs = new();
-    private readonly ConcurrentDictionary<string, SignalRGroup> _groups = new();
+    private readonly BoundedDictionary<string, SignalRConnection> _connections = new BoundedDictionary<string, SignalRConnection>(1000);
+    private readonly BoundedDictionary<string, SignalRHub> _hubs = new BoundedDictionary<string, SignalRHub>(1000);
+    private readonly BoundedDictionary<string, SignalRGroup> _groups = new BoundedDictionary<string, SignalRGroup>(1000);
 
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "signalr";
@@ -426,7 +427,7 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
     private sealed class SignalRHub
     {
         public string Name { get; }
-        private readonly ConcurrentDictionary<string, object> _methods = new();
+        private readonly BoundedDictionary<string, object> _methods = new BoundedDictionary<string, object>(1000);
 
         public SignalRHub(string name)
         {

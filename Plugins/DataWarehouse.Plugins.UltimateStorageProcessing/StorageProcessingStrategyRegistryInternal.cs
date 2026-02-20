@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorageProcessing;
 
@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateStorageProcessing;
 /// </remarks>
 internal sealed class StorageProcessingStrategyRegistryInternal
 {
-    private readonly ConcurrentDictionary<string, IStorageProcessingStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, List<IStorageProcessingStrategy>> _byCategory = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IStorageProcessingStrategy> _strategies = new BoundedDictionary<string, IStorageProcessingStrategy>(1000);
+    private readonly BoundedDictionary<string, List<IStorageProcessingStrategy>> _byCategory = new BoundedDictionary<string, List<IStorageProcessingStrategy>>(1000);
 
     /// <summary>
     /// Gets the total number of registered strategies.

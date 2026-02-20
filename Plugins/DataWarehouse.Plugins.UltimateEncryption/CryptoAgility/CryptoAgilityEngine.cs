@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -38,17 +37,17 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
     /// <summary>
     /// Active migration workers indexed by plan ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, MigrationWorker> _workers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, MigrationWorker> _workers = new BoundedDictionary<string, MigrationWorker>(1000);
 
     /// <summary>
     /// Double-encryption services indexed by plan ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, DoubleEncryptionService> _doubleEncryptionServices = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DoubleEncryptionService> _doubleEncryptionServices = new BoundedDictionary<string, DoubleEncryptionService>(1000);
 
     /// <summary>
     /// Cancellation token sources for each migration, enabling pause and cancel.
     /// </summary>
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationSources = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _cancellationSources = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
     /// <summary>
     /// Semaphore limiting the total number of concurrent migrations across all plans.
@@ -58,7 +57,7 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
     /// <summary>
     /// Tracks the phase a migration was in before being paused, for correct resume.
     /// </summary>
-    private readonly ConcurrentDictionary<string, MigrationPhase> _pausedPhases = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, MigrationPhase> _pausedPhases = new BoundedDictionary<string, MigrationPhase>(1000);
 
     private bool _disposed;
 

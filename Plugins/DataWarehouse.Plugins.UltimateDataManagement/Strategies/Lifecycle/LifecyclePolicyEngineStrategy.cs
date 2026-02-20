@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -119,9 +119,9 @@ public sealed class PolicyScheduleEntry
 /// </summary>
 public sealed class LifecyclePolicyEngineStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PolicyScheduleEntry> _schedules = new();
-    private readonly ConcurrentDictionary<string, PolicyExecutionResult> _lastResults = new();
-    private readonly ConcurrentDictionary<string, List<string>> _conflictGraph = new();
+    private readonly BoundedDictionary<string, PolicyScheduleEntry> _schedules = new BoundedDictionary<string, PolicyScheduleEntry>(1000);
+    private readonly BoundedDictionary<string, PolicyExecutionResult> _lastResults = new BoundedDictionary<string, PolicyExecutionResult>(1000);
+    private readonly BoundedDictionary<string, List<string>> _conflictGraph = new BoundedDictionary<string, List<string>>(1000);
     private readonly SemaphoreSlim _executionLock = new(1, 1);
     private CancellationTokenSource? _schedulerCts;
     private Task? _schedulerTask;

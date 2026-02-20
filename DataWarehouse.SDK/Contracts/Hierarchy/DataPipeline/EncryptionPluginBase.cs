@@ -2,13 +2,13 @@ using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Security;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Hierarchy;
 
@@ -137,7 +137,7 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
     /// Key access audit log (tracks when each key was last used).
     /// Bounded to <see cref="MaxKeyAccessLogSize"/> entries.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, DateTime> KeyAccessLog = new();
+    protected readonly BoundedDictionary<string, DateTime> KeyAccessLog = new BoundedDictionary<string, DateTime>(1000);
 
     /// <summary>
     /// Maximum number of entries in the key access log.

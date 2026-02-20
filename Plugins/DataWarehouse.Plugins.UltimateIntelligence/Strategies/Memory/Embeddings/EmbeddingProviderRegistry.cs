@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -15,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// </summary>
 public sealed class EmbeddingProviderRegistry : IDisposable
 {
-    private readonly ConcurrentDictionary<string, ProviderRegistration> _registrations = new();
-    private readonly ConcurrentDictionary<string, IEmbeddingProvider> _instances = new();
+    private readonly BoundedDictionary<string, ProviderRegistration> _registrations = new BoundedDictionary<string, ProviderRegistration>(1000);
+    private readonly BoundedDictionary<string, IEmbeddingProvider> _instances = new BoundedDictionary<string, IEmbeddingProvider>(1000);
     private readonly object _initLock = new();
     private bool _disposed;
 
@@ -188,7 +188,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
     /// <returns>Dictionary of provider IDs to validation results.</returns>
     public async Task<IReadOnlyDictionary<string, bool>> ValidateAllAsync(CancellationToken ct = default)
     {
-        var results = new ConcurrentDictionary<string, bool>();
+        var results = new BoundedDictionary<string, bool>(1000);
         var tasks = new List<Task>();
 
         foreach (var kvp in _instances)

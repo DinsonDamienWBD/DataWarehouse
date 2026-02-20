@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.EventSourcing;
 
@@ -252,8 +253,8 @@ public abstract class AggregateRoot
 /// </summary>
 public sealed class EventStoreStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<StoredEvent>> _streams = new();
-    private readonly ConcurrentDictionary<string, long> _streamVersions = new();
+    private readonly BoundedDictionary<string, List<StoredEvent>> _streams = new BoundedDictionary<string, List<StoredEvent>>(1000);
+    private readonly BoundedDictionary<string, long> _streamVersions = new BoundedDictionary<string, long>(1000);
     private readonly List<StoredEvent> _globalLog = new();
     private readonly ReaderWriterLockSlim _globalLogLock = new(LockRecursionPolicy.NoRecursion);
     private readonly ConcurrentDictionary<string, List<Action<StoredEvent>>> _subscriptions = new();
@@ -539,8 +540,8 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
 /// </summary>
 public sealed class EventStreamingStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StreamingConsumer> _consumers = new();
-    private readonly ConcurrentDictionary<string, ConsumerGroup> _consumerGroups = new();
+    private readonly BoundedDictionary<string, StreamingConsumer> _consumers = new BoundedDictionary<string, StreamingConsumer>(1000);
+    private readonly BoundedDictionary<string, ConsumerGroup> _consumerGroups = new BoundedDictionary<string, ConsumerGroup>(1000);
     private readonly ConcurrentQueue<StoredEvent> _eventBuffer = new();
     private readonly SemaphoreSlim _backpressureSemaphore = new(10000);
 
@@ -611,7 +612,7 @@ public sealed class EventStreamingStrategy : DataManagementStrategyBase
         {
             GroupId = groupId,
             SubscribedStreams = subscribedStreams.ToList(),
-            Members = new ConcurrentDictionary<string, ConsumerMember>()
+            Members = new BoundedDictionary<string, ConsumerMember>(1000)
         });
 
         var member = new ConsumerMember
@@ -793,7 +794,7 @@ internal sealed class ConsumerGroup
 {
     public required string GroupId { get; init; }
     public required List<string> SubscribedStreams { get; init; }
-    public required ConcurrentDictionary<string, ConsumerMember> Members { get; init; }
+    public required BoundedDictionary<string, ConsumerMember> Members { get; init; }
 }
 
 internal sealed class ConsumerMember
@@ -823,7 +824,7 @@ public sealed record ConsumerGroupMembership
 /// </summary>
 public sealed class EventReplayStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ReplaySession> _activeSessions = new();
+    private readonly BoundedDictionary<string, ReplaySession> _activeSessions = new BoundedDictionary<string, ReplaySession>(1000);
 
     public override string StrategyId => "eventsourcing-replay";
     public override string DisplayName => "Event Replay";
@@ -1130,8 +1131,8 @@ public sealed record WhatIfResult
 /// </summary>
 public sealed class SnapshotStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AggregateSnapshot> _snapshots = new();
-    private readonly ConcurrentDictionary<string, SnapshotPolicy> _policies = new();
+    private readonly BoundedDictionary<string, AggregateSnapshot> _snapshots = new BoundedDictionary<string, AggregateSnapshot>(1000);
+    private readonly BoundedDictionary<string, SnapshotPolicy> _policies = new BoundedDictionary<string, SnapshotPolicy>(1000);
 
     public override string StrategyId => "eventsourcing-snapshots";
     public override string DisplayName => "Aggregate Snapshots";
@@ -1318,9 +1319,9 @@ public sealed record SnapshotResult
 /// </summary>
 public sealed class EventVersioningStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SortedDictionary<int, EventSchema>> _schemas = new();
-    private readonly ConcurrentDictionary<string, Func<byte[], int, byte[]>> _upcasters = new();
-    private readonly ConcurrentDictionary<string, Func<byte[], int, byte[]>> _downcasters = new();
+    private readonly BoundedDictionary<string, SortedDictionary<int, EventSchema>> _schemas = new BoundedDictionary<string, SortedDictionary<int, EventSchema>>(1000);
+    private readonly BoundedDictionary<string, Func<byte[], int, byte[]>> _upcasters = new BoundedDictionary<string, Func<byte[], int, byte[]>>(1000);
+    private readonly BoundedDictionary<string, Func<byte[], int, byte[]>> _downcasters = new BoundedDictionary<string, Func<byte[], int, byte[]>>(1000);
 
     public override string StrategyId => "eventsourcing-versioning";
     public override string DisplayName => "Event Versioning";
@@ -1546,7 +1547,7 @@ public sealed record VersionedEventData
 /// </summary>
 public sealed class SchemaEvolutionStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaRegistry> _registries = new();
+    private readonly BoundedDictionary<string, SchemaRegistry> _registries = new BoundedDictionary<string, SchemaRegistry>(1000);
 
     public override string StrategyId => "eventsourcing-schema-evolution";
     public override string DisplayName => "Schema Evolution";
@@ -1957,9 +1958,9 @@ public sealed record InferredProperty
 public sealed class CqrsStrategy : DataManagementStrategyBase
 {
     private readonly ConcurrentDictionary<string, Func<Command, CancellationToken, Task<CommandResult>>> _commandHandlers = new();
-    private readonly ConcurrentDictionary<string, object> _readModels = new();
+    private readonly BoundedDictionary<string, object> _readModels = new BoundedDictionary<string, object>(1000);
     private readonly ConcurrentQueue<Command> _commandQueue = new();
-    private readonly ConcurrentDictionary<string, CommandValidation> _validations = new();
+    private readonly BoundedDictionary<string, CommandValidation> _validations = new BoundedDictionary<string, CommandValidation>(1000);
 
     public override string StrategyId => "eventsourcing-cqrs";
     public override string DisplayName => "CQRS Pattern";
@@ -2145,7 +2146,7 @@ public sealed class CqrsStrategy : DataManagementStrategyBase
         return Task.FromResult<IReadOnlyList<T>>(results);
     }
 
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _processedCommands = new();
+    private readonly BoundedDictionary<string, DateTimeOffset> _processedCommands = new BoundedDictionary<string, DateTimeOffset>(1000);
 
     private Task<bool> IsCommandDuplicateAsync(Command command, CancellationToken ct)
     {
@@ -2180,8 +2181,8 @@ public sealed record ValidationResult
 /// </summary>
 public sealed class EventAggregationStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AggregationDefinition> _aggregations = new();
-    private readonly ConcurrentDictionary<string, object> _aggregatedViews = new();
+    private readonly BoundedDictionary<string, AggregationDefinition> _aggregations = new BoundedDictionary<string, AggregationDefinition>(1000);
+    private readonly BoundedDictionary<string, object> _aggregatedViews = new BoundedDictionary<string, object>(1000);
 
     public override string StrategyId => "eventsourcing-aggregation";
     public override string DisplayName => "Event Aggregation";
@@ -2416,8 +2417,8 @@ public sealed record CompactionResult
 /// </summary>
 public sealed class ProjectionStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ProjectionDefinition> _projections = new();
-    private readonly ConcurrentDictionary<string, ProjectionState> _states = new();
+    private readonly BoundedDictionary<string, ProjectionDefinition> _projections = new BoundedDictionary<string, ProjectionDefinition>(1000);
+    private readonly BoundedDictionary<string, ProjectionState> _states = new BoundedDictionary<string, ProjectionState>(1000);
     private readonly ConcurrentDictionary<string, Func<StoredEvent, object?, CancellationToken, Task<object?>>> _handlers = new();
 
     public override string StrategyId => "eventsourcing-projections";
@@ -2657,10 +2658,10 @@ public sealed record ProjectionResult
 /// </summary>
 public sealed class DddEventSourcingStrategy : DataManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, object> _aggregateRepositories = new();
-    private readonly ConcurrentDictionary<string, BoundedContextDefinition> _boundedContexts = new();
-    private readonly ConcurrentDictionary<string, SagaState> _sagas = new();
-    private readonly ConcurrentDictionary<string, Func<object, CancellationToken, Task>> _domainEventHandlers = new();
+    private readonly BoundedDictionary<string, object> _aggregateRepositories = new BoundedDictionary<string, object>(1000);
+    private readonly BoundedDictionary<string, BoundedContextDefinition> _boundedContexts = new BoundedDictionary<string, BoundedContextDefinition>(1000);
+    private readonly BoundedDictionary<string, SagaState> _sagas = new BoundedDictionary<string, SagaState>(1000);
+    private readonly BoundedDictionary<string, Func<object, CancellationToken, Task>> _domainEventHandlers = new BoundedDictionary<string, Func<object, CancellationToken, Task>>(1000);
 
     public override string StrategyId => "eventsourcing-ddd";
     public override string DisplayName => "DDD Event Sourcing";

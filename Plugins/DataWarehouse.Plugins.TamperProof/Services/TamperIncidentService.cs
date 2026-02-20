@@ -3,9 +3,9 @@
 
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using SdkAccessLogProvider = DataWarehouse.SDK.Contracts.TamperProof.IAccessLogProvider;
 using PluginAccessLogProvider = DataWarehouse.Plugins.TamperProof.IAccessLogProvider;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.TamperProof.Services;
 /// </summary>
 public class TamperIncidentService
 {
-    private readonly ConcurrentDictionary<Guid, List<TamperIncidentReport>> _incidents = new();
+    private readonly BoundedDictionary<Guid, List<TamperIncidentReport>> _incidents = new BoundedDictionary<Guid, List<TamperIncidentReport>>(1000);
     private readonly SdkAccessLogProvider? _sdkAccessLogProvider;
     private readonly PluginAccessLogProvider? _pluginAccessLogProvider;
     private readonly ILogger<TamperIncidentService> _logger;

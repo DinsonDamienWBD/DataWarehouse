@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -16,9 +17,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persisten
 /// </summary>
 public sealed class PersistenceBackendRegistry : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IProductionPersistenceBackend> _backends = new();
-    private readonly ConcurrentDictionary<string, Type> _backendTypes = new();
-    private readonly ConcurrentDictionary<string, PersistenceBackendConfig> _backendConfigs = new();
+    private readonly BoundedDictionary<string, IProductionPersistenceBackend> _backends = new BoundedDictionary<string, IProductionPersistenceBackend>(1000);
+    private readonly BoundedDictionary<string, Type> _backendTypes = new BoundedDictionary<string, Type>(1000);
+    private readonly BoundedDictionary<string, PersistenceBackendConfig> _backendConfigs = new BoundedDictionary<string, PersistenceBackendConfig>(1000);
     private bool _disposed;
 
     /// <summary>
@@ -373,7 +374,7 @@ public sealed class TieredPersistenceManager : IProductionPersistenceBackend
     private readonly PersistenceBackendRegistry _registry;
     private readonly WriteAheadLog? _wal;
     private readonly PersistenceMetrics _metrics = new();
-    private readonly ConcurrentDictionary<MemoryTier, IProductionPersistenceBackend> _tierBackends = new();
+    private readonly BoundedDictionary<MemoryTier, IProductionPersistenceBackend> _tierBackends = new BoundedDictionary<MemoryTier, IProductionPersistenceBackend>(1000);
     private readonly Timer? _healthCheckTimer;
 
     private bool _disposed;
@@ -1063,7 +1064,7 @@ public sealed class PersistenceEncryption : IProductionPersistenceBackend
     private readonly IProductionPersistenceBackend _innerBackend;
     private readonly PersistenceEncryptionConfig _config;
     private readonly byte[] _masterKey;
-    private readonly ConcurrentDictionary<string, MemoryRecord>? _decryptionCache;
+    private readonly BoundedDictionary<string, MemoryRecord>? _decryptionCache;
 
     private bool _disposed;
 
@@ -1094,7 +1095,7 @@ public sealed class PersistenceEncryption : IProductionPersistenceBackend
 
         if (config.EnableDecryptionCache)
         {
-            _decryptionCache = new ConcurrentDictionary<string, MemoryRecord>();
+            _decryptionCache = new BoundedDictionary<string, MemoryRecord>(1000);
         }
     }
 

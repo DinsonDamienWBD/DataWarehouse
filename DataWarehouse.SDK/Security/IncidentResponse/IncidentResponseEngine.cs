@@ -24,10 +24,10 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         private readonly IMessageBus _messageBus;
         private readonly IAuditTrail _auditTrail;
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, IContainmentAction> _actions = new();
-        private readonly ConcurrentDictionary<string, Incident> _incidents = new();
-        private readonly ConcurrentDictionary<string, AutoResponseRule> _autoResponseRules = new();
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<DateTimeOffset>> _eventWindows = new();
+        private readonly BoundedDictionary<string, IContainmentAction> _actions = new BoundedDictionary<string, IContainmentAction>(1000);
+        private readonly BoundedDictionary<string, Incident> _incidents = new BoundedDictionary<string, Incident>(1000);
+        private readonly BoundedDictionary<string, AutoResponseRule> _autoResponseRules = new BoundedDictionary<string, AutoResponseRule>(1000);
+        private readonly BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>> _eventWindows = new BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>>(1000);
         private readonly List<IDisposable> _subscriptions = new();
         private bool _disposed;
 

@@ -3,7 +3,7 @@ using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Storage.Fabric;
 using System;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 
@@ -16,9 +16,9 @@ namespace DataWarehouse.Plugins.UniversalFabric;
 /// </summary>
 public sealed class AddressRouter
 {
-    private readonly ConcurrentDictionary<string, string> _bucketMappings = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _nodeMappings = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _clusterMappings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, string> _bucketMappings = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, string> _nodeMappings = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, string> _clusterMappings = new BoundedDictionary<string, string>(1000);
     private volatile string? _defaultBackendId;
 
     /// <summary>

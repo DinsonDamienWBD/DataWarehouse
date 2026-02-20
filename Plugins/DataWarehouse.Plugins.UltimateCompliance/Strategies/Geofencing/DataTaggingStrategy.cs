@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -26,10 +26,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class DataTaggingStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SovereigntyTag> _tags = new();
-        private readonly ConcurrentDictionary<string, List<TagHistory>> _tagHistory = new();
-        private readonly ConcurrentDictionary<string, TagTemplate> _templates = new();
-        private readonly ConcurrentDictionary<string, List<string>> _inheritanceRules = new();
+        private readonly BoundedDictionary<string, SovereigntyTag> _tags = new BoundedDictionary<string, SovereigntyTag>(1000);
+        private readonly BoundedDictionary<string, List<TagHistory>> _tagHistory = new BoundedDictionary<string, List<TagHistory>>(1000);
+        private readonly BoundedDictionary<string, TagTemplate> _templates = new BoundedDictionary<string, TagTemplate>(1000);
+        private readonly BoundedDictionary<string, List<string>> _inheritanceRules = new BoundedDictionary<string, List<string>>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "data-tagging";

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class InactivityBasedRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessRecord> _accessRecords = new();
+    private readonly BoundedDictionary<string, AccessRecord> _accessRecords = new BoundedDictionary<string, AccessRecord>(1000);
     private readonly TimeSpan _defaultInactivityThreshold;
     private readonly TimeSpan _warningPeriod;
     private readonly Dictionary<string, TimeSpan> _contentTypeThresholds = new();

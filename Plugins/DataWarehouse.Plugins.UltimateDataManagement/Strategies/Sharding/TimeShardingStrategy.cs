@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Globalization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -81,8 +81,8 @@ public sealed class TimePartition
 /// </remarks>
 public sealed class TimeShardingStrategy : ShardingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TimePartition> _partitions = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, TimePartition> _partitions = new BoundedDictionary<string, TimePartition>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _partitionLock = new();
     private readonly TimePartitionGranularity _granularity;
     private readonly int _rollingPartitionCount;

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
 {
@@ -81,8 +81,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class AwsReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CloudProvider> _regions = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _s3Store = new();
+        private readonly BoundedDictionary<string, CloudProvider> _regions = new BoundedDictionary<string, CloudProvider>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _s3Store = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _primaryRegion;
         private bool _enableTransferAcceleration = true;
         private bool _enableIntelligentTiering = true;
@@ -223,8 +223,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class AzureReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CloudProvider> _regions = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string ETag)> _cosmosStore = new();
+        private readonly BoundedDictionary<string, CloudProvider> _regions = new BoundedDictionary<string, CloudProvider>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string ETag)> _cosmosStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string ETag)>(1000);
         private ConsistencyModel _cosmosConsistencyLevel = ConsistencyModel.SessionConsistent;
         private string? _writeRegion;
         private readonly List<string> _readRegions = new();
@@ -371,8 +371,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class GcpReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CloudProvider> _regions = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset CommitTimestamp)> _spannerStore = new();
+        private readonly BoundedDictionary<string, CloudProvider> _regions = new BoundedDictionary<string, CloudProvider>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset CommitTimestamp)> _spannerStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset CommitTimestamp)>(1000);
         private bool _enableExternalConsistency = true;
         private string? _leaderRegion;
 
@@ -512,9 +512,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class HybridCloudStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CloudProvider> _providers = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _dataSovereigntyRules = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string Location)> _dataStore = new();
+        private readonly BoundedDictionary<string, CloudProvider> _providers = new BoundedDictionary<string, CloudProvider>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _dataSovereigntyRules = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string Location)> _dataStore = new BoundedDictionary<string, (byte[] Data, string Location)>(1000);
         private bool _enableWanOptimization = true;
         private bool _enableCompression = true;
 
@@ -685,8 +685,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class KubernetesReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, KubernetesNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string PodName)> _pvStore = new();
+        private readonly BoundedDictionary<string, KubernetesNode> _nodes = new BoundedDictionary<string, KubernetesNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string PodName)> _pvStore = new BoundedDictionary<string, (byte[] Data, string PodName)>(1000);
         private string? _primaryPod;
         private bool _enableServiceMesh = true;
 
@@ -841,9 +841,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public sealed class EdgeReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, EdgeNode> _edgeNodes = new();
-        private readonly ConcurrentDictionary<string, Queue<PendingSync>> _pendingSyncs = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _edgeStore = new();
+        private readonly BoundedDictionary<string, EdgeNode> _edgeNodes = new BoundedDictionary<string, EdgeNode>(1000);
+        private readonly BoundedDictionary<string, Queue<PendingSync>> _pendingSyncs = new BoundedDictionary<string, Queue<PendingSync>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _edgeStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private int _maxQueueSize = 10000;
 
         /// <summary>

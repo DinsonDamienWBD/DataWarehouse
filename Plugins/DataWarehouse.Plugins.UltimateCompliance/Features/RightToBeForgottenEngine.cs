@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Features
 {
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
     /// </summary>
     public sealed class RightToBeForgottenEngine
     {
-        private readonly ConcurrentDictionary<string, ErasureRequest> _requests = new();
+        private readonly BoundedDictionary<string, ErasureRequest> _requests = new BoundedDictionary<string, ErasureRequest>(1000);
         private readonly List<IDataStore> _registeredDataStores = new();
 
         /// <summary>

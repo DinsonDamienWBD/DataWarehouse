@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts.Carbon;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.GreenPlacement;
 
@@ -20,7 +20,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
     private const int MaxRetries = 3;
 
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)> _cache = new();
+    private readonly BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)> _cache = new BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)>(1000);
 
     /// <summary>
     /// Maps common cloud provider regions to Electricity Maps zone identifiers.

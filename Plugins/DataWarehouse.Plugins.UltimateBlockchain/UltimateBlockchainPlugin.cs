@@ -6,7 +6,6 @@ using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.Plugins.UltimateBlockchain;
 
@@ -18,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateBlockchain;
 public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
 {
     private readonly ILogger<UltimateBlockchainPlugin> _logger;
-    private readonly ConcurrentDictionary<Guid, BlockchainAnchor> _anchors = new();
+    private readonly BoundedDictionary<Guid, BlockchainAnchor> _anchors = new BoundedDictionary<Guid, BlockchainAnchor>(1000);
     private readonly List<Block> _blockchain = new();
     private readonly object _blockchainLock = new();
     private long _nextBlockNumber = 1;

@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -33,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class InfiniteStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<ProviderEndpoint> _providers = new();
-        private readonly ConcurrentDictionary<string, string> _keyToProvider = new();
-        private readonly ConcurrentDictionary<string, ProviderMetrics> _providerMetrics = new();
+        private readonly BoundedDictionary<string, string> _keyToProvider = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, ProviderMetrics> _providerMetrics = new BoundedDictionary<string, ProviderMetrics>(1000);
         private int _replicationFactor = 3;
         private int _virtualNodes = 150; // For consistent hashing
         private bool _enableAutoRebalancing = true;

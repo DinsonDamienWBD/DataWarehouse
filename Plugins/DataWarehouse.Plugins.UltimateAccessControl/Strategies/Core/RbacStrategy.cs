@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -22,10 +22,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class RbacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, Role> _roles = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _rolePermissions = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _roleHierarchy = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _effectivePermissionsCache = new();
+        private readonly BoundedDictionary<string, Role> _roles = new BoundedDictionary<string, Role>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _rolePermissions = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _roleHierarchy = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _effectivePermissionsCache = new BoundedDictionary<string, HashSet<string>>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "rbac";

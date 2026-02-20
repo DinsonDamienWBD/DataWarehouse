@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.Profiling;
 
@@ -331,7 +331,7 @@ public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
         ThrowIfNotInitialized();
         var startTime = DateTime.UtcNow;
 
-        var fieldData = new ConcurrentDictionary<string, List<object?>>();
+        var fieldData = new BoundedDictionary<string, List<object?>>(1000);
         var recordList = records.ToList();
 
         // Collect all values by field
@@ -709,7 +709,7 @@ public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
 
     private Task<List<FieldCorrelation>> CalculateCorrelationsAsync(
         List<string> fields,
-        ConcurrentDictionary<string, List<object?>> fieldData,
+        BoundedDictionary<string, List<object?>> fieldData,
         CancellationToken ct)
     {
         var correlations = new List<FieldCorrelation>();

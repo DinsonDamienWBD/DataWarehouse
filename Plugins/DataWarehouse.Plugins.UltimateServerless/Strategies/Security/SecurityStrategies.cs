@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Security;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Security;
 /// </summary>
 public sealed class IamRoleStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IamRole> _roles = new();
+    private readonly BoundedDictionary<string, IamRole> _roles = new BoundedDictionary<string, IamRole>(1000);
 
     public override string StrategyId => "security-iam-role";
     public override string DisplayName => "IAM Role Management";
@@ -78,7 +78,7 @@ public sealed class IamRoleStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class SecretsManagementStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SecretEntry> _secrets = new();
+    private readonly BoundedDictionary<string, SecretEntry> _secrets = new BoundedDictionary<string, SecretEntry>(1000);
 
     public override string StrategyId => "security-secrets";
     public override string DisplayName => "Secrets Management";

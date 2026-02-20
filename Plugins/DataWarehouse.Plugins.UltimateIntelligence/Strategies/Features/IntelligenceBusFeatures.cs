@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -14,9 +15,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 /// </summary>
 public sealed class ModelManagementStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ModelRegistration> _registry = new();
-    private readonly ConcurrentDictionary<string, ModelHealthStatus> _healthStatus = new();
-    private readonly ConcurrentDictionary<string, ModelCostTracker> _costTrackers = new();
+    private readonly BoundedDictionary<string, ModelRegistration> _registry = new BoundedDictionary<string, ModelRegistration>(1000);
+    private readonly BoundedDictionary<string, ModelHealthStatus> _healthStatus = new BoundedDictionary<string, ModelHealthStatus>(1000);
+    private readonly BoundedDictionary<string, ModelCostTracker> _costTrackers = new BoundedDictionary<string, ModelCostTracker>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "intelligence.model.management";
@@ -194,7 +195,7 @@ public sealed class ModelCostTracker
 /// </summary>
 public sealed class InferenceOptimizationStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CachedResponse> _responseCache = new();
+    private readonly BoundedDictionary<string, CachedResponse> _responseCache = new BoundedDictionary<string, CachedResponse>(1000);
     private readonly ConcurrentQueue<PendingRequest> _batchQueue = new();
     private long _totalTokenBudget;
     private long _consumedTokens;
@@ -328,7 +329,7 @@ public sealed class InferenceOptimizationStrategy : IntelligenceStrategyBase
 /// </summary>
 public sealed class VectorSearchIntegrationStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IVectorStore> _vectorStores = new();
+    private readonly BoundedDictionary<string, IVectorStore> _vectorStores = new BoundedDictionary<string, IVectorStore>(1000);
     private string? _defaultStoreId;
 
     /// <inheritdoc/>

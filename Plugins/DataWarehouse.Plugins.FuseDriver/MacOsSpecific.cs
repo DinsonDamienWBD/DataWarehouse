@@ -3,10 +3,10 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -18,7 +18,7 @@ public sealed class MacOsSpecific : IDisposable
 {
     private readonly FuseConfig _config;
     private readonly IKernelContext? _kernelContext;
-    private readonly ConcurrentDictionary<string, FinderInfo> _finderInfoCache = new();
+    private readonly BoundedDictionary<string, FinderInfo> _finderInfoCache = new BoundedDictionary<string, FinderInfo>(1000);
 #pragma warning disable CS0169 // Field is never used - reserved for native FSEvents stream pointer
     private nint _fsEventsStream;
 #pragma warning restore CS0169

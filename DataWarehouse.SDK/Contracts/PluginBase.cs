@@ -1,4 +1,4 @@
-﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Contracts.Persistence;
@@ -246,11 +246,7 @@ namespace DataWarehouse.SDK.Contracts
 
             // Initialize knowledge cache with a bounded dictionary now that StateStore is available.
             // This gives LRU eviction and optional auto-persistence for free.
-            var cache = new BoundedDictionary<string, KnowledgeObject>(
-                MaxKnowledgeCacheSize > 0 ? MaxKnowledgeCacheSize : 10_000,
-                StateStore,
-                Id,
-                "knowledge-cache");
+            var cache = new BoundedDictionary<string, KnowledgeObject>(1000);
             _trackedCollections.Add(cache);
             _knowledgeCache = cache;
 
@@ -1229,8 +1225,7 @@ namespace DataWarehouse.SDK.Contracts
         protected BoundedDictionary<TKey, TValue> CreateBoundedDictionary<TKey, TValue>(
             string collectionName, int maxCapacity) where TKey : notnull
         {
-            var dict = new BoundedDictionary<TKey, TValue>(
-                maxCapacity, StateStore, Id, $"collection.{collectionName}");
+            var dict = new BoundedDictionary<TKey, TValue>(1000);
             _trackedCollections.Add(dict);
             return dict;
         }

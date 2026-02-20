@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -38,9 +38,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableImmutableSchedule = true;
         private int _emergencyOverrideThreshold = 3; // Number of keys needed for override
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, TimeCapsuleMetadata> _capsules = new();
-        private readonly ConcurrentDictionary<string, byte[]> _encryptedData = new();
-        private readonly ConcurrentDictionary<string, DateTime> _lastProofOfLife = new();
+        private readonly BoundedDictionary<string, TimeCapsuleMetadata> _capsules = new BoundedDictionary<string, TimeCapsuleMetadata>(1000);
+        private readonly BoundedDictionary<string, byte[]> _encryptedData = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, DateTime> _lastProofOfLife = new BoundedDictionary<string, DateTime>(1000);
         private Timer? _unlockCheckTimer = null;
         private Timer? _proofOfLifeCheckTimer = null;
 

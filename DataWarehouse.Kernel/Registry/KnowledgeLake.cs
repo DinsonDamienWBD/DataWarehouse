@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel.Registry;
 
@@ -10,9 +11,9 @@ namespace DataWarehouse.Kernel.Registry;
 /// </summary>
 public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
 {
-    private readonly ConcurrentDictionary<string, KnowledgeEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _byTopic = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _byPlugin = new();
+    private readonly BoundedDictionary<string, KnowledgeEntry> _entries = new BoundedDictionary<string, KnowledgeEntry>(1000);
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byTopic = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byPlugin = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
     private readonly Timer? _cleanupTimer;
 
     public KnowledgeLake(bool enableAutoCleanup = true)

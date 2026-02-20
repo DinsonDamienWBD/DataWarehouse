@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Tags;
 
@@ -28,12 +29,12 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     /// <summary>
     /// Per-shard inverted index: TagKey -> set of object keys belonging to that shard.
     /// </summary>
-    private readonly ConcurrentDictionary<TagKey, HashSet<string>>[] _shards;
+    private readonly BoundedDictionary<TagKey, HashSet<string>>[] _shards;
 
     /// <summary>
     /// Per-shard tag values: (TagKey, ObjectKey) -> TagValue for value-based filtering.
     /// </summary>
-    private readonly ConcurrentDictionary<(TagKey TagKey, string ObjectKey), TagValue>[] _valueShards;
+    private readonly BoundedDictionary<(TagKey TagKey, string ObjectKey), TagValue>[] _valueShards;
 
     /// <summary>
     /// Per-shard reader-writer locks for write operations on the HashSet (which is not thread-safe).
@@ -56,14 +57,14 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
             throw new ArgumentOutOfRangeException(nameof(shardCount), shardCount, "Shard count must be at least 1.");
 
         _shardCount = shardCount;
-        _shards = new ConcurrentDictionary<TagKey, HashSet<string>>[shardCount];
-        _valueShards = new ConcurrentDictionary<(TagKey, string), TagValue>[shardCount];
+        _shards = new BoundedDictionary<TagKey, HashSet<string>>[shardCount];
+        _valueShards = new BoundedDictionary<(TagKey, string), TagValue>[shardCount];
         _locks = new ReaderWriterLockSlim[shardCount];
 
         for (int i = 0; i < shardCount; i++)
         {
-            _shards[i] = new ConcurrentDictionary<TagKey, HashSet<string>>();
-            _valueShards[i] = new ConcurrentDictionary<(TagKey, string), TagValue>();
+            _shards[i] = new BoundedDictionary<TagKey, HashSet<string>>(1000);
+            _valueShards[i] = new BoundedDictionary<(TagKey, string), TagValue>(1000);
             _locks[i] = new ReaderWriterLockSlim();
         }
     }

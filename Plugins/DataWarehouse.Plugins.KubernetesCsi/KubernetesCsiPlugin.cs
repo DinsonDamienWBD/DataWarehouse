@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -83,12 +82,12 @@ public sealed class KubernetesCsiPlugin : InterfacePluginBase
 
     #region Private Fields
 
-    private readonly ConcurrentDictionary<string, CsiVolume> _volumes = new();
-    private readonly ConcurrentDictionary<string, CsiSnapshot> _snapshots = new();
-    private readonly ConcurrentDictionary<string, NodeStageInfo> _stagedVolumes = new();
-    private readonly ConcurrentDictionary<string, NodePublishInfo> _publishedVolumes = new();
-    private readonly ConcurrentDictionary<string, StorageClassConfig> _storageClasses = new();
-    private readonly ConcurrentDictionary<string, TopologySegment> _topologySegments = new();
+    private readonly BoundedDictionary<string, CsiVolume> _volumes = new BoundedDictionary<string, CsiVolume>(1000);
+    private readonly BoundedDictionary<string, CsiSnapshot> _snapshots = new BoundedDictionary<string, CsiSnapshot>(1000);
+    private readonly BoundedDictionary<string, NodeStageInfo> _stagedVolumes = new BoundedDictionary<string, NodeStageInfo>(1000);
+    private readonly BoundedDictionary<string, NodePublishInfo> _publishedVolumes = new BoundedDictionary<string, NodePublishInfo>(1000);
+    private readonly BoundedDictionary<string, StorageClassConfig> _storageClasses = new BoundedDictionary<string, StorageClassConfig>(1000);
+    private readonly BoundedDictionary<string, TopologySegment> _topologySegments = new BoundedDictionary<string, TopologySegment>(1000);
     private readonly SemaphoreSlim _operationLock = new(1, 1);
 
     private IKernelContext? _context;

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.KnowledgeGraphs;
 
@@ -156,9 +157,9 @@ public sealed class ArangoGraphStrategy : KnowledgeGraphStrategyBase
 /// </summary>
 public sealed class NeptuneGraphStrategy : KnowledgeGraphStrategyBase
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, GraphNode> _nodes = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, GraphEdge> _edges = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, List<string>> _adjacencyList = new();
+    private readonly BoundedDictionary<string, GraphNode> _nodes = new BoundedDictionary<string, GraphNode>(1000);
+    private readonly BoundedDictionary<string, GraphEdge> _edges = new BoundedDictionary<string, GraphEdge>(1000);
+    private readonly BoundedDictionary<string, List<string>> _adjacencyList = new BoundedDictionary<string, List<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "graph-neptune";

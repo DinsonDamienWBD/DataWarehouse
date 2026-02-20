@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class TsaStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TimestampToken> _tokens = new();
+        private readonly BoundedDictionary<string, TimestampToken> _tokens = new BoundedDictionary<string, TimestampToken>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "integrity-tsa";

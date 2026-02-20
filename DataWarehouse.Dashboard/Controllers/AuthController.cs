@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Security;
 using System.ComponentModel.DataAnnotations;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -19,8 +19,8 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
 
     // In-memory store for demo purposes. In production, use a database or distributed cache.
-    private static readonly ConcurrentDictionary<string, UserCredential> _users = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly ConcurrentDictionary<string, RefreshTokenInfo> _refreshTokens = new();
+    private static readonly BoundedDictionary<string, UserCredential> _users = new BoundedDictionary<string, UserCredential>(1000);
+    private static readonly BoundedDictionary<string, RefreshTokenInfo> _refreshTokens = new BoundedDictionary<string, RefreshTokenInfo>(1000);
 
     static AuthController()
     {

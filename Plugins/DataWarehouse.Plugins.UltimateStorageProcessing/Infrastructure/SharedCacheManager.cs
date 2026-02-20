@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorageProcessing.Infrastructure;
 
@@ -15,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateStorageProcessing.Infrastructure;
 /// </remarks>
 internal sealed class SharedCacheManager : IDisposable
 {
-    private readonly ConcurrentDictionary<string, CachedEntry> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, CachedEntry> _cache = new BoundedDictionary<string, CachedEntry>(1000);
     private readonly Timer _cleanupTimer;
     private readonly TimeSpan _cleanupInterval;
     private long _hits;

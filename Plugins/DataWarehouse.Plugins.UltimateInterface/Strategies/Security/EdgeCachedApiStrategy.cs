@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 
@@ -51,7 +51,7 @@ internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase
     );
 
     // In-memory cache for ETags and Last-Modified timestamps
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
 
     /// <summary>
     /// Cache entry storing ETag, Last-Modified, and cached response.

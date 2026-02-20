@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -330,10 +330,10 @@ public sealed class MigrationResult
 /// </summary>
 public sealed class DataMigrationStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MigrationJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, MigrationProgress> _progress = new();
-    private readonly ConcurrentDictionary<string, List<MigrationResult>> _results = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCts = new();
+    private readonly BoundedDictionary<string, MigrationJob> _jobs = new BoundedDictionary<string, MigrationJob>(1000);
+    private readonly BoundedDictionary<string, MigrationProgress> _progress = new BoundedDictionary<string, MigrationProgress>(1000);
+    private readonly BoundedDictionary<string, List<MigrationResult>> _results = new BoundedDictionary<string, List<MigrationResult>>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _jobCts = new BoundedDictionary<string, CancellationTokenSource>(1000);
     private readonly SemaphoreSlim _migrationLock = new(1, 1);
     private long _totalMigrated;
     private long _totalBytesMigrated;

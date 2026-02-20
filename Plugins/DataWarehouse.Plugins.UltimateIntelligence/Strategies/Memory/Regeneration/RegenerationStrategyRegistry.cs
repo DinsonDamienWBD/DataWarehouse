@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -9,8 +9,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regenerat
 /// </summary>
 public sealed class RegenerationStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IAdvancedRegenerationStrategy> _strategies = new();
-    private readonly ConcurrentDictionary<string, List<string>> _formatToStrategies = new();
+    private readonly BoundedDictionary<string, IAdvancedRegenerationStrategy> _strategies = new BoundedDictionary<string, IAdvancedRegenerationStrategy>(1000);
+    private readonly BoundedDictionary<string, List<string>> _formatToStrategies = new BoundedDictionary<string, List<string>>(1000);
     private readonly object _registrationLock = new();
 
     /// <summary>

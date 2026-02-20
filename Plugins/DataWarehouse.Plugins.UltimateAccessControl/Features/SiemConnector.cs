@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class SiemConnector
     {
-        private readonly ConcurrentDictionary<string, SiemEndpoint> _endpoints = new();
+        private readonly BoundedDictionary<string, SiemEndpoint> _endpoints = new BoundedDictionary<string, SiemEndpoint>(1000);
         private readonly ConcurrentQueue<ForwardedEvent> _eventHistory = new();
         private readonly int _maxHistorySize = 1000;
 

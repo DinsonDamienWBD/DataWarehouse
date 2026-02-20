@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class AclStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AccessControlList> _resourceAcls = new();
+        private readonly BoundedDictionary<string, AccessControlList> _resourceAcls = new BoundedDictionary<string, AccessControlList>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "acl";

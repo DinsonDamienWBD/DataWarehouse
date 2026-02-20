@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
 using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
 using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
 {
@@ -462,7 +463,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     public sealed class FlexRaidFrStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
-        private readonly ConcurrentDictionary<long, SnapshotInfo> _snapshots;
+        private readonly BoundedDictionary<long, SnapshotInfo> _snapshots;
         private readonly object _snapshotLock = new();
         private long _currentSnapshotId;
         private DateTime _lastSnapshotTime;
@@ -477,7 +478,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
         {
             _chunkSize = chunkSize;
             _snapshotInterval = TimeSpan.FromMinutes(snapshotIntervalMinutes);
-            _snapshots = new ConcurrentDictionary<long, SnapshotInfo>();
+            _snapshots = new BoundedDictionary<long, SnapshotInfo>(1000);
             _lastSnapshotTime = DateTime.UtcNow;
         }
 

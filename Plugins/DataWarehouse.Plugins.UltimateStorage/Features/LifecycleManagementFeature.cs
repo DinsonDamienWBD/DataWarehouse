@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -24,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class LifecycleManagementFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, LifecyclePolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, ObjectLifecycleState> _objectStates = new();
-        private readonly ConcurrentDictionary<string, LegalHold> _legalHolds = new();
+        private readonly BoundedDictionary<string, LifecyclePolicy> _policies = new BoundedDictionary<string, LifecyclePolicy>(1000);
+        private readonly BoundedDictionary<string, ObjectLifecycleState> _objectStates = new BoundedDictionary<string, ObjectLifecycleState>(1000);
+        private readonly BoundedDictionary<string, LegalHold> _legalHolds = new BoundedDictionary<string, LegalHold>(1000);
         private readonly List<LifecycleEvent> _auditTrail = new();
         private readonly Timer _lifecycleTimer;
         private readonly object _auditLock = new();

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 {
     public class KeyRotationScheduler : IDisposable, IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, IKeyStoreStrategy> _strategies;
-        private readonly ConcurrentDictionary<string, KeyRotationPolicy> _policies;
-        private readonly ConcurrentDictionary<string, DateTime> _lastRotationTimes;
+        private readonly BoundedDictionary<string, IKeyStoreStrategy> _strategies;
+        private readonly BoundedDictionary<string, KeyRotationPolicy> _policies;
+        private readonly BoundedDictionary<string, DateTime> _lastRotationTimes;
         private readonly IMessageBus? _messageBus;
         private readonly UltimateKeyManagementConfig _config;
         private readonly CancellationTokenSource _shutdownCts = new();
@@ -25,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _messageBus = messageBus;
-            _strategies = new ConcurrentDictionary<string, IKeyStoreStrategy>();
-            _policies = new ConcurrentDictionary<string, KeyRotationPolicy>();
-            _lastRotationTimes = new ConcurrentDictionary<string, DateTime>();
+            _strategies = new BoundedDictionary<string, IKeyStoreStrategy>(1000);
+            _policies = new BoundedDictionary<string, KeyRotationPolicy>(1000);
+            _lastRotationTimes = new BoundedDictionary<string, DateTime>(1000);
         }
 
         public void RegisterStrategy(string strategyId, IKeyStoreStrategy strategy, KeyRotationPolicy? policy = null)

@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -32,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class ZeroTrustStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DeviceTrustRecord> _deviceTrust = new();
-        private readonly ConcurrentDictionary<string, SessionRecord> _sessions = new();
-        private readonly ConcurrentDictionary<string, int> _failedAttempts = new();
+        private readonly BoundedDictionary<string, DeviceTrustRecord> _deviceTrust = new BoundedDictionary<string, DeviceTrustRecord>(1000);
+        private readonly BoundedDictionary<string, SessionRecord> _sessions = new BoundedDictionary<string, SessionRecord>(1000);
+        private readonly BoundedDictionary<string, int> _failedAttempts = new BoundedDictionary<string, int>(1000);
         private int _maxFailedAttempts = 5;
         private TimeSpan _sessionTimeout = TimeSpan.FromMinutes(30);
         private TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);

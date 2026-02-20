@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 {
@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
     {
         private readonly HttpClient _httpClient;
         private BitwardenSecretsConfig _config = new();
-        private readonly ConcurrentDictionary<string, byte[]> _keyCache = new();
+        private readonly BoundedDictionary<string, byte[]> _keyCache = new BoundedDictionary<string, byte[]>(1000);
         private string? _currentKeyId;
         private string? _authToken;
         private DateTime _tokenExpiry = DateTime.MinValue;

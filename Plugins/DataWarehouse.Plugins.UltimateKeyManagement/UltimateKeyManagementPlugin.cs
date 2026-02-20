@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -21,9 +20,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
     /// </summary>
     public class UltimateKeyManagementPlugin : SecurityPluginBase, IKeyStoreRegistry, IDisposable, IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, IKeyStore> _keyStores = new();
-        private readonly ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
-        private readonly ConcurrentDictionary<string, IKeyStoreStrategy> _strategies = new();
+        private readonly BoundedDictionary<string, IKeyStore> _keyStores = new BoundedDictionary<string, IKeyStore>(1000);
+        private readonly BoundedDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new BoundedDictionary<string, IEnvelopeKeyStore>(1000);
+        private readonly BoundedDictionary<string, IKeyStoreStrategy> _strategies = new BoundedDictionary<string, IKeyStoreStrategy>(1000);
         private UltimateKeyManagementConfig _config = new();
         private KeyRotationScheduler? _rotationScheduler;
         private IMessageBus? _messageBus;

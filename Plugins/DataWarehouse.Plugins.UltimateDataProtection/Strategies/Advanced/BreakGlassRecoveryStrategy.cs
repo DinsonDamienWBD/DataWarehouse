@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 {
@@ -23,9 +23,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
     /// </remarks>
     public sealed class BreakGlassRecoveryStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, EmergencyBackup> _emergencyBackups = new();
-        private readonly ConcurrentDictionary<string, BreakGlassSession> _activeSessions = new();
-        private readonly ConcurrentDictionary<string, EmergencyAccessToken> _activeTokens = new();
+        private readonly BoundedDictionary<string, EmergencyBackup> _emergencyBackups = new BoundedDictionary<string, EmergencyBackup>(1000);
+        private readonly BoundedDictionary<string, BreakGlassSession> _activeSessions = new BoundedDictionary<string, BreakGlassSession>(1000);
+        private readonly BoundedDictionary<string, EmergencyAccessToken> _activeTokens = new BoundedDictionary<string, EmergencyAccessToken>(1000);
         private readonly List<AuditLogEntry> _auditLog = new();
         private readonly object _auditLock = new();
 

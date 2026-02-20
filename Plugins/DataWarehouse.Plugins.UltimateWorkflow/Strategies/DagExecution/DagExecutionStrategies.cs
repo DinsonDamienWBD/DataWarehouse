@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.DagExecution;
 
@@ -42,7 +43,7 @@ public sealed class TopologicalDagStrategy : WorkflowStrategyBase
 
         var completed = new HashSet<string>();
         var failed = new HashSet<string>();
-        var running = new ConcurrentDictionary<string, Task<TaskResult>>();
+        var running = new BoundedDictionary<string, Task<TaskResult>>(1000);
         var semaphore = new SemaphoreSlim(workflow.MaxParallelism);
 
         try
@@ -152,7 +153,7 @@ public sealed class DynamicDagStrategy : WorkflowStrategyBase
         Tags = ["dag", "dynamic", "runtime"]
     };
 
-    private readonly ConcurrentDictionary<string, List<WorkflowTask>> _dynamicTasks = new();
+    private readonly BoundedDictionary<string, List<WorkflowTask>> _dynamicTasks = new BoundedDictionary<string, List<WorkflowTask>>(1000);
 
     public void AddDynamicTask(string workflowInstanceId, WorkflowTask task)
     {

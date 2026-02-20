@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MicroIsolation;
 
@@ -31,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MicroIsolation;
 /// </remarks>
 public sealed class PerFileIsolationStrategy : AccessControlStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FileIsolationContext> _isolatedFiles = new();
-    private readonly ConcurrentDictionary<string, CryptographicDomain> _domains = new();
+    private readonly BoundedDictionary<string, FileIsolationContext> _isolatedFiles = new BoundedDictionary<string, FileIsolationContext>(1000);
+    private readonly BoundedDictionary<string, CryptographicDomain> _domains = new BoundedDictionary<string, CryptographicDomain>(1000);
     private readonly byte[] _masterKey;
 
     public PerFileIsolationStrategy()
@@ -304,8 +304,8 @@ public enum IsolationLevel
 /// </remarks>
 public sealed class SgxEnclaveStrategy : AccessControlStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SgxEnclaveContext> _enclaves = new();
-    private readonly ConcurrentDictionary<string, byte[]> _sealedData = new();
+    private readonly BoundedDictionary<string, SgxEnclaveContext> _enclaves = new BoundedDictionary<string, SgxEnclaveContext>(1000);
+    private readonly BoundedDictionary<string, byte[]> _sealedData = new BoundedDictionary<string, byte[]>(1000);
     private bool _sgxAvailable;
 
     /// <inheritdoc/>
@@ -604,8 +604,8 @@ public record AttestationResult
 /// </remarks>
 public sealed class TpmBindingStrategy : AccessControlStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TpmBoundResource> _boundResources = new();
-    private readonly ConcurrentDictionary<string, PcrPolicy> _pcrPolicies = new();
+    private readonly BoundedDictionary<string, TpmBoundResource> _boundResources = new BoundedDictionary<string, TpmBoundResource>(1000);
+    private readonly BoundedDictionary<string, PcrPolicy> _pcrPolicies = new BoundedDictionary<string, PcrPolicy>(1000);
     private bool _tpmAvailable;
 
     /// <inheritdoc/>
@@ -892,8 +892,8 @@ public record PcrPolicy
 /// </remarks>
 public sealed class ConfidentialComputingStrategy : AccessControlStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConfidentialContext> _contexts = new();
-    private readonly ConcurrentDictionary<string, TrustedExecutionEnvironment> _tees = new();
+    private readonly BoundedDictionary<string, ConfidentialContext> _contexts = new BoundedDictionary<string, ConfidentialContext>(1000);
+    private readonly BoundedDictionary<string, TrustedExecutionEnvironment> _tees = new BoundedDictionary<string, TrustedExecutionEnvironment>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "micro-isolation-confidential";

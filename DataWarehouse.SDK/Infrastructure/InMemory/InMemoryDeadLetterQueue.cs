@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Resilience;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.InMemory
 {
@@ -17,7 +17,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryDeadLetterQueue : IDeadLetterQueue
     {
-        private readonly ConcurrentDictionary<string, DeadLetterMessage> _messages = new();
+        private readonly BoundedDictionary<string, DeadLetterMessage> _messages = new BoundedDictionary<string, DeadLetterMessage>(1000);
         private readonly int _maxCapacity;
 
         /// <summary>

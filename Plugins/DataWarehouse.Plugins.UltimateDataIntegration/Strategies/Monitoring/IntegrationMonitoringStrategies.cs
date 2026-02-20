@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Monitoring;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Monitoring;
 /// </summary>
 public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PipelineHealth> _healthStatus = new();
-    private readonly ConcurrentDictionary<string, List<HealthCheck>> _healthHistory = new();
+    private readonly BoundedDictionary<string, PipelineHealth> _healthStatus = new BoundedDictionary<string, PipelineHealth>(1000);
+    private readonly BoundedDictionary<string, List<HealthCheck>> _healthHistory = new BoundedDictionary<string, List<HealthCheck>>(1000);
 
     public override string StrategyId => "monitoring-pipeline-health";
     public override string DisplayName => "Pipeline Health Monitoring";
@@ -175,8 +175,8 @@ public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBa
 /// </summary>
 public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SlaDefinition> _slas = new();
-    private readonly ConcurrentDictionary<string, List<SlaViolation>> _violations = new();
+    private readonly BoundedDictionary<string, SlaDefinition> _slas = new BoundedDictionary<string, SlaDefinition>(1000);
+    private readonly BoundedDictionary<string, List<SlaViolation>> _violations = new BoundedDictionary<string, List<SlaViolation>>(1000);
 
     public override string StrategyId => "monitoring-sla-tracking";
     public override string DisplayName => "SLA Tracking";
@@ -344,8 +344,8 @@ public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataQualityProfile> _profiles = new();
-    private readonly ConcurrentDictionary<string, List<QualityScore>> _scores = new();
+    private readonly BoundedDictionary<string, DataQualityProfile> _profiles = new BoundedDictionary<string, DataQualityProfile>(1000);
+    private readonly BoundedDictionary<string, List<QualityScore>> _scores = new BoundedDictionary<string, List<QualityScore>>(1000);
 
     public override string StrategyId => "monitoring-data-quality";
     public override string DisplayName => "Data Quality Monitoring";
@@ -531,8 +531,8 @@ public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, List<LineageEdge>> _edges = new();
+    private readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
+    private readonly BoundedDictionary<string, List<LineageEdge>> _edges = new BoundedDictionary<string, List<LineageEdge>>(1000);
 
     public override string StrategyId => "monitoring-lineage-tracking";
     public override string DisplayName => "Integration Lineage Tracking";
@@ -760,9 +760,9 @@ public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategy
 /// </summary>
 public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AlertRule> _rules = new();
-    private readonly ConcurrentDictionary<string, List<Alert>> _alerts = new();
-    private readonly ConcurrentDictionary<string, NotificationChannel> _channels = new();
+    private readonly BoundedDictionary<string, AlertRule> _rules = new BoundedDictionary<string, AlertRule>(1000);
+    private readonly BoundedDictionary<string, List<Alert>> _alerts = new BoundedDictionary<string, List<Alert>>(1000);
+    private readonly BoundedDictionary<string, NotificationChannel> _channels = new BoundedDictionary<string, NotificationChannel>(1000);
 
     public override string StrategyId => "monitoring-alert-notification";
     public override string DisplayName => "Alert and Notification";

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Integration;
 
@@ -9,7 +9,7 @@ namespace DataWarehouse.CLI.Integration;
 /// </summary>
 public sealed class CliScriptingEngine
 {
-    private readonly ConcurrentDictionary<string, object?> _variables = new();
+    private readonly BoundedDictionary<string, object?> _variables = new BoundedDictionary<string, object?>(1000);
     private readonly List<ScriptExecutionResult> _executionLog = new();
     private readonly Func<string, Dictionary<string, object?>, CancellationToken, Task<ScriptCommandResult>> _commandExecutor;
 
@@ -425,7 +425,7 @@ public sealed class CliScriptingEngine
 /// </summary>
 public sealed class CliProfileManager
 {
-    private readonly ConcurrentDictionary<string, ConnectionProfile> _profiles = new();
+    private readonly BoundedDictionary<string, ConnectionProfile> _profiles = new BoundedDictionary<string, ConnectionProfile>(1000);
     private string? _activeProfile;
     private readonly string _profilesPath;
 

@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Primitives;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -157,7 +157,7 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public abstract class CacheableStoragePluginBase : ListableStoragePluginBase, ICacheableStorage
     {
-        private readonly ConcurrentDictionary<string, CacheEntryMetadata> _cacheMetadata = new();
+        private readonly BoundedDictionary<string, CacheEntryMetadata> _cacheMetadata = new BoundedDictionary<string, CacheEntryMetadata>(1000);
         private readonly Timer? _cleanupTimer;
         private readonly CacheOptions _cacheOptions;
 
@@ -392,7 +392,7 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public abstract class IndexableStoragePluginBase : CacheableStoragePluginBase, IIndexableStorage
     {
-        private readonly ConcurrentDictionary<string, Dictionary<string, object>> _indexStore = new();
+        private readonly BoundedDictionary<string, Dictionary<string, object>> _indexStore = new BoundedDictionary<string, Dictionary<string, object>>(1000);
         private long _indexedCount;
         private DateTime? _lastIndexRebuild;
 

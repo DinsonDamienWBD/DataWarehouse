@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts.Carbon;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonBudgetEnforcement;
 
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonBudgetEn
 /// </summary>
 public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, MutableBudgetEntry> _budgets = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, MutableBudgetEntry> _budgets = new BoundedDictionary<string, MutableBudgetEntry>(1000);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly string _filePath;
     private Timer? _debounceSaveTimer;

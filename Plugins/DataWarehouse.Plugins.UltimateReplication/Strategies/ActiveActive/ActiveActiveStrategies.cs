@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
 {
@@ -66,9 +67,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     /// </summary>
     public sealed class HotHotStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ActiveNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, long> _writeCounters = new();
+        private readonly BoundedDictionary<string, ActiveNode> _nodes = new BoundedDictionary<string, ActiveNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)>(1000);
+        private readonly BoundedDictionary<string, long> _writeCounters = new BoundedDictionary<string, long>(1000);
         private ConflictResolutionMethod _conflictResolution = ConflictResolutionMethod.LastWriteWins;
 
         /// <inheritdoc/>
@@ -255,8 +256,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     /// </summary>
     public sealed class NWayActiveStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ActiveNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock, int AckCount)> _dataStore = new();
+        private readonly BoundedDictionary<string, ActiveNode> _nodes = new BoundedDictionary<string, ActiveNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, int AckCount)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, int AckCount)>(1000);
         private int _writeQuorum = 2;
         private int _readQuorum = 1;
 
@@ -466,8 +467,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     /// </summary>
     public sealed class MultiRegionWriteCoordinator
     {
-        private readonly ConcurrentDictionary<string, TransactionState> _activeTransactions = new();
-        private readonly ConcurrentDictionary<string, List<CompensatingAction>> _compensationLog = new();
+        private readonly BoundedDictionary<string, TransactionState> _activeTransactions = new BoundedDictionary<string, TransactionState>(1000);
+        private readonly BoundedDictionary<string, List<CompensatingAction>> _compensationLog = new BoundedDictionary<string, List<CompensatingAction>>(1000);
         private readonly TimeSpan _prepareTimeout = TimeSpan.FromSeconds(30);
         private readonly TimeSpan _commitTimeout = TimeSpan.FromSeconds(10);
 
@@ -484,8 +485,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
             public required string TransactionId { get; init; }
             public TransactionPhase Phase { get; set; } = TransactionPhase.Started;
             public string[] ParticipantRegions { get; init; } = Array.Empty<string>();
-            public ConcurrentDictionary<string, bool> PrepareVotes { get; } = new();
-            public ConcurrentDictionary<string, bool> CommitAcks { get; } = new();
+            public BoundedDictionary<string, bool> PrepareVotes { get; } = new BoundedDictionary<string, bool>(1000);
+            public BoundedDictionary<string, bool> CommitAcks { get; } = new BoundedDictionary<string, bool>(1000);
             public DateTimeOffset StartedAt { get; init; } = DateTimeOffset.UtcNow;
             public DateTimeOffset? PreparedAt { get; set; }
             public DateTimeOffset? CompletedAt { get; set; }
@@ -644,8 +645,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     /// </summary>
     public sealed class GeoDistributionManager
     {
-        private readonly ConcurrentDictionary<string, GeoRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, RegionHealthMetrics> _healthMetrics = new();
+        private readonly BoundedDictionary<string, GeoRegion> _regions = new BoundedDictionary<string, GeoRegion>(1000);
+        private readonly BoundedDictionary<string, RegionHealthMetrics> _healthMetrics = new BoundedDictionary<string, RegionHealthMetrics>(1000);
         private TimeSpan _rpoTarget = TimeSpan.FromSeconds(5);
         private TimeSpan _rtoTarget = TimeSpan.FromSeconds(30);
 
@@ -788,9 +789,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     /// </summary>
     public sealed class GlobalActiveStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GlobalRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock, string OriginRegion)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastSyncTimes = new();
+        private readonly BoundedDictionary<string, GlobalRegion> _regions = new BoundedDictionary<string, GlobalRegion>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, string OriginRegion)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, string OriginRegion)>(1000);
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastSyncTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
         private bool _enableConflictFreeRouting = true;
 
         /// <summary>

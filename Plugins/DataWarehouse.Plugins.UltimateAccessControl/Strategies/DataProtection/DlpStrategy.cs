@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 {
@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
     /// </remarks>
     public sealed class DlpStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DlpRule> _rules = new();
+        private readonly BoundedDictionary<string, DlpRule> _rules = new BoundedDictionary<string, DlpRule>(1000);
         private readonly List<string> _sensitiveKeywords = new();
         private bool _blockOnDetection = false;
 

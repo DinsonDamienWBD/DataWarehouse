@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -24,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class AutoTieringFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, ObjectAccessMetrics> _accessMetrics = new();
-        private readonly ConcurrentDictionary<string, ObjectTieringInfo> _tieringInfo = new();
-        private readonly ConcurrentDictionary<string, TieringPolicy> _policies = new();
+        private readonly BoundedDictionary<string, ObjectAccessMetrics> _accessMetrics = new BoundedDictionary<string, ObjectAccessMetrics>(1000);
+        private readonly BoundedDictionary<string, ObjectTieringInfo> _tieringInfo = new BoundedDictionary<string, ObjectTieringInfo>(1000);
+        private readonly BoundedDictionary<string, TieringPolicy> _policies = new BoundedDictionary<string, TieringPolicy>(1000);
         private readonly Timer _tieringTimer;
         private bool _disposed;
 

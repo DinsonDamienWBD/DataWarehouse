@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class WormStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, WormRecord> _records = new();
+        private readonly BoundedDictionary<string, WormRecord> _records = new BoundedDictionary<string, WormRecord>(1000);
         private TimeSpan _defaultRetentionPeriod = TimeSpan.FromDays(7 * 365); // 7 years default
 
         /// <inheritdoc/>

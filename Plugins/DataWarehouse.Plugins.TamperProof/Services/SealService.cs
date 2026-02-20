@@ -4,10 +4,10 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -171,8 +171,8 @@ public record SealInfo(
 /// </summary>
 public class SealService : ISealService
 {
-    private readonly ConcurrentDictionary<Guid, SealRecord> _blockSeals = new();
-    private readonly ConcurrentDictionary<(Guid BlockId, int ShardIndex), SealRecord> _shardSeals = new();
+    private readonly BoundedDictionary<Guid, SealRecord> _blockSeals = new BoundedDictionary<Guid, SealRecord>(1000);
+    private readonly BoundedDictionary<(Guid BlockId, int ShardIndex), SealRecord> _shardSeals = new BoundedDictionary<(Guid BlockId, int ShardIndex), SealRecord>(1000);
     private readonly List<RangeSealRecord> _rangeSeals = new();
     private readonly object _rangeSealLock = new();
     private readonly IStorageProvider? _persistentStorage;

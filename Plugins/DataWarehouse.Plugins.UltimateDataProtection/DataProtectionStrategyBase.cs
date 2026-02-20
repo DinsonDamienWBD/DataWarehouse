@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -28,9 +27,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     {
         private readonly DataProtectionStatistics _statistics = new();
         private readonly object _statsLock = new();
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeOperations = new();
-        private readonly ConcurrentDictionary<string, BackupProgress> _backupProgress = new();
-        private readonly ConcurrentDictionary<string, RestoreProgress> _restoreProgress = new();
+        private readonly BoundedDictionary<string, CancellationTokenSource> _activeOperations = new BoundedDictionary<string, CancellationTokenSource>(1000);
+        private readonly BoundedDictionary<string, BackupProgress> _backupProgress = new BoundedDictionary<string, BackupProgress>(1000);
+        private readonly BoundedDictionary<string, RestoreProgress> _restoreProgress = new BoundedDictionary<string, RestoreProgress>(1000);
 
         /// <summary>
         /// Message bus for Intelligence communication.

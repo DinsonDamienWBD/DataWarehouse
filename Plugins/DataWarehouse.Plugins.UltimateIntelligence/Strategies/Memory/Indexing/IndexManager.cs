@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -20,8 +20,8 @@ public sealed class IndexManager : IAsyncDisposable
     private readonly CompositeContextIndex _compositeIndex;
     private readonly Channel<IndexingTask> _indexingChannel;
     private readonly CancellationTokenSource _shutdownCts = new();
-    private readonly ConcurrentDictionary<string, IndexVersion> _indexVersions = new();
-    private readonly ConcurrentDictionary<string, ConsistencyCheckResult> _lastConsistencyChecks = new();
+    private readonly BoundedDictionary<string, IndexVersion> _indexVersions = new BoundedDictionary<string, IndexVersion>(1000);
+    private readonly BoundedDictionary<string, ConsistencyCheckResult> _lastConsistencyChecks = new BoundedDictionary<string, ConsistencyCheckResult>(1000);
     private readonly Task _backgroundWorker;
     private readonly Timer _optimizationTimer;
     private readonly Timer _consistencyTimer;

@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 
@@ -29,10 +30,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 /// </summary>
 internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, LoRaWanDeviceState> _devices = new();
-    private readonly ConcurrentDictionary<string, List<StreamMessage>> _uplinkMessages = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<StreamMessage>> _downlinkQueues = new();
-    private readonly ConcurrentDictionary<string, LoRaWanGatewayState> _gateways = new();
+    private readonly BoundedDictionary<string, LoRaWanDeviceState> _devices = new BoundedDictionary<string, LoRaWanDeviceState>(1000);
+    private readonly BoundedDictionary<string, List<StreamMessage>> _uplinkMessages = new BoundedDictionary<string, List<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<StreamMessage>> _downlinkQueues = new BoundedDictionary<string, ConcurrentQueue<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, LoRaWanGatewayState> _gateways = new BoundedDictionary<string, LoRaWanGatewayState>(1000);
     private long _nextFrameCounter;
     private long _totalUplinks;
 

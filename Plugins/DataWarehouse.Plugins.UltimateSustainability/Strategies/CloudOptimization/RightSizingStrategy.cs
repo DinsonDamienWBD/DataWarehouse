@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimization;
 
@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 /// </summary>
 public sealed class RightSizingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ResourceUtilization> _resources = new();
+    private readonly BoundedDictionary<string, ResourceUtilization> _resources = new BoundedDictionary<string, ResourceUtilization>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "right-sizing";

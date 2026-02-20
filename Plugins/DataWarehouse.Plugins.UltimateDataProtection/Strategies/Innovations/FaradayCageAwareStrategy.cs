@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -23,8 +23,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class FaradayCageAwareStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ShieldedBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, EnvironmentAssessment> _assessments = new();
+        private readonly BoundedDictionary<string, ShieldedBackup> _backups = new BoundedDictionary<string, ShieldedBackup>(1000);
+        private readonly BoundedDictionary<string, EnvironmentAssessment> _assessments = new BoundedDictionary<string, EnvironmentAssessment>(1000);
 
         /// <summary>
         /// Interface for RF environment detection.

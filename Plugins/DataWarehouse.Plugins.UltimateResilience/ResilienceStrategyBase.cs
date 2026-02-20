@@ -202,7 +202,7 @@ public sealed class ResilienceStatistics
 /// </summary>
 public abstract class ResilienceStrategyBase : IResilienceStrategy
 {
-    private readonly ConcurrentDictionary<string, long> _metrics = new();
+    private readonly BoundedDictionary<string, long> _metrics = new BoundedDictionary<string, long>(1000);
     private readonly ConcurrentQueue<TimeSpan> _executionTimes = new();
     private readonly object _statsLock = new();
     private long _totalExecutions;

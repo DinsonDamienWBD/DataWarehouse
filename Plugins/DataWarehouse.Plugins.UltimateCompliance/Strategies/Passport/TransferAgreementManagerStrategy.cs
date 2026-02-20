@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -19,9 +19,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 /// </summary>
 public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TransferAgreementRecord> _agreements = new();
-    private readonly ConcurrentDictionary<string, TransferAgreementRecord> _agreementsById = new();
-    private readonly ConcurrentDictionary<string, List<AgreementAuditEntry>> _auditLog = new();
+    private readonly BoundedDictionary<string, TransferAgreementRecord> _agreements = new BoundedDictionary<string, TransferAgreementRecord>(1000);
+    private readonly BoundedDictionary<string, TransferAgreementRecord> _agreementsById = new BoundedDictionary<string, TransferAgreementRecord>(1000);
+    private readonly BoundedDictionary<string, List<AgreementAuditEntry>> _auditLog = new BoundedDictionary<string, List<AgreementAuditEntry>>(1000);
     private readonly object _auditLock = new();
 
     private long _agreementsCreated;
@@ -210,7 +210,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         var key = BuildKey(sourceJurisdiction, destJurisdiction);
         _agreements.TryGetValue(key, out var agreement);
 
-        return Task.FromResult(agreement);
+        return Task.FromResult<TransferAgreementRecord?>(agreement);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.CostTracking;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.CostTracking;
 /// </summary>
 public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<UsageRecord>> _usageRecords = new();
+    private readonly BoundedDictionary<string, List<UsageRecord>> _usageRecords = new BoundedDictionary<string, List<UsageRecord>>(1000);
 
     public override string StrategyId => "cost-usage-analytics";
     public override string DisplayName => "Usage Analytics";
@@ -166,7 +166,7 @@ public sealed class CostEstimationStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class BudgetAlertingStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Budget> _budgets = new();
+    private readonly BoundedDictionary<string, Budget> _budgets = new BoundedDictionary<string, Budget>(1000);
 
     public override string StrategyId => "cost-budget-alerting";
     public override string DisplayName => "Budget Alerting";

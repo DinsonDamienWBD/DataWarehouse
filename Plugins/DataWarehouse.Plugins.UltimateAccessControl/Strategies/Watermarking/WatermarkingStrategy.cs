@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Watermarking
 {
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Watermarking
     /// </remarks>
     public sealed class WatermarkingStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, WatermarkRecord> _watermarks = new();
+        private readonly BoundedDictionary<string, WatermarkRecord> _watermarks = new BoundedDictionary<string, WatermarkRecord>(1000);
         private byte[]? _signingKey;
         private const int WatermarkSize = 32; // 256-bit watermark
 

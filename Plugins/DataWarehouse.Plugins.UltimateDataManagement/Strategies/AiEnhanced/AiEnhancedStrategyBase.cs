@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -195,7 +194,7 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
 {
     private readonly object _statsLock = new();
     private readonly AiEnhancedStatistics _aiStats = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<MessageResponse>> _pendingRequests = new();
+    private readonly BoundedDictionary<string, TaskCompletionSource<MessageResponse>> _pendingRequests = new BoundedDictionary<string, TaskCompletionSource<MessageResponse>>(1000);
     private readonly List<IDisposable> _subscriptions = new();
 
     private volatile bool _intelligenceAvailable;

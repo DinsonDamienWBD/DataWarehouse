@@ -1,10 +1,10 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.Shared.Models;
 using DataWarehouse.Shared.Services;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Commands;
 
@@ -20,7 +20,7 @@ namespace DataWarehouse.Shared.Commands;
 /// </summary>
 public sealed class CommandExecutor
 {
-    private readonly ConcurrentDictionary<string, ICommand> _commands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ICommand> _commands = new BoundedDictionary<string, ICommand>(1000);
     private readonly InstanceManager _instanceManager;
     private readonly CapabilityManager _capabilityManager;
     private readonly List<ICommand> _allCommands = new();

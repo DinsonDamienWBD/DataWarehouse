@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -1383,7 +1382,7 @@ public sealed class IntelligenceTestReport
 /// </summary>
 public sealed class TemporalKnowledgeStore
 {
-    private readonly ConcurrentDictionary<string, List<(DateTimeOffset Timestamp, KnowledgeObject Knowledge)>> _store = new();
+    private readonly BoundedDictionary<string, List<(DateTimeOffset Timestamp, KnowledgeObject Knowledge)>> _store = new BoundedDictionary<string, List<(DateTimeOffset Timestamp, KnowledgeObject Knowledge)>>(1000);
     private readonly object _lock = new();
 
     /// <summary>

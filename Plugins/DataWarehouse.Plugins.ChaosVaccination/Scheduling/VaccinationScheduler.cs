@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -29,9 +28,9 @@ public sealed class VaccinationScheduler : IVaccinationScheduler, IDisposable, I
 {
     private readonly IChaosInjectionEngine _engine;
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, VaccinationSchedule> _schedules = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRunTimes = new();
-    private readonly ConcurrentDictionary<string, int> _runningCounts = new();
+    private readonly BoundedDictionary<string, VaccinationSchedule> _schedules = new BoundedDictionary<string, VaccinationSchedule>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastRunTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, int> _runningCounts = new BoundedDictionary<string, int>(1000);
     private readonly Timer _tickTimer;
     private readonly Random _random = new();
     private readonly object _tickLock = new();
@@ -139,7 +138,7 @@ public sealed class VaccinationScheduler : IVaccinationScheduler, IDisposable, I
     {
         ct.ThrowIfCancellationRequested();
         _schedules.TryGetValue(scheduleId, out var schedule);
-        return Task.FromResult(schedule);
+        return Task.FromResult<VaccinationSchedule?>(schedule);
     }
 
     /// <inheritdoc/>

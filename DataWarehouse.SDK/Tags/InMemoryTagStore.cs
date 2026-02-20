@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Tags
 {
@@ -84,7 +85,7 @@ namespace DataWarehouse.SDK.Tags
     [SdkCompatibility("5.0.0", Notes = "Phase 55: Tag store and attachment service")]
     public sealed class InMemoryTagStore : ITagStore
     {
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<TagKey, Tag>> _store = new(StringComparer.Ordinal);
+        private readonly BoundedDictionary<string, BoundedDictionary<TagKey, Tag>> _store = new BoundedDictionary<string, BoundedDictionary<TagKey, Tag>>(1000);
 
         /// <inheritdoc />
         public Task<Tag?> GetTagAsync(string objectKey, TagKey tagKey, CancellationToken ct = default)
@@ -118,7 +119,7 @@ namespace DataWarehouse.SDK.Tags
         /// <inheritdoc />
         public Task SetTagAsync(string objectKey, Tag tag, CancellationToken ct = default)
         {
-            var objectTags = _store.GetOrAdd(objectKey, _ => new ConcurrentDictionary<TagKey, Tag>());
+            var objectTags = _store.GetOrAdd(objectKey, _ => new BoundedDictionary<TagKey, Tag>(1000));
             objectTags[tag.Key] = tag;
             return Task.CompletedTask;
         }
@@ -137,7 +138,7 @@ namespace DataWarehouse.SDK.Tags
         /// <inheritdoc />
         public Task SetTagsAsync(string objectKey, IEnumerable<Tag> tags, CancellationToken ct = default)
         {
-            var objectTags = _store.GetOrAdd(objectKey, _ => new ConcurrentDictionary<TagKey, Tag>());
+            var objectTags = _store.GetOrAdd(objectKey, _ => new BoundedDictionary<TagKey, Tag>(1000));
             foreach (var tag in tags)
             {
                 objectTags[tag.Key] = tag;

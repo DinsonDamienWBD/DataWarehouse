@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataPrivacy.Strategies.DifferentialPrivacy;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataPrivacy.Strategies.DifferentialPriva
 /// </summary>
 public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PrivacyBudget> _budgets = new();
-    private readonly ConcurrentDictionary<string, List<PrivacyQuery>> _queryHistory = new();
+    private readonly BoundedDictionary<string, PrivacyBudget> _budgets = new BoundedDictionary<string, PrivacyBudget>(1000);
+    private readonly BoundedDictionary<string, List<PrivacyQuery>> _queryHistory = new BoundedDictionary<string, List<PrivacyQuery>>(1000);
 
     public override string StrategyId => "epsilon-delta-tracking";
     public override string DisplayName => "Epsilon-Delta Tracking";
@@ -174,7 +174,7 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
 /// </summary>
 public sealed class FederatedAnalyticsStrategy : DataPrivacyStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FederatedSession> _sessions = new();
+    private readonly BoundedDictionary<string, FederatedSession> _sessions = new BoundedDictionary<string, FederatedSession>(1000);
 
     public override string StrategyId => "federated-analytics";
     public override string DisplayName => "Federated Analytics";
@@ -199,7 +199,7 @@ public sealed class FederatedAnalyticsStrategy : DataPrivacyStrategyBase
             QueryId = queryId,
             QueryType = queryType,
             ParticipantIds = participantIds,
-            Contributions = new ConcurrentDictionary<string, double>(),
+            Contributions = new BoundedDictionary<string, double>(1000),
             Status = FederatedSessionStatus.Collecting,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -590,7 +590,7 @@ public sealed record FederatedSession
     public required string QueryId { get; init; }
     public FederatedQueryType QueryType { get; init; }
     public required string[] ParticipantIds { get; init; }
-    public ConcurrentDictionary<string, double> Contributions { get; init; } = new();
+    public BoundedDictionary<string, double> Contributions { get; init; } = new BoundedDictionary<string, double>(1000);
     public FederatedSessionStatus Status { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }

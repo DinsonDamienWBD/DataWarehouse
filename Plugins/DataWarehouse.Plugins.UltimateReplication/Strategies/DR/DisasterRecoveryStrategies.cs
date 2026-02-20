@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
 {
@@ -86,9 +87,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
     /// </summary>
     public sealed class AsyncDRStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DRSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp, long Checkpoint)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, long> _siteCheckpoints = new();
+        private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, long Checkpoint)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, long Checkpoint)>(1000);
+        private readonly BoundedDictionary<string, long> _siteCheckpoints = new BoundedDictionary<string, long>(1000);
         private string? _primarySiteId;
         private long _currentCheckpoint;
         private int _rpoSeconds = 300; // 5 minutes default
@@ -243,8 +244,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
     /// </summary>
     public sealed class SyncDRStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DRSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new();
+        private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _primarySiteId;
         private int _quorum = 2;
 
@@ -392,10 +393,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
     /// </summary>
     public sealed class ZeroRPOStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DRSite> _sites = new();
+        private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
         private readonly ConcurrentQueue<LogEntry> _transactionLog = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Lsn)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, long> _siteLsn = new();
+        private readonly BoundedDictionary<string, (byte[] Data, long Lsn)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Lsn)>(1000);
+        private readonly BoundedDictionary<string, long> _siteLsn = new BoundedDictionary<string, long>(1000);
         private long _currentLsn;
         private string? _primarySiteId;
 
@@ -560,8 +561,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
     /// </summary>
     public sealed class ActivePassiveStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DRSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new();
+        private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _activeSiteId;
         private readonly List<FailoverEvent> _failoverHistory = new();
         private bool _autoFailoverEnabled = true;
@@ -788,9 +789,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
     /// </summary>
     public sealed class FailoverDRStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DRSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _rollbackStore = new();
+        private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _rollbackStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _currentPrimary;
         private string? _previousPrimary;
         private FailoverStatus _currentStatus = FailoverStatus.NotStarted;

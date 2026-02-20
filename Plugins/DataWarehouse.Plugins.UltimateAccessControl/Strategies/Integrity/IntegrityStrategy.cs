@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class IntegrityStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, IntegrityRecord> _integrityRecords = new();
+        private readonly BoundedDictionary<string, IntegrityRecord> _integrityRecords = new BoundedDictionary<string, IntegrityRecord>(1000);
         private HashAlgorithmName _hashAlgorithm = HashAlgorithmName.SHA256;
         private bool _requireIntegrityOnAccess = true;
         private TimeSpan _reverificationInterval = TimeSpan.FromHours(24);

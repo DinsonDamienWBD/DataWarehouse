@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     /// </summary>
     public sealed class BiometricStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, List<BiometricTemplate>> _userTemplates = new();
+        private readonly BoundedDictionary<string, List<BiometricTemplate>> _userTemplates = new BoundedDictionary<string, List<BiometricTemplate>>(1000);
         private const double DefaultMatchThreshold = 0.85; // 85% similarity required
         private const int MaxTemplatesPerUser = 5;
 

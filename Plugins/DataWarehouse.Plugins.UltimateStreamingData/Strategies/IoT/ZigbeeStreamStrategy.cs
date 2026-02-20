@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 
@@ -31,10 +31,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 /// </summary>
 internal sealed class ZigbeeStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, ZigbeeDeviceState> _devices = new();
-    private readonly ConcurrentDictionary<string, List<StreamMessage>> _clusterMessages = new();
-    private readonly ConcurrentDictionary<string, ZigbeeGroupState> _groups = new();
-    private readonly ConcurrentDictionary<string, List<ZigbeeBinding>> _bindingTable = new();
+    private readonly BoundedDictionary<string, ZigbeeDeviceState> _devices = new BoundedDictionary<string, ZigbeeDeviceState>(1000);
+    private readonly BoundedDictionary<string, List<StreamMessage>> _clusterMessages = new BoundedDictionary<string, List<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, ZigbeeGroupState> _groups = new BoundedDictionary<string, ZigbeeGroupState>(1000);
+    private readonly BoundedDictionary<string, List<ZigbeeBinding>> _bindingTable = new BoundedDictionary<string, List<ZigbeeBinding>>(1000);
     private long _nextSequenceNumber;
     private long _nextNwkAddress = 1; // 0x0000 is coordinator
     private long _totalFramesSent;

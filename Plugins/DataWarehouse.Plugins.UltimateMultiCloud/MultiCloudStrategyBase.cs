@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud;
 
@@ -110,7 +110,7 @@ public abstract class MultiCloudStrategyBase : IMultiCloudStrategy
     private long _failedExecutions;
     private DateTimeOffset? _lastSuccess;
     private DateTimeOffset? _lastFailure;
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
@@ -231,7 +231,7 @@ public abstract class MultiCloudStrategyBase : IMultiCloudStrategy
 /// </summary>
 public sealed class MultiCloudStrategyRegistry : IMultiCloudStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IMultiCloudStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IMultiCloudStrategy> _strategies = new BoundedDictionary<string, IMultiCloudStrategy>(1000);
 
     /// <summary>
     /// Discovers and registers strategies from an assembly.

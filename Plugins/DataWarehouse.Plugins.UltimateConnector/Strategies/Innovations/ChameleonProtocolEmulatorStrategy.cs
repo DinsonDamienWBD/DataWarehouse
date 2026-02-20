@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
@@ -9,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class ChameleonProtocolEmulatorStrategy : ConnectionStrategyBase
     {
-        private static readonly ConcurrentDictionary<string, byte[]> ProtocolHandshakes = new()
+        private static readonly BoundedDictionary<string, byte[]> ProtocolHandshakes = new BoundedDictionary<string, byte[]>(100)
         {
             ["tds-7.0"] = BuildTdsPreLoginResponse(),
             ["net8"] = BuildOracleNet8Accept(),

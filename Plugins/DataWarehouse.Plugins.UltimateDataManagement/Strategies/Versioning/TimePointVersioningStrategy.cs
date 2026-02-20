@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -22,7 +22,7 @@ public sealed class TimePointVersioningStrategy : VersioningStrategyBase
     private const int DefaultSnapshotIntervalMs = 60000; // 1 minute
     private const int DefaultRetentionDays = 30;
 
-    private readonly ConcurrentDictionary<string, ObjectTimePointStore> _stores = new();
+    private readonly BoundedDictionary<string, ObjectTimePointStore> _stores = new BoundedDictionary<string, ObjectTimePointStore>(1000);
     private int _snapshotIntervalMs = DefaultSnapshotIntervalMs;
     private int _retentionDays = DefaultRetentionDays;
 

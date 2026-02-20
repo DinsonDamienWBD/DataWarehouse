@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
 {
@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
     /// </remarks>
     public sealed class CedarStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CedarPolicy> _policies = new();
+        private readonly BoundedDictionary<string, CedarPolicy> _policies = new BoundedDictionary<string, CedarPolicy>(1000);
         private readonly HttpClient _httpClient = new();
         private string? _cedarEndpoint;
         private TimeSpan _requestTimeout = TimeSpan.FromSeconds(5);

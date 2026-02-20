@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.CostOptimization;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.CostOptimization;
 /// </summary>
 public sealed class CrossCloudCostAnalysisStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ProviderCostData> _costData = new();
+    private readonly BoundedDictionary<string, ProviderCostData> _costData = new BoundedDictionary<string, ProviderCostData>(1000);
 
     public override string StrategyId => "cost-analysis";
     public override string StrategyName => "Cross-Cloud Cost Analysis";
@@ -117,7 +117,7 @@ public sealed class CrossCloudCostAnalysisStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class SpotInstanceOptimizationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SpotPricing> _spotPrices = new();
+    private readonly BoundedDictionary<string, SpotPricing> _spotPrices = new BoundedDictionary<string, SpotPricing>(1000);
 
     public override string StrategyId => "cost-spot-optimization";
     public override string StrategyName => "Spot Instance Optimization";
@@ -179,7 +179,7 @@ public sealed class SpotInstanceOptimizationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class ReservedCapacityStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ReservedCapacity> _reservations = new();
+    private readonly BoundedDictionary<string, ReservedCapacity> _reservations = new BoundedDictionary<string, ReservedCapacity>(1000);
 
     public override string StrategyId => "cost-reserved-capacity";
     public override string StrategyName => "Reserved Capacity Optimization";
@@ -250,7 +250,7 @@ public sealed class ReservedCapacityStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class EgressOptimizationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EgressPricing> _egressPricing = new();
+    private readonly BoundedDictionary<string, EgressPricing> _egressPricing = new BoundedDictionary<string, EgressPricing>(1000);
 
     public override string StrategyId => "cost-egress-optimization";
     public override string StrategyName => "Egress Cost Optimization";
@@ -333,7 +333,7 @@ public sealed class EgressOptimizationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class StorageTierOptimizationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StorageTierPricing> _tierPricing = new();
+    private readonly BoundedDictionary<string, StorageTierPricing> _tierPricing = new BoundedDictionary<string, StorageTierPricing>(1000);
 
     public override string StrategyId => "cost-storage-tier";
     public override string StrategyName => "Storage Tier Optimization";
@@ -398,7 +398,7 @@ public sealed class StorageTierOptimizationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class AiCostPredictionStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<CostDataPoint>> _historicalData = new();
+    private readonly BoundedDictionary<string, List<CostDataPoint>> _historicalData = new BoundedDictionary<string, List<CostDataPoint>>(1000);
 
     public override string StrategyId => "cost-ai-prediction";
     public override string StrategyName => "AI Cost Prediction";

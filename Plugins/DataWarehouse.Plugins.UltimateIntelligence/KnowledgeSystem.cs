@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -173,8 +172,8 @@ public sealed class AggregatedKnowledge
 /// </summary>
 public sealed class KnowledgeAggregator : IDisposable
 {
-    private readonly ConcurrentDictionary<string, IKnowledgeSource> _sources = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, CachedKnowledge> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IKnowledgeSource> _sources = new BoundedDictionary<string, IKnowledgeSource>(1000);
+    private readonly BoundedDictionary<string, CachedKnowledge> _cache = new BoundedDictionary<string, CachedKnowledge>(1000);
     private readonly SemaphoreSlim _aggregationLock = new(1, 1);
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
     private bool _disposed;
@@ -726,8 +725,8 @@ public sealed class HotReloadHandler : IDisposable
 /// </summary>
 public sealed class CapabilityMatrix
 {
-    private readonly ConcurrentDictionary<string, HashSet<KnowledgeCapability>> _matrix = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, HashSet<string>> _capabilityToPlugins = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, HashSet<KnowledgeCapability>> _matrix = new BoundedDictionary<string, HashSet<KnowledgeCapability>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _capabilityToPlugins = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _updateLock = new();
 
     /// <summary>
@@ -1147,7 +1146,7 @@ public sealed class ContextBuilder
 /// </summary>
 public sealed class DomainSelector
 {
-    private readonly ConcurrentDictionary<string, CachedDomainSelection> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, CachedDomainSelection> _cache = new BoundedDictionary<string, CachedDomainSelection>(1000);
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
     private readonly KnowledgeAggregator _aggregator;
 
@@ -1345,8 +1344,8 @@ public sealed class StateAggregator : IDisposable
 {
     private readonly IKernelContext? _kernelContext;
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, PluginState> _pluginStates = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, object> _metrics = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, PluginState> _pluginStates = new BoundedDictionary<string, PluginState>(1000);
+    private readonly BoundedDictionary<string, object> _metrics = new BoundedDictionary<string, object>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private int _activeOperations;
     private int _activeConnections;
@@ -1622,7 +1621,7 @@ public sealed class CommandParameter
 /// </summary>
 public sealed class CommandRegistry
 {
-    private readonly ConcurrentDictionary<string, CommandDefinition> _commands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, CommandDefinition> _commands = new BoundedDictionary<string, CommandDefinition>(1000);
 
     /// <summary>
     /// Registers a command.
@@ -1918,7 +1917,7 @@ public interface IKnowledgeHandler
 /// </summary>
 public sealed class KnowledgeRouter
 {
-    private readonly ConcurrentDictionary<string, IKnowledgeHandler> _handlers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IKnowledgeHandler> _handlers = new BoundedDictionary<string, IKnowledgeHandler>(1000);
 
     /// <summary>
     /// Registers a knowledge handler.
@@ -2261,9 +2260,9 @@ public interface ICommandHandler
 public sealed class CommandExecutor
 {
     private readonly CommandRegistry _registry;
-    private readonly ConcurrentDictionary<string, ICommandHandler> _handlers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ICommandHandler> _handlers = new BoundedDictionary<string, ICommandHandler>(1000);
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, AuditEntry> _auditLog = new();
+    private readonly BoundedDictionary<string, AuditEntry> _auditLog = new BoundedDictionary<string, AuditEntry>(1000);
 
     /// <summary>
     /// Creates a new command executor.

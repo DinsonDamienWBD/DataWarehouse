@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 {
@@ -37,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
     {
         private readonly HttpClient _httpClient;
         private OnePasswordConnectConfig _config = new();
-        private readonly ConcurrentDictionary<string, byte[]> _keyCache = new();
-        private readonly ConcurrentDictionary<string, string> _itemIdCache = new(); // keyId -> itemId
+        private readonly BoundedDictionary<string, byte[]> _keyCache = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, string> _itemIdCache = new BoundedDictionary<string, string>(1000); // keyId -> itemId
         private string? _currentKeyId;
         private string? _resolvedVaultId;
 

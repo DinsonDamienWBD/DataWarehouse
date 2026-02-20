@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -32,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class SelfHealingConnectionPoolStrategy : ConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PoolMetrics> _poolMetrics = new();
-        private readonly ConcurrentDictionary<string, Timer> _healthTimers = new();
+        private readonly BoundedDictionary<string, PoolMetrics> _poolMetrics = new BoundedDictionary<string, PoolMetrics>(1000);
+        private readonly BoundedDictionary<string, Timer> _healthTimers = new BoundedDictionary<string, Timer>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-self-healing-pool";

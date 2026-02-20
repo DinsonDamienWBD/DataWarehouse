@@ -107,7 +107,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
 {
     private readonly GreenTieringPolicyEngine _policyEngine;
     private readonly ConcurrentQueue<GreenMigrationBatch> _pendingBatches = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastScanTimes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastScanTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
     private Timer? _scanTimer;
     private volatile bool _scanning;
 

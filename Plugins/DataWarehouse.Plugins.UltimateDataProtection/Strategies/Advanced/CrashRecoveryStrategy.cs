@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 {
@@ -23,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
     /// </remarks>
     public sealed class CrashRecoveryStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TransactionLog> _transactionLogs = new();
-        private readonly ConcurrentDictionary<string, Checkpoint> _checkpoints = new();
+        private readonly BoundedDictionary<string, TransactionLog> _transactionLogs = new BoundedDictionary<string, TransactionLog>(1000);
+        private readonly BoundedDictionary<string, Checkpoint> _checkpoints = new BoundedDictionary<string, Checkpoint>(1000);
         private readonly ConcurrentQueue<LogEntry> _writeAheadLog = new();
         private long _currentLogSequenceNumber = 0;
         private readonly object _logLock = new();

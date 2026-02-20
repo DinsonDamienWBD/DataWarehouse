@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -52,7 +51,7 @@ public sealed class FabricResult
 
 public sealed class FabricStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, FabricStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, FabricStrategyBase> _strategies = new BoundedDictionary<string, FabricStrategyBase>(1000);
     public int Count => _strategies.Count;
     public IReadOnlyCollection<string> RegisteredStrategies => _strategies.Keys.ToList().AsReadOnly();
     public void Register(FabricStrategyBase strategy) => _strategies[strategy.StrategyId] = strategy;

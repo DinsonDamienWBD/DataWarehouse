@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -11,9 +11,9 @@ public sealed class WinFspCacheManager : IDisposable
 {
     private readonly CacheConfig _readConfig;
     private readonly CacheConfig _writeConfig;
-    private readonly ConcurrentDictionary<string, CacheEntry> _readCache;
-    private readonly ConcurrentDictionary<string, WriteBuffer> _writeBuffers;
-    private readonly ConcurrentDictionary<string, AccessPattern> _accessPatterns;
+    private readonly BoundedDictionary<string, CacheEntry> _readCache;
+    private readonly BoundedDictionary<string, WriteBuffer> _writeBuffers;
+    private readonly BoundedDictionary<string, AccessPattern> _accessPatterns;
     private readonly SemaphoreSlim _flushLock;
     private readonly Timer _flushTimer;
     private readonly Timer _evictionTimer;
@@ -33,9 +33,9 @@ public sealed class WinFspCacheManager : IDisposable
     {
         _readConfig = readConfig ?? throw new ArgumentNullException(nameof(readConfig));
         _writeConfig = writeConfig ?? throw new ArgumentNullException(nameof(writeConfig));
-        _readCache = new ConcurrentDictionary<string, CacheEntry>(StringComparer.OrdinalIgnoreCase);
-        _writeBuffers = new ConcurrentDictionary<string, WriteBuffer>(StringComparer.OrdinalIgnoreCase);
-        _accessPatterns = new ConcurrentDictionary<string, AccessPattern>(StringComparer.OrdinalIgnoreCase);
+        _readCache = new BoundedDictionary<string, CacheEntry>(1000);
+        _writeBuffers = new BoundedDictionary<string, WriteBuffer>(1000);
+        _accessPatterns = new BoundedDictionary<string, AccessPattern>(1000);
         _flushLock = new SemaphoreSlim(1, 1);
         _cts = new CancellationTokenSource();
 

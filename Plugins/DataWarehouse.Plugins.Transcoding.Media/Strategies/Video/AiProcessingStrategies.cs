@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 /// </summary>
 internal sealed class OnnxInferenceStrategy : MediaStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OnnxModelInfo> _loadedModels = new();
+    private readonly BoundedDictionary<string, OnnxModelInfo> _loadedModels = new BoundedDictionary<string, OnnxModelInfo>(1000);
     private string _modelBasePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "DataWarehouse", "Models");

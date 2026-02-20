@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 
@@ -70,9 +71,9 @@ public sealed record LineagePropagationEvent(
 /// </remarks>
 internal sealed class MultiHopLineageBfsStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConsciousnessScore?> _scoreCache = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _upstreamLinks = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _downstreamLinks = new();
+    private readonly BoundedDictionary<string, ConsciousnessScore?> _scoreCache = new BoundedDictionary<string, ConsciousnessScore?>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _upstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _downstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "consciousness-multihop-bfs";

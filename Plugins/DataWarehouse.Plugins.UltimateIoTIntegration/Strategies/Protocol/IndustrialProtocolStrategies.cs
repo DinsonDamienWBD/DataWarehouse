@@ -1,12 +1,12 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Protocol;
 
@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Protocol;
 /// </summary>
 public class Dnp3ProtocolStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<int, Dnp3OutstationState> _outstations = new();
+    private readonly BoundedDictionary<int, Dnp3OutstationState> _outstations = new BoundedDictionary<int, Dnp3OutstationState>(1000);
     private int _masterAddress = 1;
     private int _sequenceNumber;
     private readonly object _seqLock = new();
@@ -311,11 +311,11 @@ internal sealed class Dnp3OutstationState
     public string Name { get; init; } = string.Empty;
     public bool IsOnline { get; set; }
     public DateTimeOffset LastTimeSync { get; set; }
-    public ConcurrentDictionary<int, bool> BinaryInputs { get; } = new();
-    public ConcurrentDictionary<int, bool> BinaryOutputs { get; } = new();
-    public ConcurrentDictionary<int, double> AnalogInputs { get; } = new();
-    public ConcurrentDictionary<int, double> AnalogOutputs { get; } = new();
-    public ConcurrentDictionary<int, long> Counters { get; } = new();
+    public BoundedDictionary<int, bool> BinaryInputs { get; } = new BoundedDictionary<int, bool>(1000);
+    public BoundedDictionary<int, bool> BinaryOutputs { get; } = new BoundedDictionary<int, bool>(1000);
+    public BoundedDictionary<int, double> AnalogInputs { get; } = new BoundedDictionary<int, double>(1000);
+    public BoundedDictionary<int, double> AnalogOutputs { get; } = new BoundedDictionary<int, double>(1000);
+    public BoundedDictionary<int, long> Counters { get; } = new BoundedDictionary<int, long>(1000);
 }
 
 #endregion
@@ -336,7 +336,7 @@ internal sealed class Dnp3OutstationState
 /// </summary>
 public class Iec104ProtocolStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Iec104ConnectionState> _connections = new();
+    private readonly BoundedDictionary<string, Iec104ConnectionState> _connections = new BoundedDictionary<string, Iec104ConnectionState>(1000);
     private int _sendSequence;
     private int _recvSequence;
 
@@ -554,8 +554,8 @@ internal sealed class Iec104ConnectionState
 /// </summary>
 public class CanBusProtocolStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<uint, CanSignalDefinition> _signalDatabase = new();
-    private readonly ConcurrentDictionary<int, J1939SourceAddress> _j1939AddressTable = new();
+    private readonly BoundedDictionary<uint, CanSignalDefinition> _signalDatabase = new BoundedDictionary<uint, CanSignalDefinition>(1000);
+    private readonly BoundedDictionary<int, J1939SourceAddress> _j1939AddressTable = new BoundedDictionary<int, J1939SourceAddress>(1000);
 
     public override string StrategyId => "canbus";
     public override string StrategyName => "CAN Bus Protocol";
@@ -814,7 +814,7 @@ internal sealed class J1939SourceAddress
 /// </summary>
 public class EnhancedModbusStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<int, ModbusDeviceMap> _deviceMaps = new();
+    private readonly BoundedDictionary<int, ModbusDeviceMap> _deviceMaps = new BoundedDictionary<int, ModbusDeviceMap>(1000);
 
     public override string StrategyId => "modbus-advanced";
     public override string StrategyName => "Enhanced Modbus Protocol";
@@ -1124,8 +1124,8 @@ public enum ModbusDataType
 /// </summary>
 public class EnhancedOpcUaStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OpcUaSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, OpcUaHistoricalData> _historicalData = new();
+    private readonly BoundedDictionary<string, OpcUaSubscription> _subscriptions = new BoundedDictionary<string, OpcUaSubscription>(1000);
+    private readonly BoundedDictionary<string, OpcUaHistoricalData> _historicalData = new BoundedDictionary<string, OpcUaHistoricalData>(1000);
     private int _subscriptionIdCounter;
 
     public override string StrategyId => "opcua-advanced";
@@ -1146,7 +1146,7 @@ public class EnhancedOpcUaStrategy : ProtocolStrategyBase
             SubscriptionId = subId,
             Endpoint = endpoint,
             PublishingInterval = publishingInterval,
-            MonitoredItems = new ConcurrentDictionary<string, OpcUaMonitoredItem>(),
+            MonitoredItems = new BoundedDictionary<string, OpcUaMonitoredItem>(1000),
             CreatedAt = DateTimeOffset.UtcNow,
             IsActive = true
         };
@@ -1316,7 +1316,7 @@ public sealed class OpcUaSubscription
     public required string SubscriptionId { get; init; }
     public required string Endpoint { get; init; }
     public TimeSpan PublishingInterval { get; init; }
-    public ConcurrentDictionary<string, OpcUaMonitoredItem> MonitoredItems { get; init; } = new();
+    public BoundedDictionary<string, OpcUaMonitoredItem> MonitoredItems { get; init; } = new BoundedDictionary<string, OpcUaMonitoredItem>(1000);
     public DateTimeOffset CreatedAt { get; init; }
     public bool IsActive { get; set; }
 }
@@ -1417,9 +1417,9 @@ public enum OpcUaDeadbandType { None, Absolute, Percent }
 /// </summary>
 public class RtosBridgeStrategy : ProtocolStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RtosTaskState> _tasks = new();
+    private readonly BoundedDictionary<string, RtosTaskState> _tasks = new BoundedDictionary<string, RtosTaskState>(1000);
     private RtosPlatform _platform = RtosPlatform.Simulation;
-    private readonly ConcurrentDictionary<int, Action> _interruptHandlers = new();
+    private readonly BoundedDictionary<int, Action> _interruptHandlers = new BoundedDictionary<int, Action>(1000);
 
     public override string StrategyId => "rtos-bridge";
     public override string StrategyName => "RTOS Bridge";

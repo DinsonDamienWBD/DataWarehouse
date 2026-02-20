@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Orchestration;
 
@@ -27,7 +28,7 @@ namespace DataWarehouse.SDK.Federation.Orchestration;
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Cluster-wide topology state")]
 public sealed class ClusterTopology
 {
-    private readonly ConcurrentDictionary<string, NodeTopology> _nodes;
+    private readonly BoundedDictionary<string, NodeTopology> _nodes;
     private readonly ReaderWriterLockSlim _lock;
 
     /// <summary>
@@ -35,7 +36,7 @@ public sealed class ClusterTopology
     /// </summary>
     public ClusterTopology()
     {
-        _nodes = new ConcurrentDictionary<string, NodeTopology>();
+        _nodes = new BoundedDictionary<string, NodeTopology>(1000);
         _lock = new ReaderWriterLockSlim();
     }
 

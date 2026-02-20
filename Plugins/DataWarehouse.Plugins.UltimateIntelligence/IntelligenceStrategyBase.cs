@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -26,7 +26,7 @@ public abstract class IntelligenceStrategyBase : IIntelligenceStrategy
     /// <summary>
     /// Configuration dictionary for this strategy.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, string> Configuration = new();
+    protected readonly BoundedDictionary<string, string> Configuration = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
     public abstract string StrategyId { get; }

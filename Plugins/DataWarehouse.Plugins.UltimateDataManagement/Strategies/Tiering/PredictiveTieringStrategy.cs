@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -16,8 +16,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class PredictiveTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessHistory> _accessHistories = new();
-    private readonly ConcurrentDictionary<string, PredictionResult> _predictions = new();
+    private readonly BoundedDictionary<string, AccessHistory> _accessHistories = new BoundedDictionary<string, AccessHistory>(1000);
+    private readonly BoundedDictionary<string, PredictionResult> _predictions = new BoundedDictionary<string, PredictionResult>(1000);
     private readonly int _historyWindowDays = 90;
     private readonly int _predictionHorizonDays = 30;
     private double _minConfidenceThreshold = 0.7;

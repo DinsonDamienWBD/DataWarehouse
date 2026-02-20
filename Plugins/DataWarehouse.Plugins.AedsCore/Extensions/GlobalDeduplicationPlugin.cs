@@ -5,7 +5,6 @@ using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
 namespace DataWarehouse.Plugins.AedsCore.Extensions;
@@ -16,7 +15,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// </summary>
 public sealed class GlobalDeduplicationPlugin : DataManagementPluginBase
 {
-    private readonly ConcurrentDictionary<string, bool> _localHashes = new();
+    private readonly BoundedDictionary<string, bool> _localHashes = new BoundedDictionary<string, bool>(1000);
     private const int BloomFilterSize = 100_000; // Support 100K unique hashes
     private const double FalsePositiveRate = 0.0001; // 0.01%
 

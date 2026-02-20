@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 /// </remarks>
 public sealed class LinearVersioningStrategy : VersioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectVersionStore> _stores = new();
+    private readonly BoundedDictionary<string, ObjectVersionStore> _stores = new BoundedDictionary<string, ObjectVersionStore>(1000);
     private readonly object _lockObject = new();
 
     /// <summary>

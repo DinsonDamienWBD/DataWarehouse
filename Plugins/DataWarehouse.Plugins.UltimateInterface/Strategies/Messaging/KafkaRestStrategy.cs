@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 
@@ -38,9 +38,9 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 /// </remarks>
 internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, KafkaTopic> _topics = new();
-    private readonly ConcurrentDictionary<string, KafkaConsumerGroup> _consumerGroups = new();
-    private readonly ConcurrentDictionary<string, KafkaConsumerInstance> _consumers = new();
+    private readonly BoundedDictionary<string, KafkaTopic> _topics = new BoundedDictionary<string, KafkaTopic>(1000);
+    private readonly BoundedDictionary<string, KafkaConsumerGroup> _consumerGroups = new BoundedDictionary<string, KafkaConsumerGroup>(1000);
+    private readonly BoundedDictionary<string, KafkaConsumerInstance> _consumers = new BoundedDictionary<string, KafkaConsumerInstance>(1000);
 
     public override string StrategyId => "kafka-rest";
     public string DisplayName => "Kafka REST Proxy";
@@ -379,8 +379,8 @@ internal sealed class KafkaTopic
     public required string Name { get; init; }
     public required int Partitions { get; init; }
     public required int ReplicationFactor { get; init; }
-    private readonly ConcurrentDictionary<int, List<KafkaRecord>> _partitionRecords = new();
-    private readonly ConcurrentDictionary<int, long> _partitionOffsets = new();
+    private readonly BoundedDictionary<int, List<KafkaRecord>> _partitionRecords = new BoundedDictionary<int, List<KafkaRecord>>(1000);
+    private readonly BoundedDictionary<int, long> _partitionOffsets = new BoundedDictionary<int, long>(1000);
 
     public int TotalRecords => _partitionRecords.Values.Sum(list => list.Count);
 

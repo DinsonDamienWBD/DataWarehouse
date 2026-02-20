@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -32,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _baseStoragePath = string.Empty;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, TeamAccessInfo> _teamAccess = new();
-        private readonly ConcurrentDictionary<string, string> _objectToTeam = new();
+        private readonly BoundedDictionary<string, TeamAccessInfo> _teamAccess = new BoundedDictionary<string, TeamAccessInfo>(1000);
+        private readonly BoundedDictionary<string, string> _objectToTeam = new BoundedDictionary<string, string>(1000);
 
         public override string StrategyId => "collaboration-aware";
         public override string Name => "Collaboration-Aware Storage";

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -17,10 +17,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class SemanticClusterIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, ClusterNode> _clusters = new();
-    private readonly ConcurrentDictionary<string, ClusteredEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, string> _entryToCluster = new();
-    private readonly ConcurrentDictionary<string, ClusterHistory> _clusterHistory = new();
+    private readonly BoundedDictionary<string, ClusterNode> _clusters = new BoundedDictionary<string, ClusterNode>(1000);
+    private readonly BoundedDictionary<string, ClusteredEntry> _entries = new BoundedDictionary<string, ClusteredEntry>(1000);
+    private readonly BoundedDictionary<string, string> _entryToCluster = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, ClusterHistory> _clusterHistory = new BoundedDictionary<string, ClusterHistory>(1000);
 
     private const string RootClusterId = "cluster:root";
     private const int DefaultClusterCapacity = 1000;

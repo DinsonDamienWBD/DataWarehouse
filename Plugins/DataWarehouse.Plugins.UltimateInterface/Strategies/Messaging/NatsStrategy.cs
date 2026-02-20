@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 
@@ -36,10 +36,10 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 /// </remarks>
 internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, NatsSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, NatsStream> _jetStreams = new();
-    private readonly ConcurrentDictionary<string, List<NatsMessage>> _subjects = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<NatsMessage>> _replyHandlers = new();
+    private readonly BoundedDictionary<string, NatsSubscription> _subscriptions = new BoundedDictionary<string, NatsSubscription>(1000);
+    private readonly BoundedDictionary<string, NatsStream> _jetStreams = new BoundedDictionary<string, NatsStream>(1000);
+    private readonly BoundedDictionary<string, List<NatsMessage>> _subjects = new BoundedDictionary<string, List<NatsMessage>>(1000);
+    private readonly BoundedDictionary<string, TaskCompletionSource<NatsMessage>> _replyHandlers = new BoundedDictionary<string, TaskCompletionSource<NatsMessage>>(1000);
 
     public override string StrategyId => "nats";
     public string DisplayName => "NATS";

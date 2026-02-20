@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Health;
 
@@ -19,8 +19,8 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
     private volatile bool _isLive = true;
     private volatile bool _isReady = false;
     private volatile bool _isStarted = false;
-    private readonly ConcurrentDictionary<string, HealthCheck> _healthChecks = new();
-    private readonly ConcurrentDictionary<string, string> _metadata = new();
+    private readonly BoundedDictionary<string, HealthCheck> _healthChecks = new BoundedDictionary<string, HealthCheck>(1000);
+    private readonly BoundedDictionary<string, string> _metadata = new BoundedDictionary<string, string>(1000);
 
     public override string StrategyId => "kubernetes-probes";
     public override string Name => "Kubernetes Probes";

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 
@@ -1271,8 +1271,8 @@ public sealed class F2fsOperations : FilesystemOperationsBase
 /// </summary>
 public sealed class TmpfsOperations : FilesystemOperationsBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _fileStore = new();
-    private readonly ConcurrentDictionary<string, FilesystemEntry> _entryStore = new();
+    private readonly BoundedDictionary<string, byte[]> _fileStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, FilesystemEntry> _entryStore = new BoundedDictionary<string, FilesystemEntry>(1000);
     private long _currentSize;
     private long _maxSize;
 

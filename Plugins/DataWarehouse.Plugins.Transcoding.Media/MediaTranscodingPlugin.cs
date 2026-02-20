@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -139,10 +138,10 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
 
     #region Private Fields
 
-    private readonly ConcurrentDictionary<string, TranscodingJobContext> _jobContexts = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellations = new();
-    private readonly ConcurrentDictionary<string, CachedTranscodingResult> _cache = new();
-    private readonly ConcurrentDictionary<string, TranscodingProfile> _customProfiles = new();
+    private readonly BoundedDictionary<string, TranscodingJobContext> _jobContexts = new BoundedDictionary<string, TranscodingJobContext>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _jobCancellations = new BoundedDictionary<string, CancellationTokenSource>(1000);
+    private readonly BoundedDictionary<string, CachedTranscodingResult> _cache = new BoundedDictionary<string, CachedTranscodingResult>(1000);
+    private readonly BoundedDictionary<string, TranscodingProfile> _customProfiles = new BoundedDictionary<string, TranscodingProfile>(1000);
     private readonly PriorityQueue<string, int> _jobQueue = new();
     private readonly SemaphoreSlim _queueLock = new(1, 1);
     private readonly SemaphoreSlim _processingSlots;

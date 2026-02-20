@@ -3,7 +3,7 @@ using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AedsCore;
 
@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 public class ServerDispatcherPlugin : ServerDispatcherPluginBase
 {
     private readonly ILogger<ServerDispatcherPlugin> _logger;
-    private readonly ConcurrentDictionary<string, Task> _activeJobs = new();
+    private readonly BoundedDictionary<string, Task> _activeJobs = new BoundedDictionary<string, Task>(1000);
     private readonly SemaphoreSlim _queueLock = new(1, 1);
     private int _jobCounter = 0;
     private const int MaxQueueDepth = 10_000;

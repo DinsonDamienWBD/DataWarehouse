@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +17,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Engine.FaultInjectors;
 public sealed class LatencySpikeInjector : IFaultInjector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, LatencyState> _activeLatency = new();
+    private readonly BoundedDictionary<string, LatencyState> _activeLatency = new BoundedDictionary<string, LatencyState>(1000);
 
     /// <summary>
     /// Tracks the state of an active latency spike injection.

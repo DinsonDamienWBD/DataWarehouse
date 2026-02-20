@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration;
 
@@ -33,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration;
 public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDisposable
 {
     private readonly DataIntegrationStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, IntegrationPolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, IntegrationPolicy> _policies = new BoundedDictionary<string, IntegrationPolicy>(1000);
     private bool _disposed;
 
     // Configuration
@@ -304,7 +304,7 @@ public sealed record IntegrationStatistics
 /// </summary>
 public sealed class DataIntegrationStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataIntegrationStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IDataIntegrationStrategy> _strategies = new BoundedDictionary<string, IDataIntegrationStrategy>(1000);
 
     public int Count => _strategies.Count;
 

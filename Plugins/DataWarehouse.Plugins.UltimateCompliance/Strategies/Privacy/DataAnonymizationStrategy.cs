@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -34,8 +35,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class DataAnonymizationStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AnonymizationProfile> _profiles = new();
-        private readonly ConcurrentDictionary<string, AnonymizationResult> _resultCache = new();
+        private readonly BoundedDictionary<string, AnonymizationProfile> _profiles = new BoundedDictionary<string, AnonymizationProfile>(1000);
+        private readonly BoundedDictionary<string, AnonymizationResult> _resultCache = new BoundedDictionary<string, AnonymizationResult>(1000);
         private readonly ConcurrentBag<AnonymizationAuditEntry> _auditLog = new();
 
         private int _kAnonymityDefault = 5;

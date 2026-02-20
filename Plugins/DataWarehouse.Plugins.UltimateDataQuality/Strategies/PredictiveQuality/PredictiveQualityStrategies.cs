@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.PredictiveQuality;
 
@@ -113,8 +113,8 @@ internal sealed record CauseCandidate(
 /// </remarks>
 internal sealed class QualityAnticipatorStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<QualityMeasurement>> _metricHistory = new();
-    private readonly ConcurrentDictionary<string, QualityThresholdConfig> _thresholds = new();
+    private readonly BoundedDictionary<string, List<QualityMeasurement>> _metricHistory = new BoundedDictionary<string, List<QualityMeasurement>>(1000);
+    private readonly BoundedDictionary<string, QualityThresholdConfig> _thresholds = new BoundedDictionary<string, QualityThresholdConfig>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "predictive-anticipator";
@@ -300,8 +300,8 @@ internal sealed class QualityAnticipatorStrategy : DataQualityStrategyBase
 /// </remarks>
 internal sealed class DataDriftDetectorStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, double[]> _baselines = new();
-    private readonly ConcurrentDictionary<string, double[]> _currentDistributions = new();
+    private readonly BoundedDictionary<string, double[]> _baselines = new BoundedDictionary<string, double[]>(1000);
+    private readonly BoundedDictionary<string, double[]> _currentDistributions = new BoundedDictionary<string, double[]>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "predictive-drift-detector";
@@ -462,7 +462,7 @@ internal sealed class DataDriftDetectorStrategy : DataQualityStrategyBase
 /// </remarks>
 internal sealed class AnomalousDataFlagStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<double>> _columnValues = new();
+    private readonly BoundedDictionary<string, List<double>> _columnValues = new BoundedDictionary<string, List<double>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "predictive-anomaly-flag";
@@ -619,7 +619,7 @@ internal sealed class AnomalousDataFlagStrategy : DataQualityStrategyBase
 /// </remarks>
 internal sealed class QualityTrendAnalyzerStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<TrendDataPoint>> _trendData = new();
+    private readonly BoundedDictionary<string, List<TrendDataPoint>> _trendData = new BoundedDictionary<string, List<TrendDataPoint>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "predictive-trend-analyzer";
@@ -814,7 +814,7 @@ internal sealed class QualityTrendAnalyzerStrategy : DataQualityStrategyBase
 /// </remarks>
 internal sealed class RootCauseAnalyzerStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<QualityEvent>> _events = new();
+    private readonly BoundedDictionary<string, List<QualityEvent>> _events = new BoundedDictionary<string, List<QualityEvent>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "predictive-root-cause";

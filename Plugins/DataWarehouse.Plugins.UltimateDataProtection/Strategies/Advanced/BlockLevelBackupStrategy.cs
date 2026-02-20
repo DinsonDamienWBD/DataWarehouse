@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 {
@@ -23,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
     /// </remarks>
     public sealed class BlockLevelBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BlockIndex> _blockIndices = new();
-        private readonly ConcurrentDictionary<string, byte[]> _blockStore = new();
+        private readonly BoundedDictionary<string, BlockIndex> _blockIndices = new BoundedDictionary<string, BlockIndex>(1000);
+        private readonly BoundedDictionary<string, byte[]> _blockStore = new BoundedDictionary<string, byte[]>(1000);
         private const int DefaultBlockSize = 4 * 1024 * 1024; // 4 MB
         private const int MinBlockSize = 4 * 1024; // 4 KB
         private const int MaxBlockSize = 64 * 1024 * 1024; // 64 MB

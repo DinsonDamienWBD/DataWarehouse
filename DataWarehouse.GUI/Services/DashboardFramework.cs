@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.GUI.Services;
 
@@ -8,10 +8,10 @@ namespace DataWarehouse.GUI.Services;
 /// </summary>
 public sealed class DashboardFramework
 {
-    private readonly ConcurrentDictionary<string, DashboardModel> _dashboards = new();
-    private readonly ConcurrentDictionary<string, WidgetModel> _widgets = new();
-    private readonly ConcurrentDictionary<string, DataSourceBinding> _dataBindings = new();
-    private readonly ConcurrentDictionary<string, List<DashboardEvent>> _events = new();
+    private readonly BoundedDictionary<string, DashboardModel> _dashboards = new BoundedDictionary<string, DashboardModel>(1000);
+    private readonly BoundedDictionary<string, WidgetModel> _widgets = new BoundedDictionary<string, WidgetModel>(1000);
+    private readonly BoundedDictionary<string, DataSourceBinding> _dataBindings = new BoundedDictionary<string, DataSourceBinding>(1000);
+    private readonly BoundedDictionary<string, List<DashboardEvent>> _events = new BoundedDictionary<string, List<DashboardEvent>>(1000);
 
     /// <summary>
     /// Creates a new dashboard.
@@ -164,7 +164,7 @@ public sealed class DashboardFramework
 /// </summary>
 public sealed class ConnectionManager
 {
-    private readonly ConcurrentDictionary<string, ConnectionInfo> _connections = new();
+    private readonly BoundedDictionary<string, ConnectionInfo> _connections = new BoundedDictionary<string, ConnectionInfo>(1000);
     private string? _activeConnectionId;
 
     /// <summary>
@@ -264,7 +264,7 @@ public sealed class ConnectionManager
 /// </summary>
 public sealed class StorageBrowser
 {
-    private readonly ConcurrentDictionary<string, StorageNode> _nodes = new();
+    private readonly BoundedDictionary<string, StorageNode> _nodes = new BoundedDictionary<string, StorageNode>(1000);
 
     /// <summary>
     /// Lists objects in a storage path.
@@ -348,8 +348,8 @@ public sealed class StorageBrowser
 /// </summary>
 public sealed class ConfigurationEditor
 {
-    private readonly ConcurrentDictionary<string, ConfigEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, List<ConfigChange>> _changeHistory = new();
+    private readonly BoundedDictionary<string, ConfigEntry> _entries = new BoundedDictionary<string, ConfigEntry>(1000);
+    private readonly BoundedDictionary<string, List<ConfigChange>> _changeHistory = new BoundedDictionary<string, List<ConfigChange>>(1000);
 
     /// <summary>
     /// Gets a configuration value.

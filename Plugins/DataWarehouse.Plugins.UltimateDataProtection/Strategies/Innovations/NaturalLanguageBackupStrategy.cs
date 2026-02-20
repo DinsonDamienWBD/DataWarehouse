@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -261,8 +261,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class NaturalLanguageBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, NlBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, CommandHistoryEntry> _commandHistory = new();
+        private readonly BoundedDictionary<string, NlBackup> _backups = new BoundedDictionary<string, NlBackup>(1000);
+        private readonly BoundedDictionary<string, CommandHistoryEntry> _commandHistory = new BoundedDictionary<string, CommandHistoryEntry>(1000);
         private readonly List<CommandSuggestion> _popularCommands = new();
 
         /// <summary>

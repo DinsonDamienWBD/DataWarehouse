@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -389,7 +388,7 @@ public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
     private readonly SustainabilityStatistics _statistics = new();
     private readonly object _statsLock = new();
     private bool _initialized;
-    private readonly ConcurrentDictionary<string, SustainabilityRecommendation> _activeRecommendations = new();
+    private readonly BoundedDictionary<string, SustainabilityRecommendation> _activeRecommendations = new BoundedDictionary<string, SustainabilityRecommendation>(1000);
 
     /// <summary>
     /// Message bus for Intelligence communication.
@@ -743,8 +742,8 @@ public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
 /// </summary>
 public sealed class SustainabilityStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, ISustainabilityStrategy> _strategies =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ISustainabilityStrategy> _strategies =
+        new(1000);
 
     /// <summary>
     /// Registers a strategy.

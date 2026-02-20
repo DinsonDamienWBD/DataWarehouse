@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ContainerOrchestration;
 
@@ -97,9 +97,9 @@ public sealed class CsiIdentityService
 public sealed class CsiControllerService
 {
     private readonly string _driverName;
-    private readonly ConcurrentDictionary<string, CsiVolume> _volumes = new();
-    private readonly ConcurrentDictionary<string, CsiSnapshot> _snapshots = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _publishedVolumes = new();
+    private readonly BoundedDictionary<string, CsiVolume> _volumes = new BoundedDictionary<string, CsiVolume>(1000);
+    private readonly BoundedDictionary<string, CsiSnapshot> _snapshots = new BoundedDictionary<string, CsiSnapshot>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _publishedVolumes = new BoundedDictionary<string, HashSet<string>>(1000);
     private long _totalCapacityBytes = 1024L * 1024 * 1024 * 1024; // 1TB default
     private long _usedCapacityBytes;
 
@@ -304,8 +304,8 @@ public sealed class CsiNodeService
 {
     private readonly string _driverName;
     private readonly string _nodeId;
-    private readonly ConcurrentDictionary<string, StagedVolume> _stagedVolumes = new();
-    private readonly ConcurrentDictionary<string, PublishedVolume> _publishedVolumes = new();
+    private readonly BoundedDictionary<string, StagedVolume> _stagedVolumes = new BoundedDictionary<string, StagedVolume>(1000);
+    private readonly BoundedDictionary<string, PublishedVolume> _publishedVolumes = new BoundedDictionary<string, PublishedVolume>(1000);
 
     public CsiNodeService(string driverName, string? nodeId = null)
     {

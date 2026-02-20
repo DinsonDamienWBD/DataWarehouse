@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Healthcare;
 
@@ -235,9 +236,9 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
     /// <summary>HL7 sub-component separator.</summary>
     private const char SubComponentSeparator = '&';
 
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<Hl7Message>> _messageQueues = new();
-    private readonly ConcurrentDictionary<string, MllpConnectionConfig> _connections = new();
-    private readonly ConcurrentDictionary<string, Hl7Acknowledgment> _ackLog = new();
+    private readonly BoundedDictionary<string, ConcurrentQueue<Hl7Message>> _messageQueues = new BoundedDictionary<string, ConcurrentQueue<Hl7Message>>(1000);
+    private readonly BoundedDictionary<string, MllpConnectionConfig> _connections = new BoundedDictionary<string, MllpConnectionConfig>(1000);
+    private readonly BoundedDictionary<string, Hl7Acknowledgment> _ackLog = new BoundedDictionary<string, Hl7Acknowledgment>(1000);
     private long _totalMessages;
     private long _totalAcks;
     private long _totalErrors;

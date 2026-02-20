@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.EventTriggers;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.EventTriggers;
 /// </summary>
 public sealed class HttpTriggerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HttpTriggerConfig> _triggers = new();
+    private readonly BoundedDictionary<string, HttpTriggerConfig> _triggers = new BoundedDictionary<string, HttpTriggerConfig>(1000);
 
     public override string StrategyId => "trigger-http";
     public override string DisplayName => "HTTP Trigger";
@@ -69,7 +69,7 @@ public sealed class HttpTriggerStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class QueueTriggerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, QueueTriggerConfig> _triggers = new();
+    private readonly BoundedDictionary<string, QueueTriggerConfig> _triggers = new BoundedDictionary<string, QueueTriggerConfig>(1000);
 
     public override string StrategyId => "trigger-queue";
     public override string DisplayName => "Queue Trigger";
@@ -132,7 +132,7 @@ public sealed class QueueTriggerStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class ScheduleTriggerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduleTriggerConfig> _triggers = new();
+    private readonly BoundedDictionary<string, ScheduleTriggerConfig> _triggers = new BoundedDictionary<string, ScheduleTriggerConfig>(1000);
 
     public override string StrategyId => "trigger-schedule";
     public override string DisplayName => "Schedule Trigger";
@@ -205,7 +205,7 @@ public sealed class ScheduleTriggerStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class StreamTriggerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StreamTriggerConfig> _triggers = new();
+    private readonly BoundedDictionary<string, StreamTriggerConfig> _triggers = new BoundedDictionary<string, StreamTriggerConfig>(1000);
 
     public override string StrategyId => "trigger-stream";
     public override string DisplayName => "Stream Trigger";
@@ -270,7 +270,7 @@ public sealed class StreamTriggerStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class StorageTriggerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StorageTriggerConfig> _triggers = new();
+    private readonly BoundedDictionary<string, StorageTriggerConfig> _triggers = new BoundedDictionary<string, StorageTriggerConfig>(1000);
 
     public override string StrategyId => "trigger-storage";
     public override string DisplayName => "Storage Trigger";

@@ -2,7 +2,7 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 /// </summary>
 public sealed class WeightedAverageFusion
 {
-    private readonly ConcurrentDictionary<string, double> _sensorWeights = new();
-    private readonly ConcurrentDictionary<string, List<double>> _recentVariances = new();
+    private readonly BoundedDictionary<string, double> _sensorWeights = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, List<double>> _recentVariances = new BoundedDictionary<string, List<double>>(1000);
 
     /// <summary>
     /// Configures weights for each sensor.

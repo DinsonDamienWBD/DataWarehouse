@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
 {
@@ -31,9 +31,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
     /// </remarks>
     public sealed class MicroSegmentationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SecurityZone> _securityZones = new();
-        private readonly ConcurrentDictionary<string, SegmentationPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, WorkloadRecord> _workloads = new();
+        private readonly BoundedDictionary<string, SecurityZone> _securityZones = new BoundedDictionary<string, SecurityZone>(1000);
+        private readonly BoundedDictionary<string, SegmentationPolicy> _policies = new BoundedDictionary<string, SegmentationPolicy>(1000);
+        private readonly BoundedDictionary<string, WorkloadRecord> _workloads = new BoundedDictionary<string, WorkloadRecord>(1000);
         private ThreatLevel _currentThreatLevel = ThreatLevel.Normal;
         private bool _enableDynamicSegmentation = true;
 

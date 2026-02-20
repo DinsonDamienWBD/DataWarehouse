@@ -1,7 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Database;
-using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 
@@ -45,7 +45,7 @@ public interface IDatabaseStorageStrategyRegistry
 /// </summary>
 public sealed class DatabaseStorageStrategyRegistry : IDatabaseStorageStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, DatabaseStorageStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DatabaseStorageStrategyBase> _strategies = new BoundedDictionary<string, DatabaseStorageStrategyBase>(1000);
     private volatile string _defaultStrategyId = "postgresql";
 
     /// <inheritdoc/>

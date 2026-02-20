@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -23,9 +23,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class BiometricSealedBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BiometricBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, BiometricProfile> _profiles = new();
-        private readonly ConcurrentDictionary<string, AccessAuditRecord> _auditTrail = new();
+        private readonly BoundedDictionary<string, BiometricBackup> _backups = new BoundedDictionary<string, BiometricBackup>(1000);
+        private readonly BoundedDictionary<string, BiometricProfile> _profiles = new BoundedDictionary<string, BiometricProfile>(1000);
+        private readonly BoundedDictionary<string, AccessAuditRecord> _auditTrail = new BoundedDictionary<string, AccessAuditRecord>(1000);
         private readonly object _auditLock = new();
 
         /// <summary>

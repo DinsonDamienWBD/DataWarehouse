@@ -1,8 +1,8 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -13,8 +13,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT type registry")]
     public sealed class CrdtRegistry
     {
-        private readonly ConcurrentDictionary<string, Type> _exactRegistrations = new();
-        private readonly ConcurrentDictionary<string, Type> _prefixRegistrations = new();
+        private readonly BoundedDictionary<string, Type> _exactRegistrations = new BoundedDictionary<string, Type>(1000);
+        private readonly BoundedDictionary<string, Type> _prefixRegistrations = new BoundedDictionary<string, Type>(1000);
 
         /// <summary>
         /// The default CRDT type used when no pattern matches (LWWRegister -- most general).

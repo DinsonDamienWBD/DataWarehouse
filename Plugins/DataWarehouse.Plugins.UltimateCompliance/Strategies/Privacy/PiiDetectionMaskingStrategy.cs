@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -32,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class PiiDetectionMaskingStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PiiDetector> _detectors = new();
-        private readonly ConcurrentDictionary<string, MaskingProfile> _maskingProfiles = new();
+        private readonly BoundedDictionary<string, PiiDetector> _detectors = new BoundedDictionary<string, PiiDetector>(1000);
+        private readonly BoundedDictionary<string, MaskingProfile> _maskingProfiles = new BoundedDictionary<string, MaskingProfile>(1000);
         private readonly ConcurrentBag<PiiDetectionAuditEntry> _auditLog = new();
 
         private PiiSensitivityLevel _defaultSensitivityLevel = PiiSensitivityLevel.Standard;

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -38,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, WormReplicationRecord> _replicationRecords = new();
-        private readonly ConcurrentDictionary<string, GeoWormRegion> _regions = new();
+        private readonly BoundedDictionary<string, WormReplicationRecord> _replicationRecords = new BoundedDictionary<string, WormReplicationRecord>(1000);
+        private readonly BoundedDictionary<string, GeoWormRegion> _regions = new BoundedDictionary<string, GeoWormRegion>(1000);
         private readonly TimeSpan _operationTimeout;
         private bool _disposed;
         private IDisposable? _wormRequestSubscription;

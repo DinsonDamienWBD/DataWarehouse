@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -22,9 +22,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class CrossBackendQuotaFeature : IDisposable
     {
-        private readonly ConcurrentDictionary<string, QuotaProfile> _quotaProfiles = new();
-        private readonly ConcurrentDictionary<string, BackendUsage> _backendUsage = new();
-        private readonly ConcurrentDictionary<string, List<QuotaViolation>> _violationHistory = new();
+        private readonly BoundedDictionary<string, QuotaProfile> _quotaProfiles = new BoundedDictionary<string, QuotaProfile>(1000);
+        private readonly BoundedDictionary<string, BackendUsage> _backendUsage = new BoundedDictionary<string, BackendUsage>(1000);
+        private readonly BoundedDictionary<string, List<QuotaViolation>> _violationHistory = new BoundedDictionary<string, List<QuotaViolation>>(1000);
         private bool _disposed;
 
         // Configuration
@@ -116,8 +116,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             profile.SoftQuotaBytes = softQuotaBytes;
             profile.HardQuotaBytes = hardQuotaBytes;
             profile.PerBackendLimits = perBackendLimits != null
-                ? new ConcurrentDictionary<string, long>(perBackendLimits)
-                : new ConcurrentDictionary<string, long>();
+                ? new BoundedDictionary<string, long>(1000)
+                : new BoundedDictionary<string, long>(1000);
             profile.LastModified = DateTime.UtcNow;
         }
 
@@ -483,7 +483,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         public long HardQuotaBytes { get; set; }
 
         /// <summary>Per-backend quota limits.</summary>
-        public ConcurrentDictionary<string, long> PerBackendLimits { get; set; } = new();
+        public BoundedDictionary<string, long> PerBackendLimits { get; set; } = new BoundedDictionary<string, long>(1000);
 
         /// <summary>When the quota was last modified.</summary>
         public DateTime LastModified { get; set; }

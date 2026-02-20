@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -90,9 +91,9 @@ public sealed class KafkaPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated topics with partitions
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, List<KafkaMessage>>> _topics = new();
-    private readonly ConcurrentDictionary<string, MemoryRecord> _compactedState = new();
-    private readonly ConcurrentDictionary<string, MemoryTier> _idTierMap = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<int, List<KafkaMessage>>> _topics = new BoundedDictionary<string, BoundedDictionary<int, List<KafkaMessage>>>(1000);
+    private readonly BoundedDictionary<string, MemoryRecord> _compactedState = new BoundedDictionary<string, MemoryRecord>(1000);
+    private readonly BoundedDictionary<string, MemoryTier> _idTierMap = new BoundedDictionary<string, MemoryTier>(1000);
 
     private long _nextOffset;
     private bool _disposed;
@@ -128,10 +129,10 @@ public sealed class KafkaPersistenceBackend : IProductionPersistenceBackend
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var topicName = GetTopicName(tier);
-                var partitions = new ConcurrentDictionary<int, List<KafkaMessage>>();
+                var partitions = new BoundedDictionary<int, List<KafkaMessage>>(1000);
                 for (int i = 0; i < _config.NumPartitions; i++)
                 {
-                    partitions[i] = new List<KafkaMessage>();
+                    partitions[i] = new List<KafkaMessage>(1000);
                 }
                 _topics[topicName] = partitions;
             }
@@ -776,8 +777,8 @@ public sealed class FoundationDbPersistenceBackend : IProductionPersistenceBacke
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated subspaces per tier
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, FdbRecord>> _subspaces = new();
-    private readonly ConcurrentDictionary<string, string> _idSubspaceMap = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, FdbRecord>> _subspaces = new BoundedDictionary<string, BoundedDictionary<string, FdbRecord>>(1000);
+    private readonly BoundedDictionary<string, string> _idSubspaceMap = new BoundedDictionary<string, string>(1000);
 
     // Watch notifications
     private readonly ConcurrentQueue<WatchNotification> _watchQueue = new();
@@ -823,7 +824,7 @@ public sealed class FoundationDbPersistenceBackend : IProductionPersistenceBacke
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var subspaceName = GetSubspaceName(tier);
-                _subspaces[subspaceName] = new ConcurrentDictionary<string, FdbRecord>();
+                _subspaces[subspaceName] = new BoundedDictionary<string, FdbRecord>(1000);
             }
             _isConnected = true;
         }

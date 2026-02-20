@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -22,12 +22,12 @@ public sealed class CompositeIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Document storage by object ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, IndexedDocument> _documents = new();
+    private readonly BoundedDictionary<string, IndexedDocument> _documents = new BoundedDictionary<string, IndexedDocument>(1000);
 
     /// <summary>
     /// Composite indexes: indexName -> CompositeIndex.
     /// </summary>
-    private readonly ConcurrentDictionary<string, CompositeIndex> _indexes = new();
+    private readonly BoundedDictionary<string, CompositeIndex> _indexes = new BoundedDictionary<string, CompositeIndex>(1000);
 
     /// <summary>
     /// Default index used when no specific index is specified.
@@ -37,7 +37,7 @@ public sealed class CompositeIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Statistics for query optimization.
     /// </summary>
-    private readonly ConcurrentDictionary<string, IndexStatistics> _indexStatistics = new();
+    private readonly BoundedDictionary<string, IndexStatistics> _indexStatistics = new BoundedDictionary<string, IndexStatistics>(1000);
 
     /// <summary>
     /// Represents an indexed document with its field values.

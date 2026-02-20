@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -34,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, RaidParityStatus> _parityStatus = new();
-        private readonly ConcurrentDictionary<string, RebuildOperation> _activeRebuilds = new();
+        private readonly BoundedDictionary<string, RaidParityStatus> _parityStatus = new BoundedDictionary<string, RaidParityStatus>(1000);
+        private readonly BoundedDictionary<string, RebuildOperation> _activeRebuilds = new BoundedDictionary<string, RebuildOperation>(1000);
         private bool _disposed;
         private IDisposable? _healthSubscription;
 

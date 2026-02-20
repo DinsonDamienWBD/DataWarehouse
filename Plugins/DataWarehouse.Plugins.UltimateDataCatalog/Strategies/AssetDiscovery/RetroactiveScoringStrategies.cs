@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataCatalog.Strategies.AssetDiscovery;
 
@@ -102,7 +103,7 @@ public sealed class RetroactiveBatchScoringStrategy : ConsciousnessStrategyBase
         using var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
 
         var totalScored = 0;
-        var gradeDistribution = new ConcurrentDictionary<ConsciousnessGrade, int>();
+        var gradeDistribution = new BoundedDictionary<ConsciousnessGrade, int>(1000);
 
         // Initialize grade distribution
         foreach (var grade in Enum.GetValues<ConsciousnessGrade>())

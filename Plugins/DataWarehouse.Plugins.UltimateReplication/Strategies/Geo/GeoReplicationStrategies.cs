@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Geo
 {
@@ -75,8 +75,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Geo
     /// </summary>
     public sealed class GeoReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GeoRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastHealthCheck = new();
+        private readonly BoundedDictionary<string, GeoRegion> _regions = new BoundedDictionary<string, GeoRegion>(1000);
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastHealthCheck = new BoundedDictionary<string, DateTimeOffset>(1000);
         private string? _primaryRegionId;
 
         /// <inheritdoc/>
@@ -321,8 +321,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Geo
     /// </summary>
     public sealed class CrossRegionStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GeoRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastReplicatedAt = new();
+        private readonly BoundedDictionary<string, GeoRegion> _regions = new BoundedDictionary<string, GeoRegion>(1000);
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastReplicatedAt = new BoundedDictionary<string, DateTimeOffset>(1000);
         private readonly TimeSpan _boundedStaleness;
         private string? _activeRegionId;
         private bool _autoFailoverEnabled = true;

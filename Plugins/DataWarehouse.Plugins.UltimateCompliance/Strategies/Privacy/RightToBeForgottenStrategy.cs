@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -32,10 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class RightToBeForgottenStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ErasureRequest> _requests = new();
-        private readonly ConcurrentDictionary<string, DataLocation> _dataLocations = new();
-        private readonly ConcurrentDictionary<string, ThirdPartyRecipient> _thirdParties = new();
-        private readonly ConcurrentDictionary<string, LegalException> _exceptions = new();
+        private readonly BoundedDictionary<string, ErasureRequest> _requests = new BoundedDictionary<string, ErasureRequest>(1000);
+        private readonly BoundedDictionary<string, DataLocation> _dataLocations = new BoundedDictionary<string, DataLocation>(1000);
+        private readonly BoundedDictionary<string, ThirdPartyRecipient> _thirdParties = new BoundedDictionary<string, ThirdPartyRecipient>(1000);
+        private readonly BoundedDictionary<string, LegalException> _exceptions = new BoundedDictionary<string, LegalException>(1000);
         private readonly ConcurrentBag<ErasureAuditEntry> _auditLog = new();
 
         private TimeSpan _requestDeadline = TimeSpan.FromDays(30); // GDPR: 1 month

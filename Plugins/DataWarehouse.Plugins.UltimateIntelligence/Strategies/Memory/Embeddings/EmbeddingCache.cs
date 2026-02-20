@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// </summary>
 public sealed class EmbeddingCache : IDisposable
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly LinkedList<string> _lruList = new();
     private readonly object _lruLock = new();
     private readonly int _maxEntries;

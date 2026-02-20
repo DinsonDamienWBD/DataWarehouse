@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 public sealed class HashShardingStrategy : ShardingStrategyBase
 {
     private readonly int _initialShardCount;
-    private readonly ConcurrentDictionary<string, string> _keyToShardCache = new();
+    private readonly BoundedDictionary<string, string> _keyToShardCache = new BoundedDictionary<string, string>(1000);
     private readonly int _cacheMaxSize;
     private readonly object _cacheLock = new();
 

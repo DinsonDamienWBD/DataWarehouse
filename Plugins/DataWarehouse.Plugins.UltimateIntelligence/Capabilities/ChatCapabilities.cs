@@ -1,12 +1,12 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Capabilities;
 
@@ -642,7 +642,7 @@ public sealed class ChatCapabilityHandler : IDisposable
 /// </summary>
 public sealed class ConversationManager : IDisposable
 {
-    private readonly ConcurrentDictionary<string, Conversation> _conversations = new();
+    private readonly BoundedDictionary<string, Conversation> _conversations = new BoundedDictionary<string, Conversation>(1000);
     private readonly Timer _cleanupTimer;
     private readonly TimeSpan _ttl;
     private readonly int _maxConversations;

@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -24,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class MultiBackendFanOutFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, BackendHealth> _backendHealth = new();
-        private readonly ConcurrentDictionary<string, int> _roundRobinCounters = new();
+        private readonly BoundedDictionary<string, BackendHealth> _backendHealth = new BoundedDictionary<string, BackendHealth>(1000);
+        private readonly BoundedDictionary<string, int> _roundRobinCounters = new BoundedDictionary<string, int>(1000);
         private bool _disposed;
 
         // Statistics

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies;
 
@@ -8,9 +8,9 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies;
 /// </summary>
 public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CarbonIntensityData> _intensityData = new();
-    private readonly ConcurrentDictionary<string, List<CarbonSchedulingDecision>> _decisions = new();
-    private readonly ConcurrentDictionary<string, SchedulingCarbonBudget> _budgets = new();
+    private readonly BoundedDictionary<string, CarbonIntensityData> _intensityData = new BoundedDictionary<string, CarbonIntensityData>(1000);
+    private readonly BoundedDictionary<string, List<CarbonSchedulingDecision>> _decisions = new BoundedDictionary<string, List<CarbonSchedulingDecision>>(1000);
+    private readonly BoundedDictionary<string, SchedulingCarbonBudget> _budgets = new BoundedDictionary<string, SchedulingCarbonBudget>(1000);
 
     public override string StrategyId => "carbon-aware-scheduling";
     public override string DisplayName => "Carbon-Aware Scheduling";
@@ -154,8 +154,8 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 /// </summary>
 public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<TrackingEnergyMeasurement>> _measurements = new();
-    private readonly ConcurrentDictionary<string, GhgReport> _ghgRecords = new();
+    private readonly BoundedDictionary<string, List<TrackingEnergyMeasurement>> _measurements = new BoundedDictionary<string, List<TrackingEnergyMeasurement>>(1000);
+    private readonly BoundedDictionary<string, GhgReport> _ghgRecords = new BoundedDictionary<string, GhgReport>(1000);
 
     public override string StrategyId => "energy-tracking";
     public override string DisplayName => "Energy Consumption Tracking";

@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Interface;
 
@@ -170,7 +170,7 @@ public sealed class DynamicApiGenerator : IDisposable
 {
     private readonly IPluginCapabilityRegistry _registry;
     private volatile DynamicApiModel _currentModel;
-    private readonly ConcurrentDictionary<string, ApiDataType> _sharedTypes = new();
+    private readonly BoundedDictionary<string, ApiDataType> _sharedTypes = new BoundedDictionary<string, ApiDataType>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private readonly object _regenerateLock = new();
     private bool _disposed;

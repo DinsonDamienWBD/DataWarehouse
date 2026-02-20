@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -192,9 +192,9 @@ public sealed class GoalSatisfaction
 /// </remarks>
 public sealed class IntentBasedDataManagementStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataGoal> _goals = new();
-    private readonly ConcurrentDictionary<string, GoalSatisfaction> _satisfactionCache = new();
-    private readonly ConcurrentDictionary<string, List<double>> _metricsHistory = new();
+    private readonly BoundedDictionary<string, DataGoal> _goals = new BoundedDictionary<string, DataGoal>(1000);
+    private readonly BoundedDictionary<string, GoalSatisfaction> _satisfactionCache = new BoundedDictionary<string, GoalSatisfaction>(1000);
+    private readonly BoundedDictionary<string, List<double>> _metricsHistory = new BoundedDictionary<string, List<double>>(1000);
     private readonly object _historyLock = new();
 
     /// <inheritdoc/>

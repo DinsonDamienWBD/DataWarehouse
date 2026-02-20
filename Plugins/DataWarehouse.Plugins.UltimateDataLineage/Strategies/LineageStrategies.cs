@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 /// </summary>
 public sealed class InMemoryGraphStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _upstreamLinks = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _downstreamLinks = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _upstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _downstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
 
     public override string StrategyId => "graph-memory";
     public override string DisplayName => "In-Memory Graph";

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Channels;
 using DataWarehouse.SDK.Contracts;
@@ -115,7 +114,7 @@ public sealed record BackpressureStatus
 /// </remarks>
 internal sealed class BackpressureHandling : IDisposable
 {
-    private readonly ConcurrentDictionary<string, BackpressureChannel> _channels = new();
+    private readonly BoundedDictionary<string, BackpressureChannel> _channels = new BoundedDictionary<string, BackpressureChannel>(1000);
     private readonly BackpressureConfig _config;
     private readonly IMessageBus? _messageBus;
     private readonly Timer _rateAdjustmentTimer;

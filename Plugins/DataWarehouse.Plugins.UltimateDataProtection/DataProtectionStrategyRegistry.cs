@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -22,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     /// </remarks>
     public sealed class DataProtectionStrategyRegistry
     {
-        private readonly ConcurrentDictionary<string, IDataProtectionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+        private readonly BoundedDictionary<string, IDataProtectionStrategy> _strategies = new BoundedDictionary<string, IDataProtectionStrategy>(1000);
         private IMessageBus? _messageBus;
 
         /// <summary>

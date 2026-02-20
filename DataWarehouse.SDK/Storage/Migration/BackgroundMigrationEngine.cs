@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Migration;
 
@@ -32,7 +32,7 @@ public sealed class BackgroundMigrationEngine : IMigrationEngine, IDisposable
 {
     private readonly ReadForwardingTable _forwardingTable;
     private readonly MigrationCheckpointStore _checkpointStore;
-    private readonly ConcurrentDictionary<string, MigrationJobState> _jobs = new();
+    private readonly BoundedDictionary<string, MigrationJobState> _jobs = new BoundedDictionary<string, MigrationJobState>(1000);
     private readonly int _batchSize;
 
     /// <summary>

@@ -4,6 +4,7 @@
 
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -57,10 +58,10 @@ public sealed class OfflineFilesManager : IDisposable
     #endregion
 
     private readonly WinFspFileSystem _fileSystem;
-    private readonly ConcurrentDictionary<string, PlaceholderInfo> _placeholders;
-    private readonly ConcurrentDictionary<string, SyncPolicy> _syncPolicies;
+    private readonly BoundedDictionary<string, PlaceholderInfo> _placeholders;
+    private readonly BoundedDictionary<string, SyncPolicy> _syncPolicies;
     private readonly ConcurrentQueue<OfflineOperation> _offlineQueue;
-    private readonly ConcurrentDictionary<string, ConflictInfo> _conflicts;
+    private readonly BoundedDictionary<string, ConflictInfo> _conflicts;
     private readonly SemaphoreSlim _syncLock;
     private readonly Timer _syncTimer;
     private readonly CancellationTokenSource _cts;
@@ -106,10 +107,10 @@ public sealed class OfflineFilesManager : IDisposable
     public OfflineFilesManager(WinFspFileSystem fileSystem)
     {
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        _placeholders = new ConcurrentDictionary<string, PlaceholderInfo>(StringComparer.OrdinalIgnoreCase);
-        _syncPolicies = new ConcurrentDictionary<string, SyncPolicy>(StringComparer.OrdinalIgnoreCase);
+        _placeholders = new BoundedDictionary<string, PlaceholderInfo>(1000);
+        _syncPolicies = new BoundedDictionary<string, SyncPolicy>(1000);
         _offlineQueue = new ConcurrentQueue<OfflineOperation>();
-        _conflicts = new ConcurrentDictionary<string, ConflictInfo>(StringComparer.OrdinalIgnoreCase);
+        _conflicts = new BoundedDictionary<string, ConflictInfo>(1000);
         _syncLock = new SemaphoreSlim(1, 1);
         _cts = new CancellationTokenSource();
         _isOnline = true;

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorIngestion;
 
@@ -16,7 +17,7 @@ public abstract class SensorIngestionStrategyBase : IoTStrategyBase, ISensorInge
 {
     protected long TotalMessagesIngested;
     protected long TotalBytesIngested;
-    protected readonly ConcurrentDictionary<string, Channel<TelemetryMessage>> Subscriptions = new();
+    protected readonly BoundedDictionary<string, Channel<TelemetryMessage>> Subscriptions = new BoundedDictionary<string, Channel<TelemetryMessage>>(1000);
 
     public override IoTStrategyCategory Category => IoTStrategyCategory.SensorIngestion;
 
@@ -195,7 +196,7 @@ public class BatchIngestionStrategy : SensorIngestionStrategyBase
 /// </summary>
 public class BufferedIngestionStrategy : SensorIngestionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<TelemetryMessage>> _deviceBuffers = new();
+    private readonly BoundedDictionary<string, List<TelemetryMessage>> _deviceBuffers = new BoundedDictionary<string, List<TelemetryMessage>>(1000);
     private readonly int _bufferSize = 100;
 
     public override string StrategyId => "buffered-ingestion";
@@ -271,7 +272,7 @@ public class BufferedIngestionStrategy : SensorIngestionStrategyBase
 /// </summary>
 public class TimeSeriesIngestionStrategy : SensorIngestionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SortedList<DateTimeOffset, TelemetryMessage>> _timeSeries = new();
+    private readonly BoundedDictionary<string, SortedList<DateTimeOffset, TelemetryMessage>> _timeSeries = new BoundedDictionary<string, SortedList<DateTimeOffset, TelemetryMessage>>(1000);
 
     public override string StrategyId => "timeseries-ingestion";
     public override string StrategyName => "Time-Series Ingestion";
@@ -354,7 +355,7 @@ public class TimeSeriesIngestionStrategy : SensorIngestionStrategyBase
 /// </summary>
 public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AggregationWindow> _windows = new();
+    private readonly BoundedDictionary<string, AggregationWindow> _windows = new BoundedDictionary<string, AggregationWindow>(1000);
 
     public override string StrategyId => "aggregating-ingestion";
     public override string StrategyName => "Aggregating Ingestion";
@@ -431,8 +432,8 @@ public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
     private class AggregationWindow
     {
         public int Count;
-        public ConcurrentDictionary<string, double> Sum = new();
-        public ConcurrentDictionary<string, double> Min = new();
-        public ConcurrentDictionary<string, double> Max = new();
+        public BoundedDictionary<string, double> Sum = new BoundedDictionary<string, double>(1000);
+        public BoundedDictionary<string, double> Min = new BoundedDictionary<string, double>(1000);
+        public BoundedDictionary<string, double> Max = new BoundedDictionary<string, double>(1000);
     }
 }

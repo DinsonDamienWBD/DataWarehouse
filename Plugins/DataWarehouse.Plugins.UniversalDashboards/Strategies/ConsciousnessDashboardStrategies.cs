@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 
@@ -258,7 +259,7 @@ public sealed class ConsciousnessOverviewDashboardStrategy
 /// </remarks>
 public sealed class ConsciousnessTrendDashboardStrategy
 {
-    private readonly ConcurrentDictionary<DateTime, ConsciousnessTrendPoint> _snapshots = new();
+    private readonly BoundedDictionary<DateTime, ConsciousnessTrendPoint> _snapshots = new BoundedDictionary<DateTime, ConsciousnessTrendPoint>(1000);
 
     /// <summary>
     /// Gets the total number of recorded snapshots.
@@ -377,9 +378,9 @@ public sealed class ConsciousnessTrendDashboardStrategy
 public sealed class DarkDataDashboardStrategy
 {
     private readonly Func<IReadOnlyList<ConsciousnessScore>> _scoreProvider;
-    private readonly ConcurrentDictionary<string, DarkDataCandidate> _darkObjects = new();
-    private readonly ConcurrentDictionary<string, DateTime> _remediatedObjects = new();
-    private readonly ConcurrentDictionary<string, DateTime> _discoveredAt = new();
+    private readonly BoundedDictionary<string, DarkDataCandidate> _darkObjects = new BoundedDictionary<string, DarkDataCandidate>(1000);
+    private readonly BoundedDictionary<string, DateTime> _remediatedObjects = new BoundedDictionary<string, DateTime>(1000);
+    private readonly BoundedDictionary<string, DateTime> _discoveredAt = new BoundedDictionary<string, DateTime>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DarkDataDashboardStrategy"/> class.

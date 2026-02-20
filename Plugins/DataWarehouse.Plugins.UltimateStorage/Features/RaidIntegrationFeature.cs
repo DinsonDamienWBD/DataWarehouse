@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -26,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     {
         private readonly StorageStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, RaidArray> _raidArrays = new();
-        private readonly ConcurrentDictionary<string, string> _objectToArrayMapping = new(); // object key -> array ID
+        private readonly BoundedDictionary<string, RaidArray> _raidArrays = new BoundedDictionary<string, RaidArray>(1000);
+        private readonly BoundedDictionary<string, string> _objectToArrayMapping = new BoundedDictionary<string, string>(1000); // object key -> array ID
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
 

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -201,7 +201,7 @@ public record RegenerationOptions
 /// </summary>
 public abstract class RegenerationStrategyBase : IAdvancedRegenerationStrategy
 {
-    private readonly ConcurrentDictionary<string, RegenerationStatistics> _statisticsByFormat = new();
+    private readonly BoundedDictionary<string, RegenerationStatistics> _statisticsByFormat = new BoundedDictionary<string, RegenerationStatistics>(1000);
     private long _totalRegenerations;
     private long _successfulRegenerations;
     private double _cumulativeAccuracy;

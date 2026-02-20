@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class DnaBackupStrategy : DataProtectionStrategyBase, IDnaSynthesisHardwareInterface
     {
-        private readonly ConcurrentDictionary<string, DnaBackupMetadata> _pendingBackups = new();
+        private readonly BoundedDictionary<string, DnaBackupMetadata> _pendingBackups = new BoundedDictionary<string, DnaBackupMetadata>(1000);
         private IDnaSynthesizer? _synthesizer;
         private IDnaSequencer? _sequencer;
 

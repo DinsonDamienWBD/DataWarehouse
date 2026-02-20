@@ -82,7 +82,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
     // In-memory storage for energy measurements received via message bus
     private readonly ConcurrentBag<EnergyMeasurementRecord> _energyMeasurements = new();
-    private readonly ConcurrentDictionary<string, double> _regionCarbonIntensity = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, double> _regionCarbonIntensity = new BoundedDictionary<string, double>(1000);
     private IDisposable? _energySubscription;
     private IDisposable? _intensitySubscription;
 

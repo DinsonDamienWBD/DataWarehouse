@@ -1,13 +1,13 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Hardware
 {
@@ -67,8 +67,8 @@ namespace DataWarehouse.SDK.Hardware
     {
         private readonly DriverLoaderOptions _options;
         private readonly IHardwareProbe? _probe;
-        private readonly ConcurrentDictionary<string, DriverHandle> _loadedDrivers = new();
-        private readonly ConcurrentDictionary<string, PluginAssemblyLoadContext> _contexts = new();
+        private readonly BoundedDictionary<string, DriverHandle> _loadedDrivers = new BoundedDictionary<string, DriverHandle>(1000);
+        private readonly BoundedDictionary<string, PluginAssemblyLoadContext> _contexts = new BoundedDictionary<string, PluginAssemblyLoadContext>(1000);
         private readonly SemaphoreSlim _loadLock = new(1, 1);
         private FileSystemWatcher? _directoryWatcher;
         private bool _disposed;

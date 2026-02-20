@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Graph;
 
@@ -1061,7 +1061,7 @@ public sealed class ConnectedComponentsResult
 /// </summary>
 public sealed class GraphAnalyticsRegistry
 {
-    private readonly ConcurrentDictionary<string, GraphAnalyticsAlgorithmBase> _algorithms = new();
+    private readonly BoundedDictionary<string, GraphAnalyticsAlgorithmBase> _algorithms = new BoundedDictionary<string, GraphAnalyticsAlgorithmBase>(1000);
 
     /// <summary>
     /// Registers an algorithm.

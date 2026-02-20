@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Storage;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Services;
 
@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Storage.Services;
 /// </summary>
 public sealed class DefaultTierManager : ITierManager
 {
-    private readonly ConcurrentDictionary<string, TierEntry> _tierMap = new();
+    private readonly BoundedDictionary<string, TierEntry> _tierMap = new BoundedDictionary<string, TierEntry>(1000);
 
     /// <summary>Days since last access before recommending Cool tier. Default: 30.</summary>
     public int CoolThresholdDays { get; set; } = 30;

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -12,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     /// </summary>
     public sealed class ThreatDetectionStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ThreatScore> _threatScores = new();
+        private readonly BoundedDictionary<string, ThreatScore> _threatScores = new BoundedDictionary<string, ThreatScore>(1000);
         private readonly ConcurrentQueue<ThreatAlert> _alerts = new();
         private double _criticalThreshold = 80.0;
         private double _highThreshold = 60.0;

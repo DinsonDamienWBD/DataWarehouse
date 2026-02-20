@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -37,10 +36,10 @@ namespace DataWarehouse.Plugins.UltimateDataLake;
 public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataLakeStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, DataCatalogEntry> _catalog = new();
-    private readonly ConcurrentDictionary<string, DataLineageRecord> _lineage = new();
-    private readonly ConcurrentDictionary<string, DataLakeAccessPolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DataCatalogEntry> _catalog = new BoundedDictionary<string, DataCatalogEntry>(1000);
+    private readonly BoundedDictionary<string, DataLineageRecord> _lineage = new BoundedDictionary<string, DataLineageRecord>(1000);
+    private readonly BoundedDictionary<string, DataLakeAccessPolicy> _policies = new BoundedDictionary<string, DataLakeAccessPolicy>(1000);
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;

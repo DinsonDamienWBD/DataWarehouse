@@ -5,7 +5,6 @@ using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.Plugins.AedsCore.Extensions;
 
@@ -31,9 +30,9 @@ public record PredictedContent(
 /// </remarks>
 public sealed class PreCogPlugin : DataManagementPluginBase
 {
-    private readonly ConcurrentDictionary<string, List<DateTimeOffset>> _downloadHistory = new();
-    private readonly ConcurrentDictionary<string, int> _prefetchHits = new();
-    private readonly ConcurrentDictionary<string, int> _prefetchMisses = new();
+    private readonly BoundedDictionary<string, List<DateTimeOffset>> _downloadHistory = new BoundedDictionary<string, List<DateTimeOffset>>(1000);
+    private readonly BoundedDictionary<string, int> _prefetchHits = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<string, int> _prefetchMisses = new BoundedDictionary<string, int>(1000);
 
     /// <summary>
     /// Gets the plugin identifier.

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     /// </summary>
     public sealed class NdRStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, NetworkProfile> _networkProfiles = new();
+        private readonly BoundedDictionary<string, NetworkProfile> _networkProfiles = new BoundedDictionary<string, NetworkProfile>(1000);
         private readonly ConcurrentQueue<NetworkAnomaly> _anomalies = new();
         private readonly HashSet<string> _suspiciousProtocols = new(StringComparer.OrdinalIgnoreCase)
         {

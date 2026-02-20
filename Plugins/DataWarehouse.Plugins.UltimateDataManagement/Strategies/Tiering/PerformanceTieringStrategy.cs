@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -16,8 +16,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class PerformanceTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PerformanceRequirements> _slaRequirements = new();
-    private readonly ConcurrentDictionary<string, PerformanceMetrics> _objectMetrics = new();
+    private readonly BoundedDictionary<string, PerformanceRequirements> _slaRequirements = new BoundedDictionary<string, PerformanceRequirements>(1000);
+    private readonly BoundedDictionary<string, PerformanceMetrics> _objectMetrics = new BoundedDictionary<string, PerformanceMetrics>(1000);
     private PerformanceConfig _config = PerformanceConfig.Default;
 
     /// <summary>

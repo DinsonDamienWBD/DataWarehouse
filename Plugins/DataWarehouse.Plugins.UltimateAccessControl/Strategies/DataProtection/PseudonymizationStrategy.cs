@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 {
@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
     /// </summary>
     public sealed class PseudonymizationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, string> _pseudonymMap = new();
+        private readonly BoundedDictionary<string, string> _pseudonymMap = new BoundedDictionary<string, string>(1000);
         private readonly byte[] _key;
 
         public PseudonymizationStrategy()

@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Connectors
 {
@@ -12,8 +12,8 @@ namespace DataWarehouse.SDK.Connectors
     /// </summary>
     public sealed class ConnectionStrategyRegistry
     {
-        private readonly ConcurrentDictionary<string, IConnectionStrategy> _strategies =
-            new(StringComparer.OrdinalIgnoreCase);
+        private readonly BoundedDictionary<string, IConnectionStrategy> _strategies =
+            new BoundedDictionary<string, IConnectionStrategy>(200);
 
         /// <summary>
         /// Registers a connection strategy. Overwrites any existing registration with the same ID.

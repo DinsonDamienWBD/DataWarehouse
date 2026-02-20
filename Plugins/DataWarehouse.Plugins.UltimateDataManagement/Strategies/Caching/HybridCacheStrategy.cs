@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
@@ -56,7 +56,7 @@ public sealed class HybridCacheStrategy : CachingStrategyBase
 {
     private readonly InMemoryCacheStrategy _l1Cache;
     private readonly InMemoryCacheStrategy _l2Cache;
-    private readonly ConcurrentDictionary<string, int> _accessCount = new();
+    private readonly BoundedDictionary<string, int> _accessCount = new BoundedDictionary<string, int>(1000);
     private readonly HybridCacheConfig _config;
 
     /// <summary>

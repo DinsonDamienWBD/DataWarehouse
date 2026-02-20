@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Replication
 {
@@ -34,7 +35,7 @@ namespace DataWarehouse.SDK.Replication
     [SdkCompatibility("3.0.0", Notes = "Phase 41.1-06: KS7 DVV with membership-aware pruning")]
     public sealed class DottedVersionVector
     {
-        private readonly ConcurrentDictionary<string, (long Version, string Dot)> _vector = new();
+        private readonly BoundedDictionary<string, (long Version, string Dot)> _vector = new BoundedDictionary<string, (long Version, string Dot)>(1000);
         private readonly IReplicationClusterMembership? _membership;
         private long _dotCounter;
 

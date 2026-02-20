@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts.Carbon;
 using CarbonEnergyMeasurement = DataWarehouse.SDK.Contracts.Carbon.EnergyMeasurement;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyMeasurement;
 
@@ -17,8 +17,8 @@ public sealed class RaplEnergyMeasurementStrategy : SustainabilityStrategyBase
     private const string PackagePath = "/sys/class/powercap/intel-rapl/intel-rapl:0";
     private const long MaxEnergyUj = (long)uint.MaxValue; // 32-bit overflow boundary
 
-    private readonly ConcurrentDictionary<string, double> _domainReadings = new();
-    private readonly ConcurrentDictionary<string, string> _domainPaths = new();
+    private readonly BoundedDictionary<string, double> _domainReadings = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, string> _domainPaths = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "rapl-energy-measurement";

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -22,7 +22,7 @@ public sealed class DeltaVersioningStrategy : VersioningStrategyBase
     private const int DefaultMaxDeltaChainLength = 10;
     private const int DefaultBlockSize = 64;
 
-    private readonly ConcurrentDictionary<string, ObjectDeltaStore> _stores = new();
+    private readonly BoundedDictionary<string, ObjectDeltaStore> _stores = new BoundedDictionary<string, ObjectDeltaStore>(1000);
     private int _maxDeltaChainLength = DefaultMaxDeltaChainLength;
     private int _blockSize = DefaultBlockSize;
 

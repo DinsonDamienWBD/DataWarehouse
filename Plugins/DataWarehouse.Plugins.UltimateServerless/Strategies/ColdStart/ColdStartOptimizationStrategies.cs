@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.ColdStart;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.ColdStart;
 /// </summary>
 public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ProvisionedConfig> _configs = new();
+    private readonly BoundedDictionary<string, ProvisionedConfig> _configs = new BoundedDictionary<string, ProvisionedConfig>(1000);
 
     public override string StrategyId => "coldstart-provisioned-concurrency";
     public override string DisplayName => "Provisioned Concurrency";
@@ -59,7 +59,7 @@ public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
     {
         _configs.TryGetValue($"{functionId}:{qualifier}", out var config);
         RecordOperation("GetStatus");
-        return Task.FromResult(config);
+        return Task.FromResult<ProvisionedConfig?>(config);
     }
 
     /// <summary>Scales provisioned concurrency.</summary>
@@ -177,7 +177,7 @@ public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class WarmupSchedulerStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WarmupSchedule> _schedules = new();
+    private readonly BoundedDictionary<string, WarmupSchedule> _schedules = new BoundedDictionary<string, WarmupSchedule>(1000);
 
     public override string StrategyId => "coldstart-warmup-scheduler";
     public override string DisplayName => "Warmup Scheduler";
@@ -312,7 +312,7 @@ public sealed class LazyLoadingStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class MinimumInstancesStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MinInstancesConfig> _configs = new();
+    private readonly BoundedDictionary<string, MinInstancesConfig> _configs = new BoundedDictionary<string, MinInstancesConfig>(1000);
 
     public override string StrategyId => "coldstart-min-instances";
     public override string DisplayName => "Minimum Instances";

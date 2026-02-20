@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Carbon;
 using DataWarehouse.SDK.Utilities;
@@ -24,7 +23,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     private Timer? _recommendationTimer;
     private IDisposable? _energySubscription;
     private IDisposable? _evaluateSubscription;
-    private readonly ConcurrentDictionary<string, int> _throttleEventCounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, int> _throttleEventCounts = new BoundedDictionary<string, int>(1000);
 
     /// <summary>
     /// Default soft threshold percentage. Operations are delayed above this.

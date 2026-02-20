@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -156,8 +155,8 @@ public sealed class FeatureToggleRegistry : IFeatureToggleRegistry
 {
     private readonly ConfigurationHierarchy _hierarchy;
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, FeatureToggleDefinition> _toggles = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastChanged = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, FeatureToggleDefinition> _toggles = new BoundedDictionary<string, FeatureToggleDefinition>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastChanged = new BoundedDictionary<string, DateTimeOffset>(1000);
 
     /// <summary>
     /// Creates a feature toggle registry integrated with configuration hierarchy.

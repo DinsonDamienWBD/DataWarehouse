@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow;
 
@@ -124,10 +124,10 @@ public sealed class WorkflowContext
     public Dictionary<string, object> Parameters { get; init; } = new();
 
     /// <summary>Shared state across tasks.</summary>
-    public ConcurrentDictionary<string, object> State { get; } = new();
+    public BoundedDictionary<string, object> State { get; } = new BoundedDictionary<string, object>(1000);
 
     /// <summary>Results from completed tasks.</summary>
-    public ConcurrentDictionary<string, TaskResult> TaskResults { get; } = new();
+    public BoundedDictionary<string, TaskResult> TaskResults { get; } = new BoundedDictionary<string, TaskResult>(1000);
 
     /// <summary>Workflow start time.</summary>
     public DateTimeOffset StartTime { get; init; } = DateTimeOffset.UtcNow;

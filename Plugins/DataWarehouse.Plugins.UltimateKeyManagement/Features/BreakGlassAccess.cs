@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -19,10 +18,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public sealed class BreakGlassAccess : IDisposable
     {
-        private readonly ConcurrentDictionary<string, BreakGlassSession> _activeSessions = new();
-        private readonly ConcurrentDictionary<string, BreakGlassAuditEntry> _auditLog = new();
-        private readonly ConcurrentDictionary<string, EmergencyAccessPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, AuthorizedResponder> _responders = new();
+        private readonly BoundedDictionary<string, BreakGlassSession> _activeSessions = new BoundedDictionary<string, BreakGlassSession>(1000);
+        private readonly BoundedDictionary<string, BreakGlassAuditEntry> _auditLog = new BoundedDictionary<string, BreakGlassAuditEntry>(1000);
+        private readonly BoundedDictionary<string, EmergencyAccessPolicy> _policies = new BoundedDictionary<string, EmergencyAccessPolicy>(1000);
+        private readonly BoundedDictionary<string, AuthorizedResponder> _responders = new BoundedDictionary<string, AuthorizedResponder>(1000);
         private readonly IKeyStore _keyStore;
         private readonly IMessageBus? _messageBus;
         private readonly SemaphoreSlim _accessLock = new(1, 1);

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 
@@ -29,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class InstantMountRestoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, MountedBackup> _mountedBackups = new();
-        private readonly ConcurrentDictionary<string, BlockCache> _blockCaches = new();
-        private readonly ConcurrentDictionary<string, HydrationState> _hydrationStates = new();
+        private readonly BoundedDictionary<string, MountedBackup> _mountedBackups = new BoundedDictionary<string, MountedBackup>(1000);
+        private readonly BoundedDictionary<string, BlockCache> _blockCaches = new BoundedDictionary<string, BlockCache>(1000);
+        private readonly BoundedDictionary<string, HydrationState> _hydrationStates = new BoundedDictionary<string, HydrationState>(1000);
 
         /// <summary>
         /// Default block size for COW operations (4 KB).
@@ -222,7 +221,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             var blockCache = new BlockCache
             {
                 MaxBlocks = options.CacheSize / DefaultBlockSize,
-                Blocks = new ConcurrentDictionary<long, CachedBlock>()
+                Blocks = new BoundedDictionary<long, CachedBlock>(1000)
             };
             _blockCaches[backupId] = blockCache;
 
@@ -231,9 +230,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 backup.CowLayer = new CowLayer
                 {
-                    ModifiedBlocks = new ConcurrentDictionary<long, byte[]>(),
-                    DeletedPaths = new ConcurrentDictionary<string, bool>(),
-                    NewFiles = new ConcurrentDictionary<string, VirtualFile>()
+                    ModifiedBlocks = new BoundedDictionary<long, byte[]>(1000),
+                    DeletedPaths = new BoundedDictionary<string, bool>(1000),
+                    NewFiles = new BoundedDictionary<string, VirtualFile>(1000)
                 };
             }
 
@@ -1102,7 +1101,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private sealed class BlockCache
         {
             public long MaxBlocks { get; set; }
-            public ConcurrentDictionary<long, CachedBlock> Blocks { get; set; } = new();
+            public BoundedDictionary<long, CachedBlock> Blocks { get; set; } = new BoundedDictionary<long, CachedBlock>(1000);
         }
 
         private sealed class CachedBlock
@@ -1116,9 +1115,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private sealed class CowLayer
         {
-            public ConcurrentDictionary<long, byte[]> ModifiedBlocks { get; set; } = new();
-            public ConcurrentDictionary<string, bool> DeletedPaths { get; set; } = new();
-            public ConcurrentDictionary<string, VirtualFile> NewFiles { get; set; } = new();
+            public BoundedDictionary<long, byte[]> ModifiedBlocks { get; set; } = new BoundedDictionary<long, byte[]>(1000);
+            public BoundedDictionary<string, bool> DeletedPaths { get; set; } = new BoundedDictionary<string, bool>(1000);
+            public BoundedDictionary<string, VirtualFile> NewFiles { get; set; } = new BoundedDictionary<string, VirtualFile>(1000);
             public long TotalBytesWritten { get; set; }
         }
 

@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _baseStoragePath = string.Empty;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, ObjectNode> _relationshipGraph = new();
+        private readonly BoundedDictionary<string, ObjectNode> _relationshipGraph = new BoundedDictionary<string, ObjectNode>(1000);
 
         public override string StrategyId => "relationship-aware";
         public override string Name => "Relationship-Aware Storage";

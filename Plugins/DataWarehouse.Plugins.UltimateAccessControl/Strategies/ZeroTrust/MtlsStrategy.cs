@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -8,6 +7,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
 {
@@ -34,8 +34,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
     /// </remarks>
     public sealed class MtlsStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PinnedCertificate> _pinnedCertificates = new();
-        private readonly ConcurrentDictionary<string, RevokedCertificate> _revokedCertificates = new();
+        private readonly BoundedDictionary<string, PinnedCertificate> _pinnedCertificates = new BoundedDictionary<string, PinnedCertificate>(1000);
+        private readonly BoundedDictionary<string, RevokedCertificate> _revokedCertificates = new BoundedDictionary<string, RevokedCertificate>(1000);
         private readonly HttpClient _httpClient = new();
         private bool _enableOcspValidation = true;
         private bool _enableCrlValidation = true;

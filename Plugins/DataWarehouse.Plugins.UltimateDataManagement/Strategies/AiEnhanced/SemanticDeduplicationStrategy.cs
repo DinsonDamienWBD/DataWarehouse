@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -129,8 +129,8 @@ public sealed class ContentSignature
 /// </remarks>
 public sealed class SemanticDeduplicationStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ContentSignature> _signatures = new();
-    private readonly ConcurrentDictionary<string, List<string>> _hashIndex = new(); // hash -> objectIds
+    private readonly BoundedDictionary<string, ContentSignature> _signatures = new BoundedDictionary<string, ContentSignature>(1000);
+    private readonly BoundedDictionary<string, List<string>> _hashIndex = new BoundedDictionary<string, List<string>>(1000); // hash -> objectIds
     private readonly object _indexLock = new();
     private readonly double _semanticThreshold;
     private readonly double _nearDuplicateThreshold;

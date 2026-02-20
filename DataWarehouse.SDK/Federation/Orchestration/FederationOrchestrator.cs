@@ -3,7 +3,6 @@ using DataWarehouse.SDK.Contracts.Distributed;
 using DataWarehouse.SDK.Federation.Topology;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,7 +43,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     private readonly PeriodicTimer _healthCheckTimer;
     private readonly CancellationTokenSource _cts;
     private readonly FederationOrchestratorConfiguration _config;
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTopologyChange = new();
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastTopologyChange = new BoundedDictionary<string, DateTimeOffset>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FederationOrchestrator"/> class.

@@ -3,6 +3,7 @@
 // </copyright>
 
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearning;
 
@@ -13,7 +14,7 @@ public sealed class FederatedLearningOrchestrator
 {
     private readonly TrainingConfig _config;
     private readonly PrivacyConfig _privacyConfig;
-    private readonly ConcurrentDictionary<string, bool> _registeredNodes = new();
+    private readonly BoundedDictionary<string, bool> _registeredNodes = new BoundedDictionary<string, bool>(1000);
     private readonly ModelDistributor _distributor = new();
     private readonly LocalTrainingCoordinator _trainer = new();
     private readonly GradientAggregator _aggregator = new();

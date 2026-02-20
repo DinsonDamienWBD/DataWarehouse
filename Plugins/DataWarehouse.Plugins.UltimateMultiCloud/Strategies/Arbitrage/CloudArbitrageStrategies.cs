@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Arbitrage;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Arbitrage;
 /// </summary>
 public sealed class RealTimePricingArbitrageStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PricingSnapshot> _currentPricing = new();
-    private readonly ConcurrentDictionary<string, ArbitrageOpportunity> _opportunities = new();
+    private readonly BoundedDictionary<string, PricingSnapshot> _currentPricing = new BoundedDictionary<string, PricingSnapshot>(1000);
+    private readonly BoundedDictionary<string, ArbitrageOpportunity> _opportunities = new BoundedDictionary<string, ArbitrageOpportunity>(1000);
 
     public override string StrategyId => "arbitrage-realtime-pricing";
     public override string StrategyName => "Real-Time Pricing Arbitrage";
@@ -103,7 +103,7 @@ public sealed class RealTimePricingArbitrageStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class WorkloadPlacementArbitrageStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WorkloadProfile> _workloads = new();
+    private readonly BoundedDictionary<string, WorkloadProfile> _workloads = new BoundedDictionary<string, WorkloadProfile>(1000);
 
     public override string StrategyId => "arbitrage-workload-placement";
     public override string StrategyName => "Workload Placement Arbitrage";
@@ -188,7 +188,7 @@ public sealed class WorkloadPlacementArbitrageStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class SpotInstanceArbitrageStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SpotInstanceOffer> _spotOffers = new();
+    private readonly BoundedDictionary<string, SpotInstanceOffer> _spotOffers = new BoundedDictionary<string, SpotInstanceOffer>(1000);
 
     public override string StrategyId => "arbitrage-spot-instance";
     public override string StrategyName => "Spot Instance Arbitrage";
@@ -278,8 +278,8 @@ public sealed class SpotInstanceArbitrageStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class MarketBasedSchedulingStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduledJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, List<PriceWindow>> _priceHistory = new();
+    private readonly BoundedDictionary<string, ScheduledJob> _jobs = new BoundedDictionary<string, ScheduledJob>(1000);
+    private readonly BoundedDictionary<string, List<PriceWindow>> _priceHistory = new BoundedDictionary<string, List<PriceWindow>>(1000);
 
     public override string StrategyId => "arbitrage-market-scheduling";
     public override string StrategyName => "Market-Based Scheduling";
@@ -381,7 +381,7 @@ public sealed class MarketBasedSchedulingStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class BandwidthArbitrageStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BandwidthPricing> _pricing = new();
+    private readonly BoundedDictionary<string, BandwidthPricing> _pricing = new BoundedDictionary<string, BandwidthPricing>(1000);
 
     public override string StrategyId => "arbitrage-bandwidth";
     public override string StrategyName => "Bandwidth Arbitrage";

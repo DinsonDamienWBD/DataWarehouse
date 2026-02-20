@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, PredictionRecord> _predictionHistory = new();
+        private readonly BoundedDictionary<string, PredictionRecord> _predictionHistory = new BoundedDictionary<string, PredictionRecord>(1000);
         private readonly ConcurrentQueue<LagDataPoint> _recentLagData = new();
         private readonly TimeSpan _intelligenceTimeout;
         private readonly int _maxLagDataPoints;

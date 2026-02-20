@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Hardware.Interop;
 
@@ -65,7 +65,7 @@ public enum InteropErrorCode
 public sealed class InteropConnectionHandle : IDisposable
 {
     private static long _nextId;
-    private static readonly ConcurrentDictionary<long, InteropConnectionHandle> _handles = new();
+    private static readonly BoundedDictionary<long, InteropConnectionHandle> _handles = new BoundedDictionary<long, InteropConnectionHandle>(1000);
 
     /// <summary>Unique handle ID (used as opaque pointer in C ABI).</summary>
     public long HandleId { get; }
@@ -79,7 +79,7 @@ public sealed class InteropConnectionHandle : IDisposable
     public string? AuthToken { get; set; }
 
     private readonly CancellationTokenSource _cts = new();
-    private readonly ConcurrentDictionary<string, object> _connectionState = new();
+    private readonly BoundedDictionary<string, object> _connectionState = new BoundedDictionary<string, object>(1000);
 
     /// <summary>Creates a new connection handle.</summary>
     public InteropConnectionHandle(string connectionString)
@@ -141,7 +141,7 @@ public sealed class InteropConnectionHandle : IDisposable
 /// </summary>
 public static class NativeInteropExports
 {
-    private static readonly ConcurrentDictionary<long, byte[]> _resultBuffers = new();
+    private static readonly BoundedDictionary<long, byte[]> _resultBuffers = new BoundedDictionary<long, byte[]>(1000);
     private static long _nextBufferId;
 
     /// <summary>
@@ -519,9 +519,9 @@ public sealed class AppToken
 /// </summary>
 public sealed class AppPlatformRegistry
 {
-    private readonly ConcurrentDictionary<string, AppRegistration> _apps = new();
-    private readonly ConcurrentDictionary<string, AppToken> _activeTokens = new();
-    private readonly ConcurrentDictionary<string, (int Count, DateTimeOffset WindowStart)> _rateLimits = new();
+    private readonly BoundedDictionary<string, AppRegistration> _apps = new BoundedDictionary<string, AppRegistration>(1000);
+    private readonly BoundedDictionary<string, AppToken> _activeTokens = new BoundedDictionary<string, AppToken>(1000);
+    private readonly BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)> _rateLimits = new BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)>(1000);
 
     /// <summary>Registers a new application.</summary>
     public AppRegistration RegisterApp(string name, string[] scopes, string? description = null)

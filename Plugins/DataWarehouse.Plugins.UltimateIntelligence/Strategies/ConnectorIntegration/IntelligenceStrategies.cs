@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegration;
 
@@ -151,8 +151,8 @@ public sealed record EndpointParameter
 /// </summary>
 public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, GeneratedConnectorResult> _generatedConnectors = new();
-    private readonly ConcurrentDictionary<string, string> _sourceHashes = new();
+    private readonly BoundedDictionary<string, GeneratedConnectorResult> _generatedConnectors = new BoundedDictionary<string, GeneratedConnectorResult>(1000);
+    private readonly BoundedDictionary<string, string> _sourceHashes = new BoundedDictionary<string, string>(1000);
     private readonly HttpClient _httpClient;
 
     /// <inheritdoc/>
@@ -970,7 +970,7 @@ public sealed record EntityRelationship
 /// </summary>
 public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, float[]> _fieldEmbeddingCache = new();
+    private readonly BoundedDictionary<string, float[]> _fieldEmbeddingCache = new BoundedDictionary<string, float[]>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-schema-alignment";
@@ -1514,7 +1514,7 @@ public sealed record QueryValidationResult
 /// </summary>
 public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, string> _transpilationCache = new();
+    private readonly BoundedDictionary<string, string> _transpilationCache = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-query-transpilation";
@@ -1938,7 +1938,7 @@ public sealed record BehavioralAnomalyPattern
 /// </summary>
 public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BehavioralModel> _learnedModels = new();
+    private readonly BoundedDictionary<string, BehavioralModel> _learnedModels = new BoundedDictionary<string, BehavioralModel>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-behavioral-modeling";
@@ -2338,7 +2338,7 @@ public sealed record ScheduledRequest
 /// </summary>
 public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<(DateTimeOffset Time, int Usage)>> _usageHistory = new();
+    private readonly BoundedDictionary<string, List<(DateTimeOffset Time, int Usage)>> _usageHistory = new BoundedDictionary<string, List<(DateTimeOffset Time, int Usage)>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-quota-trading";
@@ -3029,8 +3029,8 @@ public sealed record PredictedValue
 /// </summary>
 public sealed class ProbabilisticDataBufferingStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<HistoricalDataPoint>> _historyCache = new();
-    private readonly ConcurrentDictionary<string, PredictedData> _activeBuffers = new();
+    private readonly BoundedDictionary<string, List<HistoricalDataPoint>> _historyCache = new BoundedDictionary<string, List<HistoricalDataPoint>>(1000);
+    private readonly BoundedDictionary<string, PredictedData> _activeBuffers = new BoundedDictionary<string, PredictedData>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-probabilistic-buffering";

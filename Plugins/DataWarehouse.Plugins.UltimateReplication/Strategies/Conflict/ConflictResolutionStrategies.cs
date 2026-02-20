@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
 {
@@ -55,8 +55,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class LastWriteWinsStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string NodeId)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, int> _nodePriorities = new();
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string NodeId)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string NodeId)>(1000);
+        private readonly BoundedDictionary<string, int> _nodePriorities = new BoundedDictionary<string, int>(1000);
         private readonly List<ResolvedConflict> _conflictLog = new();
         private readonly object _logLock = new();
 
@@ -263,8 +263,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class VectorClockStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, List<EnhancedReplicationConflict>> _pendingConflicts = new();
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)>(1000);
+        private readonly BoundedDictionary<string, List<EnhancedReplicationConflict>> _pendingConflicts = new BoundedDictionary<string, List<EnhancedReplicationConflict>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -438,8 +438,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class MergeConflictStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, Func<byte[], byte[], byte[]>> _customMergers = new();
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)>(1000);
+        private readonly BoundedDictionary<string, Func<byte[], byte[], byte[]>> _customMergers = new BoundedDictionary<string, Func<byte[], byte[], byte[]>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -636,9 +636,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class CustomConflictStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock)>(1000);
         private Func<byte[], byte[], (byte[] Winner, string Reason)>? _globalResolver;
-        private readonly ConcurrentDictionary<string, Func<byte[], byte[], (byte[] Winner, string Reason)>> _typeResolvers = new();
+        private readonly BoundedDictionary<string, Func<byte[], byte[], (byte[] Winner, string Reason)>> _typeResolvers = new BoundedDictionary<string, Func<byte[], byte[], (byte[] Winner, string Reason)>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -781,7 +781,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class CrdtConflictStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, string CrdtType, EnhancedVectorClock Clock)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, string CrdtType, EnhancedVectorClock Clock)> _dataStore = new BoundedDictionary<string, (byte[] Data, string CrdtType, EnhancedVectorClock Clock)>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -995,8 +995,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class VersionConflictStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Version, string NodeId)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, long> _versionCounters = new();
+        private readonly BoundedDictionary<string, (byte[] Data, long Version, string NodeId)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Version, string NodeId)>(1000);
+        private readonly BoundedDictionary<string, long> _versionCounters = new BoundedDictionary<string, long>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -1124,8 +1124,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
     /// </summary>
     public sealed class ThreeWayMergeStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, VersionedData> _dataStore = new();
-        private readonly ConcurrentDictionary<string, List<byte[]>> _ancestors = new();
+        private readonly BoundedDictionary<string, VersionedData> _dataStore = new BoundedDictionary<string, VersionedData>(1000);
+        private readonly BoundedDictionary<string, List<byte[]>> _ancestors = new BoundedDictionary<string, List<byte[]>>(1000);
 
         private sealed class VersionedData
         {

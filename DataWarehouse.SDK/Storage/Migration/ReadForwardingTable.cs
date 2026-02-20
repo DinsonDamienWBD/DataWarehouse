@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Migration;
 
@@ -19,7 +20,7 @@ namespace DataWarehouse.SDK.Storage.Migration;
 [SdkCompatibility("5.0.0", Notes = "Phase 58: Background migration read forwarding")]
 public sealed class ReadForwardingTable : IDisposable
 {
-    private readonly ConcurrentDictionary<string, ReadForwardingEntry> _entries = new();
+    private readonly BoundedDictionary<string, ReadForwardingEntry> _entries = new BoundedDictionary<string, ReadForwardingEntry>(1000);
     private readonly Timer _cleanupTimer;
     private readonly TimeSpan _defaultTtl;
     private bool _disposed;

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -43,8 +42,8 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase, IDisposable
 {
     private readonly RaidStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, RaidHealthStatus> _healthStatus = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, RaidHealthStatus> _healthStatus = new BoundedDictionary<string, RaidHealthStatus>(1000);
     private bool _disposed;
 
     // Configuration

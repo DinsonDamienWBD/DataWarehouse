@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     /// </summary>
     public sealed class EdRStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, EndpointProfile> _endpointProfiles = new();
+        private readonly BoundedDictionary<string, EndpointProfile> _endpointProfiles = new BoundedDictionary<string, EndpointProfile>(1000);
         private readonly ConcurrentQueue<EndpointThreat> _threats = new();
         private readonly HashSet<string> _suspiciousProcessNames = new(StringComparer.OrdinalIgnoreCase)
         {

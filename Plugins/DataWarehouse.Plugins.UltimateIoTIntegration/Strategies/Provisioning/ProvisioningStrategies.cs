@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Provisioning;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Provisioning;
 /// </summary>
 public abstract class ProvisioningStrategyBase : IoTStrategyBase, IProvisioningStrategy
 {
-    protected readonly ConcurrentDictionary<string, DeviceCredentials> Credentials = new();
+    protected readonly BoundedDictionary<string, DeviceCredentials> Credentials = new BoundedDictionary<string, DeviceCredentials>(1000);
 
     public override IoTStrategyCategory Category => IoTStrategyCategory.Provisioning;
     public abstract CredentialType[] SupportedCredentialTypes { get; }

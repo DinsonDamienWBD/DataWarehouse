@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.AppPlatform.Models;
@@ -27,7 +26,7 @@ internal sealed class AppAccessPolicyStrategy
     /// <summary>
     /// Thread-safe dictionary storing per-app access policies keyed by AppId.
     /// </summary>
-    private readonly ConcurrentDictionary<string, AppAccessPolicy> _policies = new();
+    private readonly BoundedDictionary<string, AppAccessPolicy> _policies = new BoundedDictionary<string, AppAccessPolicy>(1000);
 
     /// <summary>
     /// Message bus for communicating policy operations to UltimateAccessControl.
@@ -116,7 +115,7 @@ internal sealed class AppAccessPolicyStrategy
     public Task<AppAccessPolicy?> GetPolicyAsync(string appId)
     {
         _policies.TryGetValue(appId, out var policy);
-        return Task.FromResult(policy);
+        return Task.FromResult<AppAccessPolicy?>(policy);
     }
 
     /// <summary>

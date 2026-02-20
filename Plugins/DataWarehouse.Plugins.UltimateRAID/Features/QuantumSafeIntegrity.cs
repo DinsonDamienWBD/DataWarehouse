@@ -1,7 +1,7 @@
 // 91.F2: Quantum-Safe RAID Integrity
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class QuantumSafeIntegrity
 {
-    private readonly ConcurrentDictionary<string, MerkleTree> _merkleTrees = new();
-    private readonly ConcurrentDictionary<string, BlockchainAttestation> _attestations = new();
+    private readonly BoundedDictionary<string, MerkleTree> _merkleTrees = new BoundedDictionary<string, MerkleTree>(1000);
+    private readonly BoundedDictionary<string, BlockchainAttestation> _attestations = new BoundedDictionary<string, BlockchainAttestation>(1000);
     private readonly HashAlgorithmType _defaultAlgorithm;
 
     public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256)

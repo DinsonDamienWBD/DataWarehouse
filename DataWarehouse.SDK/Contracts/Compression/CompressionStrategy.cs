@@ -1,4 +1,4 @@
-﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Buffers;
@@ -500,7 +500,7 @@ namespace DataWarehouse.SDK.Contracts.Compression
         // Both fields are safe for concurrent multi-plugin access.
         private readonly CompressionStatistics _statistics = new();
         private readonly object _statsLock = new();
-        private static readonly ConcurrentDictionary<string, ContentType> _contentTypeCache = new();
+        private static readonly BoundedDictionary<string, ContentType> _contentTypeCache = new BoundedDictionary<string, ContentType>(1000);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CompressionStrategyBase"/> class.

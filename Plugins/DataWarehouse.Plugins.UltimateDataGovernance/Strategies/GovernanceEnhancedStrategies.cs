@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies;
 /// </summary>
 public sealed class ClassificationConfidenceCalibrationStrategy : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ClassificationConfidence> _calibrations = new();
-    private readonly ConcurrentDictionary<string, List<CalibrationSample>> _samples = new();
+    private readonly BoundedDictionary<string, ClassificationConfidence> _calibrations = new BoundedDictionary<string, ClassificationConfidence>(1000);
+    private readonly BoundedDictionary<string, List<CalibrationSample>> _samples = new BoundedDictionary<string, List<CalibrationSample>>(1000);
 
     public override string StrategyId => "classification-confidence-calibration";
     public override string DisplayName => "Classification Confidence Calibration";
@@ -118,8 +118,8 @@ public sealed class ClassificationConfidenceCalibrationStrategy : DataGovernance
 /// </summary>
 public sealed class StewardshipAssignmentWorkflowStrategy : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StewardshipAssignment> _assignments = new();
-    private readonly ConcurrentDictionary<string, List<StewardshipTask>> _tasks = new();
+    private readonly BoundedDictionary<string, StewardshipAssignment> _assignments = new BoundedDictionary<string, StewardshipAssignment>(1000);
+    private readonly BoundedDictionary<string, List<StewardshipTask>> _tasks = new BoundedDictionary<string, List<StewardshipTask>>(1000);
 
     public override string StrategyId => "stewardship-assignment-workflow";
     public override string DisplayName => "Stewardship Assignment Workflow";
@@ -201,8 +201,8 @@ public sealed class StewardshipAssignmentWorkflowStrategy : DataGovernanceStrate
 /// </summary>
 public sealed class QualitySlaEnforcementStrategy : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, QualitySla> _slas = new();
-    private readonly ConcurrentDictionary<string, List<SlaViolation>> _violations = new();
+    private readonly BoundedDictionary<string, QualitySla> _slas = new BoundedDictionary<string, QualitySla>(1000);
+    private readonly BoundedDictionary<string, List<SlaViolation>> _violations = new BoundedDictionary<string, List<SlaViolation>>(1000);
 
     public override string StrategyId => "quality-sla-enforcement";
     public override string DisplayName => "Quality SLA Enforcement";

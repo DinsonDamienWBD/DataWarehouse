@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRTOSBridge.Strategies;
 
@@ -30,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateRTOSBridge.Strategies;
 /// </remarks>
 public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VxWorksQueue> _queues = new();
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _semaphores = new();
+    private readonly BoundedDictionary<string, VxWorksQueue> _queues = new BoundedDictionary<string, VxWorksQueue>(1000);
+    private readonly BoundedDictionary<string, SemaphoreSlim> _semaphores = new BoundedDictionary<string, SemaphoreSlim>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -231,7 +232,7 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 /// </remarks>
 public sealed class QnxProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, QnxChannel> _channels = new();
+    private readonly BoundedDictionary<string, QnxChannel> _channels = new BoundedDictionary<string, QnxChannel>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -434,8 +435,8 @@ public sealed class QnxProtocolAdapter : RtosStrategyBase
 /// </remarks>
 public sealed class FreeRtosProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FreeRtosQueue> _queues = new();
-    private readonly ConcurrentDictionary<string, uint> _eventGroups = new();
+    private readonly BoundedDictionary<string, FreeRtosQueue> _queues = new BoundedDictionary<string, FreeRtosQueue>(1000);
+    private readonly BoundedDictionary<string, uint> _eventGroups = new BoundedDictionary<string, uint>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -600,8 +601,8 @@ public sealed class FreeRtosProtocolAdapter : RtosStrategyBase
 /// </remarks>
 public sealed class ZephyrProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ZephyrMsgQueue> _msgQueues = new();
-    private readonly ConcurrentDictionary<string, ZephyrFifo> _fifos = new();
+    private readonly BoundedDictionary<string, ZephyrMsgQueue> _msgQueues = new BoundedDictionary<string, ZephyrMsgQueue>(1000);
+    private readonly BoundedDictionary<string, ZephyrFifo> _fifos = new BoundedDictionary<string, ZephyrFifo>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -786,8 +787,8 @@ public sealed class ZephyrProtocolAdapter : RtosStrategyBase
 /// </remarks>
 public sealed class IntegrityProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IntegrityConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, IntegrityPartition> _partitions = new();
+    private readonly BoundedDictionary<string, IntegrityConnection> _connections = new BoundedDictionary<string, IntegrityConnection>(1000);
+    private readonly BoundedDictionary<string, IntegrityPartition> _partitions = new BoundedDictionary<string, IntegrityPartition>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -991,7 +992,7 @@ public sealed class IntegrityProtocolAdapter : RtosStrategyBase
 /// </summary>
 public sealed class LynxOsProtocolAdapter : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LynxQueue> _queues = new();
+    private readonly BoundedDictionary<string, LynxQueue> _queues = new BoundedDictionary<string, LynxQueue>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>

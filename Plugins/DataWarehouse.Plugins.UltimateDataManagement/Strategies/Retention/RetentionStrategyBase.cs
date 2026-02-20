@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -305,7 +305,7 @@ public abstract class RetentionStrategyBase : DataManagementStrategyBase, IReten
     /// <summary>
     /// Thread-safe collection of tracked objects.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, DataObject> TrackedObjects = new();
+    protected readonly BoundedDictionary<string, DataObject> TrackedObjects = new BoundedDictionary<string, DataObject>(1000);
 
     /// <summary>
     /// Lock for statistics updates.

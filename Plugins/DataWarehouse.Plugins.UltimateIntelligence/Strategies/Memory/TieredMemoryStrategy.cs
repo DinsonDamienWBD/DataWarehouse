@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -63,17 +63,17 @@ public sealed record TieredMemoryConfig
 /// </summary>
 public sealed class InMemoryTieredMemorySystem
 {
-    private readonly ConcurrentDictionary<MemoryTier, ConcurrentDictionary<string, TieredMemoryEntry>> _tiers = new();
-    private readonly ConcurrentDictionary<MemoryTier, TierStatistics> _statistics = new();
+    private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, TieredMemoryEntry>> _tiers = new BoundedDictionary<MemoryTier, BoundedDictionary<string, TieredMemoryEntry>>(1000);
+    private readonly BoundedDictionary<MemoryTier, TierStatistics> _statistics = new BoundedDictionary<MemoryTier, TierStatistics>(1000);
     private readonly TieredMemoryConfig _config;
-    private readonly ConcurrentDictionary<string, MemoryTier> _entryTierMap = new();
+    private readonly BoundedDictionary<string, MemoryTier> _entryTierMap = new BoundedDictionary<string, MemoryTier>(1000);
 
     public InMemoryTieredMemorySystem(TieredMemoryConfig? config = null)
     {
         _config = config ?? new TieredMemoryConfig();
         foreach (MemoryTier tier in Enum.GetValues<MemoryTier>())
         {
-            _tiers[tier] = new ConcurrentDictionary<string, TieredMemoryEntry>();
+            _tiers[tier] = new BoundedDictionary<string, TieredMemoryEntry>(1000);
             _statistics[tier] = new TierStatistics
             {
                 Tier = tier,

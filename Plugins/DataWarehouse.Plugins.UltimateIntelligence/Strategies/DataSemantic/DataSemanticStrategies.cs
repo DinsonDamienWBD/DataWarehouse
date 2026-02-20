@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.DataSemantic;
 
@@ -32,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.DataSemantic;
 /// </remarks>
 public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, LineageEdge> _edges = new();
-    private readonly ConcurrentDictionary<string, LineageVersion> _versions = new();
+    private readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
+    private readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
+    private readonly BoundedDictionary<string, LineageVersion> _versions = new BoundedDictionary<string, LineageVersion>(1000);
     private readonly ReaderWriterLockSlim _graphLock = new();
     private long _edgeIdCounter;
 
@@ -429,9 +429,9 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
 /// </remarks>
 public sealed class SemanticUnderstandingStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticProfile> _profiles = new();
-    private readonly ConcurrentDictionary<string, ConceptMapping> _concepts = new();
-    private readonly ConcurrentDictionary<string, List<SemanticRelationship>> _relationships = new();
+    private readonly BoundedDictionary<string, SemanticProfile> _profiles = new BoundedDictionary<string, SemanticProfile>(1000);
+    private readonly BoundedDictionary<string, ConceptMapping> _concepts = new BoundedDictionary<string, ConceptMapping>(1000);
+    private readonly BoundedDictionary<string, List<SemanticRelationship>> _relationships = new BoundedDictionary<string, List<SemanticRelationship>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "data-semantic-understanding";
@@ -776,10 +776,10 @@ public sealed class SemanticUnderstandingStrategy : IntelligenceStrategyBase
 /// </remarks>
 public sealed class LivingCatalogStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CatalogEntry> _catalog = new();
-    private readonly ConcurrentDictionary<string, List<UsageRecord>> _usage = new();
-    private readonly ConcurrentDictionary<string, QualityScore> _quality = new();
-    private readonly ConcurrentDictionary<string, List<string>> _searchIndex = new();
+    private readonly BoundedDictionary<string, CatalogEntry> _catalog = new BoundedDictionary<string, CatalogEntry>(1000);
+    private readonly BoundedDictionary<string, List<UsageRecord>> _usage = new BoundedDictionary<string, List<UsageRecord>>(1000);
+    private readonly BoundedDictionary<string, QualityScore> _quality = new BoundedDictionary<string, QualityScore>(1000);
+    private readonly BoundedDictionary<string, List<string>> _searchIndex = new BoundedDictionary<string, List<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "data-semantic-living-catalog";

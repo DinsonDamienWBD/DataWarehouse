@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -123,11 +123,11 @@ public sealed class GeoShardConfig
 /// </remarks>
 public sealed class GeoShardingStrategy : ShardingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, GeoShardConfig> _geoConfigs = new();
-    private readonly ConcurrentDictionary<GeoRegion, List<string>> _regionToShards = new();
-    private readonly ConcurrentDictionary<string, string> _countryToShard = new();
-    private readonly ConcurrentDictionary<string, GeoLocation> _keyToLocation = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, GeoShardConfig> _geoConfigs = new BoundedDictionary<string, GeoShardConfig>(1000);
+    private readonly BoundedDictionary<GeoRegion, List<string>> _regionToShards = new BoundedDictionary<GeoRegion, List<string>>(1000);
+    private readonly BoundedDictionary<string, string> _countryToShard = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, GeoLocation> _keyToLocation = new BoundedDictionary<string, GeoLocation>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly object _configLock = new();
     private readonly int _cacheMaxSize;
     private GeoLocation? _defaultLocation;

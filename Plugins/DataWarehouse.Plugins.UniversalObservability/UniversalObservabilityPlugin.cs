@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -29,7 +28,7 @@ namespace DataWarehouse.Plugins.UniversalObservability;
 /// </remarks>
 public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
 {
-    private readonly ConcurrentDictionary<string, IObservabilityStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IObservabilityStrategy> _strategies = new BoundedDictionary<string, IObservabilityStrategy>(1000);
     private IObservabilityStrategy? _activeMetricsStrategy;
     private IObservabilityStrategy? _activeLoggingStrategy;
     private IObservabilityStrategy? _activeTracingStrategy;

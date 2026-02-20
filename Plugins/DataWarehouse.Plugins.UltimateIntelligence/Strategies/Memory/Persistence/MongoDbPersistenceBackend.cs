@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -87,14 +88,14 @@ public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated collections per tier
-    private readonly ConcurrentDictionary<MemoryTier, ConcurrentDictionary<string, MongoDocument>> _collections = new();
+    private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, MongoDocument>> _collections = new BoundedDictionary<MemoryTier, BoundedDictionary<string, MongoDocument>>(1000);
 
     // Simulated indexes
-    private readonly ConcurrentDictionary<string, HashSet<string>> _scopeIndex = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
 
     // Simulated GridFS
-    private readonly ConcurrentDictionary<string, byte[]> _gridFsFiles = new();
+    private readonly BoundedDictionary<string, byte[]> _gridFsFiles = new BoundedDictionary<string, byte[]>(1000);
 
     // Change stream
     private readonly ConcurrentQueue<ChangeStreamEvent> _changeStream = new();
@@ -131,7 +132,7 @@ public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
         // Initialize collections
         foreach (var tier in Enum.GetValues<MemoryTier>())
         {
-            _collections[tier] = new ConcurrentDictionary<string, MongoDocument>();
+            _collections[tier] = new BoundedDictionary<string, MongoDocument>(1000);
         }
 
         // Simulate connection
@@ -969,7 +970,7 @@ public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
 
     #region Private Helpers
 
-    private ConcurrentDictionary<string, MongoDocument> GetCollection(MemoryTier tier)
+    private BoundedDictionary<string, MongoDocument> GetCollection(MemoryTier tier)
     {
         return _collections[tier];
     }

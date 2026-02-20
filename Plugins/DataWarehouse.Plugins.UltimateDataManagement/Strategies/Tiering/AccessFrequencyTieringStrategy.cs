@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -16,8 +16,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class AccessFrequencyTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessTracking> _accessTracking = new();
-    private readonly ConcurrentDictionary<string, TierTransition> _recentTransitions = new();
+    private readonly BoundedDictionary<string, AccessTracking> _accessTracking = new BoundedDictionary<string, AccessTracking>(1000);
+    private readonly BoundedDictionary<string, TierTransition> _recentTransitions = new BoundedDictionary<string, TierTransition>(1000);
     private TierThresholds _thresholds = TierThresholds.Default;
     private readonly TimeSpan _cooldownPeriod = TimeSpan.FromHours(24);
     private readonly double _hysteresisMultiplier = 1.2;

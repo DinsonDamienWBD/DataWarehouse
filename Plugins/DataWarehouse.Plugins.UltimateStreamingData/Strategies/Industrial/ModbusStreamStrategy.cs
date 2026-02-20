@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Industrial;
 
@@ -243,9 +244,9 @@ public sealed record ModbusPollingConfig
 /// </summary>
 internal sealed class ModbusStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ModbusPollingConfig> _pollingGroups = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<ModbusReadResult>> _dataQueues = new();
-    private readonly ConcurrentDictionary<string, ushort[]> _registerState = new();
+    private readonly BoundedDictionary<string, ModbusPollingConfig> _pollingGroups = new BoundedDictionary<string, ModbusPollingConfig>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<ModbusReadResult>> _dataQueues = new BoundedDictionary<string, ConcurrentQueue<ModbusReadResult>>(1000);
+    private readonly BoundedDictionary<string, ushort[]> _registerState = new BoundedDictionary<string, ushort[]>(1000);
     private long _totalPolls;
     private long _totalErrors;
 

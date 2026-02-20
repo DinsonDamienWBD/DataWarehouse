@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.Plugins.AirGapBridge.Core;
 using DataWarehouse.Plugins.AirGapBridge.Detection;
 using LiteDB;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AirGapBridge.PocketInstance;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.AirGapBridge.PocketInstance;
 /// </summary>
 public sealed class PocketInstanceManager : IDisposable
 {
-    private readonly ConcurrentDictionary<string, PocketInstance> _instances = new();
+    private readonly BoundedDictionary<string, PocketInstance> _instances = new BoundedDictionary<string, PocketInstance>(1000);
     private readonly string _localInstanceId;
     private bool _disposed;
 
@@ -532,7 +532,7 @@ public sealed class PocketInstance
     public ILiteCollection<SyncStateEntry>? SyncStateCollection { get; set; }
 
     // Sync rules
-    public ConcurrentDictionary<string, SyncRule> SyncRules { get; } = new();
+    public BoundedDictionary<string, SyncRule> SyncRules { get; } = new BoundedDictionary<string, SyncRule>(1000);
 }
 
 /// <summary>

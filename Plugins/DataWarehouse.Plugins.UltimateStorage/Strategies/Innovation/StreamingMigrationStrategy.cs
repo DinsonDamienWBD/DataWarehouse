@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableDualWrite = true;
         private double _syncThreshold = 0.95;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, MigrationStatus> _objectStatus = new();
+        private readonly BoundedDictionary<string, MigrationStatus> _objectStatus = new BoundedDictionary<string, MigrationStatus>(1000);
         private long _totalObjects = 0;
         private long _migratedObjects = 0;
 

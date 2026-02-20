@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -78,7 +79,7 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
     private Guid? _lastScannedBlockId;
 
     // Block tracking for resumable scans
-    private readonly ConcurrentDictionary<Guid, DateTime> _scannedBlocks = new();
+    private readonly BoundedDictionary<Guid, DateTime> _scannedBlocks = new BoundedDictionary<Guid, DateTime>(1000);
     private readonly ConcurrentQueue<Guid> _pendingBlocks = new();
 
     /// <inheritdoc/>

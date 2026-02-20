@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Consensus;
 
@@ -21,8 +21,8 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
     private long _currentTerm;
     private string? _votedFor;
     private string? _leaderId;
-    private readonly ConcurrentDictionary<string, long> _nextIndex = new();
-    private readonly ConcurrentDictionary<string, long> _matchIndex = new();
+    private readonly BoundedDictionary<string, long> _nextIndex = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, long> _matchIndex = new BoundedDictionary<string, long>(1000);
     private readonly List<(long term, object command)> _log = new();
     private long _commitIndex;
     private long _lastApplied;
@@ -273,7 +273,7 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
     private long _proposalNumber;
     private long _highestAcceptedProposal;
     private object? _acceptedValue;
-    private readonly ConcurrentDictionary<long, object?> _promises = new();
+    private readonly BoundedDictionary<long, object?> _promises = new BoundedDictionary<long, object?>(1000);
     private readonly object _stateLock = new();
 
     private readonly string _nodeId;
@@ -430,8 +430,8 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
 {
     private long _viewNumber;
     private long _sequenceNumber;
-    private readonly ConcurrentDictionary<long, (object request, int prepareCount, int commitCount)> _pending = new();
-    private readonly ConcurrentDictionary<long, object> _committed = new();
+    private readonly BoundedDictionary<long, (object request, int prepareCount, int commitCount)> _pending = new BoundedDictionary<long, (object request, int prepareCount, int commitCount)>(1000);
+    private readonly BoundedDictionary<long, object> _committed = new BoundedDictionary<long, object>(1000);
     private readonly object _stateLock = new();
 
     private readonly string _nodeId;
@@ -586,8 +586,8 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
     private long _zxid; // Zookeeper transaction ID
     private long _epoch;
     private bool _isLeader;
-    private readonly ConcurrentDictionary<long, object> _proposals = new();
-    private readonly ConcurrentDictionary<long, int> _ackCounts = new();
+    private readonly BoundedDictionary<long, object> _proposals = new BoundedDictionary<long, object>(1000);
+    private readonly BoundedDictionary<long, int> _ackCounts = new BoundedDictionary<long, int>(1000);
     private readonly object _stateLock = new();
 
     private readonly string _nodeId;
@@ -745,7 +745,7 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
     private long _opNumber;
     private long _commitNumber;
     private bool _isPrimary;
-    private readonly ConcurrentDictionary<long, object> _log = new();
+    private readonly BoundedDictionary<long, object> _log = new BoundedDictionary<long, object>(1000);
     private readonly object _stateLock = new();
 
     private readonly string _nodeId;

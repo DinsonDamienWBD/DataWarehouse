@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit.Strategies.Chunked;
 
@@ -42,7 +43,7 @@ internal sealed class ChunkedResumableStrategy : DataTransitStrategyBase
     /// <summary>
     /// Thread-safe storage of active and completed chunk manifests keyed by transfer ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ChunkManifest> _manifests = new();
+    private readonly BoundedDictionary<string, ChunkManifest> _manifests = new BoundedDictionary<string, ChunkManifest>(1000);
 
     /// <summary>
     /// HTTP client used for chunk upload and manifest submission.

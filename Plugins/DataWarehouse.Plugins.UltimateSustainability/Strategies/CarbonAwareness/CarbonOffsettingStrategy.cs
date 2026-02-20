@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwareness;
 
@@ -10,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwarenes
 public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
 {
     private readonly ConcurrentQueue<CarbonFootprintEntry> _footprintHistory = new();
-    private readonly ConcurrentDictionary<string, OffsetPurchase> _offsetPurchases = new();
+    private readonly BoundedDictionary<string, OffsetPurchase> _offsetPurchases = new BoundedDictionary<string, OffsetPurchase>(1000);
     private double _totalEmissionsGrams;
     private double _totalOffsetsGrams;
     private readonly object _lock = new();

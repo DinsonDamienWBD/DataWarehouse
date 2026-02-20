@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.ScatterGather;
 
@@ -42,7 +42,7 @@ internal sealed class ScatterGatherStrategy : ComputeRuntimeStrategyBase
             var chunks = lines.Chunk(chunkSize).ToArray();
 
             // PARALLEL EXECUTION
-            var results = new ConcurrentDictionary<int, string>();
+            var results = new BoundedDictionary<int, string>(1000);
             var codeStr = task.GetCodeAsString();
 
             await Parallel.ForEachAsync(

@@ -1,19 +1,19 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 {
     /// <summary>Databricks bulk import strategy using Delta Lake and Auto Loader.</summary>
     public class DatabricksImportStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+        private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "databricks-import";
         public override string Name => "Databricks Import";

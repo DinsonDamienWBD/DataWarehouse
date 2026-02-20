@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,7 +18,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Engine.FaultInjectors;
 public sealed class NetworkPartitionInjector : IFaultInjector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, PartitionState> _activePartitions = new();
+    private readonly BoundedDictionary<string, PartitionState> _activePartitions = new BoundedDictionary<string, PartitionState>(1000);
 
     /// <summary>
     /// Tracks the state of an active network partition.

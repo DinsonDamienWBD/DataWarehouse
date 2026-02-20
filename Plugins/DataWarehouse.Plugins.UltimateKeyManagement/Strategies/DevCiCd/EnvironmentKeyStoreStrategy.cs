@@ -1,8 +1,8 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 {
@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
     public sealed class EnvironmentKeyStoreStrategy : KeyStoreStrategyBase
     {
         private EnvironmentKeyStoreConfig _config = new();
-        private readonly ConcurrentDictionary<string, byte[]> _generatedKeys = new();
+        private readonly BoundedDictionary<string, byte[]> _generatedKeys = new BoundedDictionary<string, byte[]>(1000);
         private string? _currentKeyId;
 
         public override KeyStoreCapabilities Capabilities => new()

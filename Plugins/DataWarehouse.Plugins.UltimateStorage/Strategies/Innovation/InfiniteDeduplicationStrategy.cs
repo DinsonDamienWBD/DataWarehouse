@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -36,9 +36,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableConvergentEncryption = true;
         private int _blockSize = 8192;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, GlobalChunk> _globalChunkStore = new();
-        private readonly ConcurrentDictionary<string, TenantManifest> _tenantManifests = new();
-        private readonly ConcurrentDictionary<string, TenantInfo> _tenants = new();
+        private readonly BoundedDictionary<string, GlobalChunk> _globalChunkStore = new BoundedDictionary<string, GlobalChunk>(1000);
+        private readonly BoundedDictionary<string, TenantManifest> _tenantManifests = new BoundedDictionary<string, TenantManifest>(1000);
+        private readonly BoundedDictionary<string, TenantInfo> _tenants = new BoundedDictionary<string, TenantInfo>(1000);
         private long _totalUniqueChunks;
         private long _totalChunkReferences;
         private long _totalBytesLogical;

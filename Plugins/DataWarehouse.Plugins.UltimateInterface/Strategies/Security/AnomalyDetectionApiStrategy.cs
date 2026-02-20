@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 
@@ -54,7 +54,7 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
     private const double MediumAnomalyThreshold = 0.5;
 
     // Client behavioral baseline tracking
-    private readonly ConcurrentDictionary<string, ClientBaseline> _baselines = new();
+    private readonly BoundedDictionary<string, ClientBaseline> _baselines = new BoundedDictionary<string, ClientBaseline>(1000);
 
     /// <summary>
     /// Client behavioral baseline for anomaly detection.

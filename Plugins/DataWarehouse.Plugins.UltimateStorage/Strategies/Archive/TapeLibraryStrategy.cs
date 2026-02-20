@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 {
@@ -46,8 +46,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private TimeSpan _loadTimeout = TimeSpan.FromMinutes(2);
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, TapeInfo> _tapeInventory = new();
-        private readonly ConcurrentDictionary<string, string> _objectToTapeMap = new();
+        private readonly BoundedDictionary<string, TapeInfo> _tapeInventory = new BoundedDictionary<string, TapeInfo>(1000);
+        private readonly BoundedDictionary<string, string> _objectToTapeMap = new BoundedDictionary<string, string>(1000);
         private TapeCatalog? _catalog;
         private IntPtr _tapeHandle = IntPtr.Zero;
         private string? _currentLoadedTape = null;
@@ -1338,7 +1338,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class TapeCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly ConcurrentDictionary<string, TapeCatalogEntry> _entries = new();
+        private readonly BoundedDictionary<string, TapeCatalogEntry> _entries = new BoundedDictionary<string, TapeCatalogEntry>(1000);
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private TapeCatalog(string catalogPath)
@@ -1379,7 +1379,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         public Task<TapeCatalogEntry?> GetEntryAsync(string key, CancellationToken ct)
         {
             _entries.TryGetValue(key, out var entry);
-            return Task.FromResult(entry);
+            return Task.FromResult<TapeCatalogEntry?>(entry);
         }
 
         public Task<List<TapeCatalogEntry>> ListEntriesAsync(string? prefix, CancellationToken ct)

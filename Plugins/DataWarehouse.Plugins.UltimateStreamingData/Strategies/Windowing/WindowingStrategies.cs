@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Windowing;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Windowing;
 /// </summary>
 public sealed class TumblingWindowStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WindowState> _windowStates = new();
+    private readonly BoundedDictionary<string, WindowState> _windowStates = new BoundedDictionary<string, WindowState>(1000);
 
     public override string StrategyId => "windowing-tumbling";
     public override string DisplayName => "Tumbling Window";
@@ -78,7 +78,7 @@ public sealed class TumblingWindowStrategy : StreamingDataStrategyBase
     {
         ThrowIfNotInitialized();
 
-        var windowBuffers = new ConcurrentDictionary<string, List<TEvent>>();
+        var windowBuffers = new BoundedDictionary<string, List<TEvent>>(1000);
         var watermark = DateTimeOffset.MinValue;
 
         await foreach (var evt in events.WithCancellation(ct))
@@ -258,7 +258,7 @@ public sealed class SlidingWindowStrategy : StreamingDataStrategyBase
     {
         ThrowIfNotInitialized();
 
-        var windowBuffers = new ConcurrentDictionary<string, List<TEvent>>();
+        var windowBuffers = new BoundedDictionary<string, List<TEvent>>(1000);
         var watermark = DateTimeOffset.MinValue;
 
         await foreach (var evt in events.WithCancellation(ct))
@@ -421,7 +421,7 @@ public sealed class SessionWindowStrategy : StreamingDataStrategyBase
     {
         ThrowIfNotInitialized();
 
-        var sessions = new ConcurrentDictionary<TKey, SessionState<TEvent>>();
+        var sessions = new BoundedDictionary<TKey, SessionState<TEvent>>(1000);
         var watermark = DateTimeOffset.MinValue;
 
         await foreach (var evt in events.WithCancellation(ct))
@@ -630,7 +630,7 @@ public sealed class GlobalWindowStrategy : StreamingDataStrategyBase
     {
         ThrowIfNotInitialized();
 
-        var globalBuffers = new ConcurrentDictionary<TKey, GlobalWindowState<TEvent>>();
+        var globalBuffers = new BoundedDictionary<TKey, GlobalWindowState<TEvent>>(1000);
         var triggerCount = 0L;
 
         await foreach (var evt in events.WithCancellation(ct))
@@ -797,7 +797,7 @@ public sealed class CountWindowStrategy : StreamingDataStrategyBase
     {
         ThrowIfNotInitialized();
 
-        var buffers = new ConcurrentDictionary<TKey, CountWindowState<TEvent>>();
+        var buffers = new BoundedDictionary<TKey, CountWindowState<TEvent>>(1000);
 
         await foreach (var evt in events.WithCancellation(ct))
         {

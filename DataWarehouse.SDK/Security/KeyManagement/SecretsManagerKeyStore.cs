@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -12,6 +11,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Security.KeyManagement
 {
@@ -71,7 +71,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         private string? _sessionToken;
         private DateTime _credentialExpiry = DateTime.MaxValue;
         private readonly SemaphoreSlim _credentialLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, SecureCacheEntry> _secureCache = new();
+        private readonly BoundedDictionary<string, SecureCacheEntry> _secureCache = new BoundedDictionary<string, SecureCacheEntry>(1000);
         private string? _currentKeyId;
 
         private const string ServiceName = "secretsmanager";
@@ -653,7 +653,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         private string? _clientEmail;
         private string? _privateKeyPem;
         private AdcSource _credSource = AdcSource.None;
-        private readonly ConcurrentDictionary<string, SecureCacheEntry> _secureCache = new();
+        private readonly BoundedDictionary<string, SecureCacheEntry> _secureCache = new BoundedDictionary<string, SecureCacheEntry>(1000);
         private string? _currentKeyId;
 
         private const string SmBaseUrl = "https://secretmanager.googleapis.com";

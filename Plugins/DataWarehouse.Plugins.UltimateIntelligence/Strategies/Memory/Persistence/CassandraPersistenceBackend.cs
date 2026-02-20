@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -124,10 +124,10 @@ public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
     // PRIMARY KEY ((scope), tier, created_at, id)
     // Partition key: scope
     // Clustering columns: tier, created_at (DESC), id
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<CassandraClusteringKey, CassandraRow>> _partitions = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<CassandraClusteringKey, CassandraRow>> _partitions = new BoundedDictionary<string, BoundedDictionary<CassandraClusteringKey, CassandraRow>>(1000);
 
     // Secondary index on ID for direct lookups
-    private readonly ConcurrentDictionary<string, (string Scope, CassandraClusteringKey ClusteringKey)> _idIndex = new();
+    private readonly BoundedDictionary<string, (string Scope, CassandraClusteringKey ClusteringKey)> _idIndex = new BoundedDictionary<string, (string Scope, CassandraClusteringKey ClusteringKey)>(1000);
 
     private bool _disposed;
     private bool _isConnected;
@@ -219,7 +219,7 @@ public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
             // Get or create partition
             if (!_partitions.TryGetValue(record.Scope, out var partition))
             {
-                partition = new ConcurrentDictionary<CassandraClusteringKey, CassandraRow>();
+                partition = new BoundedDictionary<CassandraClusteringKey, CassandraRow>(1000);
                 _partitions[record.Scope] = partition;
             }
 

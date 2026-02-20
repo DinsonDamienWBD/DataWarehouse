@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +12,7 @@ using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 using DataWarehouse.SDK.Storage.Billing;
 using DataWarehouse.SDK.Storage.Migration;
 using DataWarehouse.SDK.Storage.Placement;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.ZeroGravity;
 
@@ -48,7 +48,7 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
 
     // In-memory store for objects keyed by storage path.
     // Production deployments override read/write delegates to target real storage nodes.
-    private readonly ConcurrentDictionary<string, StoredObject> _objectStore = new();
+    private readonly BoundedDictionary<string, StoredObject> _objectStore = new BoundedDictionary<string, StoredObject>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "zero-gravity";

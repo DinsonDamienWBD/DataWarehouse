@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -23,9 +23,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class QuantumKeyDistributionBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, QkdBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, QuantumKey> _quantumKeys = new();
-        private readonly ConcurrentDictionary<string, QkdSession> _activeSessions = new();
+        private readonly BoundedDictionary<string, QkdBackup> _backups = new BoundedDictionary<string, QkdBackup>(1000);
+        private readonly BoundedDictionary<string, QuantumKey> _quantumKeys = new BoundedDictionary<string, QuantumKey>(1000);
+        private readonly BoundedDictionary<string, QkdSession> _activeSessions = new BoundedDictionary<string, QkdSession>(1000);
 
         /// <summary>
         /// Interface for QKD hardware operations.

@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Moonshots;
 
@@ -107,7 +107,7 @@ public sealed record MoonshotPipelineDefinition(
 /// </summary>
 public sealed class MoonshotPipelineContext
 {
-    private readonly ConcurrentDictionary<string, object> _properties = new();
+    private readonly BoundedDictionary<string, object> _properties = new BoundedDictionary<string, object>(1000);
     private readonly List<MoonshotStageResult> _stageResults = new();
     private readonly object _resultsLock = new();
 

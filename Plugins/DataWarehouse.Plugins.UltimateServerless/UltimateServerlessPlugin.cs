@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -26,9 +25,9 @@ namespace DataWarehouse.Plugins.UltimateServerless;
 /// </summary>
 public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, ServerlessStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ServerlessFunctionConfig> _registeredFunctions = new();
-    private readonly ConcurrentDictionary<string, List<InvocationResult>> _invocationHistory = new();
+    private readonly BoundedDictionary<string, ServerlessStrategyBase> _strategies = new BoundedDictionary<string, ServerlessStrategyBase>(1000);
+    private readonly BoundedDictionary<string, ServerlessFunctionConfig> _registeredFunctions = new BoundedDictionary<string, ServerlessFunctionConfig>(1000);
+    private readonly BoundedDictionary<string, List<InvocationResult>> _invocationHistory = new BoundedDictionary<string, List<InvocationResult>>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
 

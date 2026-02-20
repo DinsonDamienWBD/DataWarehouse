@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -88,12 +88,12 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated partitioned tables
-    private readonly ConcurrentDictionary<MemoryTier, ConcurrentDictionary<string, PostgresRow>> _partitions = new();
+    private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, PostgresRow>> _partitions = new BoundedDictionary<MemoryTier, BoundedDictionary<string, PostgresRow>>(1000);
 
     // Simulated indexes
-    private readonly ConcurrentDictionary<string, HashSet<string>> _scopeIndex = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
-    private readonly ConcurrentDictionary<string, string> _fullTextIndex = new(); // id -> tsvector text
+    private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, string> _fullTextIndex = new BoundedDictionary<string, string>(1000); // id -> tsvector text
 
     private bool _disposed;
     private bool _isConnected;
@@ -128,7 +128,7 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
         // Initialize partitions
         foreach (var tier in Enum.GetValues<MemoryTier>())
         {
-            _partitions[tier] = new ConcurrentDictionary<string, PostgresRow>();
+            _partitions[tier] = new BoundedDictionary<string, PostgresRow>(1000);
         }
 
         // Simulate connection and schema creation

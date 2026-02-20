@@ -2,10 +2,10 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Net.Quic;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AedsCore.DataPlane;
 
@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.AedsCore.DataPlane;
 public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
 {
     private readonly ILogger<QuicDataPlanePlugin> _logger;
-    private readonly ConcurrentDictionary<string, QuicConnectionPool> _connectionPools;
+    private readonly BoundedDictionary<string, QuicConnectionPool> _connectionPools;
     private const int MAX_RETRIES = 3;
     private const int CONNECTION_IDLE_TIMEOUT_SECONDS = 60;
     private const int MAX_STREAMS_PER_CONNECTION = 100;
@@ -48,7 +48,7 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
     public QuicDataPlanePlugin(ILogger<QuicDataPlanePlugin> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _connectionPools = new ConcurrentDictionary<string, QuicConnectionPool>();
+        _connectionPools = new BoundedDictionary<string, QuicConnectionPool>(1000);
     }
 
     /// <inheritdoc />

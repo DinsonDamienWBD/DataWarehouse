@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateDataPrivacy;
 public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataPrivacyStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, PrivacyPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, ConsentRecord> _consents = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, PrivacyPolicy> _policies = new BoundedDictionary<string, PrivacyPolicy>(1000);
+    private readonly BoundedDictionary<string, ConsentRecord> _consents = new BoundedDictionary<string, ConsentRecord>(1000);
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;

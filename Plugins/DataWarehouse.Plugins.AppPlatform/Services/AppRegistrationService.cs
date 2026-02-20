@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.AppPlatform.Models;
@@ -15,7 +14,7 @@ internal sealed class AppRegistrationService
     /// <summary>
     /// Thread-safe dictionary storing all application registrations keyed by AppId.
     /// </summary>
-    private readonly ConcurrentDictionary<string, AppRegistration> _registrations = new();
+    private readonly BoundedDictionary<string, AppRegistration> _registrations = new BoundedDictionary<string, AppRegistration>(1000);
 
     /// <summary>
     /// Message bus for cross-plugin communication, used to provision tenants in UltimateAccessControl.
@@ -129,7 +128,7 @@ internal sealed class AppRegistrationService
     public Task<AppRegistration?> GetAppAsync(string appId)
     {
         _registrations.TryGetValue(appId, out var registration);
-        return Task.FromResult(registration);
+        return Task.FromResult<AppRegistration?>(registration);
     }
 
     /// <summary>

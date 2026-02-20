@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -15,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     /// </summary>
     public sealed class HardwareTokenStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, List<RegisteredToken>> _userTokens = new();
-        private readonly ConcurrentDictionary<string, ChallengeData> _activeChallenges = new();
+        private readonly BoundedDictionary<string, List<RegisteredToken>> _userTokens = new BoundedDictionary<string, List<RegisteredToken>>(1000);
+        private readonly BoundedDictionary<string, ChallengeData> _activeChallenges = new BoundedDictionary<string, ChallengeData>(1000);
         private const int ChallengeExpirationSeconds = 60;
         private const int MaxTokensPerUser = 10;
 

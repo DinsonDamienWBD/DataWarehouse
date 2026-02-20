@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -7,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Storage.Migration;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Placement;
 
@@ -37,7 +37,7 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
     private readonly IPlacementOptimizer _optimizer;
     private readonly IMigrationEngine _migrationEngine;
     private readonly RebalancerOptions _options;
-    private readonly ConcurrentDictionary<string, RebalanceJob> _jobs = new();
+    private readonly BoundedDictionary<string, RebalanceJob> _jobs = new BoundedDictionary<string, RebalanceJob>(1000);
     private readonly Timer _monitorTimer;
     private bool _disposed;
     private int _isRunning; // 0 = idle, 1 = running (interlocked)

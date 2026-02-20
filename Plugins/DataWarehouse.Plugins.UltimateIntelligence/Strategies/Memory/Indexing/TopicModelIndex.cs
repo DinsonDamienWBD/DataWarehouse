@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -17,11 +17,11 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class TopicModelIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, TopicNode> _topics = new();
-    private readonly ConcurrentDictionary<string, TopicEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, Dictionary<string, float>> _entryTopicDistribution = new();
-    private readonly ConcurrentDictionary<string, TopicEvolution> _topicEvolution = new();
-    private readonly ConcurrentDictionary<(string, string), float> _topicSimilarity = new();
+    private readonly BoundedDictionary<string, TopicNode> _topics = new BoundedDictionary<string, TopicNode>(1000);
+    private readonly BoundedDictionary<string, TopicEntry> _entries = new BoundedDictionary<string, TopicEntry>(1000);
+    private readonly BoundedDictionary<string, Dictionary<string, float>> _entryTopicDistribution = new BoundedDictionary<string, Dictionary<string, float>>(1000);
+    private readonly BoundedDictionary<string, TopicEvolution> _topicEvolution = new BoundedDictionary<string, TopicEvolution>(1000);
+    private readonly BoundedDictionary<(string, string), float> _topicSimilarity = new BoundedDictionary<(string, string), float>(1000);
 
     private const int DefaultTopicCount = 50;
     private const float TopicAssignmentThreshold = 0.1f;

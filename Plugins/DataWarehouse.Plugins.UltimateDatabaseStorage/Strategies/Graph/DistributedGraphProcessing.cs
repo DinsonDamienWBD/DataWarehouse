@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Graph;
 
@@ -18,7 +19,7 @@ public sealed class PregelGraphProcessor<TVertex, TMessage, TEdge>
     where TVertex : class
     where TMessage : class
 {
-    private readonly ConcurrentDictionary<string, VertexState<TVertex, TMessage>> _vertices = new();
+    private readonly BoundedDictionary<string, VertexState<TVertex, TMessage>> _vertices = new BoundedDictionary<string, VertexState<TVertex, TMessage>>(1000);
     private readonly ConcurrentDictionary<string, List<Edge<TEdge>>> _edges = new();
     private readonly GraphPartitioningStrategyBase _partitioner;
     private readonly PregelConfiguration _config;
@@ -164,7 +165,7 @@ public sealed class PregelGraphProcessor<TVertex, TMessage, TEdge>
         IMessageCombiner<TMessage>? messageCombiner,
         CancellationToken ct)
     {
-        var nextMessages = new ConcurrentDictionary<string, ConcurrentBag<TMessage>>();
+        var nextMessages = new BoundedDictionary<string, ConcurrentBag<TMessage>>(1000);
         long messagesSent = 0;
         int activeVertices = 0;
 

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute;
 
@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateCompute;
 /// </remarks>
 internal sealed class ComputeRuntimeStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IComputeRuntimeStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<ComputeRuntime, List<IComputeRuntimeStrategy>> _byRuntime = new();
+    private readonly BoundedDictionary<string, IComputeRuntimeStrategy> _strategies = new BoundedDictionary<string, IComputeRuntimeStrategy>(1000);
+    private readonly BoundedDictionary<ComputeRuntime, List<IComputeRuntimeStrategy>> _byRuntime = new BoundedDictionary<ComputeRuntime, List<IComputeRuntimeStrategy>>(1000);
 
     /// <summary>
     /// Gets the total number of registered strategies.

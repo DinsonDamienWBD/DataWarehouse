@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -33,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     public sealed class UltimateDataProtectionPlugin : SecurityPluginBase
     {
         private readonly DataProtectionStrategyRegistry _registry = new();
-        private readonly ConcurrentDictionary<string, object> _activeOperations = new();
+        private readonly BoundedDictionary<string, object> _activeOperations = new BoundedDictionary<string, object>(1000);
 
         /// <inheritdoc/>
         public override string Id => "com.datawarehouse.dataprotection.ultimate";

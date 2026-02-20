@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -36,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableMultiBackend = true;
         private bool _enableFailover = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, BackendAdapter> _adapters = new();
-        private readonly ConcurrentDictionary<string, ObjectLocation> _objectLocations = new();
+        private readonly BoundedDictionary<string, BackendAdapter> _adapters = new BoundedDictionary<string, BackendAdapter>(1000);
+        private readonly BoundedDictionary<string, ObjectLocation> _objectLocations = new BoundedDictionary<string, ObjectLocation>(1000);
         private BackendAdapter? _primaryAdapter;
         private BackendAdapter? _secondaryAdapter;
 

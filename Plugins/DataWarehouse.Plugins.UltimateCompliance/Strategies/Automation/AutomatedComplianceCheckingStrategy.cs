@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -14,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// </summary>
     public sealed class AutomatedComplianceCheckingStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CheckResult> _checkCache = new();
-        private readonly ConcurrentDictionary<string, List<ComplianceRule>> _rulesByFramework = new();
+        private readonly BoundedDictionary<string, CheckResult> _checkCache = new BoundedDictionary<string, CheckResult>(1000);
+        private readonly BoundedDictionary<string, List<ComplianceRule>> _rulesByFramework = new BoundedDictionary<string, List<ComplianceRule>>(1000);
         private Timer? _continuousCheckTimer;
         private bool _continuousCheckingEnabled;
 

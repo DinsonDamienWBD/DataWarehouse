@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
@@ -123,7 +122,7 @@ public sealed record AnomalyDetectionConfig
 /// </remarks>
 internal sealed class AnomalyDetectionStream : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RunningStatistics> _statistics = new();
+    private readonly BoundedDictionary<string, RunningStatistics> _statistics = new BoundedDictionary<string, RunningStatistics>(1000);
     private readonly IMessageBus? _messageBus;
     private readonly AnomalyDetectionConfig _config;
     private long _totalAnalyzed;

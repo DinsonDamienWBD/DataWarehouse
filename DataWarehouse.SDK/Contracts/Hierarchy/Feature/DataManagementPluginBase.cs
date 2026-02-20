@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Hierarchy;
 
@@ -11,7 +12,7 @@ namespace DataWarehouse.SDK.Contracts.Hierarchy;
 /// </summary>
 public abstract class DataManagementPluginBase : FeaturePluginBase
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, object>> _tenantStorage = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, object>> _tenantStorage = new BoundedDictionary<string, BoundedDictionary<string, object>>(1000);
 
     /// <inheritdoc/>
     public override string FeatureCategory => "DataManagement";
@@ -37,7 +38,7 @@ public abstract class DataManagementPluginBase : FeaturePluginBase
     protected async Task<T?> GetDataAsync<T>(string key, CancellationToken ct = default)
     {
         var tenantId = GetCurrentTenantId();
-        var tenantCache = _tenantStorage.GetOrAdd(tenantId, _ => new ConcurrentDictionary<string, object>());
+        var tenantCache = _tenantStorage.GetOrAdd(tenantId, _ => new BoundedDictionary<string, object>(1000));
 
         if (tenantCache.TryGetValue(key, out var cached) && cached is T typedValue)
             return typedValue;
@@ -63,7 +64,7 @@ public abstract class DataManagementPluginBase : FeaturePluginBase
     protected async Task SetDataAsync<T>(string key, T value, CancellationToken ct = default)
     {
         var tenantId = GetCurrentTenantId();
-        var tenantCache = _tenantStorage.GetOrAdd(tenantId, _ => new ConcurrentDictionary<string, object>());
+        var tenantCache = _tenantStorage.GetOrAdd(tenantId, _ => new BoundedDictionary<string, object>(1000));
 
         tenantCache[key] = value!;
         await SaveToStorageAsync(tenantId, key, value, ct);

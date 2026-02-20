@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -31,7 +30,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.BlastRadius
         private readonly FailurePropagationMonitor _propagationMonitor;
         private readonly ChaosVaccinationOptions _globalOptions;
         private readonly Timer _enforcementTimer;
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _recentBreaches = new();
+        private readonly BoundedDictionary<string, DateTimeOffset> _recentBreaches = new BoundedDictionary<string, DateTimeOffset>(1000);
         private volatile bool _disposed;
 
         /// <inheritdoc />

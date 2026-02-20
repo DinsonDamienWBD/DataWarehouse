@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Simulation;
 
@@ -332,7 +332,7 @@ public sealed class SimulationSession
     public DateTime CreatedAt { get; } = DateTime.UtcNow;
 
     /// <summary>All forks in this session.</summary>
-    public ConcurrentDictionary<string, StateFork> Forks { get; } = new();
+    public BoundedDictionary<string, StateFork> Forks { get; } = new BoundedDictionary<string, StateFork>(1000);
 
     /// <summary>The root fork ID.</summary>
     public string? RootForkId { get; private set; }
@@ -739,7 +739,7 @@ public sealed record StateChange
 /// </summary>
 public sealed class RollbackGuarantee
 {
-    private readonly ConcurrentDictionary<string, List<RollbackPoint>> _rollbackPoints = new();
+    private readonly BoundedDictionary<string, List<RollbackPoint>> _rollbackPoints = new BoundedDictionary<string, List<RollbackPoint>>(1000);
     private readonly object _lock = new();
 
     /// <summary>
@@ -884,7 +884,7 @@ public sealed record RollbackValidation
 /// </summary>
 public sealed class ChangeSimulator
 {
-    private readonly ConcurrentDictionary<string, SimulatedChange> _pendingChanges = new();
+    private readonly BoundedDictionary<string, SimulatedChange> _pendingChanges = new BoundedDictionary<string, SimulatedChange>(1000);
 
     /// <summary>
     /// Queues a change for simulation.
@@ -1325,7 +1325,7 @@ Format: JSON with keys: recommendations (array), warnings (array), riskFactors (
 /// </summary>
 public sealed class SimulationEngine : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SimulationSession> _sessions = new();
+    private readonly BoundedDictionary<string, SimulationSession> _sessions = new BoundedDictionary<string, SimulationSession>(1000);
     private readonly RollbackGuarantee _rollbackGuarantee = new();
     private readonly ChangeSimulator _changeSimulator = new();
     private readonly ImpactAnalyzer _impactAnalyzer;

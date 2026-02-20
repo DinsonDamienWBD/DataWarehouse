@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -37,9 +36,9 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposable
 {
     private readonly IoTStrategyRegistry _registry = new();
-    private readonly ConcurrentDictionary<string, DeviceState> _deviceStates = new();
-    private readonly ConcurrentDictionary<string, TelemetryBuffer> _telemetryBuffers = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, DeviceState> _deviceStates = new BoundedDictionary<string, DeviceState>(1000);
+    private readonly BoundedDictionary<string, TelemetryBuffer> _telemetryBuffers = new BoundedDictionary<string, TelemetryBuffer>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Statistics

@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 
@@ -31,8 +31,8 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
 {
     private readonly DeclarativeZoneRegistry _registry;
 
-    private readonly ConcurrentDictionary<string, CachedEnforcementResult> _enforcementCache = new();
-    private readonly ConcurrentDictionary<string, List<EnforcementAuditEntry>> _auditTrail = new();
+    private readonly BoundedDictionary<string, CachedEnforcementResult> _enforcementCache = new BoundedDictionary<string, CachedEnforcementResult>(1000);
+    private readonly BoundedDictionary<string, List<EnforcementAuditEntry>> _auditTrail = new BoundedDictionary<string, List<EnforcementAuditEntry>>(1000);
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 

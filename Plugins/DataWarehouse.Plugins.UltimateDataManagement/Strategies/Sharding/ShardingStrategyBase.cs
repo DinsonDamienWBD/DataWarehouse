@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -272,7 +272,7 @@ public abstract class ShardingStrategyBase : DataManagementStrategyBase, IShardi
     /// <summary>
     /// Thread-safe registry of shards.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, ShardInfo> ShardRegistry = new(StringComparer.OrdinalIgnoreCase);
+    protected readonly BoundedDictionary<string, ShardInfo> ShardRegistry = new BoundedDictionary<string, ShardInfo>(1000);
 
     /// <summary>
     /// Lock for shard registry modifications.

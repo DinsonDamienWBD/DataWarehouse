@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 /// </summary>
 internal sealed class GpuAccelerationStrategy : MediaStrategyBase
 {
-    private static readonly ConcurrentDictionary<int, GpuDeviceInfo> _gpuCache = new();
+    private static readonly BoundedDictionary<int, GpuDeviceInfo> _gpuCache = new BoundedDictionary<int, GpuDeviceInfo>(1000);
     private DateTime _lastGpuScan = DateTime.MinValue;
     private static readonly TimeSpan GpuCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly SemaphoreSlim _scanLock = new(1, 1);

@@ -1,8 +1,8 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -49,13 +49,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Leader-only: For each server, index of the next log entry to send to that server.
         /// Initialized to leader last log index + 1.
         /// </summary>
-        public ConcurrentDictionary<string, long> NextIndex { get; } = new();
+        public BoundedDictionary<string, long> NextIndex { get; } = new BoundedDictionary<string, long>(1000);
 
         /// <summary>
         /// Leader-only: For each server, index of highest log entry known to be replicated on server.
         /// Initialized to 0.
         /// </summary>
-        public ConcurrentDictionary<string, long> MatchIndex { get; } = new();
+        public BoundedDictionary<string, long> MatchIndex { get; } = new BoundedDictionary<string, long>(1000);
     }
 
     /// <summary>

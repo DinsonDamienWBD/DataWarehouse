@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 {
@@ -28,10 +28,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     /// </remarks>
     public sealed class IamStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, IamUser> _users = new();
-        private readonly ConcurrentDictionary<string, IamRole> _roles = new();
-        private readonly ConcurrentDictionary<string, IamSession> _sessions = new();
-        private readonly ConcurrentDictionary<string, List<AuditEvent>> _auditLog = new();
+        private readonly BoundedDictionary<string, IamUser> _users = new BoundedDictionary<string, IamUser>(1000);
+        private readonly BoundedDictionary<string, IamRole> _roles = new BoundedDictionary<string, IamRole>(1000);
+        private readonly BoundedDictionary<string, IamSession> _sessions = new BoundedDictionary<string, IamSession>(1000);
+        private readonly BoundedDictionary<string, List<AuditEvent>> _auditLog = new BoundedDictionary<string, List<AuditEvent>>(1000);
 
         private TimeSpan _sessionTimeout = TimeSpan.FromHours(8);
         private int _passwordMinLength = 12;

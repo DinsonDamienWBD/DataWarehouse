@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
@@ -18,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 /// </remarks>
 public sealed class InMemoryCacheStrategy : CachingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _tagLock = new();
     private long _currentSize;
     private readonly long _maxSize;

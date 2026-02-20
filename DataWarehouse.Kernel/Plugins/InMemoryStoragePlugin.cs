@@ -2,7 +2,6 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Plugins
 {
@@ -23,7 +22,7 @@ namespace DataWarehouse.Kernel.Plugins
     /// </summary>
     public sealed class InMemoryStoragePlugin : StorageProviderPluginBase, IListableStorage
     {
-        private readonly ConcurrentDictionary<string, StoredBlob> _storage = new();
+        private readonly BoundedDictionary<string, StoredBlob> _storage = new BoundedDictionary<string, StoredBlob>(1000);
         private readonly object _evictionLock = new();
         private readonly InMemoryStorageConfig _config;
         private readonly List<Action<EvictionEvent>> _evictionCallbacks = new();

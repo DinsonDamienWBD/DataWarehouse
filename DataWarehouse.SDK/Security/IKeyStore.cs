@@ -1,5 +1,6 @@
-﻿using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Security
 {
@@ -761,8 +762,8 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public class DefaultKeyStoreRegistry : IKeyStoreRegistry
     {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IKeyStore> _keyStores = new();
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
+        private readonly BoundedDictionary<string, IKeyStore> _keyStores = new BoundedDictionary<string, IKeyStore>(1000);
+        private readonly BoundedDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new BoundedDictionary<string, IEnvelopeKeyStore>(1000);
 
         /// <inheritdoc/>
         public void Register(string pluginId, IKeyStore keyStore)
@@ -843,14 +844,14 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public class InMemoryKeyManagementConfigProvider : IKeyManagementConfigProvider
     {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, KeyManagementConfig> _configs = new();
+        private readonly BoundedDictionary<string, KeyManagementConfig> _configs = new BoundedDictionary<string, KeyManagementConfig>(1000);
 
         /// <inheritdoc/>
         public Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
         {
             var key = GetConfigKey(context);
             _configs.TryGetValue(key, out var config);
-            return Task.FromResult(config);
+            return Task.FromResult<KeyManagementConfig?>(config);
         }
 
         /// <inheritdoc/>
@@ -959,7 +960,7 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public abstract class KeyStoreStrategyBase : StrategyBase, IKeyStoreStrategy
     {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedKey> _keyCache = new();
+        private readonly BoundedDictionary<string, CachedKey> _keyCache = new BoundedDictionary<string, CachedKey>(1000);
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
         private bool _disposed;
         private TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);

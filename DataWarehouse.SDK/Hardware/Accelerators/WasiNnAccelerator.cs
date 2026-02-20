@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Edge.Inference;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Hardware.Accelerators
 {
@@ -216,7 +216,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     {
         private readonly OnnxWasiNnHost _onnxHost;
         private readonly IPlatformCapabilityRegistry _registry;
-        private readonly ConcurrentDictionary<Guid, ModelHandle> _loadedModels = new();
+        private readonly BoundedDictionary<Guid, ModelHandle> _loadedModels = new BoundedDictionary<Guid, ModelHandle>(1000);
         private readonly List<InferenceBackend> _availableBackends = new();
         private InferenceBackend _bestBackend = InferenceBackend.CPU;
         private bool _initialized;

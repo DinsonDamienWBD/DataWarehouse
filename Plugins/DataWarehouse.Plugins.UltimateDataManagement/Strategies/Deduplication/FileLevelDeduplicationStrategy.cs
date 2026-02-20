@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,8 +18,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class FileLevelDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _fileStore = new();
-    private readonly ConcurrentDictionary<string, string> _objectToHash = new();
+    private readonly BoundedDictionary<string, byte[]> _fileStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, string> _objectToHash = new BoundedDictionary<string, string>(1000);
     private readonly bool _storeInMemory;
 
     /// <summary>

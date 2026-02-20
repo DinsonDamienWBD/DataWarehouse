@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class TamperProofStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TamperProofChain> _chains = new();
+        private readonly BoundedDictionary<string, TamperProofChain> _chains = new BoundedDictionary<string, TamperProofChain>(1000);
         private readonly byte[] _hmacKey;
         private bool _requireChainVerificationOnAccess = true;
 

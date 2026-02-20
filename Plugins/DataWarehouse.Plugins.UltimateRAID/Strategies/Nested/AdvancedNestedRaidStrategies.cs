@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
 using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
 using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested;
 
@@ -31,8 +31,8 @@ public sealed class Raid10Strategy : SdkRaidStrategyBase
 {
     private readonly int _chunkSize;
     private readonly int _disksPerMirror;
-    private readonly ConcurrentDictionary<int, int> _hotSpareAssignments = new();
-    private readonly ConcurrentDictionary<int, RebuildState> _activeRebuilds = new();
+    private readonly BoundedDictionary<int, int> _hotSpareAssignments = new BoundedDictionary<int, int>(1000);
+    private readonly BoundedDictionary<int, RebuildState> _activeRebuilds = new BoundedDictionary<int, RebuildState>(1000);
 
     /// <summary>Initializes RAID 10 with configurable chunk size and mirrors.</summary>
     /// <param name="chunkSize">Stripe chunk size in bytes (default 64KB).</param>
@@ -305,7 +305,7 @@ public sealed class Raid50Strategy : SdkRaidStrategyBase
 {
     private readonly int _chunkSize;
     private readonly int _disksPerRaid5Group;
-    private readonly ConcurrentDictionary<int, bool> _failureDomains = new();
+    private readonly BoundedDictionary<int, bool> _failureDomains = new BoundedDictionary<int, bool>(1000);
 
     public Raid50Strategy(int chunkSize = 64 * 1024, int disksPerRaid5Group = 4)
     {
@@ -604,7 +604,7 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
 {
     private readonly int _chunkSize;
     private readonly int _disksPerRaid6Group;
-    private readonly ConcurrentDictionary<string, RebuildPriority> _rebuildQueue = new();
+    private readonly BoundedDictionary<string, RebuildPriority> _rebuildQueue = new BoundedDictionary<string, RebuildPriority>(1000);
 
     public Raid60Strategy(int chunkSize = 64 * 1024, int disksPerRaid6Group = 5)
     {

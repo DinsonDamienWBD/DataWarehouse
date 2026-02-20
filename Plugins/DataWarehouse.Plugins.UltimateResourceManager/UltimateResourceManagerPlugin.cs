@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateResourceManager;
 public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly ResourceStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, ResourceQuota> _quotas = new();
-    private readonly ConcurrentDictionary<string, ResourceAllocation> _activeAllocations = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, ResourceQuota> _quotas = new BoundedDictionary<string, ResourceQuota>(1000);
+    private readonly BoundedDictionary<string, ResourceAllocation> _activeAllocations = new BoundedDictionary<string, ResourceAllocation>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Configuration

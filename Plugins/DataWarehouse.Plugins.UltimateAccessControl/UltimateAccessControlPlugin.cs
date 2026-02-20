@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -65,8 +64,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     /// </remarks>
     public sealed class UltimateAccessControlPlugin : SecurityPluginBase, IDisposable
     {
-        private readonly ConcurrentDictionary<string, IAccessControlStrategy> _strategies = new();
-        private readonly ConcurrentDictionary<string, double> _strategyWeights = new();
+        private readonly BoundedDictionary<string, IAccessControlStrategy> _strategies = new BoundedDictionary<string, IAccessControlStrategy>(1000);
+        private readonly BoundedDictionary<string, double> _strategyWeights = new BoundedDictionary<string, double>(1000);
         private readonly List<PolicyAccessDecision> _auditLog = new();
         private IAccessControlStrategy? _defaultStrategy;
         private PolicyEvaluationMode _evaluationMode = PolicyEvaluationMode.FirstMatch;

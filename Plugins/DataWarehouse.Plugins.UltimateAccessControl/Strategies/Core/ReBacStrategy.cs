@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class ReBacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, List<Relationship>> _relationships = new();
+        private readonly BoundedDictionary<string, List<Relationship>> _relationships = new BoundedDictionary<string, List<Relationship>>(1000);
         private readonly Dictionary<string, HashSet<string>> _relationshipPermissions = new();
 
         /// <inheritdoc/>

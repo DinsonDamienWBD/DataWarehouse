@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Graph;
 
@@ -365,8 +365,8 @@ public sealed class RangePartitioningStrategy : GraphPartitioningStrategyBase
 /// </remarks>
 public sealed class EdgeCutPartitioningStrategy : GraphPartitioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, int> _vertexAssignments = new();
-    private readonly ConcurrentDictionary<int, long> _partitionSizes = new();
+    private readonly BoundedDictionary<string, int> _vertexAssignments = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<int, long> _partitionSizes = new BoundedDictionary<int, long>(1000);
     private readonly object _balanceLock = new();
 
     /// <inheritdoc/>
@@ -465,8 +465,8 @@ public sealed class EdgeCutPartitioningStrategy : GraphPartitioningStrategyBase
 /// </remarks>
 public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<int>> _vertexReplicas = new();
-    private readonly ConcurrentDictionary<int, long> _partitionEdgeCounts = new();
+    private readonly BoundedDictionary<string, HashSet<int>> _vertexReplicas = new BoundedDictionary<string, HashSet<int>>(1000);
+    private readonly BoundedDictionary<int, long> _partitionEdgeCounts = new BoundedDictionary<int, long>(1000);
     private readonly object _balanceLock = new();
 
     /// <inheritdoc/>
@@ -591,8 +591,8 @@ public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBas
 /// </remarks>
 public sealed class CommunityPartitioningStrategy : GraphPartitioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, int> _communityAssignments = new();
-    private readonly ConcurrentDictionary<int, int> _communityToPartition = new();
+    private readonly BoundedDictionary<string, int> _communityAssignments = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<int, int> _communityToPartition = new BoundedDictionary<int, int>(1000);
     private int _nextCommunityId = 0;
 
     /// <inheritdoc/>
@@ -837,7 +837,7 @@ public sealed class GridPartitioningStrategy : GraphPartitioningStrategyBase
 /// </summary>
 public sealed class GraphPartitioningStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, GraphPartitioningStrategyBase> _strategies = new();
+    private readonly BoundedDictionary<string, GraphPartitioningStrategyBase> _strategies = new BoundedDictionary<string, GraphPartitioningStrategyBase>(1000);
 
     /// <summary>
     /// Registers a partitioning strategy.

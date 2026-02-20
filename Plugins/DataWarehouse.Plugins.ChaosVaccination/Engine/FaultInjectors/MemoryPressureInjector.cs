@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -19,7 +18,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Engine.FaultInjectors;
 public sealed class MemoryPressureInjector : IFaultInjector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, MemoryPressureState> _activeAllocations = new();
+    private readonly BoundedDictionary<string, MemoryPressureState> _activeAllocations = new BoundedDictionary<string, MemoryPressureState>(1000);
 
     /// <summary>
     /// Tracks the state of an active memory pressure injection.

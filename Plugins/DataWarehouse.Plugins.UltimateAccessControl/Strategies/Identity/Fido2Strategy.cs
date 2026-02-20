@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 {
@@ -32,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     /// </remarks>
     public sealed class Fido2Strategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, Fido2Credential> _credentials = new();
-        private readonly ConcurrentDictionary<string, Fido2Challenge> _challenges = new();
+        private readonly BoundedDictionary<string, Fido2Credential> _credentials = new BoundedDictionary<string, Fido2Credential>(1000);
+        private readonly BoundedDictionary<string, Fido2Challenge> _challenges = new BoundedDictionary<string, Fido2Challenge>(1000);
 
         private string _relyingPartyId = "localhost";
         private string _relyingPartyName = "DataWarehouse";

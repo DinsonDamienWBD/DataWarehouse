@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using DataWarehouse.Plugins.AirGapBridge.Core;
 using DataWarehouse.Plugins.AirGapBridge.Detection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Convergence;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.AirGapBridge.Convergence;
 /// </summary>
 public sealed class ConvergenceManager
 {
-    private readonly ConcurrentDictionary<string, DetectedInstance> _detectedInstances = new();
-    private readonly ConcurrentDictionary<string, ConvergenceSession> _convergenceSessions = new();
+    private readonly BoundedDictionary<string, DetectedInstance> _detectedInstances = new BoundedDictionary<string, DetectedInstance>(1000);
+    private readonly BoundedDictionary<string, ConvergenceSession> _convergenceSessions = new BoundedDictionary<string, ConvergenceSession>(1000);
     private readonly string _localInstanceId;
     private readonly int _localSchemaVersion;
 

@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Federation.Addressing;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Catalog;
 
@@ -24,7 +25,7 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 /// </remarks>
 internal sealed class ManifestCache
 {
-    private readonly ConcurrentDictionary<ObjectIdentity, ObjectLocationEntry> _cache;
+    private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _cache;
     private readonly int _maxSize;
 
     /// <summary>
@@ -33,7 +34,7 @@ internal sealed class ManifestCache
     /// <param name="maxSize">The maximum number of entries to cache. Default: 100,000.</param>
     public ManifestCache(int maxSize = 100_000)
     {
-        _cache = new ConcurrentDictionary<ObjectIdentity, ObjectLocationEntry>();
+        _cache = new BoundedDictionary<ObjectIdentity, ObjectLocationEntry>(1000);
         _maxSize = maxSize;
     }
 

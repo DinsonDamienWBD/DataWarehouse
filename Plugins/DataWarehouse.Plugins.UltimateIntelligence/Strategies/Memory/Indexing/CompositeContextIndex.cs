@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 public sealed class CompositeContextIndex : ContextIndexBase
 {
     private readonly Dictionary<string, IContextIndex> _indexes = new();
-    private readonly ConcurrentDictionary<string, IndexHealth> _indexHealth = new();
+    private readonly BoundedDictionary<string, IndexHealth> _indexHealth = new BoundedDictionary<string, IndexHealth>(1000);
     private readonly QueryRouter _router;
 
     /// <inheritdoc/>
@@ -419,7 +419,7 @@ internal sealed class QueryRouter
     public IList<IContextIndex> SelectIndexes(
         ContextQuery query,
         IList<IContextIndex> availableIndexes,
-        ConcurrentDictionary<string, IndexHealth> health)
+        BoundedDictionary<string, IndexHealth> health)
     {
         var selected = new List<IContextIndex>();
 

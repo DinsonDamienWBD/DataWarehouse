@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -14,9 +15,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 /// </remarks>
 public sealed class PredictiveSnapshotStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataChangeProfile> _changeProfiles = new();
+    private readonly BoundedDictionary<string, DataChangeProfile> _changeProfiles = new BoundedDictionary<string, DataChangeProfile>(1000);
     private readonly ConcurrentQueue<SnapshotRecommendation> _recommendations = new();
-    private readonly ConcurrentDictionary<string, double> _anomalyScores = new();
+    private readonly BoundedDictionary<string, double> _anomalyScores = new BoundedDictionary<string, double>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-predictive-snapshot";
@@ -324,7 +325,7 @@ Return JSON:
 /// </summary>
 public sealed class TimeTravelQueryStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<SnapshotVersion>> _snapshotIndex = new();
+    private readonly BoundedDictionary<string, List<SnapshotVersion>> _snapshotIndex = new BoundedDictionary<string, List<SnapshotVersion>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-time-travel-query";
@@ -597,8 +598,8 @@ Return JSON:
 /// </summary>
 public sealed class SnapshotFederationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FederatedSnapshotSource> _sources = new();
-    private readonly ConcurrentDictionary<string, UnifiedSnapshotView> _unifiedViews = new();
+    private readonly BoundedDictionary<string, FederatedSnapshotSource> _sources = new BoundedDictionary<string, FederatedSnapshotSource>(1000);
+    private readonly BoundedDictionary<string, UnifiedSnapshotView> _unifiedViews = new BoundedDictionary<string, UnifiedSnapshotView>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-snapshot-federation";

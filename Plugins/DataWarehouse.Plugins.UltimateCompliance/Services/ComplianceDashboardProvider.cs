@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
         private readonly IReadOnlyCollection<IComplianceStrategy> _strategies;
         private readonly IMessageBus? _messageBus;
         private readonly string _pluginId;
-        private readonly ConcurrentDictionary<string, FrameworkDashboardStatus> _frameworkStatuses = new();
+        private readonly BoundedDictionary<string, FrameworkDashboardStatus> _frameworkStatuses = new BoundedDictionary<string, FrameworkDashboardStatus>(1000);
         private readonly ConcurrentQueue<ComplianceTrendPoint> _trendHistory = new();
         private DateTime _lastCheckTimestamp = DateTime.UtcNow;
         private static readonly int MaxTrendPoints = 1000;

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
@@ -47,9 +46,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
     /// </remarks>
     public sealed class InfiniteVersioningStrategy : IVersioningSubsystem
     {
-        private readonly ConcurrentDictionary<string, List<VersionInfo>> _versionIndex = new();
-        private readonly ConcurrentDictionary<string, byte[]> _contentStore = new();
-        private readonly ConcurrentDictionary<string, ContentBlock[]> _blockIndex = new();
+        private readonly BoundedDictionary<string, List<VersionInfo>> _versionIndex = new BoundedDictionary<string, List<VersionInfo>>(1000);
+        private readonly BoundedDictionary<string, byte[]> _contentStore = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, ContentBlock[]> _blockIndex = new BoundedDictionary<string, ContentBlock[]>(1000);
         private readonly object _globalLock = new();
         private IVersioningPolicy? _currentPolicy;
         private bool _isEnabled = true;

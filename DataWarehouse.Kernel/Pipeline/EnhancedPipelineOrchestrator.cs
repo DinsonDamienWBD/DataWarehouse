@@ -5,7 +5,6 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Pipeline;
 
@@ -28,7 +27,7 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     private readonly ILogger? _logger;
     private readonly PipelinePluginIntegration? _pluginIntegration;
     private readonly IPipelineTransactionFactory? _transactionFactory;
-    private readonly ConcurrentDictionary<string, IDataTransformation> _registeredStages = new();
+    private readonly BoundedDictionary<string, IDataTransformation> _registeredStages = new BoundedDictionary<string, IDataTransformation>(1000);
 
     /// <summary>
     /// Creates a new enhanced pipeline orchestrator.

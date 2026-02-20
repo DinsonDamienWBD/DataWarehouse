@@ -6,6 +6,7 @@ using DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily;
 using DataWarehouse.Plugins.UltimateEncryption.Strategies.Aes;
 using FluentAssertions;
 using Xunit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Performance;
 
@@ -100,7 +101,7 @@ public class PerformanceBaselineTests
     [Fact]
     public void ConcurrentDictionary_100KOps_ShouldCompleteWithin5000ms()
     {
-        var dict = new System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>();
+        var dict = new BoundedDictionary<string, byte[]>(1000);
         var sw = Stopwatch.StartNew();
 
         // Write 100K entries

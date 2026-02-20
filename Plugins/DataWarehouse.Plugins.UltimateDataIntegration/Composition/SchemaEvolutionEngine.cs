@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -37,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
         private readonly ILogger? _logger;
 
         // Bounded collections per Phase 23 memory safety
-        private readonly ConcurrentDictionary<string, SchemaEvolutionProposal> _pendingProposals = new();
-        private readonly ConcurrentDictionary<string, List<SchemaEvolutionProposal>> _proposalHistory = new();
+        private readonly BoundedDictionary<string, SchemaEvolutionProposal> _pendingProposals = new BoundedDictionary<string, SchemaEvolutionProposal>(1000);
+        private readonly BoundedDictionary<string, List<SchemaEvolutionProposal>> _proposalHistory = new BoundedDictionary<string, List<SchemaEvolutionProposal>>(1000);
         private const int MaxHistoryPerSchema = 1000;
 
         private readonly List<IDisposable> _subscriptions = new();

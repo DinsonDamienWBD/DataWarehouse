@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 
@@ -27,8 +26,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class AiRestoreOrchestratorStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RestoreOrchestrationState> _orchestrations = new();
-        private readonly ConcurrentDictionary<string, DependencyGraph> _dependencyCache = new();
+        private readonly BoundedDictionary<string, RestoreOrchestrationState> _orchestrations = new BoundedDictionary<string, RestoreOrchestrationState>(1000);
+        private readonly BoundedDictionary<string, DependencyGraph> _dependencyCache = new BoundedDictionary<string, DependencyGraph>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-ai-restore-orchestrator";

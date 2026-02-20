@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
 {
@@ -111,10 +112,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class BidirectionalMergeStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Version, string Origin)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, Queue<SyncEntry>> _pendingSyncs = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _mergeHistory = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long Version, string Origin)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Version, string Origin)>(1000);
+        private readonly BoundedDictionary<string, Queue<SyncEntry>> _pendingSyncs = new BoundedDictionary<string, Queue<SyncEntry>>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _mergeHistory = new BoundedDictionary<string, HashSet<string>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -349,10 +350,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class ConflictAvoidanceStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string Owner)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, string> _keyOwnership = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _siteKeyRanges = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string Owner)> _dataStore = new BoundedDictionary<string, (byte[] Data, string Owner)>(1000);
+        private readonly BoundedDictionary<string, string> _keyOwnership = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _siteKeyRanges = new BoundedDictionary<string, HashSet<string>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -508,10 +509,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class SchemaEvolutionStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int SchemaVersion)> _dataStore = new();
-        private readonly ConcurrentDictionary<int, SchemaDefinition> _schemas = new();
-        private readonly ConcurrentDictionary<(int From, int To), Func<byte[], byte[]>> _migrations = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, int SchemaVersion)> _dataStore = new BoundedDictionary<string, (byte[] Data, int SchemaVersion)>(1000);
+        private readonly BoundedDictionary<int, SchemaDefinition> _schemas = new BoundedDictionary<int, SchemaDefinition>(1000);
+        private readonly BoundedDictionary<(int From, int To), Func<byte[], byte[]>> _migrations = new BoundedDictionary<(int From, int To), Func<byte[], byte[]>>(1000);
         private int _currentSchemaVersion = 1;
 
         /// <summary>
@@ -688,8 +689,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class ZeroDataLossStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string Hash, long Sequence)> _dataStore = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string Hash, long Sequence)> _dataStore = new BoundedDictionary<string, (byte[] Data, string Hash, long Sequence)>(1000);
         private readonly ConcurrentQueue<AuditEntry> _auditLog = new();
         private long _sequence;
 
@@ -886,9 +887,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class ResumableMergeStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Checkpoint)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, SyncState> _syncStates = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long Checkpoint)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Checkpoint)>(1000);
+        private readonly BoundedDictionary<string, SyncState> _syncStates = new BoundedDictionary<string, SyncState>(1000);
 
         private sealed class SyncState
         {
@@ -1064,9 +1065,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class IncrementalSyncStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Version, byte[] PreviousHash)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, long> _siteVersions = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long Version, byte[] PreviousHash)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Version, byte[] PreviousHash)>(1000);
+        private readonly BoundedDictionary<string, long> _siteVersions = new BoundedDictionary<string, long>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -1217,8 +1218,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
     /// </summary>
     public sealed class ProvenanceTrackingStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGapSite> _sites = new();
-        private readonly ConcurrentDictionary<string, DataWithProvenance> _dataStore = new();
+        private readonly BoundedDictionary<string, AirGapSite> _sites = new BoundedDictionary<string, AirGapSite>(1000);
+        private readonly BoundedDictionary<string, DataWithProvenance> _dataStore = new BoundedDictionary<string, DataWithProvenance>(1000);
 
         private sealed class DataWithProvenance
         {

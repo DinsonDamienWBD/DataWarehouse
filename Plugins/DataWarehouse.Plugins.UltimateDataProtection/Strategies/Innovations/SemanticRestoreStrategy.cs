@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
@@ -31,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class SemanticRestoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BackupSemanticMetadata> _semanticCatalog = new();
-        private readonly ConcurrentDictionary<string, QueryInterpretation> _interpretationCache = new();
+        private readonly BoundedDictionary<string, BackupSemanticMetadata> _semanticCatalog = new BoundedDictionary<string, BackupSemanticMetadata>(1000);
+        private readonly BoundedDictionary<string, QueryInterpretation> _interpretationCache = new BoundedDictionary<string, QueryInterpretation>(1000);
 
         /// <summary>
         /// Patterns for extracting temporal references from queries.

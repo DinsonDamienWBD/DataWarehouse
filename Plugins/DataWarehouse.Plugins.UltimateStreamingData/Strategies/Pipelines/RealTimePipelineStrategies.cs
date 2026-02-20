@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Pipelines;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Pipelines;
 /// </summary>
 public sealed class RealTimeEtlPipelineStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EtlPipeline> _pipelines = new();
-    private readonly ConcurrentDictionary<string, PipelineMetrics> _metrics = new();
+    private readonly BoundedDictionary<string, EtlPipeline> _pipelines = new BoundedDictionary<string, EtlPipeline>(1000);
+    private readonly BoundedDictionary<string, PipelineMetrics> _metrics = new BoundedDictionary<string, PipelineMetrics>(1000);
     private long _totalRecordsProcessed;
 
     public override string StrategyId => "pipeline-etl";
@@ -236,9 +236,9 @@ public sealed class RealTimeEtlPipelineStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class CdcPipelineStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CdcConnector> _connectors = new();
-    private readonly ConcurrentDictionary<string, List<CdcEvent>> _eventLog = new();
-    private readonly ConcurrentDictionary<string, SchemaVersion> _schemaRegistry = new();
+    private readonly BoundedDictionary<string, CdcConnector> _connectors = new BoundedDictionary<string, CdcConnector>(1000);
+    private readonly BoundedDictionary<string, List<CdcEvent>> _eventLog = new BoundedDictionary<string, List<CdcEvent>>(1000);
+    private readonly BoundedDictionary<string, SchemaVersion> _schemaRegistry = new BoundedDictionary<string, SchemaVersion>(1000);
     private long _totalEventsCaptures;
 
     public override string StrategyId => "pipeline-cdc";
@@ -419,9 +419,9 @@ public sealed class CdcPipelineStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class EventRouterPipelineStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EventRouter> _routers = new();
-    private readonly ConcurrentDictionary<string, RoutingRule> _rules = new();
-    private readonly ConcurrentDictionary<string, List<RoutedEvent>> _deadLetterQueues = new();
+    private readonly BoundedDictionary<string, EventRouter> _routers = new BoundedDictionary<string, EventRouter>(1000);
+    private readonly BoundedDictionary<string, RoutingRule> _rules = new BoundedDictionary<string, RoutingRule>(1000);
+    private readonly BoundedDictionary<string, List<RoutedEvent>> _deadLetterQueues = new BoundedDictionary<string, List<RoutedEvent>>(1000);
     private long _totalEventsRouted;
 
     public override string StrategyId => "pipeline-router";
@@ -628,10 +628,10 @@ public sealed class EventRouterPipelineStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class DataIntegrationHubStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IntegrationHub> _hubs = new();
-    private readonly ConcurrentDictionary<string, DataSource> _sources = new();
-    private readonly ConcurrentDictionary<string, DataSink> _sinks = new();
-    private readonly ConcurrentDictionary<string, List<LineageRecord>> _lineage = new();
+    private readonly BoundedDictionary<string, IntegrationHub> _hubs = new BoundedDictionary<string, IntegrationHub>(1000);
+    private readonly BoundedDictionary<string, DataSource> _sources = new BoundedDictionary<string, DataSource>(1000);
+    private readonly BoundedDictionary<string, DataSink> _sinks = new BoundedDictionary<string, DataSink>(1000);
+    private readonly BoundedDictionary<string, List<LineageRecord>> _lineage = new BoundedDictionary<string, List<LineageRecord>>(1000);
 
     public override string StrategyId => "pipeline-integration-hub";
     public override string DisplayName => "Data Integration Hub";
@@ -898,9 +898,9 @@ public sealed class DataIntegrationHubStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class StreamEnrichmentPipelineStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EnrichmentPipeline> _pipelines = new();
-    private readonly ConcurrentDictionary<string, EnrichmentSource> _enrichmentSources = new();
-    private readonly ConcurrentDictionary<string, Dictionary<string, object>> _cache = new();
+    private readonly BoundedDictionary<string, EnrichmentPipeline> _pipelines = new BoundedDictionary<string, EnrichmentPipeline>(1000);
+    private readonly BoundedDictionary<string, EnrichmentSource> _enrichmentSources = new BoundedDictionary<string, EnrichmentSource>(1000);
+    private readonly BoundedDictionary<string, Dictionary<string, object>> _cache = new BoundedDictionary<string, Dictionary<string, object>>(1000);
 
     public override string StrategyId => "pipeline-enrichment";
     public override string DisplayName => "Stream Enrichment Pipeline";

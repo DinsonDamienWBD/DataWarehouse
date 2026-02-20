@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -28,8 +27,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class BlockchainAnchoredBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BlockchainAnchoredMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, List<BlockchainAnchor>> _anchors = new();
+        private readonly BoundedDictionary<string, BlockchainAnchoredMetadata> _backups = new BoundedDictionary<string, BlockchainAnchoredMetadata>(1000);
+        private readonly BoundedDictionary<string, List<BlockchainAnchor>> _anchors = new BoundedDictionary<string, List<BlockchainAnchor>>(1000);
 
         /// <summary>
         /// Supported blockchain networks.

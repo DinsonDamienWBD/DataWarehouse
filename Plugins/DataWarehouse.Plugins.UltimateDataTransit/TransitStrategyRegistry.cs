@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 /// </summary>
 internal sealed class TransitStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataTransitStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDataTransitStrategy> _strategies = new BoundedDictionary<string, IDataTransitStrategy>(1000);
 
     /// <summary>
     /// Registers a transit strategy. Replaces any existing strategy with the same ID.

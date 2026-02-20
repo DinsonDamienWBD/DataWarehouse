@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.InMemory
 {
@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryLoadBalancerStrategy : ILoadBalancerStrategy
     {
-        private readonly ConcurrentDictionary<string, NodeHealthReport> _healthReports = new();
+        private readonly BoundedDictionary<string, NodeHealthReport> _healthReports = new BoundedDictionary<string, NodeHealthReport>(1000);
 
         /// <inheritdoc />
         public string AlgorithmName => "SingleNode";

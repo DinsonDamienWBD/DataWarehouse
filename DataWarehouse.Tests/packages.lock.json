@@ -2766,6 +2766,12 @@
           "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
+      "datawarehouse.plugins.chaosvaccination": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )"
+        }
+      },
       "datawarehouse.plugins.compute.wasm": {
         "type": "Project",
         "dependencies": {
@@ -2803,6 +2809,12 @@
         }
       },
       "datawarehouse.plugins.selfemulatingobjects": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )"
+        }
+      },
+      "datawarehouse.plugins.semanticsync": {
         "type": "Project",
         "dependencies": {
           "DataWarehouse.SDK": "[1.0.0, )"
@@ -3273,6 +3285,12 @@
           "DataWarehouse.SDK": "[1.0.0, )",
           "QuestPDF": "[2025.12.4, )",
           "SkiaSharp": "[3.119.2, )"
+        }
+      },
+      "datawarehouse.plugins.universalfabric": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
       "datawarehouse.plugins.universalobservability": {

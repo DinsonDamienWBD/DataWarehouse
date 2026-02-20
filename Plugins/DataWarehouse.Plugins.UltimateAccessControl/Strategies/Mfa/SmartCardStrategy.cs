@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -16,8 +16,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     /// </summary>
     public sealed class SmartCardStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, List<RegisteredCard>> _userCards = new();
-        private readonly ConcurrentDictionary<string, SmartCardSession> _activeSessions = new();
+        private readonly BoundedDictionary<string, List<RegisteredCard>> _userCards = new BoundedDictionary<string, List<RegisteredCard>>(1000);
+        private readonly BoundedDictionary<string, SmartCardSession> _activeSessions = new BoundedDictionary<string, SmartCardSession>(1000);
         private const int SessionTimeoutMinutes = 15;
         private const int MaxCardsPerUser = 5;
         private const int PinMaxAttempts = 3;

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Tags
 {
@@ -17,8 +18,8 @@ namespace DataWarehouse.SDK.Tags
     [SdkCompatibility("5.0.0", Notes = "Phase 55: In-memory tag schema registry")]
     public sealed class InMemoryTagSchemaRegistry : ITagSchemaRegistry
     {
-        private readonly ConcurrentDictionary<string, TagSchema> _schemas = new(StringComparer.Ordinal);
-        private readonly ConcurrentDictionary<TagKey, string> _tagKeyIndex = new();
+        private readonly BoundedDictionary<string, TagSchema> _schemas = new BoundedDictionary<string, TagSchema>(1000);
+        private readonly BoundedDictionary<TagKey, string> _tagKeyIndex = new BoundedDictionary<TagKey, string>(1000);
 
         /// <inheritdoc />
         public Task RegisterAsync(TagSchema schema, CancellationToken ct = default)
@@ -40,7 +41,7 @@ namespace DataWarehouse.SDK.Tags
         public Task<TagSchema?> GetAsync(string schemaId, CancellationToken ct = default)
         {
             _schemas.TryGetValue(schemaId, out var schema);
-            return Task.FromResult(schema);
+            return Task.FromResult<TagSchema?>(schema);
         }
 
         /// <inheritdoc />

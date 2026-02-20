@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.Plugins.AppPlatform.Models;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AppPlatform.Services;
 
@@ -16,13 +16,13 @@ internal sealed class ServiceTokenService
     /// <summary>
     /// Thread-safe dictionary storing all service tokens keyed by TokenId.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ServiceToken> _tokens = new();
+    private readonly BoundedDictionary<string, ServiceToken> _tokens = new BoundedDictionary<string, ServiceToken>(1000);
 
     /// <summary>
     /// Cache for token validation results keyed by token hash, with 30-second TTL.
     /// Improves performance for repeated validation of the same token.
     /// </summary>
-    private readonly ConcurrentDictionary<string, (TokenValidationResult Result, DateTime ExpiresAt)> _validationCache = new();
+    private readonly BoundedDictionary<string, (TokenValidationResult Result, DateTime ExpiresAt)> _validationCache = new BoundedDictionary<string, (TokenValidationResult Result, DateTime ExpiresAt)>(1000);
 
     /// <summary>
     /// TTL for cached validation results.

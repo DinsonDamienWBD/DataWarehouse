@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -8,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regenerat
 /// </summary>
 public sealed class RegenerationMetrics
 {
-    private readonly ConcurrentDictionary<string, StrategyMetrics> _strategyMetrics = new();
+    private readonly BoundedDictionary<string, StrategyMetrics> _strategyMetrics = new BoundedDictionary<string, StrategyMetrics>(1000);
     private readonly ConcurrentQueue<MetricEvent> _eventLog = new();
     private readonly MetricsConfiguration _config;
     private readonly object _aggregateLock = new();
@@ -492,7 +493,7 @@ internal sealed class StrategyMetrics
 {
     private readonly string _strategyId;
     private readonly object _lock = new();
-    private readonly ConcurrentDictionary<string, int> _errorCounts = new();
+    private readonly BoundedDictionary<string, int> _errorCounts = new BoundedDictionary<string, int>(1000);
     private readonly List<double> _recentAccuracies = new();
     private readonly List<double> _recentDurations = new();
 

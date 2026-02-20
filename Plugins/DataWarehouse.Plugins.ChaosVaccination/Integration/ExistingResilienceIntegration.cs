@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
@@ -24,7 +23,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Integration;
 public sealed class ExistingResilienceIntegration : IDisposable
 {
     private readonly IMessageBus _messageBus;
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<PluginMessage>> _pendingRequests = new();
+    private readonly BoundedDictionary<string, TaskCompletionSource<PluginMessage>> _pendingRequests = new BoundedDictionary<string, TaskCompletionSource<PluginMessage>>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private readonly TimeSpan _defaultTimeout;
     private bool _disposed;

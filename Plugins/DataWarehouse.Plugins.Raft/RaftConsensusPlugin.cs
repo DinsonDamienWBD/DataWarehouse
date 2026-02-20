@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -50,7 +49,7 @@ namespace DataWarehouse.Plugins.Raft
         // Node configuration
         private string _nodeId = string.Empty;
         private string _nodeEndpoint = string.Empty;
-        private readonly ConcurrentDictionary<string, RaftPeer> _peers = new();
+        private readonly BoundedDictionary<string, RaftPeer> _peers = new BoundedDictionary<string, RaftPeer>(1000);
 
         // Log storage - persistent
         private IRaftLogStore? _logStore;
@@ -58,18 +57,18 @@ namespace DataWarehouse.Plugins.Raft
         private long _lastApplied;
 
         // Leader state (volatile, reset after election)
-        private readonly ConcurrentDictionary<string, long> _nextIndex = new();
-        private readonly ConcurrentDictionary<string, long> _matchIndex = new();
+        private readonly BoundedDictionary<string, long> _nextIndex = new BoundedDictionary<string, long>(1000);
+        private readonly BoundedDictionary<string, long> _matchIndex = new BoundedDictionary<string, long>(1000);
 
         // Commit handlers
         private readonly List<Action<Proposal>> _commitHandlers = new();
         private readonly object _handlerLock = new();
 
         // Distributed locks
-        private readonly ConcurrentDictionary<string, DistributedLock> _locks = new();
+        private readonly BoundedDictionary<string, DistributedLock> _locks = new BoundedDictionary<string, DistributedLock>(1000);
 
         // Pending proposals waiting for commit
-        private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new();
+        private readonly BoundedDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new BoundedDictionary<string, TaskCompletionSource<bool>>(1000);
 
         // Timers and cancellation
         private CancellationTokenSource? _cts;

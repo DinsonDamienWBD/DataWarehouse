@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Modes;
 
@@ -374,7 +375,7 @@ public sealed class ConversationMemory
 public sealed class StreamingSupport
 {
     private readonly IAIProvider _aiProvider;
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeStreams = new();
+    private readonly BoundedDictionary<string, CancellationTokenSource> _activeStreams = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
     /// <summary>
     /// Initializes streaming support.
@@ -482,7 +483,7 @@ public sealed record StreamChunk
 /// </summary>
 public sealed class ChatHandler : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ChatSession> _sessions = new();
+    private readonly BoundedDictionary<string, ChatSession> _sessions = new BoundedDictionary<string, ChatSession>(1000);
     private StreamingSupport? _streamingSupport;
 
     /// <inheritdoc/>
@@ -817,7 +818,7 @@ public sealed class BackgroundTask
 public sealed class TaskQueue
 {
     private readonly PriorityQueue<BackgroundTask, int> _queue = new();
-    private readonly ConcurrentDictionary<string, BackgroundTask> _allTasks = new();
+    private readonly BoundedDictionary<string, BackgroundTask> _allTasks = new BoundedDictionary<string, BackgroundTask>(1000);
     private readonly object _lock = new();
 
     /// <summary>Total tasks in queue.</summary>
@@ -959,7 +960,7 @@ public sealed record AutoDecisionPolicy
 /// </summary>
 public sealed class AutoDecision
 {
-    private readonly ConcurrentDictionary<string, AutoDecisionPolicy> _policies = new();
+    private readonly BoundedDictionary<string, AutoDecisionPolicy> _policies = new BoundedDictionary<string, AutoDecisionPolicy>(1000);
     private readonly ConcurrentQueue<DecisionRecord> _decisionHistory = new();
 
     /// <summary>
@@ -1109,7 +1110,7 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
 {
     private readonly TaskQueue _taskQueue = new();
     private readonly AutoDecision _autoDecision = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _runningTasks = new();
+    private readonly BoundedDictionary<string, CancellationTokenSource> _runningTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
     private readonly SemaphoreSlim _concurrencySemaphore;
     private CancellationTokenSource? _processorCts;
     private Task? _processorTask;
@@ -1370,8 +1371,8 @@ public sealed class ScheduledTask
 /// </summary>
 public sealed class ScheduledTasks : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduledTask> _tasks = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _runningTasks = new();
+    private readonly BoundedDictionary<string, ScheduledTask> _tasks = new BoundedDictionary<string, ScheduledTask>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _runningTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
     private CancellationTokenSource? _schedulerCts;
     private Task? _schedulerTask;
     private bool _isRunning;
@@ -1621,7 +1622,7 @@ public enum ReportFrequency
 public sealed class ReportGenerator : FeatureStrategyBase
 {
     private readonly ScheduledTasks _scheduler;
-    private readonly ConcurrentDictionary<string, ReportDefinition> _reports = new();
+    private readonly BoundedDictionary<string, ReportDefinition> _reports = new BoundedDictionary<string, ReportDefinition>(1000);
 
     /// <summary>
     /// Initializes the report generator.
@@ -1931,7 +1932,7 @@ public enum EventSeverity
 /// </summary>
 public sealed class EventListener : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<EventSubscription>> _subscriptions = new();
+    private readonly BoundedDictionary<string, List<EventSubscription>> _subscriptions = new BoundedDictionary<string, List<EventSubscription>>(1000);
     private readonly ConcurrentQueue<SystemEvent> _eventHistory = new();
     private readonly int _maxHistorySize;
 
@@ -2181,7 +2182,7 @@ public sealed class TriggerCondition
 public sealed class TriggerEngine : FeatureStrategyBase
 {
     private readonly EventListener _eventListener;
-    private readonly ConcurrentDictionary<string, TriggerDefinition> _triggers = new();
+    private readonly BoundedDictionary<string, TriggerDefinition> _triggers = new BoundedDictionary<string, TriggerDefinition>(1000);
 
     /// <summary>
     /// Initializes the trigger engine.
@@ -2303,7 +2304,7 @@ public sealed class AnomalyResponder : FeatureStrategyBase
 {
     private readonly EventListener _eventListener;
     private readonly TriggerEngine _triggerEngine;
-    private readonly ConcurrentDictionary<string, AnomalyResponse> _responses = new();
+    private readonly BoundedDictionary<string, AnomalyResponse> _responses = new BoundedDictionary<string, AnomalyResponse>(1000);
 
     /// <summary>
     /// Initializes the anomaly responder.

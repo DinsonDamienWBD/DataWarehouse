@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -35,8 +34,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, StorageBackendInfo> _backends = new();
-        private readonly ConcurrentDictionary<string, StorageReplicaMapping> _replicaMappings = new();
+        private readonly BoundedDictionary<string, StorageBackendInfo> _backends = new BoundedDictionary<string, StorageBackendInfo>(1000);
+        private readonly BoundedDictionary<string, StorageReplicaMapping> _replicaMappings = new BoundedDictionary<string, StorageReplicaMapping>(1000);
         private bool _disposed;
         private IDisposable? _capacitySubscription;
 
@@ -158,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                     var mappings = _replicaMappings.GetOrAdd(key, _ => new StorageReplicaMapping
                     {
                         Key = key,
-                        Backends = new ConcurrentDictionary<string, ReplicaInfo>()
+                        Backends = new BoundedDictionary<string, ReplicaInfo>(1000)
                     });
                     mappings.Backends[backendId] = new ReplicaInfo
                     {
@@ -410,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         /// <summary>Storage key.</summary>
         public required string Key { get; init; }
         /// <summary>Backends holding replicas.</summary>
-        public required ConcurrentDictionary<string, ReplicaInfo> Backends { get; init; }
+        public required BoundedDictionary<string, ReplicaInfo> Backends { get; init; }
     }
 
     /// <summary>

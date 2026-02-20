@@ -5,7 +5,7 @@ using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AedsCore;
 
@@ -41,8 +41,8 @@ namespace DataWarehouse.Plugins.AedsCore;
 public class ClientCourierPlugin : PlatformPluginBase
 {
     private readonly ILogger<ClientCourierPlugin> _logger;
-    private readonly ConcurrentDictionary<string, WatchedFile> _watchedFiles = new();
-    private readonly ConcurrentDictionary<string, FileSystemWatcher> _watchers = new();
+    private readonly BoundedDictionary<string, WatchedFile> _watchedFiles = new BoundedDictionary<string, WatchedFile>(1000);
+    private readonly BoundedDictionary<string, FileSystemWatcher> _watchers = new BoundedDictionary<string, FileSystemWatcher>(1000);
     private readonly SemaphoreSlim _executionLock = new(1, 1);
 
     private IControlPlaneTransport? _controlPlane;

@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     public sealed class PushNotificationStrategy : AccessControlStrategyBase
     {
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, PushChallengeSession> _activeChallenges = new();
+        private readonly BoundedDictionary<string, PushChallengeSession> _activeChallenges = new BoundedDictionary<string, PushChallengeSession>(1000);
         private const int ChallengeTimeoutSeconds = 60;
         private const int MaxPendingChallenges = 5;
 

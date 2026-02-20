@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies;
 /// </summary>
 public sealed class QuorumConsistencyManager
 {
-    private readonly ConcurrentDictionary<string, ReplicaState> _replicas = new();
+    private readonly BoundedDictionary<string, ReplicaState> _replicas = new BoundedDictionary<string, ReplicaState>(1000);
     private readonly TimeSpan _defaultTimeout;
     private long _totalReads;
     private long _totalWrites;
@@ -257,8 +257,8 @@ public sealed class ReplicaState
 /// </summary>
 public sealed class MultiRegionReplicationManager
 {
-    private readonly ConcurrentDictionary<string, RegionNode> _regions = new();
-    private readonly ConcurrentDictionary<string, List<ReplicationEvent>> _replicationLog = new();
+    private readonly BoundedDictionary<string, RegionNode> _regions = new BoundedDictionary<string, RegionNode>(1000);
+    private readonly BoundedDictionary<string, List<ReplicationEvent>> _replicationLog = new BoundedDictionary<string, List<ReplicationEvent>>(1000);
     private readonly IConflictResolver _conflictResolver;
     private long _totalReplicated;
     private long _conflictsResolved;
@@ -606,8 +606,8 @@ public sealed record ErasureRepairMetrics
 /// </summary>
 public sealed class GeoDistributionManager
 {
-    private readonly ConcurrentDictionary<string, GeoNode> _topology = new();
-    private readonly ConcurrentDictionary<string, FailoverRecord> _failoverHistory = new();
+    private readonly BoundedDictionary<string, GeoNode> _topology = new BoundedDictionary<string, GeoNode>(1000);
+    private readonly BoundedDictionary<string, FailoverRecord> _failoverHistory = new BoundedDictionary<string, FailoverRecord>(1000);
     private readonly TimeSpan _healthCheckInterval;
 
     public GeoDistributionManager(TimeSpan? healthCheckInterval = null)

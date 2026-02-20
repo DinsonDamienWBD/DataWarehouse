@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 using SyncResult = DataWarehouse.SDK.Contracts.Distributed.SyncResult;
 using SyncConflict = DataWarehouse.SDK.Contracts.Distributed.SyncConflict;
@@ -76,8 +76,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly IClusterMembership _membership;
         private readonly CrdtRegistry _registry;
         private readonly CrdtReplicationSyncConfiguration _config;
-        private readonly ConcurrentDictionary<string, CrdtDataItem> _dataStore = new();
-        private readonly ConcurrentDictionary<string, SyncStatus> _syncStatuses = new();
+        private readonly BoundedDictionary<string, CrdtDataItem> _dataStore = new BoundedDictionary<string, CrdtDataItem>(1000);
+        private readonly BoundedDictionary<string, SyncStatus> _syncStatuses = new BoundedDictionary<string, SyncStatus>(1000);
         private DataWarehouse.SDK.Replication.VectorClock _localClock = new(new Dictionary<string, long>());
         private readonly SemaphoreSlim _clockLock = new(1, 1);
         private readonly CancellationTokenSource _cts = new();

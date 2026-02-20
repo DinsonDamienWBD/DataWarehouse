@@ -14,6 +14,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -41,8 +42,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     [SdkCompatibility("4.2.0", Notes = "mTLS inter-node communication")]
     public sealed class TcpP2PNetwork : IP2PNetwork, IDisposable
     {
-        private readonly ConcurrentDictionary<string, PeerInfo> _knownPeers = new();
-        private readonly ConcurrentDictionary<string, TcpClient> _activeConnections = new();
+        private readonly BoundedDictionary<string, PeerInfo> _knownPeers = new BoundedDictionary<string, PeerInfo>(1000);
+        private readonly BoundedDictionary<string, TcpClient> _activeConnections = new BoundedDictionary<string, TcpClient>(1000);
         private readonly ConcurrentQueue<GossipMessage> _pendingGossip = new();
         private readonly TcpListener? _listener;
         private readonly TcpP2PNetworkConfig _config;

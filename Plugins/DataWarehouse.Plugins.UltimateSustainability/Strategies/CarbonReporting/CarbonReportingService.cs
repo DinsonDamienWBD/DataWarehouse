@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Carbon;
 using DataWarehouse.SDK.Utilities;
@@ -24,8 +23,8 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
     private readonly CarbonDashboardDataStrategy _dashboardStrategy;
 
     // Cached green score averages for summary generation
-    private readonly ConcurrentDictionary<string, double> _regionCarbonIntensity = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, double> _regionRenewablePct = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, double> _regionCarbonIntensity = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, double> _regionRenewablePct = new BoundedDictionary<string, double>(1000);
     private IDisposable? _intensitySubscription;
     private IDisposable? _scoresSubscription;
 

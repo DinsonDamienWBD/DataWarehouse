@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -28,10 +29,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class ComplianceAuditStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AuditTrail> _auditTrails = new();
+        private readonly BoundedDictionary<string, AuditTrail> _auditTrails = new BoundedDictionary<string, AuditTrail>(1000);
         private readonly ConcurrentBag<SovereigntyDecision> _decisions = new();
-        private readonly ConcurrentDictionary<string, AuditReport> _reports = new();
-        private readonly ConcurrentDictionary<string, ComplianceMetrics> _metrics = new();
+        private readonly BoundedDictionary<string, AuditReport> _reports = new BoundedDictionary<string, AuditReport>(1000);
+        private readonly BoundedDictionary<string, ComplianceMetrics> _metrics = new BoundedDictionary<string, ComplianceMetrics>(1000);
 
         private TimeSpan _retentionPeriod = TimeSpan.FromDays(365 * 7); // 7 years default
         private int _maxDecisionsInMemory = 100000;
@@ -262,6 +263,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                     .Where(r => !string.IsNullOrEmpty(r))
                     .Distinct()
                     .Count(),
+
                 ViolationsByType = recentDecisions
                     .Where(d => !d.WasAllowed)
                     .GroupBy(d => d.ViolationType ?? "Unknown")

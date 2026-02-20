@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -173,8 +173,8 @@ public sealed class OrganizableContent
 /// </remarks>
 public sealed class SelfOrganizingDataStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OrganizationResult> _organizationCache = new();
-    private readonly ConcurrentDictionary<string, float[]> _embeddingCache = new();
+    private readonly BoundedDictionary<string, OrganizationResult> _organizationCache = new BoundedDictionary<string, OrganizationResult>(1000);
+    private readonly BoundedDictionary<string, float[]> _embeddingCache = new BoundedDictionary<string, float[]>(1000);
     private readonly string[] _defaultCategories;
     private readonly TimeSpan _cacheTtl;
 

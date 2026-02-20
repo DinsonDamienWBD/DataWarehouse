@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Industrial;
 
@@ -194,11 +195,11 @@ public sealed record OpcUaSessionConfig
 /// </summary>
 internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OpcUaSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<OpcUaDataValue>> _dataQueues = new();
-    private readonly ConcurrentDictionary<string, OpcUaSessionConfig> _sessions = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _sessionLastActivity = new();
-    private readonly ConcurrentDictionary<string, long> _sequenceNumbers = new();
+    private readonly BoundedDictionary<string, OpcUaSubscription> _subscriptions = new BoundedDictionary<string, OpcUaSubscription>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<OpcUaDataValue>> _dataQueues = new BoundedDictionary<string, ConcurrentQueue<OpcUaDataValue>>(1000);
+    private readonly BoundedDictionary<string, OpcUaSessionConfig> _sessions = new BoundedDictionary<string, OpcUaSessionConfig>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _sessionLastActivity = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, long> _sequenceNumbers = new BoundedDictionary<string, long>(1000);
     private long _totalNotifications;
     private long _totalErrors;
 

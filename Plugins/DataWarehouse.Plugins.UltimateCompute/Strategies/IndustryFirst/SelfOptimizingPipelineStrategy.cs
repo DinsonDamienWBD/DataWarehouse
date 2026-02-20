@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -20,8 +20,8 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PipelineConfig> _configs = new();
-    private readonly ConcurrentDictionary<string, double> _emaThoughput = new();
+    private readonly BoundedDictionary<string, PipelineConfig> _configs = new BoundedDictionary<string, PipelineConfig>(1000);
+    private readonly BoundedDictionary<string, double> _emaThoughput = new BoundedDictionary<string, double>(1000);
     private const double EmaAlpha = 0.3; // Exponential moving average decay
 
     /// <inheritdoc/>
@@ -64,7 +64,7 @@ internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBas
 
             // Create batches based on current config
             var batches = lines.Chunk(Math.Max(1, config.BatchSize)).ToArray();
-            var results = new ConcurrentDictionary<int, string>();
+            var results = new BoundedDictionary<int, string>(1000);
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             // Execute pipeline with current parameters

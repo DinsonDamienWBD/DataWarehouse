@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -21,8 +22,8 @@ public sealed record VolatileStoreStatistics
 /// </summary>
 public sealed class VolatileMemoryStore
 {
-    private readonly ConcurrentDictionary<string, TieredMemoryEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, LinkedListNode<string>> _lruNodes = new();
+    private readonly BoundedDictionary<string, TieredMemoryEntry> _entries = new BoundedDictionary<string, TieredMemoryEntry>(1000);
+    private readonly BoundedDictionary<string, LinkedListNode<string>> _lruNodes = new BoundedDictionary<string, LinkedListNode<string>>(1000);
     private readonly LinkedList<string> _lruOrder = new();
     private readonly object _lruLock = new();
     private readonly TierConfig _config;
@@ -35,7 +36,7 @@ public sealed class VolatileMemoryStore
     private long _bytesUsed;
 
     // Semantic index for fast similarity search
-    private readonly ConcurrentDictionary<string, List<(string EntryId, float[] Vector)>> _scopeVectorIndex = new();
+    private readonly BoundedDictionary<string, List<(string EntryId, float[] Vector)>> _scopeVectorIndex = new BoundedDictionary<string, List<(string EntryId, float[] Vector)>>(1000);
 
     public VolatileMemoryStore(TierConfig config)
     {
@@ -430,7 +431,7 @@ public sealed class VolatileMemoryStore
 public sealed class LruCache<TKey, TValue> where TKey : notnull
 {
     private readonly int _capacity;
-    private readonly ConcurrentDictionary<TKey, LinkedListNode<(TKey Key, TValue Value)>> _cache = new();
+    private readonly BoundedDictionary<TKey, LinkedListNode<(TKey Key, TValue Value)>> _cache = new BoundedDictionary<TKey, LinkedListNode<(TKey Key, TValue Value)>>(1000);
     private readonly LinkedList<(TKey Key, TValue Value)> _order = new();
     private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
 
@@ -548,7 +549,7 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
 /// </summary>
 public sealed class SemanticVectorIndex
 {
-    private readonly ConcurrentDictionary<string, ConcurrentBag<(string Id, float[] Vector)>> _buckets = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<(string Id, float[] Vector)>> _buckets = new BoundedDictionary<string, ConcurrentBag<(string Id, float[] Vector)>>(1000);
     private readonly int _numBuckets;
     private readonly float[] _randomProjection;
 

@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 {
@@ -18,9 +18,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
     /// </summary>
     public class LoRaWanConnectionStrategy : IoTConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, LoRaDevice> _devices = new();
-        private readonly ConcurrentDictionary<string, Queue<LoRaDownlink>> _downlinkQueues = new();
-        private readonly ConcurrentDictionary<string, AdrState> _adrStates = new();
+        private readonly BoundedDictionary<string, LoRaDevice> _devices = new BoundedDictionary<string, LoRaDevice>(1000);
+        private readonly BoundedDictionary<string, Queue<LoRaDownlink>> _downlinkQueues = new BoundedDictionary<string, Queue<LoRaDownlink>>(1000);
+        private readonly BoundedDictionary<string, AdrState> _adrStates = new BoundedDictionary<string, AdrState>(1000);
 
         public override string StrategyId => "lorawan";
         public override string DisplayName => "LoRaWAN";

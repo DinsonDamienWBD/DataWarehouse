@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -28,7 +27,7 @@ public sealed class ChaosInjectionEngine : IChaosInjectionEngine, IDisposable
 {
     private readonly IMessageBus? _messageBus;
     private readonly ChaosVaccinationOptions _options;
-    private readonly ConcurrentDictionary<string, RunningExperiment> _runningExperiments = new();
+    private readonly BoundedDictionary<string, RunningExperiment> _runningExperiments = new BoundedDictionary<string, RunningExperiment>(1000);
     private readonly Dictionary<FaultType, IFaultInjector> _injectors = new();
     private readonly SemaphoreSlim _concurrencyLimiter;
     private bool _disposed;

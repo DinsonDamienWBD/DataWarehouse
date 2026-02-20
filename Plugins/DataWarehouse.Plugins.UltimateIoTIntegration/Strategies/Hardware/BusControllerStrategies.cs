@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Hardware;
 
@@ -23,7 +23,7 @@ public abstract class HardwareBusStrategyBase : IoTStrategyBase, IHardwareBusStr
 /// </summary>
 public class GpioControllerStrategy : HardwareBusStrategyBase
 {
-    private readonly ConcurrentDictionary<int, GpioPinState> _pinStates = new();
+    private readonly BoundedDictionary<int, GpioPinState> _pinStates = new BoundedDictionary<int, GpioPinState>(1000);
     private bool _initialized;
 
     public override string StrategyId => "gpio-controller";

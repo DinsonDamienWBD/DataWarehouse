@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.Scoring;
 
@@ -373,9 +373,9 @@ public sealed class DimensionScoringStrategy : DataQualityStrategyBase
 
         var recordList = records.ToList();
         var recordScores = new List<RecordQualityScore>();
-        var fieldScoreSums = new ConcurrentDictionary<string, double>();
-        var fieldCounts = new ConcurrentDictionary<string, int>();
-        var issueCounts = new ConcurrentDictionary<string, int>();
+        var fieldScoreSums = new BoundedDictionary<string, double>(1000);
+        var fieldCounts = new BoundedDictionary<string, int>(1000);
+        var issueCounts = new BoundedDictionary<string, int>(1000);
 
         foreach (var record in recordList)
         {

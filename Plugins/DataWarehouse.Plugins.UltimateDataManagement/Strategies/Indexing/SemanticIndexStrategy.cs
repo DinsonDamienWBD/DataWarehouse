@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -21,9 +20,9 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 public sealed class SemanticIndexStrategy : IndexingStrategyBase
 {
     // Document embeddings: docId -> embedding vectors
-    private readonly ConcurrentDictionary<string, VectorDocument> _documents = new();
+    private readonly BoundedDictionary<string, VectorDocument> _documents = new BoundedDictionary<string, VectorDocument>(1000);
     // Inverted index for exact term matching (hybrid search)
-    private readonly ConcurrentDictionary<string, HashSet<string>> _termIndex = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _termIndex = new BoundedDictionary<string, HashSet<string>>(1000);
 
     private IMessageBus? _messageBus;
     private readonly int _embeddingDimension;

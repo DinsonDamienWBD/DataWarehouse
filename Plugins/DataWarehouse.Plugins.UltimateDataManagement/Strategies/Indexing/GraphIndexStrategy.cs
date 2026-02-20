@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -22,42 +23,42 @@ public sealed class GraphIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Node storage by node ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, GraphNode> _nodes = new();
+    private readonly BoundedDictionary<string, GraphNode> _nodes = new BoundedDictionary<string, GraphNode>(1000);
 
     /// <summary>
     /// Edge storage by edge ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, GraphEdge> _edges = new();
+    private readonly BoundedDictionary<string, GraphEdge> _edges = new BoundedDictionary<string, GraphEdge>(1000);
 
     /// <summary>
     /// Adjacency list: nodeId -> list of outgoing edges.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _outgoingEdges = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _outgoingEdges = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
 
     /// <summary>
     /// Reverse adjacency list: nodeId -> list of incoming edges.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _incomingEdges = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _incomingEdges = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
 
     /// <summary>
     /// Label index for nodes: label -> nodeIds.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _nodeLabelIndex = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _nodeLabelIndex = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
 
     /// <summary>
     /// Label index for edges: label/type -> edgeIds.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _edgeLabelIndex = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _edgeLabelIndex = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
 
     /// <summary>
     /// Property indexes on nodes: propertyName -> (value -> nodeIds).
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> _nodePropertyIndexes = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, ConcurrentBag<string>>> _nodePropertyIndexes = new BoundedDictionary<string, BoundedDictionary<string, ConcurrentBag<string>>>(1000);
 
     /// <summary>
     /// Property indexes on edges: propertyName -> (value -> edgeIds).
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> _edgePropertyIndexes = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, ConcurrentBag<string>>> _edgePropertyIndexes = new BoundedDictionary<string, BoundedDictionary<string, ConcurrentBag<string>>>(1000);
 
     /// <summary>
     /// Default maximum traversal depth to prevent infinite loops.
@@ -486,7 +487,7 @@ public sealed class GraphIndexStrategy : IndexingStrategyBase
     {
         var valueStr = value.ToString() ?? "";
         var propIndex = _nodePropertyIndexes.GetOrAdd(propertyName,
-            _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
+            _ => new BoundedDictionary<string, ConcurrentBag<string>>(1000));
         var valueBag = propIndex.GetOrAdd(valueStr, _ => new ConcurrentBag<string>());
         valueBag.Add(nodeId);
     }
@@ -498,7 +499,7 @@ public sealed class GraphIndexStrategy : IndexingStrategyBase
     {
         var valueStr = value.ToString() ?? "";
         var propIndex = _edgePropertyIndexes.GetOrAdd(propertyName,
-            _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
+            _ => new BoundedDictionary<string, ConcurrentBag<string>>(1000));
         var valueBag = propIndex.GetOrAdd(valueStr, _ => new ConcurrentBag<string>());
         valueBag.Add(edgeId);
     }

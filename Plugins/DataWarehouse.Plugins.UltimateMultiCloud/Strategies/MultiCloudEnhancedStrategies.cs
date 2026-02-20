@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies;
 
@@ -7,8 +7,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies;
 /// </summary>
 public sealed class CrossCloudConflictResolutionStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VectorClock> _vectorClocks = new();
-    private readonly ConcurrentDictionary<string, List<ConflictRecord>> _conflictLog = new();
+    private readonly BoundedDictionary<string, VectorClock> _vectorClocks = new BoundedDictionary<string, VectorClock>(1000);
+    private readonly BoundedDictionary<string, List<ConflictRecord>> _conflictLog = new BoundedDictionary<string, List<ConflictRecord>>(1000);
 
     public override string StrategyId => "conflict-resolution-lww";
     public override string StrategyName => "Cross-Cloud Conflict Resolution (LWW)";
@@ -114,8 +114,8 @@ public sealed class CrossCloudConflictResolutionStrategy : MultiCloudStrategyBas
 /// </summary>
 public sealed class CloudArbitrageStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CloudPricing> _pricing = new();
-    private readonly ConcurrentDictionary<string, List<ArbitrageDecision>> _decisionHistory = new();
+    private readonly BoundedDictionary<string, CloudPricing> _pricing = new BoundedDictionary<string, CloudPricing>(1000);
+    private readonly BoundedDictionary<string, List<ArbitrageDecision>> _decisionHistory = new BoundedDictionary<string, List<ArbitrageDecision>>(1000);
 
     public override string StrategyId => "cloud-arbitrage";
     public override string StrategyName => "Cloud Arbitrage";

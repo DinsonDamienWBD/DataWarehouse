@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure.Distributed;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Tags;
 
@@ -24,10 +24,10 @@ namespace DataWarehouse.SDK.Tags;
 public sealed class CrdtTagCollection
 {
     private readonly SdkORSet _tagKeys;
-    private readonly ConcurrentDictionary<TagKey, (Tag Tag, TagVersionVector Version)> _tagValues;
+    private readonly BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)> _tagValues;
     private readonly string _nodeId;
     private readonly TagMergeMode _defaultMode;
-    private readonly ConcurrentDictionary<TagKey, TagMergeMode> _mergeOverrides;
+    private readonly BoundedDictionary<TagKey, TagMergeMode> _mergeOverrides;
     private TagVersionVector _currentVersion;
 
     /// <summary>
@@ -41,8 +41,8 @@ public sealed class CrdtTagCollection
         _nodeId = nodeId;
         _defaultMode = defaultMode;
         _tagKeys = new SdkORSet();
-        _tagValues = new ConcurrentDictionary<TagKey, (Tag, TagVersionVector)>();
-        _mergeOverrides = new ConcurrentDictionary<TagKey, TagMergeMode>();
+        _tagValues = new BoundedDictionary<TagKey, (Tag, TagVersionVector)>(1000);
+        _mergeOverrides = new BoundedDictionary<TagKey, TagMergeMode>(1000);
         _currentVersion = new TagVersionVector();
     }
 
@@ -51,8 +51,8 @@ public sealed class CrdtTagCollection
         string nodeId,
         TagMergeMode defaultMode,
         SdkORSet tagKeys,
-        ConcurrentDictionary<TagKey, (Tag Tag, TagVersionVector Version)> tagValues,
-        ConcurrentDictionary<TagKey, TagMergeMode> mergeOverrides,
+        BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)> tagValues,
+        BoundedDictionary<TagKey, TagMergeMode> mergeOverrides,
         TagVersionVector currentVersion)
     {
         _nodeId = nodeId;
@@ -196,7 +196,7 @@ public sealed class CrdtTagCollection
         var mergedOrSet = (SdkORSet)_tagKeys.Merge(other._tagKeys);
 
         // Step 2: Merge tag values for each key present in merged OR-Set
-        var mergedValues = new ConcurrentDictionary<TagKey, (Tag Tag, TagVersionVector Version)>();
+        var mergedValues = new BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)>(1000);
 
         foreach (var element in mergedOrSet.Elements)
         {
@@ -242,7 +242,7 @@ public sealed class CrdtTagCollection
         var mergedVersion = TagVersionVector.Merge(_currentVersion, other._currentVersion);
 
         // Step 4: Merge merge-overrides (union, prefer local if conflict)
-        var mergedOverrides = new ConcurrentDictionary<TagKey, TagMergeMode>(_mergeOverrides);
+        var mergedOverrides = new BoundedDictionary<TagKey, TagMergeMode>(1000);
         foreach (var (key, mode) in other._mergeOverrides)
         {
             mergedOverrides.TryAdd(key, mode);
@@ -312,7 +312,7 @@ public sealed class CrdtTagCollection
         var defaultMode = (TagMergeMode)(envelope.DefaultMode);
         var currentVersion = TagVersionVector.Deserialize(envelope.CurrentVersion ?? Array.Empty<byte>());
 
-        var tagValues = new ConcurrentDictionary<TagKey, (Tag, TagVersionVector)>();
+        var tagValues = new BoundedDictionary<TagKey, (Tag, TagVersionVector)>(1000);
         if (envelope.TagEntries != null)
         {
             foreach (var (keyStr, entry) in envelope.TagEntries)
@@ -330,7 +330,7 @@ public sealed class CrdtTagCollection
             }
         }
 
-        var mergeOverrides = new ConcurrentDictionary<TagKey, TagMergeMode>();
+        var mergeOverrides = new BoundedDictionary<TagKey, TagMergeMode>(1000);
         if (envelope.MergeOverrides != null)
         {
             foreach (var (keyStr, modeInt) in envelope.MergeOverrides)

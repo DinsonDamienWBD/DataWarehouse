@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.SemanticSync;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.SemanticSync.Strategies.Fidelity;
 
@@ -53,7 +54,7 @@ internal sealed class BandwidthBudgetTracker
     /// Tracks bytes consumed per fidelity level within the current measurement window.
     /// Thread-safe via <see cref="ConcurrentDictionary{TKey,TValue}"/>.
     /// </summary>
-    private readonly ConcurrentDictionary<SyncFidelity, long> _bytesConsumedByFidelity = new();
+    private readonly BoundedDictionary<SyncFidelity, long> _bytesConsumedByFidelity = new BoundedDictionary<SyncFidelity, long>(1000);
 
     /// <summary>
     /// Number of sync operations currently queued but not yet completed.

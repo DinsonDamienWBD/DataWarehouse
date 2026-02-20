@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -16,10 +16,10 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
 {
     private readonly SortedDictionary<uint, string> _ring = new();
-    private readonly ConcurrentDictionary<string, List<uint>> _shardToVirtualNodes = new();
+    private readonly BoundedDictionary<string, List<uint>> _shardToVirtualNodes = new BoundedDictionary<string, List<uint>>(1000);
     private readonly ReaderWriterLockSlim _ringLock = new();
     private readonly int _virtualNodesPerShard;
-    private readonly ConcurrentDictionary<string, string> _keyCache = new();
+    private readonly BoundedDictionary<string, string> _keyCache = new BoundedDictionary<string, string>(1000);
     private readonly int _cacheMaxSize;
     private uint[]? _sortedRingKeys;
 

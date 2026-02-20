@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     public sealed class AccessAuditLoggingStrategy : AccessControlStrategyBase, IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentQueue<AuditLogEntry> _logQueue = new();
-        private readonly ConcurrentDictionary<string, AuditLogEntry> _recentLogs = new();
+        private readonly BoundedDictionary<string, AuditLogEntry> _recentLogs = new BoundedDictionary<string, AuditLogEntry>(1000);
         private readonly List<IAuditLogDestination> _destinations = new();
         private readonly object _chainLock = new();
 

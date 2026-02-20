@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -24,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class CostBasedSelectionFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, BackendCostConfig> _costConfigs = new();
-        private readonly ConcurrentDictionary<string, BackendUsageMetrics> _usageMetrics = new();
+        private readonly BoundedDictionary<string, BackendCostConfig> _costConfigs = new BoundedDictionary<string, BackendCostConfig>(1000);
+        private readonly BoundedDictionary<string, BackendUsageMetrics> _usageMetrics = new BoundedDictionary<string, BackendUsageMetrics>(1000);
         private readonly List<CostEntry> _costHistory = new();
         private readonly object _historyLock = new();
         private readonly Timer _costCalculationTimer;

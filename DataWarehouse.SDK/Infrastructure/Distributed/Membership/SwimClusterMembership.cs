@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -19,7 +20,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     [SdkCompatibility("2.0.0", Notes = "Phase 29: SWIM gossip membership")]
     public sealed class SwimClusterMembership : IClusterMembership, IDisposable
     {
-        private readonly ConcurrentDictionary<string, SwimMemberState> _members = new();
+        private readonly BoundedDictionary<string, SwimMemberState> _members = new BoundedDictionary<string, SwimMemberState>(1000);
         private readonly ClusterNode _self;
         private readonly IP2PNetwork _network;
         private readonly IGossipProtocol _gossip;
@@ -27,8 +28,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly CancellationTokenSource _probeCts = new();
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly ConcurrentQueue<SwimMembershipUpdate> _recentUpdates = new();
-        private readonly ConcurrentDictionary<string, int> _deadReportCounts = new();
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastStateChangePerNode = new();
+        private readonly BoundedDictionary<string, int> _deadReportCounts = new BoundedDictionary<string, int>(1000);
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastStateChangePerNode = new BoundedDictionary<string, DateTimeOffset>(1000);
         private string? _leaderId;
         private Task? _probeLoopTask;
         private Task? _suspicionCheckTask;

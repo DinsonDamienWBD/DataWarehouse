@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -12,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class AutomatedIncidentResponse
     {
-        private readonly ConcurrentDictionary<string, ResponsePlaybook> _playbooks = new();
+        private readonly BoundedDictionary<string, ResponsePlaybook> _playbooks = new BoundedDictionary<string, ResponsePlaybook>(1000);
         private readonly ConcurrentQueue<IncidentResponse> _responseHistory = new();
         private readonly int _maxHistorySize = 1000;
 

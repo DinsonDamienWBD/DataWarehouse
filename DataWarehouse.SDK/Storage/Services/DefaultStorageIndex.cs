@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Storage;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Services;
 
@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Storage.Services;
 /// </summary>
 public sealed class DefaultStorageIndex : IStorageIndex
 {
-    private readonly ConcurrentDictionary<string, StorageObjectMetadata> _index = new();
+    private readonly BoundedDictionary<string, StorageObjectMetadata> _index = new BoundedDictionary<string, StorageObjectMetadata>(1000);
 
     /// <summary>
     /// Maximum number of entries in the index. Default: 100,000.

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
@@ -89,7 +89,7 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
     private readonly ICacheBackingStore _backingStore;
     private readonly WriteBehindConfig _config;
     private readonly Channel<WriteBehindOperation> _writeQueue;
-    private readonly ConcurrentDictionary<string, WriteBehindOperation> _pendingWrites = new();
+    private readonly BoundedDictionary<string, WriteBehindOperation> _pendingWrites = new BoundedDictionary<string, WriteBehindOperation>(1000);
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly List<Task> _workers = new();
     private readonly Timer _flushTimer;

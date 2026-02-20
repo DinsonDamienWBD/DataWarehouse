@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.Standardization;
 
@@ -536,7 +536,7 @@ public sealed class FormatStandardizationStrategy : DataQualityStrategyBase
 /// </summary>
 public sealed class CodeStandardizationStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dictionary<string, string>> _codeMappings = new();
+    private readonly BoundedDictionary<string, Dictionary<string, string>> _codeMappings = new BoundedDictionary<string, Dictionary<string, string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "code-standardization";

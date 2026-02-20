@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -26,7 +27,7 @@ public static class KnowledgeAwarePluginExtensions
     /// <summary>
     /// Knowledge registration cache to track registered plugins.
     /// </summary>
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, KnowledgeRegistrationInfo> _registrations = new();
+    private static readonly BoundedDictionary<string, KnowledgeRegistrationInfo> _registrations = new BoundedDictionary<string, KnowledgeRegistrationInfo>(1000);
 
     /// <summary>
     /// Gets a KnowledgeObject describing the plugin's capabilities for registration with Universal Intelligence.

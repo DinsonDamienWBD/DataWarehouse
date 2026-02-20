@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     {
         private readonly ILogger _logger;
         private readonly IMessageBus? _messageBus;
-        private readonly ConcurrentDictionary<string, AccessPatternProfile> _profiles = new();
+        private readonly BoundedDictionary<string, AccessPatternProfile> _profiles = new BoundedDictionary<string, AccessPatternProfile>(1000);
         private readonly ConcurrentQueue<DetectedAnomaly> _recentAnomalies = new();
         private readonly double _zScoreThreshold = 3.0;
         private readonly int _maxAnomalyHistorySize = 1000;

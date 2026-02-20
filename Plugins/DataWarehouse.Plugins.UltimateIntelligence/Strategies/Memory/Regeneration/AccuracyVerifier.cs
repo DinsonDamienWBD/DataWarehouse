@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -13,7 +13,7 @@ public sealed class AccuracyVerifier
 {
     private readonly RegenerationMetrics _metrics;
     private readonly VerifierConfiguration _config;
-    private readonly ConcurrentDictionary<string, VerificationCache> _cache = new();
+    private readonly BoundedDictionary<string, VerificationCache> _cache = new BoundedDictionary<string, VerificationCache>(1000);
 
     /// <summary>
     /// Initializes a new accuracy verifier.

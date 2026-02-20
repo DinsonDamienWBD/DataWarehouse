@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
 {
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
     public sealed class DeprecationManager : IDisposable
     {
         private static readonly Lazy<DeprecationManager> _instance = new(() => new DeprecationManager());
-        private readonly ConcurrentDictionary<string, DeprecationInfo> _deprecatedItems = new();
+        private readonly BoundedDictionary<string, DeprecationInfo> _deprecatedItems = new BoundedDictionary<string, DeprecationInfo>(1000);
         private readonly ConcurrentBag<DeprecationWarning> _emittedWarnings = new();
         private readonly DeprecationManagerOptions _options;
         private readonly object _lock = new();

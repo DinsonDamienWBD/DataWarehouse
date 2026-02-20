@@ -127,8 +127,8 @@ public sealed record CepMatchResult
 /// </remarks>
 internal sealed class ComplexEventProcessing : IDisposable
 {
-    private readonly ConcurrentDictionary<string, CepPattern> _patterns = new();
-    private readonly ConcurrentDictionary<string, PatternState> _patternStates = new();
+    private readonly BoundedDictionary<string, CepPattern> _patterns = new BoundedDictionary<string, CepPattern>(1000);
+    private readonly BoundedDictionary<string, PatternState> _patternStates = new BoundedDictionary<string, PatternState>(1000);
     private readonly IMessageBus? _messageBus;
     private readonly TimeSpan _cleanupInterval;
     private readonly Timer _cleanupTimer;
@@ -538,7 +538,7 @@ internal sealed class ComplexEventProcessing : IDisposable
     /// </summary>
     private sealed class PatternState
     {
-        private readonly ConcurrentDictionary<string, ConcurrentBag<TimestampedEvent>> _eventsByType = new();
+        private readonly BoundedDictionary<string, ConcurrentBag<TimestampedEvent>> _eventsByType = new BoundedDictionary<string, ConcurrentBag<TimestampedEvent>>(1000);
         private readonly object _lock = new();
 
         public void AddEvent(string eventType, StreamEvent evt, TimeSpan window)

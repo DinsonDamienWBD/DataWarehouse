@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -185,7 +185,7 @@ public record RegenerationPassResult
 /// </summary>
 public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
 {
-    private readonly ConcurrentDictionary<string, RegenerationStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, RegenerationStrategy> _strategies = new BoundedDictionary<string, RegenerationStrategy>(1000);
     private long _totalRegenerations;
     private long _successfulRegenerations;
     private double _cumulativeAccuracy;

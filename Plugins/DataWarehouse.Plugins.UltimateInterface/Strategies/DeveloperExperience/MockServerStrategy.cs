@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience;
 
@@ -31,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 /// </remarks>
 internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, MockResponse> _mockRegistry = new();
+    private readonly BoundedDictionary<string, MockResponse> _mockRegistry = new BoundedDictionary<string, MockResponse>(1000);
     private readonly ConcurrentQueue<RecordedRequest> _recordedRequests = new();
     private bool _recordingMode;
 

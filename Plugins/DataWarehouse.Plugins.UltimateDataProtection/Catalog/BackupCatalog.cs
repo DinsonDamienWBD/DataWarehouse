@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Catalog
 {
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Catalog
     /// </summary>
     public sealed class BackupCatalog
     {
-        private readonly ConcurrentDictionary<string, BackupCatalogEntry> _entries = new();
-        private readonly ConcurrentDictionary<string, List<string>> _chains = new(); // root -> chain members
+        private readonly BoundedDictionary<string, BackupCatalogEntry> _entries = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private readonly BoundedDictionary<string, List<string>> _chains = new BoundedDictionary<string, List<string>>(1000); // root -> chain members
 
         /// <summary>
         /// Gets the total number of catalog entries.

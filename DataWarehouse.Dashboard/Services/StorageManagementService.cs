@@ -1,5 +1,5 @@
 using DataWarehouse.SDK.Contracts;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Services;
 
@@ -93,8 +93,8 @@ public class StorageChangedEventArgs : EventArgs
 /// </summary>
 public class StorageManagementService : IStorageManagementService
 {
-    private readonly ConcurrentDictionary<string, StoragePoolInfo> _pools = new();
-    private readonly ConcurrentDictionary<string, RaidConfiguration> _raidConfigs = new();
+    private readonly BoundedDictionary<string, StoragePoolInfo> _pools = new BoundedDictionary<string, StoragePoolInfo>(1000);
+    private readonly BoundedDictionary<string, RaidConfiguration> _raidConfigs = new BoundedDictionary<string, RaidConfiguration>(1000);
     private readonly IPluginDiscoveryService _pluginService;
     private readonly ILogger<StorageManagementService> _logger;
 

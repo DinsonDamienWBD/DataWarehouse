@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -21,8 +21,8 @@ public sealed class CopyOnWriteVersioningStrategy : VersioningStrategyBase
 {
     private const int DefaultBlockSize = 4096; // 4KB blocks
 
-    private readonly ConcurrentDictionary<string, ObjectCoWStore> _stores = new();
-    private readonly ConcurrentDictionary<string, SharedBlock> _blockPool = new();
+    private readonly BoundedDictionary<string, ObjectCoWStore> _stores = new BoundedDictionary<string, ObjectCoWStore>(1000);
+    private readonly BoundedDictionary<string, SharedBlock> _blockPool = new BoundedDictionary<string, SharedBlock>(1000);
     private readonly object _gcLock = new();
     private int _blockSize = DefaultBlockSize;
 

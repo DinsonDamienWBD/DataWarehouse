@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 {
@@ -22,8 +23,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
     /// </summary>
     public class RamDiskStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RamDiskEntry> _storage = new();
-        private readonly ConcurrentDictionary<string, LinkedListNode<string>> _lruIndex = new();
+        private readonly BoundedDictionary<string, RamDiskEntry> _storage = new BoundedDictionary<string, RamDiskEntry>(1000);
+        private readonly BoundedDictionary<string, LinkedListNode<string>> _lruIndex = new BoundedDictionary<string, LinkedListNode<string>>(1000);
         private readonly LinkedList<string> _lruList = new();
         private readonly SemaphoreSlim _lruLock = new(1, 1);
         private readonly SemaphoreSlim _snapshotLock = new(1, 1);

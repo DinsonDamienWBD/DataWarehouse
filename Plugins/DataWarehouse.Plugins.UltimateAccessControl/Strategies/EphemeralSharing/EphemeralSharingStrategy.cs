@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharing
 {
@@ -328,8 +329,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharin
     /// </summary>
     public sealed class BurnAfterReadingManager
     {
-        private readonly ConcurrentDictionary<string, BurnPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, byte[]> _burnedDataHashes = new();
+        private readonly BoundedDictionary<string, BurnPolicy> _policies = new BoundedDictionary<string, BurnPolicy>(1000);
+        private readonly BoundedDictionary<string, byte[]> _burnedDataHashes = new BoundedDictionary<string, byte[]>(1000);
 
         /// <summary>
         /// Registers a resource with burn-after-reading policy.
@@ -547,7 +548,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharin
     /// </summary>
     public sealed class AccessLogger
     {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<AccessLogEntry>> _logs = new();
+        private readonly BoundedDictionary<string, ConcurrentQueue<AccessLogEntry>> _logs = new BoundedDictionary<string, ConcurrentQueue<AccessLogEntry>>(1000);
         private readonly int _maxEntriesPerResource;
 
         /// <summary>
@@ -692,7 +693,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharin
     /// </summary>
     public sealed class PasswordProtection
     {
-        private readonly ConcurrentDictionary<string, PasswordProtectedShare> _protectedShares = new();
+        private readonly BoundedDictionary<string, PasswordProtectedShare> _protectedShares = new BoundedDictionary<string, PasswordProtectedShare>(1000);
 
         /// <summary>
         /// Protects a share with a password.
@@ -969,7 +970,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharin
     /// </summary>
     public sealed class RecipientNotificationService
     {
-        private readonly ConcurrentDictionary<string, NotificationSubscription> _subscriptions = new();
+        private readonly BoundedDictionary<string, NotificationSubscription> _subscriptions = new BoundedDictionary<string, NotificationSubscription>(1000);
         private readonly ConcurrentQueue<PendingNotification> _pendingNotifications = new();
 
         /// <summary>
@@ -1212,7 +1213,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EphemeralSharin
     /// </summary>
     public sealed class ShareRevocationManager
     {
-        private readonly ConcurrentDictionary<string, RevocationRecord> _revocations = new();
+        private readonly BoundedDictionary<string, RevocationRecord> _revocations = new BoundedDictionary<string, RevocationRecord>(1000);
 
         /// <summary>
         /// Event raised when a share is revoked.
@@ -1675,9 +1676,9 @@ img {
     /// </remarks>
     public sealed class EphemeralSharingStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, EphemeralShare> _shares = new();
-        private readonly ConcurrentDictionary<string, AccessCounter> _accessCounters = new();
-        private readonly ConcurrentDictionary<string, TtlEngine> _ttlEngines = new();
+        private readonly BoundedDictionary<string, EphemeralShare> _shares = new BoundedDictionary<string, EphemeralShare>(1000);
+        private readonly BoundedDictionary<string, AccessCounter> _accessCounters = new BoundedDictionary<string, AccessCounter>(1000);
+        private readonly BoundedDictionary<string, TtlEngine> _ttlEngines = new BoundedDictionary<string, TtlEngine>(1000);
 
         private readonly AccessLogger _accessLogger = new();
         private readonly PasswordProtection _passwordProtection = new();

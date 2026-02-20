@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -31,9 +30,9 @@ namespace DataWarehouse.Plugins.UltimateDataLineage;
 public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly LineageStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, LineageEdge> _edges = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
+    private readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Configuration

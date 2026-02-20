@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -13,9 +13,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class MfaOrchestrator
     {
-        private readonly ConcurrentDictionary<string, List<MfaMethod>> _userMethods = new();
-        private readonly ConcurrentDictionary<string, TrustedDevice> _trustedDevices = new();
-        private readonly ConcurrentDictionary<string, MfaChallenge> _activeChallenges = new();
+        private readonly BoundedDictionary<string, List<MfaMethod>> _userMethods = new BoundedDictionary<string, List<MfaMethod>>(1000);
+        private readonly BoundedDictionary<string, TrustedDevice> _trustedDevices = new BoundedDictionary<string, TrustedDevice>(1000);
+        private readonly BoundedDictionary<string, MfaChallenge> _activeChallenges = new BoundedDictionary<string, MfaChallenge>(1000);
 
         /// <summary>
         /// Determines required MFA factors based on risk score.

@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Storage.Fabric;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalFabric.S3Server;
 
@@ -30,7 +31,7 @@ namespace DataWarehouse.Plugins.UniversalFabric.S3Server;
 /// </remarks>
 public sealed class S3BucketManager
 {
-    private readonly ConcurrentDictionary<string, S3BucketInfo> _buckets = new(StringComparer.Ordinal);
+    private readonly BoundedDictionary<string, S3BucketInfo> _buckets = new BoundedDictionary<string, S3BucketInfo>(1000);
     private readonly IBackendRegistry _registry;
     private readonly string _storagePath;
     private readonly object _persistLock = new();

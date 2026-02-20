@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -79,7 +79,7 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
 
     // Simulated ONNX session and tokenizer (in production, use Microsoft.ML.OnnxRuntime)
     private bool _isLoaded;
-    private readonly ConcurrentDictionary<string, int> _vocabulary = new();
+    private readonly BoundedDictionary<string, int> _vocabulary = new BoundedDictionary<string, int>(1000);
     private readonly object _loadLock = new();
 
     /// <inheritdoc/>

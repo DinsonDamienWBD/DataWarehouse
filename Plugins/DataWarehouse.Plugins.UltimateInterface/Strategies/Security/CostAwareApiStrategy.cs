@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 
@@ -62,7 +62,7 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
     };
 
     // Client budget tracking
-    private readonly ConcurrentDictionary<string, ClientBudget> _budgets = new();
+    private readonly BoundedDictionary<string, ClientBudget> _budgets = new BoundedDictionary<string, ClientBudget>(1000);
 
     /// <summary>
     /// Client budget data.

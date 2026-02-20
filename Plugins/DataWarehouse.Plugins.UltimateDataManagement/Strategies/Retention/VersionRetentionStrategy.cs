@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class VersionRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectVersionHistory> _versionHistories = new();
+    private readonly BoundedDictionary<string, ObjectVersionHistory> _versionHistories = new BoundedDictionary<string, ObjectVersionHistory>(1000);
     private readonly int _maxVersions;
     private readonly int _minVersions;
     private readonly TimeSpan? _maxVersionAge;

@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class TeleportStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<RegionEndpoint> _regions = new();
-        private readonly ConcurrentDictionary<string, List<string>> _objectRegions = new();
+        private readonly BoundedDictionary<string, List<string>> _objectRegions = new BoundedDictionary<string, List<string>>(1000);
         private int _replicationRegions = 3;
         private bool _enablePredictiveReplication = true;
         private bool _enableLatencyRouting = true;

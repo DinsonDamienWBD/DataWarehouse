@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -631,8 +630,8 @@ public class WasmValidationResult
 /// </summary>
 public abstract class WasmFunctionPluginBase : ComputePluginBase, IWasmRuntime
 {
-    private readonly ConcurrentDictionary<string, WasmFunctionMetadata> _functions = new();
-    private readonly ConcurrentDictionary<string, WasmFunctionStatistics> _statistics = new();
+    private readonly BoundedDictionary<string, WasmFunctionMetadata> _functions = new BoundedDictionary<string, WasmFunctionMetadata>(1000);
+    private readonly BoundedDictionary<string, WasmFunctionStatistics> _statistics = new BoundedDictionary<string, WasmFunctionStatistics>(1000);
     private int _activeExecutions;
 
     /// <inheritdoc/>
@@ -911,7 +910,7 @@ public abstract class WasmFunctionPluginBase : ComputePluginBase, IWasmRuntime
     public virtual Task<WasmFunctionMetadata?> GetFunctionAsync(string functionId, CancellationToken ct = default)
     {
         _functions.TryGetValue(functionId, out var metadata);
-        return Task.FromResult(metadata);
+        return Task.FromResult<WasmFunctionMetadata?>(metadata);
     }
 
     /// <summary>
@@ -1841,7 +1840,7 @@ public static class SchemaInference
 /// </summary>
 public abstract class DataVirtualizationPluginBase : InterfacePluginBase, IVirtualTableProvider
 {
-    private readonly ConcurrentDictionary<string, VirtualTableSchema> _tables = new();
+    private readonly BoundedDictionary<string, VirtualTableSchema> _tables = new BoundedDictionary<string, VirtualTableSchema>(1000);
 
     /// <inheritdoc/>
     public override string Protocol => "SQL";
@@ -2035,7 +2034,7 @@ public abstract class DataVirtualizationPluginBase : InterfacePluginBase, IVirtu
     public virtual Task<VirtualTableSchema?> GetTableSchemaAsync(string tableName, CancellationToken ct = default)
     {
         _tables.TryGetValue(tableName, out var schema);
-        return Task.FromResult(schema);
+        return Task.FromResult<VirtualTableSchema?>(schema);
     }
 
     /// <summary>
@@ -2915,9 +2914,9 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     /// <inheritdoc/>
     public override string MediaType => "MultiMedia";
 
-    private readonly ConcurrentDictionary<string, TranscodingJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, TranscodingResult> _results = new();
-    private readonly ConcurrentDictionary<string, TranscodingProfile> _profiles = new();
+    private readonly BoundedDictionary<string, TranscodingJob> _jobs = new BoundedDictionary<string, TranscodingJob>(1000);
+    private readonly BoundedDictionary<string, TranscodingResult> _results = new BoundedDictionary<string, TranscodingResult>(1000);
+    private readonly BoundedDictionary<string, TranscodingProfile> _profiles = new BoundedDictionary<string, TranscodingProfile>(1000);
     private long _totalJobs;
     private long _successfulJobs;
     private long _failedJobs;
@@ -3173,7 +3172,7 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     public virtual Task<TranscodingJob?> GetJobStatusAsync(string jobId, CancellationToken ct = default)
     {
         _jobs.TryGetValue(jobId, out var job);
-        return Task.FromResult(job);
+        return Task.FromResult<TranscodingJob?>(job);
     }
 
     /// <summary>
@@ -3234,7 +3233,7 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     public virtual Task<TranscodingResult?> GetResultAsync(string jobId, CancellationToken ct = default)
     {
         _results.TryGetValue(jobId, out var result);
-        return Task.FromResult(result);
+        return Task.FromResult<TranscodingResult?>(result);
     }
 
     /// <summary>
@@ -3290,7 +3289,7 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     public virtual Task<TranscodingProfile?> GetProfileAsync(string profileId, CancellationToken ct = default)
     {
         _profiles.TryGetValue(profileId, out var profile);
-        return Task.FromResult(profile);
+        return Task.FromResult<TranscodingProfile?>(profile);
     }
 
     /// <summary>

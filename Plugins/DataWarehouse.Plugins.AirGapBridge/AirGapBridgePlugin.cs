@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.Plugins.AirGapBridge.Convergence;
 using DataWarehouse.Plugins.AirGapBridge.Core;
@@ -37,7 +36,7 @@ namespace DataWarehouse.Plugins.AirGapBridge;
 /// </summary>
 public sealed class AirGapBridgePlugin : InfrastructurePluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, AirGapDevice> _devices = new();
+    private readonly BoundedDictionary<string, AirGapDevice> _devices = new BoundedDictionary<string, AirGapDevice>(1000);
     private readonly byte[] _masterKey;
     private readonly string _instanceId;
     private IKernelContext? _context;

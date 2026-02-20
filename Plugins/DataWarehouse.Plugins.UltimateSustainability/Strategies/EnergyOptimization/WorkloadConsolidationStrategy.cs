@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyOptimization;
 
@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyOptimiza
 /// </summary>
 public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<int, CoreState> _coreStates = new();
+    private readonly BoundedDictionary<int, CoreState> _coreStates = new BoundedDictionary<int, CoreState>(1000);
     private int _activeCoreCount;
     private int _totalCoreCount;
     private double _consolidationRatio;

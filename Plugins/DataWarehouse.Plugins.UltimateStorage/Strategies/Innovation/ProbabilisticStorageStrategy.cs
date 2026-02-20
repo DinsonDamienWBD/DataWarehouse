@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Primitives.Probabilistic;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -38,19 +38,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private ProbabilisticConfig _config = ProbabilisticConfig.Balanced;
 
         // Probabilistic structure stores
-        private readonly ConcurrentDictionary<string, BloomFilter<string>> _bloomFilters = new();
-        private readonly ConcurrentDictionary<string, HyperLogLog<string>> _hyperLogLogs = new();
-        private readonly ConcurrentDictionary<string, CountMinSketch<string>> _countMinSketches = new();
-        private readonly ConcurrentDictionary<string, TopKHeavyHitters<string>> _topKTrackers = new();
-        private readonly ConcurrentDictionary<string, TDigest> _tDigests = new();
+        private readonly BoundedDictionary<string, BloomFilter<string>> _bloomFilters = new BoundedDictionary<string, BloomFilter<string>>(1000);
+        private readonly BoundedDictionary<string, HyperLogLog<string>> _hyperLogLogs = new BoundedDictionary<string, HyperLogLog<string>>(1000);
+        private readonly BoundedDictionary<string, CountMinSketch<string>> _countMinSketches = new BoundedDictionary<string, CountMinSketch<string>>(1000);
+        private readonly BoundedDictionary<string, TopKHeavyHitters<string>> _topKTrackers = new BoundedDictionary<string, TopKHeavyHitters<string>>(1000);
+        private readonly BoundedDictionary<string, TDigest> _tDigests = new BoundedDictionary<string, TDigest>(1000);
 
         // Exact data for upgrade path (T85.10)
-        private readonly ConcurrentDictionary<string, HashSet<string>> _exactSets = new();
-        private readonly ConcurrentDictionary<string, Dictionary<string, long>> _exactCounts = new();
-        private readonly ConcurrentDictionary<string, List<double>> _exactValues = new();
+        private readonly BoundedDictionary<string, HashSet<string>> _exactSets = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, Dictionary<string, long>> _exactCounts = new BoundedDictionary<string, Dictionary<string, long>>(1000);
+        private readonly BoundedDictionary<string, List<double>> _exactValues = new BoundedDictionary<string, List<double>>(1000);
 
         // Metadata and statistics
-        private readonly ConcurrentDictionary<string, StructureMetadata> _structureMetadata = new();
+        private readonly BoundedDictionary<string, StructureMetadata> _structureMetadata = new BoundedDictionary<string, StructureMetadata>(1000);
         private long _totalQueriesServed;
         private long _approximateQueriesServed;
         private long _exactQueriesServed;

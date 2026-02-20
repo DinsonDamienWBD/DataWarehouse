@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -15,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     public sealed class EmailOtpStrategy : AccessControlStrategyBase
     {
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, EmailOtpSession> _activeSessions = new();
-        private readonly ConcurrentDictionary<string, RateLimitData> _rateLimits = new();
+        private readonly BoundedDictionary<string, EmailOtpSession> _activeSessions = new BoundedDictionary<string, EmailOtpSession>(1000);
+        private readonly BoundedDictionary<string, RateLimitData> _rateLimits = new BoundedDictionary<string, RateLimitData>(1000);
 
         private const int CodeLength = 8; // Longer than SMS (emails can handle it)
         private const int CodeExpirationMinutes = 10; // Longer expiration than SMS

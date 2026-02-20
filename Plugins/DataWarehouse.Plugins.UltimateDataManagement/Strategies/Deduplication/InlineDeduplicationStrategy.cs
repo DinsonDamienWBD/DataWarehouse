@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class InlineDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _dataStore = new();
+    private readonly BoundedDictionary<string, byte[]> _dataStore = new BoundedDictionary<string, byte[]>(1000);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly int _bufferSize;
 

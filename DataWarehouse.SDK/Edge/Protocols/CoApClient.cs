@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Edge.Protocols
 {
@@ -36,8 +36,8 @@ namespace DataWarehouse.SDK.Edge.Protocols
     public sealed class CoApClient : ICoApClient
     {
         private UdpClient? _udpClient;
-        private readonly ConcurrentDictionary<ushort, TaskCompletionSource<CoApResponse>> _pendingRequests = new();
-        private readonly ConcurrentDictionary<string, Action<CoApResponse>> _observations = new();
+        private readonly BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>> _pendingRequests = new BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>>(1000);
+        private readonly BoundedDictionary<string, Action<CoApResponse>> _observations = new BoundedDictionary<string, Action<CoApResponse>>(1000);
         private ushort _nextMessageId;
         private CancellationTokenSource? _receiveCts;
         private Task? _receiveTask;

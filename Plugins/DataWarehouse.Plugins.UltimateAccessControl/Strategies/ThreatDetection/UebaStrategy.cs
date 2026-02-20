@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     {
         private readonly ILogger _logger;
         private readonly IMessageBus? _messageBus;
-        private readonly ConcurrentDictionary<string, UserBehaviorProfile> _profiles = new();
+        private readonly BoundedDictionary<string, UserBehaviorProfile> _profiles = new BoundedDictionary<string, UserBehaviorProfile>(1000);
         private readonly ConcurrentQueue<BehaviorAnomaly> _anomalies = new();
         private readonly int _baselineWindowSize = 100;
         private readonly double _zScoreThreshold = 3.0;

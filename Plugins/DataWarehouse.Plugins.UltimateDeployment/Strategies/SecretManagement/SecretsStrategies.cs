@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.SecretManagement;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.SecretManagement;
 /// </summary>
 public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VaultLease> _leases = new();
-    private readonly ConcurrentDictionary<string, SecretVersion> _secretVersions = new();
+    private readonly BoundedDictionary<string, VaultLease> _leases = new BoundedDictionary<string, VaultLease>(1000);
+    private readonly BoundedDictionary<string, SecretVersion> _secretVersions = new BoundedDictionary<string, SecretVersion>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {

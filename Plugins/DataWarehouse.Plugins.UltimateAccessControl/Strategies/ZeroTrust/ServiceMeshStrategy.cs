@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
 {
@@ -30,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
     /// </remarks>
     public sealed class ServiceMeshStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ServicePolicy> _servicePolicies = new();
-        private readonly ConcurrentDictionary<string, ServiceRegistration> _services = new();
+        private readonly BoundedDictionary<string, ServicePolicy> _servicePolicies = new BoundedDictionary<string, ServicePolicy>(1000);
+        private readonly BoundedDictionary<string, ServiceRegistration> _services = new BoundedDictionary<string, ServiceRegistration>(1000);
         private ServiceMeshType _meshType = ServiceMeshType.Istio;
         private bool _requireSidecar = true;
         private bool _enforceMtls = true;

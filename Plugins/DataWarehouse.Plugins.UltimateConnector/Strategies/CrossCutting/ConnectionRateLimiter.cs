@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 {
@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class ConnectionRateLimiter : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, TokenBucket> _buckets = new();
+        private readonly BoundedDictionary<string, TokenBucket> _buckets = new BoundedDictionary<string, TokenBucket>(1000);
         private readonly Timer _replenishTimer;
         private volatile bool _disposed;
 

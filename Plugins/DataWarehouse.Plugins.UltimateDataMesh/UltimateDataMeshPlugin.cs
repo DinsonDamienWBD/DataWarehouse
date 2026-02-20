@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -35,12 +34,12 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataMeshStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, DataDomain> _domains = new();
-    private readonly ConcurrentDictionary<string, DataProduct> _products = new();
-    private readonly ConcurrentDictionary<string, DataConsumer> _consumers = new();
-    private readonly ConcurrentDictionary<string, CrossDomainShare> _shares = new();
-    private readonly ConcurrentDictionary<string, GovernancePolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DataDomain> _domains = new BoundedDictionary<string, DataDomain>(1000);
+    private readonly BoundedDictionary<string, DataProduct> _products = new BoundedDictionary<string, DataProduct>(1000);
+    private readonly BoundedDictionary<string, DataConsumer> _consumers = new BoundedDictionary<string, DataConsumer>(1000);
+    private readonly BoundedDictionary<string, CrossDomainShare> _shares = new BoundedDictionary<string, CrossDomainShare>(1000);
+    private readonly BoundedDictionary<string, GovernancePolicy> _policies = new BoundedDictionary<string, GovernancePolicy>(1000);
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;

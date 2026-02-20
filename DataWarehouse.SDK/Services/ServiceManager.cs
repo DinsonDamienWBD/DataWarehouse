@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Services;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.SDK.Services;
 /// </summary>
 public sealed class ServiceManager : IDisposable, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, ManagedService> _services = new();
-    private readonly ConcurrentDictionary<Type, object> _singletons = new();
+    private readonly BoundedDictionary<string, ManagedService> _services = new BoundedDictionary<string, ManagedService>(1000);
+    private readonly BoundedDictionary<Type, object> _singletons = new BoundedDictionary<Type, object>(1000);
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly List<string> _startOrder = new();
     private ServiceManagerState _state = ServiceManagerState.Stopped;

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -74,7 +74,7 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
 {
     private readonly List<KeyRange> _ranges = new();
     private readonly ReaderWriterLockSlim _rangeLock = new();
-    private readonly ConcurrentDictionary<string, string> _keyCache = new();
+    private readonly BoundedDictionary<string, string> _keyCache = new BoundedDictionary<string, string>(1000);
     private readonly int _cacheMaxSize;
 
     /// <summary>

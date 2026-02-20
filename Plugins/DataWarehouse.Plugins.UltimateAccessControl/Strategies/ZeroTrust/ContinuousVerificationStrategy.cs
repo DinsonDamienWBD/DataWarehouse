@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
 {
@@ -32,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
     /// </remarks>
     public sealed class ContinuousVerificationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SessionContext> _sessions = new();
-        private readonly ConcurrentDictionary<string, BehavioralProfile> _profiles = new();
+        private readonly BoundedDictionary<string, SessionContext> _sessions = new BoundedDictionary<string, SessionContext>(1000);
+        private readonly BoundedDictionary<string, BehavioralProfile> _profiles = new BoundedDictionary<string, BehavioralProfile>(1000);
         private TimeSpan _sessionRevalidationInterval = TimeSpan.FromMinutes(15);
         private double _anomalyThreshold = 0.7;
         private double _stepUpThreshold = 0.8;

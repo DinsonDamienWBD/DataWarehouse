@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Hardware.Accelerators
 {
@@ -76,7 +76,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private Pkcs11Wrapper.CK_FUNCTION_LIST _functions;
         private uint _session = 0;
         private bool _isConnected = false;
-        private readonly ConcurrentDictionary<string, uint> _keyHandles = new(); // label -> HSM object handle
+        private readonly BoundedDictionary<string, uint> _keyHandles = new BoundedDictionary<string, uint>(1000); // label -> HSM object handle
         private readonly object _lock = new();
 
         /// <summary>

@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -19,9 +19,9 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EmbeddingEntry> _embeddingIndex = new();
-    private readonly ConcurrentDictionary<string, byte[]> _dataStore = new();
-    private readonly ConcurrentDictionary<string, SemanticGroup> _semanticGroups = new();
+    private readonly BoundedDictionary<string, EmbeddingEntry> _embeddingIndex = new BoundedDictionary<string, EmbeddingEntry>(1000);
+    private readonly BoundedDictionary<string, byte[]> _dataStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, SemanticGroup> _semanticGroups = new BoundedDictionary<string, SemanticGroup>(1000);
     private readonly double _similarityThreshold;
     private readonly int _embeddingDimension;
     private readonly Func<byte[], CancellationToken, Task<float[]>>? _embeddingProvider;

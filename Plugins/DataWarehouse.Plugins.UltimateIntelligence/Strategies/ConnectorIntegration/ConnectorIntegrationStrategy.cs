@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private readonly ILogger? _logger;
         private readonly List<IDisposable> _subscriptions = new();
         private ConnectorIntegrationMode _mode = ConnectorIntegrationMode.Disabled;
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Net.Http.HttpClient> _httpClients = new();
+        private readonly BoundedDictionary<string, System.Net.Http.HttpClient> _httpClients = new BoundedDictionary<string, System.Net.Http.HttpClient>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "feature-connector-integration";

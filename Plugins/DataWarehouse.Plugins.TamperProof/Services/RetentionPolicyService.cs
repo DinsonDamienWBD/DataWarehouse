@@ -3,7 +3,7 @@
 
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -98,9 +98,9 @@ public interface IRetentionPolicyService
 /// </summary>
 public class RetentionPolicyService : IRetentionPolicyService
 {
-    private readonly ConcurrentDictionary<Guid, RetentionPolicy> _policies = new();
-    private readonly ConcurrentDictionary<Guid, List<RetentionLegalHold>> _legalHolds = new();
-    private readonly ConcurrentDictionary<string, LegalHoldAuditEntry> _auditLog = new();
+    private readonly BoundedDictionary<Guid, RetentionPolicy> _policies = new BoundedDictionary<Guid, RetentionPolicy>(1000);
+    private readonly BoundedDictionary<Guid, List<RetentionLegalHold>> _legalHolds = new BoundedDictionary<Guid, List<RetentionLegalHold>>(1000);
+    private readonly BoundedDictionary<string, LegalHoldAuditEntry> _auditLog = new BoundedDictionary<string, LegalHoldAuditEntry>(1000);
     private readonly ILogger<RetentionPolicyService> _logger;
 
     /// <summary>

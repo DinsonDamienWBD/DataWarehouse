@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 {
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
     /// </summary>
     public sealed class TokenizationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, string> _tokenVault = new();
-        private readonly ConcurrentDictionary<string, string> _reverseVault = new();
+        private readonly BoundedDictionary<string, string> _tokenVault = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, string> _reverseVault = new BoundedDictionary<string, string>(1000);
 
         public override string StrategyId => "dataprotection-tokenization";
         public override string StrategyName => "Tokenization";

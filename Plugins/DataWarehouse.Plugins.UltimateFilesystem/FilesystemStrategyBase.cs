@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateFilesystem;
 
@@ -199,7 +199,7 @@ public abstract class FilesystemStrategyBase : IFilesystemStrategy
 /// </summary>
 public sealed class FilesystemStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IFilesystemStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IFilesystemStrategy> _strategies = new BoundedDictionary<string, IFilesystemStrategy>(1000);
 
     /// <summary>Registers a strategy.</summary>
     public void Register(IFilesystemStrategy strategy)

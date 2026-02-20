@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -6,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts.Carbon;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.GreenPlacement;
 
@@ -24,7 +24,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
     private const double MoerToGCO2ePerKwhFactor = 453.592 / 1000.0; // lbs CO2/MWh -> gCO2e/kWh
 
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)> _cache = new();
+    private readonly BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)> _cache = new BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)>(1000);
 
     private string? _bearerToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -317,10 +317,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class SocialBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SocialBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, TrustedParty> _trustedParties = new();
-        private readonly ConcurrentDictionary<string, List<KeyFragment>> _fragments = new();
-        private readonly ConcurrentDictionary<string, RecoveryAttempt> _recoveryAttempts = new();
+        private readonly BoundedDictionary<string, SocialBackup> _backups = new BoundedDictionary<string, SocialBackup>(1000);
+        private readonly BoundedDictionary<string, TrustedParty> _trustedParties = new BoundedDictionary<string, TrustedParty>(1000);
+        private readonly BoundedDictionary<string, List<KeyFragment>> _fragments = new BoundedDictionary<string, List<KeyFragment>>(1000);
+        private readonly BoundedDictionary<string, RecoveryAttempt> _recoveryAttempts = new BoundedDictionary<string, RecoveryAttempt>(1000);
         private ShamirScheme _defaultScheme = new();
 
         /// <inheritdoc/>

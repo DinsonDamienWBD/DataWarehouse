@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -26,11 +27,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class AdminOverridePreventionStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ProtectedOperation> _protectedOperations = new();
-        private readonly ConcurrentDictionary<string, MultiPartyAuthorization> _pendingAuthorizations = new();
-        private readonly ConcurrentDictionary<string, CryptographicCommitment> _commitments = new();
+        private readonly BoundedDictionary<string, ProtectedOperation> _protectedOperations = new BoundedDictionary<string, ProtectedOperation>(1000);
+        private readonly BoundedDictionary<string, MultiPartyAuthorization> _pendingAuthorizations = new BoundedDictionary<string, MultiPartyAuthorization>(1000);
+        private readonly BoundedDictionary<string, CryptographicCommitment> _commitments = new BoundedDictionary<string, CryptographicCommitment>(1000);
         private readonly ConcurrentBag<TamperEvidentAuditEntry> _auditLog = new();
-        private readonly ConcurrentDictionary<string, TimeLock> _timeLocks = new();
+        private readonly BoundedDictionary<string, TimeLock> _timeLocks = new BoundedDictionary<string, TimeLock>(1000);
 
         private int _requiredApprovals = 2;
         private TimeSpan _minimumDelay = TimeSpan.FromHours(1);

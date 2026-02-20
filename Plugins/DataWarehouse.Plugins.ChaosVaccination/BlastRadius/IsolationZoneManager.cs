@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,7 +17,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.BlastRadius
     [SdkCompatibility("5.0.0", Notes = "Phase 61: Blast radius enforcement")]
     public sealed class IsolationZoneManager : IDisposable
     {
-        private readonly ConcurrentDictionary<string, ActiveZone> _activeZones = new();
+        private readonly BoundedDictionary<string, ActiveZone> _activeZones = new BoundedDictionary<string, ActiveZone>(1000);
         private readonly IMessageBus? _messageBus;
         private readonly SemaphoreSlim _zoneLock = new(1, 1);
         private readonly Timer _cleanupTimer;

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.Distributed;
 
@@ -43,8 +43,8 @@ public sealed class DistributedExecutionStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
-        var nodeAssignments = new ConcurrentDictionary<string, string>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
+        var nodeAssignments = new BoundedDictionary<string, string>(1000);
 
         var tasks = workflow.GetTopologicalOrder().Select(async task =>
         {
@@ -249,8 +249,8 @@ public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
-        var gossipState = new ConcurrentDictionary<string, DateTimeOffset>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
+        var gossipState = new BoundedDictionary<string, DateTimeOffset>(1000);
 
         foreach (var task in workflow.GetTopologicalOrder())
         {

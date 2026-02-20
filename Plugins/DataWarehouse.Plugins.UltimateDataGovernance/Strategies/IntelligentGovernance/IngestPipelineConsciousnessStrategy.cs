@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.IntelligentGov
 /// </remarks>
 public sealed class ConsciousnessScoreStore
 {
-    private readonly ConcurrentDictionary<string, ConsciousnessScore> _scores = new();
+    private readonly BoundedDictionary<string, ConsciousnessScore> _scores = new BoundedDictionary<string, ConsciousnessScore>(1000);
 
     /// <summary>
     /// Gets the number of scores currently stored.

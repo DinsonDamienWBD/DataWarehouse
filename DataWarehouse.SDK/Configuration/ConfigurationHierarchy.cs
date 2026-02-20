@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Configuration;
 
@@ -227,7 +227,7 @@ public sealed class FileConfigurationStore : IConfigurationStore
 /// </summary>
 public sealed class InMemoryConfigurationStore : IConfigurationStore
 {
-    private readonly ConcurrentDictionary<(ConfigurationLevel Level, string Scope, string Key), ConfigurationEntry> _store = new();
+    private readonly BoundedDictionary<(ConfigurationLevel Level, string Scope, string Key), ConfigurationEntry> _store = new BoundedDictionary<(ConfigurationLevel Level, string Scope, string Key), ConfigurationEntry>(1000);
 
     public Task SaveAsync(ConfigurationLevel level, string scope, string key, object? value, CancellationToken ct = default)
     {
@@ -277,8 +277,8 @@ public sealed class InMemoryConfigurationStore : IConfigurationStore
 /// </summary>
 public sealed class ConfigurationHierarchy
 {
-    private readonly ConcurrentDictionary<(ConfigurationLevel Level, string Scope, string Key), object?> _values = new();
-    private readonly ConcurrentDictionary<string, ConfigurableParameter> _parameterDefinitions = new();
+    private readonly BoundedDictionary<(ConfigurationLevel Level, string Scope, string Key), object?> _values = new BoundedDictionary<(ConfigurationLevel Level, string Scope, string Key), object?>(1000);
+    private readonly BoundedDictionary<string, ConfigurableParameter> _parameterDefinitions = new BoundedDictionary<string, ConfigurableParameter>(1000);
     private readonly IConfigurationStore? _store;
     private readonly SemaphoreSlim _persistLock = new(1, 1);
 

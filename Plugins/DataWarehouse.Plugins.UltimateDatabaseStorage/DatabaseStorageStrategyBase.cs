@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Database;
-using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 
@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 /// </summary>
 public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, object> _configuration = new();
+    private readonly BoundedDictionary<string, object> _configuration = new BoundedDictionary<string, object>(1000);
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private readonly SemaphoreSlim _operationLock;
     private long _totalBytesStored;

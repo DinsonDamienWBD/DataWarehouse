@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimization;
 
@@ -8,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 /// </summary>
 public sealed class SpotInstanceStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SpotInstance> _instances = new();
+    private readonly BoundedDictionary<string, SpotInstance> _instances = new BoundedDictionary<string, SpotInstance>(1000);
     private readonly ConcurrentQueue<InterruptionEvent> _interruptions = new();
 
     /// <inheritdoc/>

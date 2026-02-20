@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -160,9 +161,9 @@ public sealed record PersistentStoreStatistics
 /// </summary>
 public sealed class RocksDbMemoryStore : IPersistentMemoryStore
 {
-    private readonly ConcurrentDictionary<string, ContextEntry> _store = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _scopeIndex = new();
-    private readonly ConcurrentDictionary<string, float[]> _vectorIndex = new();
+    private readonly BoundedDictionary<string, ContextEntry> _store = new BoundedDictionary<string, ContextEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, float[]> _vectorIndex = new BoundedDictionary<string, float[]>(1000);
     private readonly object _lockObject = new();
     private long _totalWrites;
     private long _totalReads;
@@ -483,8 +484,8 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
 /// </summary>
 public sealed class ObjectStorageMemoryStore : IPersistentMemoryStore
 {
-    private readonly ConcurrentDictionary<string, ContextEntry> _localCache = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _scopeIndex = new();
+    private readonly BoundedDictionary<string, ContextEntry> _localCache = new BoundedDictionary<string, ContextEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly ConcurrentQueue<ContextEntry> _writeQueue = new();
     private readonly SemaphoreSlim _writeSemaphore = new(1, 1);
     private long _compactionCount;
@@ -799,7 +800,7 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
     private readonly List<IPersistentMemoryStore> _shards = new();
     private readonly int _replicationFactor;
     private readonly bool _enableConsistentHashing;
-    private readonly ConcurrentDictionary<string, int> _entryToShardMap = new();
+    private readonly BoundedDictionary<string, int> _entryToShardMap = new BoundedDictionary<string, int>(1000);
     private long _compactionCount;
     private DateTimeOffset? _lastCompaction;
     private DateTimeOffset? _lastFlush;

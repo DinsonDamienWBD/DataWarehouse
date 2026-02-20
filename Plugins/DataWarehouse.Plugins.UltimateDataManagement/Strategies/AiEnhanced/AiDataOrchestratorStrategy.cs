@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -141,8 +141,8 @@ public sealed class AccessPattern
 /// </remarks>
 public sealed class AiDataOrchestratorStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessPattern> _accessPatterns = new();
-    private readonly ConcurrentDictionary<string, PlacementRecommendation> _recommendations = new();
+    private readonly BoundedDictionary<string, AccessPattern> _accessPatterns = new BoundedDictionary<string, AccessPattern>(1000);
+    private readonly BoundedDictionary<string, PlacementRecommendation> _recommendations = new BoundedDictionary<string, PlacementRecommendation>(1000);
     private readonly object _analysisLock = new();
     private readonly TimeSpan _observationWindow;
     private DateTime _lastBatchAnalysis = DateTime.MinValue;

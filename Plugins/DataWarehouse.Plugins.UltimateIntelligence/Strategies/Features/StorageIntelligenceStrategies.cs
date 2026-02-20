@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -14,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 /// </remarks>
 public sealed class WorkloadDnaStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WorkloadDnaProfile> _profiles = new();
-    private readonly ConcurrentDictionary<string, List<IoEvent>> _recentEvents = new();
+    private readonly BoundedDictionary<string, WorkloadDnaProfile> _profiles = new BoundedDictionary<string, WorkloadDnaProfile>(1000);
+    private readonly BoundedDictionary<string, List<IoEvent>> _recentEvents = new BoundedDictionary<string, List<IoEvent>>(1000);
     private readonly ConcurrentQueue<WorkloadClassification> _classificationHistory = new();
 
     /// <inheritdoc/>
@@ -432,8 +433,8 @@ Return JSON:
 /// </summary>
 public sealed class AiTierMigrationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TierPlacement> _placements = new();
-    private readonly ConcurrentDictionary<string, AccessHistory> _accessHistories = new();
+    private readonly BoundedDictionary<string, TierPlacement> _placements = new BoundedDictionary<string, TierPlacement>(1000);
+    private readonly BoundedDictionary<string, AccessHistory> _accessHistories = new BoundedDictionary<string, AccessHistory>(1000);
     private readonly ConcurrentQueue<MigrationRecommendation> _migrationQueue = new();
 
     /// <inheritdoc/>

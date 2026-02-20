@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimization;
 
@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 /// </summary>
 public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RegionCarbonData> _regionData = new();
+    private readonly BoundedDictionary<string, RegionCarbonData> _regionData = new BoundedDictionary<string, RegionCarbonData>(1000);
     private Timer? _updateTimer;
 
     /// <inheritdoc/>

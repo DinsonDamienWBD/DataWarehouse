@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -25,11 +26,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class DynamicAuthorizationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DynamicPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, JitElevation> _jitElevations = new();
-        private readonly ConcurrentDictionary<string, UserBehaviorProfile> _behaviorProfiles = new();
-        private readonly ConcurrentDictionary<string, RiskAssessment> _riskCache = new();
-        private readonly ConcurrentDictionary<string, AccessSession> _activeSessions = new();
+        private readonly BoundedDictionary<string, DynamicPolicy> _policies = new BoundedDictionary<string, DynamicPolicy>(1000);
+        private readonly BoundedDictionary<string, JitElevation> _jitElevations = new BoundedDictionary<string, JitElevation>(1000);
+        private readonly BoundedDictionary<string, UserBehaviorProfile> _behaviorProfiles = new BoundedDictionary<string, UserBehaviorProfile>(1000);
+        private readonly BoundedDictionary<string, RiskAssessment> _riskCache = new BoundedDictionary<string, RiskAssessment>(1000);
+        private readonly BoundedDictionary<string, AccessSession> _activeSessions = new BoundedDictionary<string, AccessSession>(1000);
         private readonly List<IRiskSignalProvider> _riskProviders = new();
         private readonly List<IContextEnricher> _contextEnrichers = new();
 

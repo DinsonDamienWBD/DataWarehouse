@@ -1,5 +1,5 @@
 // 91.F5: RAID Snapshots - CoW Snapshots, Clones, Scheduling, Replication
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -9,10 +9,10 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class RaidSnapshots
 {
-    private readonly ConcurrentDictionary<string, SnapshotTree> _snapshotTrees = new();
-    private readonly ConcurrentDictionary<string, Clone> _clones = new();
-    private readonly ConcurrentDictionary<string, SnapshotSchedule> _schedules = new();
-    private readonly ConcurrentDictionary<string, ReplicationConfig> _replications = new();
+    private readonly BoundedDictionary<string, SnapshotTree> _snapshotTrees = new BoundedDictionary<string, SnapshotTree>(1000);
+    private readonly BoundedDictionary<string, Clone> _clones = new BoundedDictionary<string, Clone>(1000);
+    private readonly BoundedDictionary<string, SnapshotSchedule> _schedules = new BoundedDictionary<string, SnapshotSchedule>(1000);
+    private readonly BoundedDictionary<string, ReplicationConfig> _replications = new BoundedDictionary<string, ReplicationConfig>(1000);
     private readonly CowBlockManager _cowManager;
 
     public RaidSnapshots()
@@ -555,7 +555,7 @@ public sealed class RaidSnapshots
 public sealed class CowBlockManager
 {
     public const int BlockSize = 4096;
-    private readonly ConcurrentDictionary<string, CowState> _states = new();
+    private readonly BoundedDictionary<string, CowState> _states = new BoundedDictionary<string, CowState>(1000);
 
     public CowState CreateCowState(string arrayId, string snapshotId)
     {
@@ -637,7 +637,7 @@ public sealed class CowWriteResult
 public sealed class SnapshotTree
 {
     private readonly string _arrayId;
-    private readonly ConcurrentDictionary<string, Snapshot> _snapshots = new();
+    private readonly BoundedDictionary<string, Snapshot> _snapshots = new BoundedDictionary<string, Snapshot>(1000);
 
     public SnapshotTree(string arrayId)
     {

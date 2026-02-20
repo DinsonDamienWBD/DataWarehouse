@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -24,10 +25,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class DynamicReconfigurationStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, NodeLocationRecord> _nodeLocations = new();
-        private readonly ConcurrentDictionary<string, LocationChangeRequest> _pendingChanges = new();
-        private readonly ConcurrentDictionary<string, LocationChangeHistory> _changeHistory = new();
-        private readonly ConcurrentDictionary<string, MigrationPlan> _migrationPlans = new();
+        private readonly BoundedDictionary<string, NodeLocationRecord> _nodeLocations = new BoundedDictionary<string, NodeLocationRecord>(1000);
+        private readonly BoundedDictionary<string, LocationChangeRequest> _pendingChanges = new BoundedDictionary<string, LocationChangeRequest>(1000);
+        private readonly BoundedDictionary<string, LocationChangeHistory> _changeHistory = new BoundedDictionary<string, LocationChangeHistory>(1000);
+        private readonly BoundedDictionary<string, MigrationPlan> _migrationPlans = new BoundedDictionary<string, MigrationPlan>(1000);
         private readonly ConcurrentBag<ReconfigurationEvent> _events = new();
 
         private TimeSpan _defaultGracePeriod = TimeSpan.FromHours(24);

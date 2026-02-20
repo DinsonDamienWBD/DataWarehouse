@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConsensus;
 
@@ -79,7 +80,7 @@ public sealed class RaftGroup
     /// <summary>
     /// Applied state machine entries (committed and applied data).
     /// </summary>
-    private readonly ConcurrentDictionary<long, byte[]> _stateMachine = new();
+    private readonly BoundedDictionary<long, byte[]> _stateMachine = new BoundedDictionary<long, byte[]>(1000);
 
     /// <summary>
     /// The local node ID for this group.

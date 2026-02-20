@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,8 +16,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class SmartRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectFeatures> _featureStore = new();
-    private readonly ConcurrentDictionary<string, double> _predictionCache = new();
+    private readonly BoundedDictionary<string, ObjectFeatures> _featureStore = new BoundedDictionary<string, ObjectFeatures>(1000);
+    private readonly BoundedDictionary<string, double> _predictionCache = new BoundedDictionary<string, double>(1000);
     private readonly Func<ObjectFeatures, CancellationToken, Task<double>>? _mlPredictor;
     private readonly double _retainThreshold;
     private readonly double _deleteThreshold;

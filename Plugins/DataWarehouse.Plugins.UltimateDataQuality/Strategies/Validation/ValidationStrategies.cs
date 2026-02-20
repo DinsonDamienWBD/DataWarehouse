@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.Validation;
 
@@ -175,8 +175,8 @@ public sealed class ValidationResult
 /// </summary>
 public sealed class SchemaValidationStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, JsonDocument> _schemas = new();
-    private readonly ConcurrentDictionary<string, ValidationRule[]> _schemaRules = new();
+    private readonly BoundedDictionary<string, JsonDocument> _schemas = new BoundedDictionary<string, JsonDocument>(1000);
+    private readonly BoundedDictionary<string, ValidationRule[]> _schemaRules = new BoundedDictionary<string, ValidationRule[]>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "schema-validation";
@@ -793,8 +793,8 @@ public sealed class SchemaValidationStrategy : DataQualityStrategyBase
 /// </summary>
 public sealed class RuleBasedValidationStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ValidationRule> _rules = new();
-    private readonly ConcurrentDictionary<string, Func<DataRecord, ValidationRule, DataQualityIssue?>> _customValidators = new();
+    private readonly BoundedDictionary<string, ValidationRule> _rules = new BoundedDictionary<string, ValidationRule>(1000);
+    private readonly BoundedDictionary<string, Func<DataRecord, ValidationRule, DataQualityIssue?>> _customValidators = new BoundedDictionary<string, Func<DataRecord, ValidationRule, DataQualityIssue?>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "rule-based-validation";
@@ -1046,7 +1046,7 @@ public sealed class RuleBasedValidationStrategy : DataQualityStrategyBase
 /// </summary>
 public sealed class StatisticalValidationStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FieldStatistics> _fieldStats = new();
+    private readonly BoundedDictionary<string, FieldStatistics> _fieldStats = new BoundedDictionary<string, FieldStatistics>(1000);
     private double _outlierThreshold = 3.0; // Standard deviations
 
     /// <inheritdoc/>

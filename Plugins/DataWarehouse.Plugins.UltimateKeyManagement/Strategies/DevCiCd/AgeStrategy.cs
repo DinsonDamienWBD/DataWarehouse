@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 {
@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
     public sealed class AgeStrategy : KeyStoreStrategyBase
     {
         private AgeConfig _config = new();
-        private readonly ConcurrentDictionary<string, byte[]> _keyCache = new();
+        private readonly BoundedDictionary<string, byte[]> _keyCache = new BoundedDictionary<string, byte[]>(1000);
         private string? _currentKeyId;
         private readonly SemaphoreSlim _processLock = new(1, 1);
         private string? _identityContent;

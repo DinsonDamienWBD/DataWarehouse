@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 {
@@ -24,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
     /// </remarks>
     public sealed class AirGappedBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AirGappedPackage> _packages = new();
-        private readonly ConcurrentDictionary<string, MountSession> _mountedSessions = new();
+        private readonly BoundedDictionary<string, AirGappedPackage> _packages = new BoundedDictionary<string, AirGappedPackage>(1000);
+        private readonly BoundedDictionary<string, MountSession> _mountedSessions = new BoundedDictionary<string, MountSession>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "air-gapped";

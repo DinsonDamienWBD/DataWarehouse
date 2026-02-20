@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
         private readonly ComplianceAlertService _alertService;
         private readonly IMessageBus? _messageBus;
         private readonly string _pluginId;
-        private readonly ConcurrentDictionary<string, IncidentTicket> _incidents = new();
+        private readonly BoundedDictionary<string, IncidentTicket> _incidents = new BoundedDictionary<string, IncidentTicket>(1000);
         private long _incidentSequence;
 
         public TamperIncidentWorkflowService(

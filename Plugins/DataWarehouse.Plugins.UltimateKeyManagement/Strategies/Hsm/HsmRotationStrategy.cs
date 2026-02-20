@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 {
@@ -28,8 +28,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
     /// </summary>
     public sealed class HsmRotationStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, KeyVersion> _keyVersions = new();
-        private readonly ConcurrentDictionary<string, List<RotationAuditEntry>> _auditTrail = new();
+        private readonly BoundedDictionary<string, KeyVersion> _keyVersions = new BoundedDictionary<string, KeyVersion>(1000);
+        private readonly BoundedDictionary<string, List<RotationAuditEntry>> _auditTrail = new BoundedDictionary<string, List<RotationAuditEntry>>(1000);
         private readonly SemaphoreSlim _rotationLock = new(1, 1);
         private TimeSpan _rotationInterval = TimeSpan.FromDays(90);
         private TimeSpan _retentionPeriod = TimeSpan.FromDays(365);

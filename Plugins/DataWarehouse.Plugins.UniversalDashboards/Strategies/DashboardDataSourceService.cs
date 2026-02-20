@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 
@@ -11,7 +12,7 @@ namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 /// </summary>
 public sealed class DashboardDataSourceService
 {
-    private readonly ConcurrentDictionary<string, IDashboardDataSource> _dataSources = new();
+    private readonly BoundedDictionary<string, IDashboardDataSource> _dataSources = new BoundedDictionary<string, IDashboardDataSource>(1000);
     private readonly ConcurrentDictionary<string, List<Action<DataSourceUpdate>>> _subscribers = new();
 
     /// <summary>

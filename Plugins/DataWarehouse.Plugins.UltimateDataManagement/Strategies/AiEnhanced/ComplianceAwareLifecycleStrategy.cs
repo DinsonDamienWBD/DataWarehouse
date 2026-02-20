@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -248,8 +248,8 @@ public sealed class RetentionPolicy
 /// </remarks>
 public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ComplianceAnalysis> _analysisCache = new();
-    private readonly ConcurrentDictionary<string, RetentionPolicy> _policies = new();
+    private readonly BoundedDictionary<string, ComplianceAnalysis> _analysisCache = new BoundedDictionary<string, ComplianceAnalysis>(1000);
+    private readonly BoundedDictionary<string, RetentionPolicy> _policies = new BoundedDictionary<string, RetentionPolicy>(1000);
     private readonly TimeSpan _cacheTtl;
 
     /// <summary>

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMicroservices;
 
@@ -184,8 +184,8 @@ public sealed record MicroservicesStrategyCapabilities
 /// </summary>
 public abstract class MicroservicesStrategyBase
 {
-    private readonly ConcurrentDictionary<string, long> _operationCounts = new();
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, long> _operationCounts = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private long _totalOperations;
     private long _successfulOperations;
     private long _failedOperations;

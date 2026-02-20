@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.Plugins.UltimateDataProtection.Versioning;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
 {
@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
     /// </summary>
     public sealed class VersioningSubsystem : IVersioningSubsystem
     {
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, VersionInfo>> _versions = new();
-        private readonly ConcurrentDictionary<string, byte[]> _versionContent = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _contentHashes = new();
+        private readonly BoundedDictionary<string, BoundedDictionary<string, VersionInfo>> _versions = new BoundedDictionary<string, BoundedDictionary<string, VersionInfo>>(1000);
+        private readonly BoundedDictionary<string, byte[]> _versionContent = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _contentHashes = new BoundedDictionary<string, HashSet<string>>(1000);
         private IVersioningPolicy? _currentPolicy;
         private VersioningMode _currentMode = VersioningMode.Manual;
         private bool _isEnabled = true;
@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
             ArgumentNullException.ThrowIfNull(metadata);
 
-            var itemVersions = _versions.GetOrAdd(itemId, _ => new ConcurrentDictionary<string, VersionInfo>());
+            var itemVersions = _versions.GetOrAdd(itemId, _ => new BoundedDictionary<string, VersionInfo>(1000));
             var versionNumber = itemVersions.Count + 1;
             var versionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
 
@@ -81,7 +81,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             var itemHashes = _contentHashes.GetOrAdd(itemId, _ => new HashSet<string>());
             var isDuplicate = itemHashes.Contains(contentHash);
 
-            var itemVersions = _versions.GetOrAdd(itemId, _ => new ConcurrentDictionary<string, VersionInfo>());
+            var itemVersions = _versions.GetOrAdd(itemId, _ => new BoundedDictionary<string, VersionInfo>(1000));
             var versionNumber = itemVersions.Count + 1;
             var versionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
 
@@ -212,7 +212,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             }
 
             itemVersions.TryGetValue(versionId, out var version);
-            return Task.FromResult(version);
+            return Task.FromResult<VersionInfo?>(version);
         }
 
         /// <inheritdoc/>

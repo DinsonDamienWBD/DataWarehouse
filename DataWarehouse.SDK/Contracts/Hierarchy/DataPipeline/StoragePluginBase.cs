@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Hierarchy;
 
@@ -105,7 +105,7 @@ public abstract class StoragePluginBase : DataPipelinePluginBase
 
     #region Opt-in Caching (from CacheableStoragePluginBase)
 
-    private ConcurrentDictionary<string, CacheEntryState>? _cacheEntries;
+    private BoundedDictionary<string, CacheEntryState>? _cacheEntries;
     private Timer? _cacheCleanupTimer;
     private CacheConfiguration? _cacheConfig;
 
@@ -123,7 +123,7 @@ public abstract class StoragePluginBase : DataPipelinePluginBase
     {
         ArgumentNullException.ThrowIfNull(config);
         _cacheConfig = config;
-        _cacheEntries = new ConcurrentDictionary<string, CacheEntryState>();
+        _cacheEntries = new BoundedDictionary<string, CacheEntryState>(1000);
 
         if (config.CleanupInterval > TimeSpan.Zero)
         {
@@ -298,7 +298,7 @@ public abstract class StoragePluginBase : DataPipelinePluginBase
 
     #region Opt-in Indexing (from IndexableStoragePluginBase)
 
-    private ConcurrentDictionary<string, Dictionary<string, object>>? _indexStore;
+    private BoundedDictionary<string, Dictionary<string, object>>? _indexStore;
     private IndexConfiguration? _indexConfig;
     private long _indexedCount;
 
@@ -316,7 +316,7 @@ public abstract class StoragePluginBase : DataPipelinePluginBase
     {
         ArgumentNullException.ThrowIfNull(config);
         _indexConfig = config;
-        _indexStore = new ConcurrentDictionary<string, Dictionary<string, object>>();
+        _indexStore = new BoundedDictionary<string, Dictionary<string, object>>(1000);
     }
 
     /// <summary>

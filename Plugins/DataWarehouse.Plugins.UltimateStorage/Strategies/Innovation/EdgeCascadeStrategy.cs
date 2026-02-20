@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -36,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private long _edgeCacheMaxBytes = 10_000_000_000L;
         private bool _enableCacheWarming = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, CachedItem> _originCache = new();
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, CachedItem>> _edgeCaches = new();
+        private readonly BoundedDictionary<string, CachedItem> _originCache = new BoundedDictionary<string, CachedItem>(1000);
+        private readonly BoundedDictionary<string, BoundedDictionary<string, CachedItem>> _edgeCaches = new BoundedDictionary<string, BoundedDictionary<string, CachedItem>>(1000);
 
         public override string StrategyId => "edge-cascade";
         public override string Name => "Edge Cascade Storage";
@@ -86,7 +86,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                             Path = path,
                             IsActive = true
                         });
-                        _edgeCaches[tierId] = new ConcurrentDictionary<string, CachedItem>();
+                        _edgeCaches[tierId] = new BoundedDictionary<string, CachedItem>(1000);
                     }
                 }
 
@@ -142,7 +142,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
 
             var nearestEdge = SelectNearestEdge();
-            ConcurrentDictionary<string, CachedItem>? edgeCache = null;
+            BoundedDictionary<string, CachedItem>? edgeCache = null;
             if (nearestEdge != null && _edgeCaches.TryGetValue(nearestEdge.Id, out edgeCache))
             {
                 if (edgeCache.TryGetValue(key, out var cachedItem) && cachedItem.ExpiresAt > DateTime.UtcNow)

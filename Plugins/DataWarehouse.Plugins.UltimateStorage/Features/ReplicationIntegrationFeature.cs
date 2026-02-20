@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -26,9 +25,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     {
         private readonly StorageStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, ReplicationGroup> _replicationGroups = new();
-        private readonly ConcurrentDictionary<string, string> _objectToGroupMapping = new(); // object key -> group ID
-        private readonly ConcurrentDictionary<string, ReplicationLag> _replicationLags = new();
+        private readonly BoundedDictionary<string, ReplicationGroup> _replicationGroups = new BoundedDictionary<string, ReplicationGroup>(1000);
+        private readonly BoundedDictionary<string, string> _objectToGroupMapping = new BoundedDictionary<string, string>(1000); // object key -> group ID
+        private readonly BoundedDictionary<string, ReplicationLag> _replicationLags = new BoundedDictionary<string, ReplicationLag>(1000);
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
         private Timer? _lagMonitorTimer;

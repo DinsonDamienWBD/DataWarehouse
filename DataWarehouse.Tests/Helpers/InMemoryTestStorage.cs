@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Helpers;
 
@@ -10,7 +11,7 @@ namespace DataWarehouse.Tests.Helpers;
 /// </summary>
 public sealed class InMemoryTestStorage
 {
-    private readonly ConcurrentDictionary<string, byte[]> _store = new();
+    private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
     /// <summary>
     /// Number of items currently stored.

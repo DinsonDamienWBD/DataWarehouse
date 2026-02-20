@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -26,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class QuantumSafeBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, QuantumSafeBackupMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, byte[]> _encapsulatedKeys = new();
+        private readonly BoundedDictionary<string, QuantumSafeBackupMetadata> _backups = new BoundedDictionary<string, QuantumSafeBackupMetadata>(1000);
+        private readonly BoundedDictionary<string, byte[]> _encapsulatedKeys = new BoundedDictionary<string, byte[]>(1000);
 
         /// <summary>
         /// Available post-quantum algorithm families.

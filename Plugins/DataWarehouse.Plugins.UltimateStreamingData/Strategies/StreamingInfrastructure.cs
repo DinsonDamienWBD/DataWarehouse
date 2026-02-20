@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies;
 
@@ -10,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies;
 /// </summary>
 public sealed class RedisStreamsConsumerGroupManager
 {
-    private readonly ConcurrentDictionary<string, RedisStreamState> _streams = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RedisConsumerGroupState>> _groups = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, PendingEntry>> _pendingEntries = new();
+    private readonly BoundedDictionary<string, RedisStreamState> _streams = new BoundedDictionary<string, RedisStreamState>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, RedisConsumerGroupState>> _groups = new BoundedDictionary<string, BoundedDictionary<string, RedisConsumerGroupState>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, PendingEntry>> _pendingEntries = new BoundedDictionary<string, BoundedDictionary<string, PendingEntry>>(1000);
 
     /// <summary>Creates a new consumer group for a stream at the given start ID.</summary>
     public void CreateGroup(string streamKey, string groupName, string startId = "$")
@@ -20,7 +21,7 @@ public sealed class RedisStreamsConsumerGroupManager
         ArgumentException.ThrowIfNullOrWhiteSpace(streamKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(groupName);
 
-        var groups = _groups.GetOrAdd(streamKey, _ => new ConcurrentDictionary<string, RedisConsumerGroupState>());
+        var groups = _groups.GetOrAdd(streamKey, _ => new BoundedDictionary<string, RedisConsumerGroupState>(1000));
         if (!groups.TryAdd(groupName, new RedisConsumerGroupState
         {
             GroupName = groupName,
@@ -44,7 +45,7 @@ public sealed class RedisStreamsConsumerGroupManager
         var stream = _streams.GetOrAdd(streamKey, _ => new RedisStreamState { StreamKey = streamKey });
         var results = new List<RedisStreamEntry>();
         var pelKey = $"{streamKey}:{groupName}";
-        var pel = _pendingEntries.GetOrAdd(pelKey, _ => new ConcurrentDictionary<string, PendingEntry>());
+        var pel = _pendingEntries.GetOrAdd(pelKey, _ => new BoundedDictionary<string, PendingEntry>(1000));
 
         if (id == ">")
         {
@@ -229,7 +230,7 @@ public sealed record PendingInfo
 /// </summary>
 public sealed class KinesisCheckpointManager
 {
-    private readonly ConcurrentDictionary<string, KinesisLeaseEntry> _leaseTable = new();
+    private readonly BoundedDictionary<string, KinesisLeaseEntry> _leaseTable = new BoundedDictionary<string, KinesisLeaseEntry>(1000);
 
     /// <summary>Takes a lease on a shard for checkpointing.</summary>
     public bool TakeLease(string streamName, string shardId, string workerId)
@@ -313,7 +314,7 @@ public sealed class KinesisLeaseEntry
 /// </summary>
 public sealed class KinesisShardIteratorManager
 {
-    private readonly ConcurrentDictionary<string, ShardIteratorState> _iterators = new();
+    private readonly BoundedDictionary<string, ShardIteratorState> _iterators = new BoundedDictionary<string, ShardIteratorState>(1000);
     private long _iteratorIdCounter;
 
     /// <summary>Gets a shard iterator for the specified position.</summary>
@@ -375,7 +376,7 @@ public sealed record ShardIteratorState
 /// </summary>
 public sealed class KinesisReshardingDetector
 {
-    private readonly ConcurrentDictionary<string, List<string>> _shardHistory = new();
+    private readonly BoundedDictionary<string, List<string>> _shardHistory = new BoundedDictionary<string, List<string>>(1000);
 
     /// <summary>Records a shard split event.</summary>
     public ReshardingEvent RecordSplit(string streamName, string parentShardId, string childShardId1, string childShardId2)
@@ -441,7 +442,7 @@ public sealed record ReshardingEvent
 /// </summary>
 public sealed class EventHubsPartitionBalancer
 {
-    private readonly ConcurrentDictionary<string, EventHubsOwnership> _ownership = new();
+    private readonly BoundedDictionary<string, EventHubsOwnership> _ownership = new BoundedDictionary<string, EventHubsOwnership>(1000);
     private readonly TimeSpan _ownershipExpiry = TimeSpan.FromSeconds(30);
 
     /// <summary>Claims ownership of a partition with optimistic concurrency.</summary>
@@ -522,7 +523,7 @@ public sealed record EventHubsOwnership
 /// </summary>
 public sealed class EventHubsCheckpointStore
 {
-    private readonly ConcurrentDictionary<string, EventHubsCheckpointEntry> _checkpoints = new();
+    private readonly BoundedDictionary<string, EventHubsCheckpointEntry> _checkpoints = new BoundedDictionary<string, EventHubsCheckpointEntry>(1000);
 
     /// <summary>Updates a checkpoint for a partition.</summary>
     public bool UpdateCheckpoint(string eventHubName, string consumerGroup, string partitionId,
@@ -585,7 +586,7 @@ public sealed record EventHubsCheckpointEntry
 /// </summary>
 public sealed class MqttQoS2ProtocolHandler
 {
-    private readonly ConcurrentDictionary<int, MqttQoS2State> _pendingMessages = new();
+    private readonly BoundedDictionary<int, MqttQoS2State> _pendingMessages = new BoundedDictionary<int, MqttQoS2State>(1000);
 
     /// <summary>Initiates QoS 2 publish (sender side). Returns packet ID.</summary>
     public int InitiatePublish(byte[] payload, string topic)
@@ -665,7 +666,7 @@ public sealed class MqttQoS2State
 /// </summary>
 public sealed class MqttRetainedMessageCache
 {
-    private readonly ConcurrentDictionary<string, MqttRetainedMessage> _cache = new();
+    private readonly BoundedDictionary<string, MqttRetainedMessage> _cache = new BoundedDictionary<string, MqttRetainedMessage>(1000);
 
     /// <summary>Sets or updates a retained message for a topic.</summary>
     public void Set(string topic, byte[] payload, byte qos = 1)
@@ -732,7 +733,7 @@ public sealed record MqttRetainedMessage
 /// </summary>
 public sealed class MqttSessionPersistenceManager
 {
-    private readonly ConcurrentDictionary<string, MqttPersistentSession> _sessions = new();
+    private readonly BoundedDictionary<string, MqttPersistentSession> _sessions = new BoundedDictionary<string, MqttPersistentSession>(1000);
 
     /// <summary>Gets or creates a persistent session for a client.</summary>
     public MqttPersistentSession GetOrCreateSession(string clientId, bool cleanSession)
@@ -797,7 +798,7 @@ public sealed class MqttPersistentSession
 {
     public required string ClientId { get; init; }
     public bool CleanSession { get; init; }
-    public ConcurrentDictionary<string, byte> Subscriptions { get; } = new();
+    public BoundedDictionary<string, byte> Subscriptions { get; } = new BoundedDictionary<string, byte>(1000);
     public ConcurrentQueue<MqttPendingMessage> PendingMessages { get; } = new();
     public DateTime CreatedAt { get; init; }
 }

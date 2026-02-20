@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ExecutionMetrics> _metrics = new();
+    private readonly BoundedDictionary<string, ExecutionMetrics> _metrics = new BoundedDictionary<string, ExecutionMetrics>(1000);
     private const double DefaultIntensityThreshold = 10.0; // FLOPS/byte
     private bool _isInitialized;
     private CancellationTokenSource? _shutdownCts;
@@ -186,7 +186,7 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                     cpuSegments.Add((i, lines[i]));
             }
 
-            var results = new ConcurrentDictionary<int, string>();
+            var results = new BoundedDictionary<int, string>(1000);
             var gpuElapsed = TimeSpan.Zero;
             var cpuElapsed = TimeSpan.Zero;
 

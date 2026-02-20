@@ -3,7 +3,7 @@
 
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -24,10 +24,10 @@ internal class OrphanCleanupService : IDisposable, IAsyncDisposable
     private bool _disposed;
 
     // Orphan registry: tracks all known orphaned WORM records
-    private readonly ConcurrentDictionary<Guid, OrphanedWormRecord> _orphanRegistry = new();
+    private readonly BoundedDictionary<Guid, OrphanedWormRecord> _orphanRegistry = new BoundedDictionary<Guid, OrphanedWormRecord>(1000);
 
     // Successful transaction hashes for recovery linking: ContentHash -> (TransactionId, ObjectId)
-    private readonly ConcurrentDictionary<string, (Guid TransactionId, Guid ObjectId)> _successfulTransactions = new();
+    private readonly BoundedDictionary<string, (Guid TransactionId, Guid ObjectId)> _successfulTransactions = new BoundedDictionary<string, (Guid TransactionId, Guid ObjectId)>(1000);
 
     // Metrics
     private long _totalProcessed;

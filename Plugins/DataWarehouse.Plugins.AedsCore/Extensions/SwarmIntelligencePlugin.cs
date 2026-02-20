@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
@@ -38,9 +37,9 @@ public record PeerInfo(
 /// </remarks>
 public sealed class SwarmIntelligencePlugin : OrchestrationPluginBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<int>> _localPayloadChunks = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _announcements = new();
-    private readonly ConcurrentDictionary<string, List<PeerInfo>> _peerCache = new();
+    private readonly BoundedDictionary<string, HashSet<int>> _localPayloadChunks = new BoundedDictionary<string, HashSet<int>>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _announcements = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, List<PeerInfo>> _peerCache = new BoundedDictionary<string, List<PeerInfo>>(1000);
     private const int ChunkSizeBytes = 1_048_576; // 1 MB chunks
     private const int MaxConcurrentPeerConnections = 4;
 
@@ -126,7 +125,7 @@ public sealed class SwarmIntelligencePlugin : OrchestrationPluginBase
         if (peers == null || peers.Count == 0)
             throw new ArgumentException("Peer list cannot be null or empty.", nameof(peers));
 
-        var chunks = new ConcurrentDictionary<int, byte[]>();
+        var chunks = new BoundedDictionary<int, byte[]>(1000);
         var downloadedBytes = 0L;
         var totalBytes = totalChunks * (long)ChunkSizeBytes;
 

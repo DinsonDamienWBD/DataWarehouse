@@ -3,10 +3,10 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -27,7 +27,7 @@ public sealed class OverlayfsBackend : IDisposable
     private readonly FuseConfig _config;
     private readonly OverlayfsConfig _overlayConfig;
     private readonly IKernelContext? _kernelContext;
-    private readonly ConcurrentDictionary<string, OverlayEntry> _entryCache = new();
+    private readonly BoundedDictionary<string, OverlayEntry> _entryCache = new BoundedDictionary<string, OverlayEntry>(1000);
     private readonly HashSet<string> _whiteouts = new();
     private readonly HashSet<string> _opaqueDirectories = new();
     private readonly object _syncLock = new();

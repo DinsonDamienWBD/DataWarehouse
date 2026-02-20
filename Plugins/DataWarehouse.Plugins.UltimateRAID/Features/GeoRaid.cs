@@ -1,6 +1,6 @@
 // 91.F1: Geo-RAID - Cross-datacenter RAID with geographic awareness
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.RAID;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -10,9 +10,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class GeoRaid
 {
-    private readonly ConcurrentDictionary<string, GeoRaidArray> _arrays = new();
-    private readonly ConcurrentDictionary<string, GeographicRegion> _regions = new();
-    private readonly ConcurrentDictionary<string, PendingParitySync> _pendingSyncs = new();
+    private readonly BoundedDictionary<string, GeoRaidArray> _arrays = new BoundedDictionary<string, GeoRaidArray>(1000);
+    private readonly BoundedDictionary<string, GeographicRegion> _regions = new BoundedDictionary<string, GeographicRegion>(1000);
+    private readonly BoundedDictionary<string, PendingParitySync> _pendingSyncs = new BoundedDictionary<string, PendingParitySync>(1000);
 
     /// <summary>
     /// 91.F1.1: Configure cross-datacenter parity distribution.

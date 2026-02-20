@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -72,8 +72,8 @@ public sealed class CompositeShardKey
 public sealed class CompositeShardingStrategy : ShardingStrategyBase
 {
     private readonly List<ShardKeyComponent> _components = new();
-    private readonly ConcurrentDictionary<string, string> _compositeToShard = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, string> _compositeToShard = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _componentLock = new();
     private readonly int _cacheMaxSize;
     private string _keyDelimiter = ":";

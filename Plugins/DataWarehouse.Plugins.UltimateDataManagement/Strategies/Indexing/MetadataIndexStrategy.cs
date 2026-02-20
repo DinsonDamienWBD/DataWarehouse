@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -19,13 +20,13 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 public sealed class MetadataIndexStrategy : IndexingStrategyBase
 {
     // Field indexes: fieldName -> (value -> docIds)
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, HashSet<string>>> _stringIndexes = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, HashSet<string>>> _stringIndexes = new BoundedDictionary<string, BoundedDictionary<string, HashSet<string>>>(1000);
     // Numeric indexes: fieldName -> sorted list of (value, docId)
     private readonly ConcurrentDictionary<string, SortedList<double, HashSet<string>>> _numericIndexes = new();
     // Date indexes: fieldName -> sorted list of (ticks, docId)
     private readonly ConcurrentDictionary<string, SortedList<long, HashSet<string>>> _dateIndexes = new();
     // Document store
-    private readonly ConcurrentDictionary<string, IndexedMetadata> _documents = new();
+    private readonly BoundedDictionary<string, IndexedMetadata> _documents = new BoundedDictionary<string, IndexedMetadata>(1000);
 
     private readonly object _numericLock = new();
     private readonly object _dateLock = new();
@@ -329,7 +330,7 @@ public sealed class MetadataIndexStrategy : IndexingStrategyBase
 
     private void IndexStringField(string fieldName, string value, string objectId)
     {
-        var fieldIndex = _stringIndexes.GetOrAdd(fieldName, _ => new ConcurrentDictionary<string, HashSet<string>>());
+        var fieldIndex = _stringIndexes.GetOrAdd(fieldName, _ => new BoundedDictionary<string, HashSet<string>>(1000));
         var docs = fieldIndex.GetOrAdd(value.ToLowerInvariant(), _ => new HashSet<string>());
 
         lock (docs)

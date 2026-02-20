@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,7 +25,7 @@ namespace DataWarehouse.SDK.Security.Siem
         private readonly IMessageBus _messageBus;
         private readonly ILogger _logger;
         private readonly SiemTransportOptions _options;
-        private readonly ConcurrentDictionary<string, ISiemTransport> _transports = new();
+        private readonly BoundedDictionary<string, ISiemTransport> _transports = new BoundedDictionary<string, ISiemTransport>(1000);
         private readonly Channel<SiemEvent> _eventChannel;
         private readonly List<IDisposable> _subscriptions = new();
         private readonly CancellationTokenSource _cts = new();

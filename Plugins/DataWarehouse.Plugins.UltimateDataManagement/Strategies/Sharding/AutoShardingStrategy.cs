@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -131,9 +132,9 @@ public sealed class AutoShardingOperationRecord
 public sealed class AutoShardingStrategy : ShardingStrategyBase
 {
     private readonly AutoShardingConfig _config;
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ConcurrentQueue<AutoShardingOperationRecord> _operationHistory = new();
-    private readonly ConcurrentDictionary<string, DateTime> _shardLastOperation = new();
+    private readonly BoundedDictionary<string, DateTime> _shardLastOperation = new BoundedDictionary<string, DateTime>(1000);
     private readonly Timer? _monitorTimer;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
     private readonly int _cacheMaxSize;

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     {
         private readonly ILogger _logger;
         private readonly IMessageBus? _messageBus;
-        private readonly ConcurrentDictionary<string, ThreatIndicator> _threatFeed = new();
+        private readonly BoundedDictionary<string, ThreatIndicator> _threatFeed = new BoundedDictionary<string, ThreatIndicator>(1000);
         private readonly ConcurrentQueue<ThreatMatch> _matches = new();
         private readonly HashSet<string> _knownMaliciousIps = new();
         private readonly HashSet<string> _knownMaliciousDomains = new();

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -13,7 +14,7 @@ namespace DataWarehouse.SDK.Infrastructure;
 /// <typeparam name="TConfig">Configuration type for the connection (e.g., S3Config, RelationalDbConfig).</typeparam>
 public class StorageConnectionRegistry<TConfig> : IAsyncDisposable where TConfig : class
 {
-    private readonly ConcurrentDictionary<string, StorageConnectionInstance<TConfig>> _instances = new();
+    private readonly BoundedDictionary<string, StorageConnectionInstance<TConfig>> _instances = new BoundedDictionary<string, StorageConnectionInstance<TConfig>>(1000);
     private readonly SemaphoreSlim _registryLock = new(1, 1);
     private readonly Func<TConfig, Task<object>>? _defaultConnectionFactory;
     private volatile bool _disposed;

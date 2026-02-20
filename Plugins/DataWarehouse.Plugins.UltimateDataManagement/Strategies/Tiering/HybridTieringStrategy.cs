@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class HybridTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StrategyRegistration> _strategies = new();
+    private readonly BoundedDictionary<string, StrategyRegistration> _strategies = new BoundedDictionary<string, StrategyRegistration>(1000);
     private ConflictResolutionMode _conflictMode = ConflictResolutionMode.WeightedVoting;
 
     /// <summary>

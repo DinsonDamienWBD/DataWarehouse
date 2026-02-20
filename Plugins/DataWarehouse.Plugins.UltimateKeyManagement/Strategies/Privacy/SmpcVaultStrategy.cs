@@ -4,11 +4,11 @@ using Org.BouncyCastle.Crypto.EC;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ECPoint = Org.BouncyCastle.Math.EC.ECPoint;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 {
@@ -142,7 +142,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
     public sealed class SmpcVaultStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         private SmpcConfig _config = new();
-        private readonly ConcurrentDictionary<string, SmpcKeyData> _keys = new();
+        private readonly BoundedDictionary<string, SmpcKeyData> _keys = new BoundedDictionary<string, SmpcKeyData>(1000);
         private string _currentKeyId = "default";
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly SecureRandom _secureRandom = new();
@@ -958,7 +958,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                if (_keys.Remove(keyId, out var keyData))
+                if (_keys.TryRemove(keyId, out var keyData))
                 {
                     await PersistKeysToStorage();
 

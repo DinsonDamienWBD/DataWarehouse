@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -7,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -28,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class PolicyBasedAccessControlStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PolicyDefinition> _policies = new();
-        private readonly ConcurrentDictionary<string, PolicySet> _policySets = new();
-        private readonly ConcurrentDictionary<string, PolicyVersion> _policyVersions = new();
+        private readonly BoundedDictionary<string, PolicyDefinition> _policies = new BoundedDictionary<string, PolicyDefinition>(1000);
+        private readonly BoundedDictionary<string, PolicySet> _policySets = new BoundedDictionary<string, PolicySet>(1000);
+        private readonly BoundedDictionary<string, PolicyVersion> _policyVersions = new BoundedDictionary<string, PolicyVersion>(1000);
         private readonly List<IPolicyInformationPoint> _pips = new();
         private ConflictResolutionStrategy _defaultConflictResolution = ConflictResolutionStrategy.DenyOverrides;
         private int _nextVersionNumber = 1;

@@ -2,11 +2,11 @@ using DataWarehouse.SDK.Contracts;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Edge.Inference
 {
@@ -37,7 +37,7 @@ namespace DataWarehouse.SDK.Edge.Inference
     [SdkCompatibility("3.0.0", Notes = "Phase 36: ONNX Runtime WASI-NN host (EDGE-04)")]
     public sealed class OnnxWasiNnHost : IWasiNnHost
     {
-        private readonly ConcurrentDictionary<string, OnnxInferenceSession> _sessionCache = new();
+        private readonly BoundedDictionary<string, OnnxInferenceSession> _sessionCache = new BoundedDictionary<string, OnnxInferenceSession>(1000);
         private readonly int _maxCachedSessions;
 
         /// <summary>

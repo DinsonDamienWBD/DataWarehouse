@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Storage;
 [SdkCompatibility("5.0.0", Notes = "Phase 61: Vaccination scheduler")]
 public sealed class InMemoryChaosResultsDatabase : IChaosResultsDatabase
 {
-    private readonly ConcurrentDictionary<string, ExperimentRecord> _records = new();
+    private readonly BoundedDictionary<string, ExperimentRecord> _records = new BoundedDictionary<string, ExperimentRecord>(1000);
     private readonly ConcurrentQueue<string> _insertionOrder = new();
     private readonly IMessageBus? _messageBus;
     private readonly int _maxRecords;
@@ -115,7 +115,7 @@ public sealed class InMemoryChaosResultsDatabase : IChaosResultsDatabase
         ct.ThrowIfCancellationRequested();
 
         _records.TryGetValue(experimentId, out var record);
-        return Task.FromResult(record);
+        return Task.FromResult<ExperimentRecord?>(record);
     }
 
     /// <inheritdoc/>

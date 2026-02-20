@@ -3,13 +3,13 @@ using DataWarehouse.SDK.VirtualDiskEngine.BlockAllocation;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.VirtualDiskEngine.Metadata;
 
@@ -27,8 +27,8 @@ public sealed class InodeTable : IInodeTable, IDisposable
     private readonly IBlockAllocator _allocator;
     private readonly long _inodeTableStartBlock;
     private readonly long _inodeTableBlockCount;
-    private readonly ConcurrentDictionary<long, Inode> _cache = new();
-    private readonly ConcurrentDictionary<long, SemaphoreSlim> _inodeLocks = new();
+    private readonly BoundedDictionary<long, Inode> _cache = new BoundedDictionary<long, Inode>(1000);
+    private readonly BoundedDictionary<long, SemaphoreSlim> _inodeLocks = new BoundedDictionary<long, SemaphoreSlim>(1000);
     private readonly SemaphoreSlim _tableMetadataLock = new(1, 1);
 
     private long _nextInodeNumber;

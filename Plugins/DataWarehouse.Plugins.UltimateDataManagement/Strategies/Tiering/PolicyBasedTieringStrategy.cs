@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class PolicyBasedTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TieringRule> _rules = new();
+    private readonly BoundedDictionary<string, TieringRule> _rules = new BoundedDictionary<string, TieringRule>(1000);
     private readonly List<TieringRule> _sortedRules = new();
     private readonly object _rulesLock = new();
     private long _rulesEvaluated;

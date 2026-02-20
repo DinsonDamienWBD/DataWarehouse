@@ -1,6 +1,6 @@
 // 91.F4: RAID-Aware Deduplication
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class RaidDeduplication
 {
-    private readonly ConcurrentDictionary<string, DedupIndex> _dedupIndexes = new();
-    private readonly ConcurrentDictionary<byte[], DedupEntry> _hashIndex = new(new ByteArrayComparer());
+    private readonly BoundedDictionary<string, DedupIndex> _dedupIndexes = new BoundedDictionary<string, DedupIndex>(1000);
+    private readonly BoundedDictionary<byte[], DedupEntry> _hashIndex = new(1000, new ByteArrayComparer());
     private readonly DedupConfiguration _config;
     private long _totalBlocksProcessed;
     private long _duplicateBlocksFound;
@@ -473,7 +473,7 @@ public sealed class RaidDeduplication
 public sealed class DedupIndex
 {
     private readonly string _arrayId;
-    private readonly ConcurrentDictionary<byte[], DedupEntry> _entries = new(new ByteArrayComparer());
+    private readonly BoundedDictionary<byte[], DedupEntry> _entries = new(1000, new ByteArrayComparer());
 
     public DedupIndex(string arrayId)
     {

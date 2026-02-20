@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Scheduler
 {
@@ -7,8 +7,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Scheduler
     /// </summary>
     public sealed class BackupScheduler : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, ScheduledBackupJob> _jobs = new();
-        private readonly ConcurrentDictionary<string, Timer> _timers = new();
+        private readonly BoundedDictionary<string, ScheduledBackupJob> _jobs = new BoundedDictionary<string, ScheduledBackupJob>(1000);
+        private readonly BoundedDictionary<string, Timer> _timers = new BoundedDictionary<string, Timer>(1000);
         private readonly SemaphoreSlim _concurrencyLimiter;
         private bool _disposed;
 

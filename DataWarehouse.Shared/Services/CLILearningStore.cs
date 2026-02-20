@@ -1,8 +1,8 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Services;
 
@@ -95,9 +95,9 @@ public sealed record UserPreference
 /// </summary>
 public sealed class CLILearningStore : IDisposable, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, LearnedPattern> _patterns = new();
-    private readonly ConcurrentDictionary<string, SynonymMapping> _synonyms = new();
-    private readonly ConcurrentDictionary<string, UserPreference> _preferences = new();
+    private readonly BoundedDictionary<string, LearnedPattern> _patterns = new BoundedDictionary<string, LearnedPattern>(1000);
+    private readonly BoundedDictionary<string, SynonymMapping> _synonyms = new BoundedDictionary<string, SynonymMapping>(1000);
+    private readonly BoundedDictionary<string, UserPreference> _preferences = new BoundedDictionary<string, UserPreference>(1000);
     private readonly string? _persistencePath;
     private readonly Timer? _persistenceTimer;
     private readonly SemaphoreSlim _persistenceLock = new(1, 1);

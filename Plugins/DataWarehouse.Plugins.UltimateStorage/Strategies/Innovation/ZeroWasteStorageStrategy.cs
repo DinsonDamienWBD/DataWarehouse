@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -38,8 +38,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableInlineMetadata = true;
         private bool _enableBitPacking = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, BlockAllocation> _allocations = new();
-        private readonly ConcurrentDictionary<long, BlockInfo> _blockIndex = new();
+        private readonly BoundedDictionary<string, BlockAllocation> _allocations = new BoundedDictionary<string, BlockAllocation>(1000);
+        private readonly BoundedDictionary<long, BlockInfo> _blockIndex = new BoundedDictionary<long, BlockInfo>(1000);
         private long _totalBlocksAllocated;
         private long _totalBlocksUsed;
         private long _totalBitsUsed;

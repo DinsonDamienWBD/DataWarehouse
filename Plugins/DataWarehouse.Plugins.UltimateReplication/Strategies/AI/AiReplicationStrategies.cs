@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 {
@@ -66,10 +66,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class PredictiveReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AccessPattern> _accessPatterns = new();
-        private readonly ConcurrentDictionary<string, List<DateTimeOffset>> _accessHistory = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string[] PreReplicatedTo)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, double> _nodeAffinityScores = new();
+        private readonly BoundedDictionary<string, AccessPattern> _accessPatterns = new BoundedDictionary<string, AccessPattern>(1000);
+        private readonly BoundedDictionary<string, List<DateTimeOffset>> _accessHistory = new BoundedDictionary<string, List<DateTimeOffset>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string[] PreReplicatedTo)> _dataStore = new BoundedDictionary<string, (byte[] Data, string[] PreReplicatedTo)>(1000);
+        private readonly BoundedDictionary<string, double> _nodeAffinityScores = new BoundedDictionary<string, double>(1000);
         private double _predictionThreshold = 0.7;
         private int _historyWindowSize = 100;
 
@@ -299,10 +299,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class SemanticReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, HashSet<string>> _dataRelationships = new();
-        private readonly ConcurrentDictionary<string, string> _dataCategories = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string[] RelatedKeys)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _categoryNodeAffinity = new();
+        private readonly BoundedDictionary<string, HashSet<string>> _dataRelationships = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, string> _dataCategories = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string[] RelatedKeys)> _dataStore = new BoundedDictionary<string, (byte[] Data, string[] RelatedKeys)>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _categoryNodeAffinity = new BoundedDictionary<string, HashSet<string>>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -458,8 +458,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class AdaptiveReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, WorkloadMetrics> _workloadMetrics = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, ReplicationConfig Config)> _dataStore = new();
+        private readonly BoundedDictionary<string, WorkloadMetrics> _workloadMetrics = new BoundedDictionary<string, WorkloadMetrics>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)> _dataStore = new BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)>(1000);
         private readonly AdaptiveConfig _config = new();
 
         /// <summary>
@@ -671,9 +671,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class IntelligentReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, NodeHealthHistory> _nodeHealth = new();
-        private readonly ConcurrentDictionary<string, List<AnomalyEvent>> _anomalies = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new();
+        private readonly BoundedDictionary<string, NodeHealthHistory> _nodeHealth = new BoundedDictionary<string, NodeHealthHistory>(1000);
+        private readonly BoundedDictionary<string, List<AnomalyEvent>> _anomalies = new BoundedDictionary<string, List<AnomalyEvent>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private double _anomalyThreshold = 2.0; // Standard deviations
 
         /// <summary>
@@ -894,7 +894,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class AutoTuneReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, TuningState State)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, TuningState State)> _dataStore = new BoundedDictionary<string, (byte[] Data, TuningState State)>(1000);
         private readonly TuningParameters _params = new();
         private readonly List<TuningEpisode> _episodes = new();
         private readonly Random _random = new();
@@ -1127,9 +1127,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class PriorityBasedReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DataPriority> _priorities = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DataPriority Priority)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, Queue<(string Key, DataPriority Priority)>> _priorityQueues = new();
+        private readonly BoundedDictionary<string, DataPriority> _priorities = new BoundedDictionary<string, DataPriority>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DataPriority Priority)> _dataStore = new BoundedDictionary<string, (byte[] Data, DataPriority Priority)>(1000);
+        private readonly BoundedDictionary<string, Queue<(string Key, DataPriority Priority)>> _priorityQueues = new BoundedDictionary<string, Queue<(string Key, DataPriority Priority)>>(1000);
 
         /// <summary>
         /// Data priority levels.
@@ -1267,8 +1267,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class CostOptimizedReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RegionCost> _regionCosts = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, double EstimatedCost)> _dataStore = new();
+        private readonly BoundedDictionary<string, RegionCost> _regionCosts = new BoundedDictionary<string, RegionCost>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, double EstimatedCost)> _dataStore = new BoundedDictionary<string, (byte[] Data, double EstimatedCost)>(1000);
         private double _monthlyBudget = 10000.0;
         private double _currentMonthSpend;
         private readonly object _budgetLock = new();
@@ -1432,9 +1432,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class ComplianceAwareReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, DataClassification> _classifications = new();
-        private readonly ConcurrentDictionary<string, RegionCompliance> _regionCompliance = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string Classification)> _dataStore = new();
+        private readonly BoundedDictionary<string, DataClassification> _classifications = new BoundedDictionary<string, DataClassification>(1000);
+        private readonly BoundedDictionary<string, RegionCompliance> _regionCompliance = new BoundedDictionary<string, RegionCompliance>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string Classification)> _dataStore = new BoundedDictionary<string, (byte[] Data, string Classification)>(1000);
         private readonly List<ComplianceViolation> _violations = new();
         private readonly object _violationLock = new();
 
@@ -1641,9 +1641,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
     /// </summary>
     public sealed class LatencyOptimizedReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, LatencyMeasurement> _latencyMatrix = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, string OptimalRoute)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, List<double>> _latencyHistory = new();
+        private readonly BoundedDictionary<string, LatencyMeasurement> _latencyMatrix = new BoundedDictionary<string, LatencyMeasurement>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, string OptimalRoute)> _dataStore = new BoundedDictionary<string, (byte[] Data, string OptimalRoute)>(1000);
+        private readonly BoundedDictionary<string, List<double>> _latencyHistory = new BoundedDictionary<string, List<double>>(1000);
         private double _slaTargetMs = 100.0;
 
         /// <summary>

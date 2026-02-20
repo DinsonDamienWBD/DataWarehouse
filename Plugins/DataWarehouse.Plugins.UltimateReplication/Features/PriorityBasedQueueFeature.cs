@@ -25,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<ReplicationPriority, ConcurrentQueue<QueuedReplication>> _queues;
-        private readonly ConcurrentDictionary<string, QueuedReplication> _itemIndex = new();
+        private readonly BoundedDictionary<ReplicationPriority, ConcurrentQueue<QueuedReplication>> _queues;
+        private readonly BoundedDictionary<string, QueuedReplication> _itemIndex = new BoundedDictionary<string, QueuedReplication>(1000);
         private readonly TimeSpan _starvationThreshold;
         private readonly int _maxQueueDepth;
         private bool _disposed;
@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             _starvationThreshold = starvationThreshold ?? TimeSpan.FromMinutes(5);
             _maxQueueDepth = maxQueueDepth;
 
-            _queues = new ConcurrentDictionary<ReplicationPriority, ConcurrentQueue<QueuedReplication>>();
+            _queues = new BoundedDictionary<ReplicationPriority, ConcurrentQueue<QueuedReplication>>(1000);
             foreach (var priority in Enum.GetValues<ReplicationPriority>())
             {
                 _queues[priority] = new ConcurrentQueue<QueuedReplication>();

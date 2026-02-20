@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.TaskScheduling;
 
@@ -383,7 +383,7 @@ public sealed class MultilevelFeedbackQueueStrategy : WorkflowStrategyBase
         Tags = ["scheduling", "mlfq", "adaptive"]
     };
 
-    private readonly ConcurrentDictionary<string, int> _taskQueues = new();
+    private readonly BoundedDictionary<string, int> _taskQueues = new BoundedDictionary<string, int>(1000);
 
     public override async Task<WorkflowResult> ExecuteAsync(
         WorkflowDefinition workflow,

@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Utilities;
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ContainerOrchestration;
 
 /// <summary>
@@ -6,8 +7,8 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ContainerOrchestra
 /// </summary>
 public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _k8sStates = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DeploymentState> _k8sStates = new BoundedDictionary<string, DeploymentState>(1000);
     private DateTimeOffset? _lastHealthCheck;
     private bool _lastHealthCheckResult = true;
 

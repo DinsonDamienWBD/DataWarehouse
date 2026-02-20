@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.ScatterGather;
 
@@ -77,7 +77,7 @@ internal sealed class ShuffleStrategy : ComputeRuntimeStrategyBase
 
             // Process each partition through the user code
             var codeStr = task.GetCodeAsString();
-            var partitionOutputs = new ConcurrentDictionary<int, string>();
+            var partitionOutputs = new BoundedDictionary<int, string>(1000);
 
             await Parallel.ForEachAsync(
                 Enumerable.Range(0, targetPartitions),

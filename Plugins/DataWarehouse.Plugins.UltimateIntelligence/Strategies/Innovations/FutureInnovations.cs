@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Innovations;
 
@@ -12,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Innovations;
 /// </summary>
 public sealed class ConsciousStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ContentUnderstanding> _contentMap = new();
+    private readonly BoundedDictionary<string, ContentUnderstanding> _contentMap = new BoundedDictionary<string, ContentUnderstanding>(1000);
 
     public override string StrategyId => "innovation-conscious-storage";
     public override string StrategyName => "Conscious Storage";
@@ -68,7 +69,7 @@ public sealed class ConsciousStorageStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class PrecognitiveStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, UserBehaviorModel> _userModels = new();
+    private readonly BoundedDictionary<string, UserBehaviorModel> _userModels = new BoundedDictionary<string, UserBehaviorModel>(1000);
 
     public override string StrategyId => "innovation-precognitive-storage";
     public override string StrategyName => "Precognitive Storage";
@@ -108,7 +109,7 @@ public sealed class PrecognitiveStorageStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class EmpatheticStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EmotionalState> _userStates = new();
+    private readonly BoundedDictionary<string, EmotionalState> _userStates = new BoundedDictionary<string, EmotionalState>(1000);
 
     public override string StrategyId => "innovation-empathetic-storage";
     public override string StrategyName => "Empathetic Storage";
@@ -215,7 +216,7 @@ public sealed class CollaborativeIntelligenceStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class SelfDocumentingStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, GeneratedDocumentation> _docs = new();
+    private readonly BoundedDictionary<string, GeneratedDocumentation> _docs = new BoundedDictionary<string, GeneratedDocumentation>(1000);
 
     public override string StrategyId => "innovation-self-documenting";
     public override string StrategyName => "Self-Documenting Storage";
@@ -338,7 +339,7 @@ public sealed class SimilaritySearchStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class TemporalSearchStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<TemporalActivity>> _activityLog = new();
+    private readonly BoundedDictionary<string, List<TemporalActivity>> _activityLog = new BoundedDictionary<string, List<TemporalActivity>>(1000);
 
     public override string StrategyId => "innovation-temporal-search";
     public override string StrategyName => "Temporal Search";
@@ -385,7 +386,7 @@ public sealed class TemporalSearchStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class RelationshipSearchStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _relationships = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _relationships = new BoundedDictionary<string, HashSet<string>>(1000);
 
     public override string StrategyId => "innovation-relationship-search";
     public override string StrategyName => "Relationship Search";
@@ -875,7 +876,7 @@ public sealed class KnowledgeSynthesisStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class ConversationalStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<ConversationTurn>> _conversations = new();
+    private readonly BoundedDictionary<string, List<ConversationTurn>> _conversations = new BoundedDictionary<string, List<ConversationTurn>>(1000);
 
     public override string StrategyId => "innovation-conversational-storage";
     public override string StrategyName => "Conversational Storage";

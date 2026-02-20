@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 
@@ -18,8 +18,8 @@ namespace DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 /// </summary>
 public sealed class ContentAddressableStorageLayer
 {
-    private readonly ConcurrentDictionary<string, CasBlock> _blockStore = new();
-    private readonly ConcurrentDictionary<string, CasReference> _referenceMap = new();
+    private readonly BoundedDictionary<string, CasBlock> _blockStore = new BoundedDictionary<string, CasBlock>(1000);
+    private readonly BoundedDictionary<string, CasReference> _referenceMap = new BoundedDictionary<string, CasReference>(1000);
     private readonly IMessageBus? _messageBus;
     private long _totalBlocks;
     private long _deduplicatedBytes;
@@ -288,7 +288,7 @@ public sealed record DeduplicationStats
 /// </summary>
 public sealed class BlockLevelEncryptionManager
 {
-    private readonly ConcurrentDictionary<string, EncryptionHeader> _headers = new();
+    private readonly BoundedDictionary<string, EncryptionHeader> _headers = new BoundedDictionary<string, EncryptionHeader>(1000);
     private readonly IMessageBus? _messageBus;
     private readonly bool _aesNiAvailable;
     private long _blocksEncrypted;
@@ -552,8 +552,8 @@ public sealed record EncryptionMetrics
 /// </summary>
 public sealed class DistributedHaFilesystemManager
 {
-    private readonly ConcurrentDictionary<string, FilesystemNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, DataPlacement> _placements = new();
+    private readonly BoundedDictionary<string, FilesystemNode> _nodes = new BoundedDictionary<string, FilesystemNode>(1000);
+    private readonly BoundedDictionary<string, DataPlacement> _placements = new BoundedDictionary<string, DataPlacement>(1000);
     private string? _leaderId;
     private long _currentTerm;
     private readonly object _electionLock = new();

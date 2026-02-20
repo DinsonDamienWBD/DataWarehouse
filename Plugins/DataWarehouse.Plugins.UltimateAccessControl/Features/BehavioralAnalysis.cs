@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class BehavioralAnalysis
     {
-        private readonly ConcurrentDictionary<string, UserProfile> _profiles = new();
+        private readonly BoundedDictionary<string, UserProfile> _profiles = new BoundedDictionary<string, UserProfile>(1000);
         private readonly ConcurrentQueue<BehaviorAlert> _alerts = new();
         private readonly double _deviationThreshold = 2.5; // Standard deviations
         private readonly int _baselineMinimumSamples = 20;

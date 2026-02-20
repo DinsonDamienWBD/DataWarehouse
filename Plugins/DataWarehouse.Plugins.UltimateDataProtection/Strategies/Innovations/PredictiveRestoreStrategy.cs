@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 
@@ -30,9 +29,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class PredictiveRestoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BackupAccessHistory> _accessHistory = new();
-        private readonly ConcurrentDictionary<string, PreStagedBackup> _preStagedBackups = new();
-        private readonly ConcurrentDictionary<string, PredictionModel> _userModels = new();
+        private readonly BoundedDictionary<string, BackupAccessHistory> _accessHistory = new BoundedDictionary<string, BackupAccessHistory>(1000);
+        private readonly BoundedDictionary<string, PreStagedBackup> _preStagedBackups = new BoundedDictionary<string, PreStagedBackup>(1000);
+        private readonly BoundedDictionary<string, PredictionModel> _userModels = new BoundedDictionary<string, PredictionModel>(1000);
         private readonly object _predictionLock = new();
         private Timer? _predictionTimer;
 

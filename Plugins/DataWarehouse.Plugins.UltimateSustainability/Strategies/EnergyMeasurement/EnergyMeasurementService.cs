@@ -19,7 +19,7 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
     private const string MeasurementTopic = "sustainability.energy.measured";
 
     private readonly ConcurrentQueue<CarbonEnergyMeasurement> _measurements = new();
-    private readonly ConcurrentDictionary<string, List<CarbonEnergyMeasurement>> _byOperationType = new();
+    private readonly BoundedDictionary<string, List<CarbonEnergyMeasurement>> _byOperationType = new BoundedDictionary<string, List<CarbonEnergyMeasurement>>(1000);
     private int _measurementCount;
 
     private readonly RaplEnergyMeasurementStrategy? _raplStrategy;

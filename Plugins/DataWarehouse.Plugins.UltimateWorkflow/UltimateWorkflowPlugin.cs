@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -38,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposable
 {
     private readonly WorkflowStrategyRegistry _registry = new();
-    private readonly ConcurrentDictionary<string, WorkflowDefinition> _workflows = new();
-    private readonly ConcurrentDictionary<string, WorkflowResult> _executions = new();
+    private readonly BoundedDictionary<string, WorkflowDefinition> _workflows = new BoundedDictionary<string, WorkflowDefinition>(1000);
+    private readonly BoundedDictionary<string, WorkflowResult> _executions = new BoundedDictionary<string, WorkflowResult>(1000);
     private WorkflowStrategyBase? _activeStrategy;
     private CancellationTokenSource? _cts;
     private bool _disposed;

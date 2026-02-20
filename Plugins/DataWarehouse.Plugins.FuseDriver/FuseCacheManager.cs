@@ -3,9 +3,9 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -17,9 +17,9 @@ public sealed class FuseCacheManager : IDisposable
 {
     private readonly FuseConfig _config;
     private readonly IKernelContext? _kernelContext;
-    private readonly ConcurrentDictionary<string, CacheEntry> _attrCache = new();
-    private readonly ConcurrentDictionary<string, byte[]> _readCache = new();
-    private readonly ConcurrentDictionary<ulong, WriteBufferEntry> _writeBuffers = new();
+    private readonly BoundedDictionary<string, CacheEntry> _attrCache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly BoundedDictionary<string, byte[]> _readCache = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<ulong, WriteBufferEntry> _writeBuffers = new BoundedDictionary<ulong, WriteBufferEntry>(1000);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly Timer _cleanupTimer;
     private readonly object _statsLock = new();

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Failover;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Failover;
 /// </summary>
 public sealed class AutomaticCloudFailoverStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ProviderHealthState> _providerHealth = new();
-    private readonly ConcurrentDictionary<string, FailoverConfiguration> _configs = new();
+    private readonly BoundedDictionary<string, ProviderHealthState> _providerHealth = new BoundedDictionary<string, ProviderHealthState>(1000);
+    private readonly BoundedDictionary<string, FailoverConfiguration> _configs = new BoundedDictionary<string, FailoverConfiguration>(1000);
     private string? _activeProvider;
 
     public override string StrategyId => "failover-automatic";
@@ -107,7 +107,7 @@ public sealed class AutomaticCloudFailoverStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class ActiveActiveCloudStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ProviderWeight> _weights = new();
+    private readonly BoundedDictionary<string, ProviderWeight> _weights = new BoundedDictionary<string, ProviderWeight>(1000);
     private readonly Random _random = new();
 
     public override string StrategyId => "failover-active-active";
@@ -179,7 +179,7 @@ public sealed class ActivePassiveCloudStrategy : MultiCloudStrategyBase
 {
     private string? _primaryProvider;
     private readonly List<string> _standbyProviders = new();
-    private readonly ConcurrentDictionary<string, bool> _providerHealth = new();
+    private readonly BoundedDictionary<string, bool> _providerHealth = new BoundedDictionary<string, bool>(1000);
 
     public override string StrategyId => "failover-active-passive";
     public override string StrategyName => "Active-Passive Multi-Cloud";
@@ -257,7 +257,7 @@ public sealed class ActivePassiveCloudStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class HealthBasedRoutingStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CircuitBreakerState> _circuits = new();
+    private readonly BoundedDictionary<string, CircuitBreakerState> _circuits = new BoundedDictionary<string, CircuitBreakerState>(1000);
 
     public override string StrategyId => "failover-health-routing";
     public override string StrategyName => "Health-Based Routing";
@@ -344,7 +344,7 @@ public sealed class HealthBasedRoutingStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class DnsFailoverStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DnsRecord> _records = new();
+    private readonly BoundedDictionary<string, DnsRecord> _records = new BoundedDictionary<string, DnsRecord>(1000);
 
     public override string StrategyId => "failover-dns";
     public override string StrategyName => "DNS-Based Failover";
@@ -405,7 +405,7 @@ public sealed class DnsFailoverStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class LatencyBasedFailoverStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LatencyMeasurement> _latencies = new();
+    private readonly BoundedDictionary<string, LatencyMeasurement> _latencies = new BoundedDictionary<string, LatencyMeasurement>(1000);
 
     public override string StrategyId => "failover-latency";
     public override string StrategyName => "Latency-Based Failover";

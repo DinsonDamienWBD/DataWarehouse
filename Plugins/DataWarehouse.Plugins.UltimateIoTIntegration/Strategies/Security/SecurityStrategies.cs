@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Security;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Security;
 /// </summary>
 public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStrategy
 {
-    protected readonly ConcurrentDictionary<string, string> DeviceTokens = new();
+    protected readonly BoundedDictionary<string, string> DeviceTokens = new BoundedDictionary<string, string>(1000);
 
     public override IoTStrategyCategory Category => IoTStrategyCategory.Security;
 

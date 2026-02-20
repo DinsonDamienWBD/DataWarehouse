@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
 using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
 using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 {
@@ -1966,7 +1966,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// </summary>
     public sealed class WorkloadAnalyzer
     {
-        private readonly ConcurrentDictionary<string, WorkloadProfile> _profiles = new();
+        private readonly BoundedDictionary<string, WorkloadProfile> _profiles = new BoundedDictionary<string, WorkloadProfile>(1000);
         private readonly bool _isIntelligenceAvailable;
 
         public WorkloadAnalyzer(bool isIntelligenceAvailable = false)
@@ -2406,7 +2406,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     public sealed class FailurePredictionModel
     {
         private readonly bool _isIntelligenceAvailable;
-        private readonly ConcurrentDictionary<string, List<DiskHealthSnapshot>> _healthHistory = new();
+        private readonly BoundedDictionary<string, List<DiskHealthSnapshot>> _healthHistory = new BoundedDictionary<string, List<DiskHealthSnapshot>>(1000);
 
         public FailurePredictionModel(bool isIntelligenceAvailable = false)
         {
@@ -2538,7 +2538,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// </summary>
     public sealed class CapacityForecaster
     {
-        private readonly ConcurrentDictionary<string, List<CapacitySample>> _usageHistory = new();
+        private readonly BoundedDictionary<string, List<CapacitySample>> _usageHistory = new BoundedDictionary<string, List<CapacitySample>>(1000);
 
         /// <summary>
         /// Records current capacity usage for trend tracking.

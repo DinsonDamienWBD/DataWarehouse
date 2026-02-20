@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
@@ -27,8 +26,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class SemanticBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SemanticBackupMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, SemanticProfile> _semanticProfiles = new();
+        private readonly BoundedDictionary<string, SemanticBackupMetadata> _backups = new BoundedDictionary<string, SemanticBackupMetadata>(1000);
+        private readonly BoundedDictionary<string, SemanticProfile> _semanticProfiles = new BoundedDictionary<string, SemanticProfile>(1000);
 
         /// <summary>
         /// Default importance threshold for critical data (0-100).

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -13,7 +14,7 @@ public sealed class RegenerationPipeline
     private readonly AccuracyVerifier _verifier;
     private readonly RegenerationMetrics _metrics;
     private readonly PipelineConfiguration _config;
-    private readonly ConcurrentDictionary<string, PipelineExecution> _activeExecutions = new();
+    private readonly BoundedDictionary<string, PipelineExecution> _activeExecutions = new BoundedDictionary<string, PipelineExecution>(1000);
 
     /// <summary>
     /// Initializes a new regeneration pipeline with specified components.

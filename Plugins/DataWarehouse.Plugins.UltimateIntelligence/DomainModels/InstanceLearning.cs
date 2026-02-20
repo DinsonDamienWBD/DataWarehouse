@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -398,7 +397,7 @@ public sealed record ConfidenceMetrics
 public sealed class BlankModelFactory
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, (string ModelId, BlankModelConfig Config)> _createdModels = new();
+    private readonly BoundedDictionary<string, (string ModelId, BlankModelConfig Config)> _createdModels = new BoundedDictionary<string, (string ModelId, BlankModelConfig Config)>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="BlankModelFactory"/>.
@@ -474,8 +473,8 @@ public sealed class BlankModelFactory
 public sealed class InstanceDataCurator
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, List<TrainingSample>> _instanceBuffers = new();
-    private readonly ConcurrentDictionary<string, DataSchema> _instanceSchemas = new();
+    private readonly BoundedDictionary<string, List<TrainingSample>> _instanceBuffers = new BoundedDictionary<string, List<TrainingSample>>(1000);
+    private readonly BoundedDictionary<string, DataSchema> _instanceSchemas = new BoundedDictionary<string, DataSchema>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="InstanceDataCurator"/>.
@@ -644,7 +643,7 @@ public sealed class InstanceDataCurator
 public sealed class IncrementalTrainer
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, TrainingHistory> _trainingHistory = new();
+    private readonly BoundedDictionary<string, TrainingHistory> _trainingHistory = new BoundedDictionary<string, TrainingHistory>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="IncrementalTrainer"/>.
@@ -772,7 +771,7 @@ public sealed class WeightCheckpointManager
 {
     private readonly IMessageBus? _messageBus;
     private readonly string _checkpointPath;
-    private readonly ConcurrentDictionary<string, List<WeightCheckpoint>> _checkpointHistory = new();
+    private readonly BoundedDictionary<string, List<WeightCheckpoint>> _checkpointHistory = new BoundedDictionary<string, List<WeightCheckpoint>>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="WeightCheckpointManager"/>.
@@ -914,7 +913,7 @@ public sealed class WeightCheckpointManager
 public sealed class TrainingScheduler
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, TrainingSchedule> _schedules = new();
+    private readonly BoundedDictionary<string, TrainingSchedule> _schedules = new BoundedDictionary<string, TrainingSchedule>(1000);
     private readonly Timer _schedulerTimer;
 
     /// <summary>
@@ -1049,7 +1048,7 @@ public sealed class TrainingScheduler
 public sealed class FeedbackCollector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, FeedbackRecord> _feedbackRecords = new();
+    private readonly BoundedDictionary<string, FeedbackRecord> _feedbackRecords = new BoundedDictionary<string, FeedbackRecord>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="FeedbackCollector"/>.
@@ -1216,7 +1215,7 @@ public sealed class CorrectionMemory
 {
     private readonly IMessageBus? _messageBus;
     private readonly string _storagePath;
-    private readonly ConcurrentDictionary<string, List<FeedbackRecord>> _correctionsByModel = new();
+    private readonly BoundedDictionary<string, List<FeedbackRecord>> _correctionsByModel = new BoundedDictionary<string, List<FeedbackRecord>>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="CorrectionMemory"/>.
@@ -1416,7 +1415,7 @@ public sealed class ReinforcementLearner
 public sealed class ConfidenceTracker
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, ConfidenceMetrics> _confidenceByQueryType = new();
+    private readonly BoundedDictionary<string, ConfidenceMetrics> _confidenceByQueryType = new BoundedDictionary<string, ConfidenceMetrics>(1000);
 
     /// <summary>
     /// Initializes a new instance of <see cref="ConfidenceTracker"/>.

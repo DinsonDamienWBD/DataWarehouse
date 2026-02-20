@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Fallback;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Fallback;
 /// </summary>
 public sealed class CacheFallbackStrategy<TResult> : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, (TResult value, DateTimeOffset timestamp)> _cache = new();
+    private readonly BoundedDictionary<string, (TResult value, DateTimeOffset timestamp)> _cache = new BoundedDictionary<string, (TResult value, DateTimeOffset timestamp)>(1000);
     private readonly TimeSpan _cacheTtl;
     private readonly Func<ResilienceContext?, string> _keySelector;
 

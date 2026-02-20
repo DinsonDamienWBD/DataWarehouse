@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Utilities;
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
 /// <summary>
@@ -31,13 +32,13 @@ public interface ICacheBackingStore
 /// </summary>
 public sealed class InMemoryBackingStore : ICacheBackingStore
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _store = new();
+    private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
     /// <inheritdoc/>
     public Task<byte[]?> ReadAsync(string key, CancellationToken ct = default)
     {
         _store.TryGetValue(key, out var value);
-        return Task.FromResult(value);
+        return Task.FromResult<byte[]?>(value);
     }
 
     /// <inheritdoc/>

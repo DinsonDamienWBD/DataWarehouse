@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -222,7 +221,7 @@ public enum TensorDataType
 public class WasiNnBackendRegistry
 {
     private readonly IMessageBus _messageBus;
-    private readonly ConcurrentDictionary<string, WasiNnBackend> _backends = new();
+    private readonly BoundedDictionary<string, WasiNnBackend> _backends = new BoundedDictionary<string, WasiNnBackend>(1000);
     private readonly object _lock = new();
 
     /// <summary>
@@ -556,7 +555,7 @@ public class WasiNnModelCache
 {
     private readonly int _maxCacheSize;
     private readonly long _maxMemoryBytes;
-    private readonly ConcurrentDictionary<string, CachedModel> _cache = new();
+    private readonly BoundedDictionary<string, CachedModel> _cache = new BoundedDictionary<string, CachedModel>(1000);
     private readonly LinkedList<string> _lruList = new();
     private readonly object _lock = new();
     private long _currentMemoryUsage = 0;

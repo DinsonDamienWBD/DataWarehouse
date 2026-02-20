@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -16,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class ManualTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TierAssignment> _manualAssignments = new();
-    private readonly ConcurrentDictionary<string, TierLock> _tierLocks = new();
+    private readonly BoundedDictionary<string, TierAssignment> _manualAssignments = new BoundedDictionary<string, TierAssignment>(1000);
+    private readonly BoundedDictionary<string, TierLock> _tierLocks = new BoundedDictionary<string, TierLock>(1000);
     private readonly ConcurrentQueue<TierAuditEntry> _auditLog = new();
     private readonly int _maxAuditEntries = 10000;
     private long _totalManualAssignments;

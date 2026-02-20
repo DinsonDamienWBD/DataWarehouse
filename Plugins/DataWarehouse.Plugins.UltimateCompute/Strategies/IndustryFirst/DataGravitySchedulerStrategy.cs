@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class DataGravitySchedulerStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<PlacementRecord>> _placementHistory = new();
+    private readonly BoundedDictionary<string, List<PlacementRecord>> _placementHistory = new BoundedDictionary<string, List<PlacementRecord>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "compute.industryfirst.datagravity";

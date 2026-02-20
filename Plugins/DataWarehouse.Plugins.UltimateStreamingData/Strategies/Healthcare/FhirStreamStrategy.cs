@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Healthcare;
 
@@ -275,11 +276,11 @@ public sealed record FhirWebhookDeliveryResult
 /// </summary>
 internal sealed class FhirStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FhirSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<FhirNotification>> _notificationQueues = new();
-    private readonly ConcurrentDictionary<string, long> _sequenceCounters = new();
-    private readonly ConcurrentDictionary<string, long> _eventCounters = new();
-    private readonly ConcurrentDictionary<string, FhirWebhookDeliveryResult> _deliveryLog = new();
+    private readonly BoundedDictionary<string, FhirSubscription> _subscriptions = new BoundedDictionary<string, FhirSubscription>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<FhirNotification>> _notificationQueues = new BoundedDictionary<string, ConcurrentQueue<FhirNotification>>(1000);
+    private readonly BoundedDictionary<string, long> _sequenceCounters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, long> _eventCounters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, FhirWebhookDeliveryResult> _deliveryLog = new BoundedDictionary<string, FhirWebhookDeliveryResult>(1000);
     private long _totalNotifications;
     private long _totalDeliveries;
 

@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFirst;
 
@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFir
 /// </summary>
 internal sealed class BuildCacheSharingStrategy : StorageProcessingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private long _hits;
     private long _misses;
 

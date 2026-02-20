@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -686,7 +686,7 @@ public abstract class ContextIndexBase : IContextIndex
     /// <summary>
     /// Configuration dictionary for this index.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, string> Configuration = new();
+    protected readonly BoundedDictionary<string, string> Configuration = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
     public abstract string IndexId { get; }

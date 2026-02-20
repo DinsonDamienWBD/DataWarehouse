@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ConfigManagement;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.ConfigManagement;
 /// </summary>
 public sealed class ConsulConfigStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConfigVersion> _configVersions = new();
-    private readonly ConcurrentDictionary<string, List<ConfigWatch>> _watches = new();
+    private readonly BoundedDictionary<string, ConfigVersion> _configVersions = new BoundedDictionary<string, ConfigVersion>(1000);
+    private readonly BoundedDictionary<string, List<ConfigWatch>> _watches = new BoundedDictionary<string, List<ConfigWatch>>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -18,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public sealed class ZeroDowntimeRotation : IDisposable
     {
-        private readonly ConcurrentDictionary<string, RotationSession> _activeSessions = new();
-        private readonly ConcurrentDictionary<string, RotationHistory> _rotationHistory = new();
+        private readonly BoundedDictionary<string, RotationSession> _activeSessions = new BoundedDictionary<string, RotationSession>(1000);
+        private readonly BoundedDictionary<string, RotationHistory> _rotationHistory = new BoundedDictionary<string, RotationHistory>(1000);
         private readonly IKeyStoreRegistry _registry;
         private readonly IMessageBus? _messageBus;
         private readonly SemaphoreSlim _rotationLock = new(1, 1);

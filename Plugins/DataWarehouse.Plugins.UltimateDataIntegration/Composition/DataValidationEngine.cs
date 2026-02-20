@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition;
 
@@ -14,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition;
 /// </summary>
 public sealed class DataValidationEngine
 {
-    private readonly ConcurrentDictionary<string, ValidationRuleSet> _ruleSets = new();
-    private readonly ConcurrentDictionary<string, Func<object?, ValidationResult>> _customValidators = new();
+    private readonly BoundedDictionary<string, ValidationRuleSet> _ruleSets = new BoundedDictionary<string, ValidationRuleSet>(1000);
+    private readonly BoundedDictionary<string, Func<object?, ValidationResult>> _customValidators = new BoundedDictionary<string, Func<object?, ValidationResult>>(1000);
 
     /// <summary>
     /// Registers a validation rule set for a dataset/table.

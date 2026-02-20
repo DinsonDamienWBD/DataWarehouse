@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Migration;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.SDK.Storage.Migration;
 public sealed class MigrationCheckpointStore
 {
     private readonly string _checkpointDirectory;
-    private readonly ConcurrentDictionary<string, MigrationCheckpoint> _inMemory = new();
+    private readonly BoundedDictionary<string, MigrationCheckpoint> _inMemory = new BoundedDictionary<string, MigrationCheckpoint>(1000);
 
     /// <summary>
     /// Creates a new checkpoint store backed by the specified directory.

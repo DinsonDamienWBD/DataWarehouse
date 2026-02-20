@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -52,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
     /// </remarks>
     public sealed class UltimateCompliancePlugin : SecurityPluginBase, IDisposable
     {
-        private readonly ConcurrentDictionary<string, IComplianceStrategy> _strategies = new();
+        private readonly BoundedDictionary<string, IComplianceStrategy> _strategies = new BoundedDictionary<string, IComplianceStrategy>(1000);
         private readonly List<IDisposable> _subscriptions = new();
         private ComplianceReportService? _reportService;
         private ChainOfCustodyExporter? _custodyExporter;

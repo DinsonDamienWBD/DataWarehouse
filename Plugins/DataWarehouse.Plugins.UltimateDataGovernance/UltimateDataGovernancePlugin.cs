@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,10 +32,10 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance;
 public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataGovernanceStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, GovernancePolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, DataOwnership> _ownerships = new();
-    private readonly ConcurrentDictionary<string, DataClassification> _classifications = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, GovernancePolicy> _policies = new BoundedDictionary<string, GovernancePolicy>(1000);
+    private readonly BoundedDictionary<string, DataOwnership> _ownerships = new BoundedDictionary<string, DataOwnership>(1000);
+    private readonly BoundedDictionary<string, DataClassification> _classifications = new BoundedDictionary<string, DataClassification>(1000);
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;

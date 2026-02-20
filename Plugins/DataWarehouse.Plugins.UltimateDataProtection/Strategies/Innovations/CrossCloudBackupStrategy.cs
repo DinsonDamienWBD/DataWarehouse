@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
@@ -27,8 +26,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class CrossCloudBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CrossCloudBackupMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, TransactionState> _activeTransactions = new();
+        private readonly BoundedDictionary<string, CrossCloudBackupMetadata> _backups = new BoundedDictionary<string, CrossCloudBackupMetadata>(1000);
+        private readonly BoundedDictionary<string, TransactionState> _activeTransactions = new BoundedDictionary<string, TransactionState>(1000);
 
         /// <summary>
         /// Supported cloud providers.

@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.Rollback;
 
@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.Rollback;
 /// </summary>
 public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RollbackPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, DeploymentMonitor> _monitors = new();
-    private readonly ConcurrentDictionary<string, List<DeploymentSnapshot>> _snapshotHistory = new();
+    private readonly BoundedDictionary<string, RollbackPolicy> _policies = new BoundedDictionary<string, RollbackPolicy>(1000);
+    private readonly BoundedDictionary<string, DeploymentMonitor> _monitors = new BoundedDictionary<string, DeploymentMonitor>(1000);
+    private readonly BoundedDictionary<string, List<DeploymentSnapshot>> _snapshotHistory = new BoundedDictionary<string, List<DeploymentSnapshot>>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -399,9 +399,9 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ManualRollbackStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RollbackRequest> _pendingRequests = new();
-    private readonly ConcurrentDictionary<string, List<RollbackAuditEntry>> _auditLog = new();
-    private readonly ConcurrentDictionary<string, DeploymentVersionHistory> _versionHistory = new();
+    private readonly BoundedDictionary<string, RollbackRequest> _pendingRequests = new BoundedDictionary<string, RollbackRequest>(1000);
+    private readonly BoundedDictionary<string, List<RollbackAuditEntry>> _auditLog = new BoundedDictionary<string, List<RollbackAuditEntry>>(1000);
+    private readonly BoundedDictionary<string, DeploymentVersionHistory> _versionHistory = new BoundedDictionary<string, DeploymentVersionHistory>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -802,9 +802,9 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class VersionPinningStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VersionPin> _pinnedVersions = new();
-    private readonly ConcurrentDictionary<string, List<VersionPinEvent>> _pinHistory = new();
-    private readonly ConcurrentDictionary<string, VersionGovernancePolicy> _policies = new();
+    private readonly BoundedDictionary<string, VersionPin> _pinnedVersions = new BoundedDictionary<string, VersionPin>(1000);
+    private readonly BoundedDictionary<string, List<VersionPinEvent>> _pinHistory = new BoundedDictionary<string, List<VersionPinEvent>>(1000);
+    private readonly BoundedDictionary<string, VersionGovernancePolicy> _policies = new BoundedDictionary<string, VersionGovernancePolicy>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -1140,9 +1140,9 @@ public sealed class VersionPinningStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class SnapshotRestoreStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<FullSnapshot>> _snapshots = new();
-    private readonly ConcurrentDictionary<string, SnapshotPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, RestoreOperation> _restoreOperations = new();
+    private readonly BoundedDictionary<string, List<FullSnapshot>> _snapshots = new BoundedDictionary<string, List<FullSnapshot>>(1000);
+    private readonly BoundedDictionary<string, SnapshotPolicy> _policies = new BoundedDictionary<string, SnapshotPolicy>(1000);
+    private readonly BoundedDictionary<string, RestoreOperation> _restoreOperations = new BoundedDictionary<string, RestoreOperation>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -1655,8 +1655,8 @@ public sealed class SnapshotRestoreStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ImmutableDeploymentStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ImmutableArtifact> _artifacts = new();
-    private readonly ConcurrentDictionary<string, List<DeploymentRecord>> _deploymentLedger = new();
+    private readonly BoundedDictionary<string, ImmutableArtifact> _artifacts = new BoundedDictionary<string, ImmutableArtifact>(1000);
+    private readonly BoundedDictionary<string, List<DeploymentRecord>> _deploymentLedger = new BoundedDictionary<string, List<DeploymentRecord>>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -2000,9 +2000,9 @@ public sealed class ImmutableDeploymentStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class TimeBasedRollbackStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduledRollback> _scheduledRollbacks = new();
-    private readonly ConcurrentDictionary<string, MaintenanceWindow> _maintenanceWindows = new();
-    private readonly ConcurrentDictionary<string, List<TimeBasedEvent>> _eventLog = new();
+    private readonly BoundedDictionary<string, ScheduledRollback> _scheduledRollbacks = new BoundedDictionary<string, ScheduledRollback>(1000);
+    private readonly BoundedDictionary<string, MaintenanceWindow> _maintenanceWindows = new BoundedDictionary<string, MaintenanceWindow>(1000);
+    private readonly BoundedDictionary<string, List<TimeBasedEvent>> _eventLog = new BoundedDictionary<string, List<TimeBasedEvent>>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {

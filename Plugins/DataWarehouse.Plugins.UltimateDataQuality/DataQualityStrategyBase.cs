@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality;
 
@@ -436,7 +436,7 @@ public abstract class DataQualityStrategyBase : IDataQualityStrategy
 {
     private readonly DataQualityStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
@@ -643,8 +643,8 @@ public abstract class DataQualityStrategyBase : IDataQualityStrategy
 /// </summary>
 public sealed class DataQualityStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataQualityStrategy> _strategies =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDataQualityStrategy> _strategies =
+        new(1000);
 
     /// <summary>
     /// Registers a strategy.

@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -432,11 +432,11 @@ public enum ConsistencyViolationSeverity
 /// </remarks>
 public sealed class TemporalConsistencyStrategy : IndexingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TemporalSnapshot> _snapshots = new();
-    private readonly ConcurrentDictionary<string, TemporalTransaction> _activeTransactions = new();
-    private readonly ConcurrentDictionary<string, List<TemporalWriteOperation>> _committedWrites = new();
-    private readonly ConcurrentDictionary<string, long> _objectVersions = new();
-    private readonly ConcurrentDictionary<string, DateTime> _sessionLastWrite = new();
+    private readonly BoundedDictionary<string, TemporalSnapshot> _snapshots = new BoundedDictionary<string, TemporalSnapshot>(1000);
+    private readonly BoundedDictionary<string, TemporalTransaction> _activeTransactions = new BoundedDictionary<string, TemporalTransaction>(1000);
+    private readonly BoundedDictionary<string, List<TemporalWriteOperation>> _committedWrites = new BoundedDictionary<string, List<TemporalWriteOperation>>(1000);
+    private readonly BoundedDictionary<string, long> _objectVersions = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DateTime> _sessionLastWrite = new BoundedDictionary<string, DateTime>(1000);
     private readonly ReaderWriterLockSlim _globalLock = new();
     private readonly ILogger? _logger;
 

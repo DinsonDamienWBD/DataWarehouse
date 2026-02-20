@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -14,9 +15,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     /// </summary>
     public sealed class HoneypotStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, HoneypotResource> _honeypots = new();
+        private readonly BoundedDictionary<string, HoneypotResource> _honeypots = new BoundedDictionary<string, HoneypotResource>(1000);
         private readonly ConcurrentQueue<AttackerProfile> _attackerProfiles = new();
-        private readonly ConcurrentDictionary<string, int> _attackerInteractions = new();
+        private readonly BoundedDictionary<string, int> _attackerInteractions = new BoundedDictionary<string, int>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "honeypot";

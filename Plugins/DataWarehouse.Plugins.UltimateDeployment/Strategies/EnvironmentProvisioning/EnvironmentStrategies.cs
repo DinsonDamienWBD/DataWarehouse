@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.EnvironmentProvisioning;
 
@@ -8,7 +8,7 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.EnvironmentProvisi
 /// </summary>
 public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TerraformState> _states = new();
+    private readonly BoundedDictionary<string, TerraformState> _states = new BoundedDictionary<string, TerraformState>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {
@@ -767,7 +767,7 @@ public sealed class CrossplaneEnvironmentStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EphemeralEnv> _environments = new();
+    private readonly BoundedDictionary<string, EphemeralEnv> _environments = new BoundedDictionary<string, EphemeralEnv>(1000);
 
     public override DeploymentCharacteristics Characteristics => new()
     {

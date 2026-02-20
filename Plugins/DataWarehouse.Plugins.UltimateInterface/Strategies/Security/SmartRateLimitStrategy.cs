@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 
@@ -59,7 +60,7 @@ internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBas
     };
 
     // Client request tracking
-    private readonly ConcurrentDictionary<string, ClientRateData> _clientData = new();
+    private readonly BoundedDictionary<string, ClientRateData> _clientData = new BoundedDictionary<string, ClientRateData>(1000);
 
     /// <summary>
     /// Rate limit tier configuration.

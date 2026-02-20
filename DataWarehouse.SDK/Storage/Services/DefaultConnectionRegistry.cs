@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Services;
 
@@ -16,8 +16,8 @@ namespace DataWarehouse.SDK.Storage.Services;
 /// <typeparam name="TConfig">The configuration type for connections.</typeparam>
 public sealed class DefaultConnectionRegistry<TConfig> : IConnectionRegistry<TConfig> where TConfig : class
 {
-    private readonly ConcurrentDictionary<string, RegistrationEntry> _connections = new();
-    private readonly ConcurrentDictionary<string, ConnectionHealth> _healthCache = new();
+    private readonly BoundedDictionary<string, RegistrationEntry> _connections = new BoundedDictionary<string, RegistrationEntry>(1000);
+    private readonly BoundedDictionary<string, ConnectionHealth> _healthCache = new BoundedDictionary<string, ConnectionHealth>(1000);
     private readonly Func<string, TConfig, CancellationToken, Task<bool>>? _healthChecker;
 
     /// <summary>

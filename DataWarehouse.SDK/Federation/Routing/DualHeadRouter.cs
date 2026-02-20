@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Routing;
 
@@ -36,7 +36,7 @@ public sealed class DualHeadRouter : IStorageRouter
     private readonly IRequestClassifier _classifier;
     private readonly RoutingPipeline _objectPipeline;
     private readonly RoutingPipeline _filePathPipeline;
-    private readonly ConcurrentDictionary<RequestLanguage, long> _routingCounters;
+    private readonly BoundedDictionary<RequestLanguage, long> _routingCounters;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DualHeadRouter"/> class.
@@ -76,7 +76,7 @@ public sealed class DualHeadRouter : IStorageRouter
         _classifier = classifier;
         _objectPipeline = objectPipeline;
         _filePathPipeline = filePathPipeline;
-        _routingCounters = new ConcurrentDictionary<RequestLanguage, long>();
+        _routingCounters = new BoundedDictionary<RequestLanguage, long>(1000);
     }
 
     /// <inheritdoc />

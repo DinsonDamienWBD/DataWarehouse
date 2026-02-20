@@ -41,19 +41,19 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
     /// In production, this maps to PKCS#11 key store, Azure Managed HSM, or AWS CloudHSM.
     /// Rule 13 compliant: we actually perform AES-256-GCM key wrapping, not just flag setting.
     /// </summary>
-    private readonly ConcurrentDictionary<Guid, HsmTimeLockEntry> _hsmVault = new();
+    private readonly BoundedDictionary<Guid, HsmTimeLockEntry> _hsmVault = new BoundedDictionary<Guid, HsmTimeLockEntry>(1000);
 
     /// <summary>
     /// Nonce store for AES-GCM operations, keyed by lock ID.
     /// Required for authenticated decryption during key release.
     /// </summary>
-    private readonly ConcurrentDictionary<string, byte[]> _nonces = new();
+    private readonly BoundedDictionary<string, byte[]> _nonces = new BoundedDictionary<string, byte[]>(1000);
 
     /// <summary>
     /// Authentication tag store for AES-GCM operations, keyed by lock ID.
     /// Required for integrity verification during key release.
     /// </summary>
-    private readonly ConcurrentDictionary<string, byte[]> _authTags = new();
+    private readonly BoundedDictionary<string, byte[]> _authTags = new BoundedDictionary<string, byte[]>(1000);
 
     /// <inheritdoc/>
     public override string Id => "tamperproof.timelock.hsm";

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -12,9 +13,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class PrivilegedAccessManager
     {
-        private readonly ConcurrentDictionary<string, PrivilegedSession> _activeSessions = new();
+        private readonly BoundedDictionary<string, PrivilegedSession> _activeSessions = new BoundedDictionary<string, PrivilegedSession>(1000);
         private readonly ConcurrentQueue<SessionRecord> _sessionHistory = new();
-        private readonly ConcurrentDictionary<string, JitAccessGrant> _jitGrants = new();
+        private readonly BoundedDictionary<string, JitAccessGrant> _jitGrants = new BoundedDictionary<string, JitAccessGrant>(1000);
         private readonly int _maxSessionHistorySize = 1000;
 
         /// <summary>

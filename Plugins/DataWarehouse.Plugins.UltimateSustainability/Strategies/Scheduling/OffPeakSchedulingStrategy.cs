@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.Scheduling;
 
@@ -8,7 +8,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.Scheduling;
 /// </summary>
 public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduledJob> _pendingJobs = new();
+    private readonly BoundedDictionary<string, ScheduledJob> _pendingJobs = new BoundedDictionary<string, ScheduledJob>(1000);
     private Timer? _schedulerTimer;
 
     /// <inheritdoc/>

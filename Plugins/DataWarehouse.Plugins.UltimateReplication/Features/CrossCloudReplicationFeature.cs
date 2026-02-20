@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -35,8 +34,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, CloudProviderStatus> _providers = new();
-        private readonly ConcurrentDictionary<string, CrossCloudReplicationRecord> _replicationRecords = new();
+        private readonly BoundedDictionary<string, CloudProviderStatus> _providers = new BoundedDictionary<string, CloudProviderStatus>(1000);
+        private readonly BoundedDictionary<string, CrossCloudReplicationRecord> _replicationRecords = new BoundedDictionary<string, CrossCloudReplicationRecord>(1000);
         private bool _disposed;
         private IDisposable? _healthSubscription;
 

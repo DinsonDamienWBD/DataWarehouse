@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 {
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class PredictiveFailoverStrategy : ConnectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, FailoverState> _failoverStates = new();
+        private readonly BoundedDictionary<string, FailoverState> _failoverStates = new BoundedDictionary<string, FailoverState>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-predictive-failover";

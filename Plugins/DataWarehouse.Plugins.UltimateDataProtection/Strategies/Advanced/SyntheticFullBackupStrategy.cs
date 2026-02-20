@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 {
@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
     /// </remarks>
     public sealed class SyntheticFullBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BackupChain> _backupChains = new();
+        private readonly BoundedDictionary<string, BackupChain> _backupChains = new BoundedDictionary<string, BackupChain>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "synthetic-full";
@@ -108,7 +108,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
                 // Phase 4: Merge backups
                 long bytesProcessed = 0;
-                var mergedData = new ConcurrentDictionary<string, byte[]>();
+                var mergedData = new BoundedDictionary<string, byte[]>(1000);
 
                 progressCallback(new BackupProgress
                 {
@@ -484,7 +484,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<long> WriteSyntheticFullAsync(
             string backupId,
-            ConcurrentDictionary<string, byte[]> mergedData,
+            BoundedDictionary<string, byte[]> mergedData,
             BackupRequest request,
             CancellationToken ct)
         {

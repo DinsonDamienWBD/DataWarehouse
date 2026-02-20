@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.DeviceManagement;
 
@@ -100,7 +100,7 @@ internal class DeviceSyncState
     /// <summary>
     /// Property value history (property name -> list of timestamped values).
     /// </summary>
-    public ConcurrentDictionary<string, BoundedList<TimestampedValue>> PropertyHistory { get; } = new();
+    public BoundedDictionary<string, BoundedList<TimestampedValue>> PropertyHistory { get; } = new BoundedDictionary<string, BoundedList<TimestampedValue>>(1000);
 
     /// <summary>
     /// Last synchronization timestamp.
@@ -164,7 +164,7 @@ internal class BoundedList<T>
 public class ContinuousSyncService
 {
     private readonly ContinuousSyncOptions _options;
-    private readonly ConcurrentDictionary<string, DeviceSyncState> _syncStates = new();
+    private readonly BoundedDictionary<string, DeviceSyncState> _syncStates = new BoundedDictionary<string, DeviceSyncState>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContinuousSyncService"/> class.

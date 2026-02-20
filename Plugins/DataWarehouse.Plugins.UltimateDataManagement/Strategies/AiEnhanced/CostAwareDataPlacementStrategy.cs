@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -161,9 +161,9 @@ public sealed class BudgetConstraint
 /// </remarks>
 public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StoragePricing> _tiers = new();
-    private readonly ConcurrentDictionary<string, (string Tier, long SizeBytes, long ReadOps, long WriteOps, DateTime Since)> _objectMetrics = new();
-    private readonly ConcurrentDictionary<string, CostAnalysis> _analysisCache = new();
+    private readonly BoundedDictionary<string, StoragePricing> _tiers = new BoundedDictionary<string, StoragePricing>(1000);
+    private readonly BoundedDictionary<string, (string Tier, long SizeBytes, long ReadOps, long WriteOps, DateTime Since)> _objectMetrics = new BoundedDictionary<string, (string Tier, long SizeBytes, long ReadOps, long WriteOps, DateTime Since)>(1000);
+    private readonly BoundedDictionary<string, CostAnalysis> _analysisCache = new BoundedDictionary<string, CostAnalysis>(1000);
     private BudgetConstraint? _budget;
 
     /// <summary>

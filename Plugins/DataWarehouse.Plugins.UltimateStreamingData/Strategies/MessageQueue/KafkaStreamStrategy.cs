@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 
@@ -29,10 +30,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 /// </summary>
 internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, KafkaTopicState> _topics = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, List<StreamMessage>>> _partitionData = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, long>> _consumerOffsets = new();
-    private readonly ConcurrentDictionary<long, bool> _producerSequences = new();
+    private readonly BoundedDictionary<string, KafkaTopicState> _topics = new BoundedDictionary<string, KafkaTopicState>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>> _partitionData = new BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, long>> _consumerOffsets = new BoundedDictionary<string, BoundedDictionary<string, long>>(1000);
+    private readonly BoundedDictionary<long, bool> _producerSequences = new BoundedDictionary<long, bool>(1000);
     private long _nextSequence;
     private long _totalPublished;
     private long _totalConsumed;
@@ -146,7 +147,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
         }
 
         // Get or create partition storage
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
         var partitionMessages = topicPartitions.GetOrAdd(partition, _ => new List<StreamMessage>());
 
         long offset;
@@ -190,7 +191,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
             throw new StreamingException($"Topic '{streamName}' does not exist.");
 
         var groupId = consumerGroup?.GroupId ?? $"anonymous-{Guid.NewGuid():N}";
-        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, long>());
+        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new BoundedDictionary<string, long>(1000));
 
         // Determine start offset
         long startOffset = 0;
@@ -203,7 +204,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
             startOffset = committed;
         }
 
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
 
         // Round-robin across all partitions from the start offset
         for (int p = 0; p < topic.PartitionCount && !ct.IsCancellationRequested; p++)
@@ -257,10 +258,10 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
             throw new StreamingException($"Topic '{streamName}' already exists.");
 
         // Initialize partition storage
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
         for (int i = 0; i < partitions; i++)
         {
-            topicPartitions.TryAdd(i, new List<StreamMessage>());
+            topicPartitions.TryAdd(i, new List<StreamMessage>(1000));
         }
 
         return Task.CompletedTask;
@@ -349,7 +350,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, long>());
+        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new BoundedDictionary<string, long>(1000));
         topicOffsets[consumerGroup.GroupId] = offset.Offset;
         return Task.CompletedTask;
     }
@@ -360,7 +361,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, long>());
+        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new BoundedDictionary<string, long>(1000));
         topicOffsets[consumerGroup.GroupId] = offset.Offset;
         return Task.CompletedTask;
     }
@@ -371,7 +372,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, long>());
+        var topicOffsets = _consumerOffsets.GetOrAdd(streamName, _ => new BoundedDictionary<string, long>(1000));
         var offset = topicOffsets.GetOrAdd(consumerGroup.GroupId, 0);
         return Task.FromResult(new StreamOffset { Partition = 0, Offset = offset });
     }

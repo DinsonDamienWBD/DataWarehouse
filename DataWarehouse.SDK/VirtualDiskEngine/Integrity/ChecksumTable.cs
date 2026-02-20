@@ -2,10 +2,10 @@ using DataWarehouse.SDK.Contracts;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 
@@ -28,7 +28,7 @@ public sealed class ChecksumTable : IAsyncDisposable
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     // Cache of checksum table blocks (key: checksum table block number, value: block data)
-    private readonly ConcurrentDictionary<long, byte[]> _blockCache = new();
+    private readonly BoundedDictionary<long, byte[]> _blockCache = new BoundedDictionary<long, byte[]>(1000);
 
     // Dirty checksum table blocks that need to be flushed
     private readonly HashSet<long> _dirtyBlocks = new();

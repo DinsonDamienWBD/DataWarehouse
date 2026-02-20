@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Configuration;
 
@@ -453,7 +453,7 @@ public sealed class FaultToleranceValidationResult
 /// </summary>
 public sealed class FaultToleranceManager
 {
-    private readonly ConcurrentDictionary<string, FaultToleranceConfig> _containerConfigs = new();
+    private readonly BoundedDictionary<string, FaultToleranceConfig> _containerConfigs = new BoundedDictionary<string, FaultToleranceConfig>(1000);
     private FaultToleranceConfig _defaultConfig;
     private readonly object _lock = new();
 

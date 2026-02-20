@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.DeviceManagement;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.DeviceManageme
 /// </summary>
 public abstract class DeviceManagementStrategyBase : IoTStrategyBase, IDeviceManagementStrategy
 {
-    protected readonly ConcurrentDictionary<string, DeviceInfo> Devices = new();
-    protected readonly ConcurrentDictionary<string, DeviceTwin> DeviceTwins = new();
+    protected readonly BoundedDictionary<string, DeviceInfo> Devices = new BoundedDictionary<string, DeviceInfo>(1000);
+    protected readonly BoundedDictionary<string, DeviceTwin> DeviceTwins = new BoundedDictionary<string, DeviceTwin>(1000);
 
     public override IoTStrategyCategory Category => IoTStrategyCategory.DeviceManagement;
 
@@ -127,7 +127,7 @@ public class DeviceRegistryStrategy : DeviceManagementStrategyBase
     public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
     {
         Devices.TryGetValue(deviceId, out var device);
-        return Task.FromResult(device);
+        return Task.FromResult<DeviceInfo?>(device);
     }
 }
 
@@ -297,7 +297,7 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
 /// </summary>
 public class FleetManagementStrategy : DeviceManagementStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _deviceGroups = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _deviceGroups = new BoundedDictionary<string, HashSet<string>>(1000);
 
     public override string StrategyId => "fleet-management";
     public override string StrategyName => "Fleet Management";
@@ -387,7 +387,7 @@ public class FleetManagementStrategy : DeviceManagementStrategyBase
     public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
     {
         Devices.TryGetValue(deviceId, out var device);
-        return Task.FromResult(device);
+        return Task.FromResult<DeviceInfo?>(device);
     }
 }
 
@@ -509,6 +509,6 @@ public class DeviceLifecycleStrategy : DeviceManagementStrategyBase
     public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
     {
         Devices.TryGetValue(deviceId, out var device);
-        return Task.FromResult(device);
+        return Task.FromResult<DeviceInfo?>(device);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Infrastructure;
 
@@ -133,7 +134,7 @@ internal sealed class PooledConnection<TConnection> where TConnection : IDatabas
 public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisposable
     where TConnection : IDatabaseProtocolStrategy, IDisposable
 {
-    private readonly ConcurrentDictionary<string, ConnectionPool> _pools = new();
+    private readonly BoundedDictionary<string, ConnectionPool> _pools = new BoundedDictionary<string, ConnectionPool>(1000);
     private readonly ConnectionPoolOptions _defaultOptions;
     private readonly Func<ConnectionParameters, Task<TConnection>> _connectionFactory;
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -364,7 +365,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
         private readonly Func<ConnectionParameters, Task<TConnection>> _connectionFactory;
         private readonly ConnectionPoolManager<TConnection> _manager;
         private readonly ConcurrentQueue<PooledConnection<TConnection>> _available = new();
-        private readonly ConcurrentDictionary<TConnection, PooledConnection<TConnection>> _inUse = new();
+        private readonly BoundedDictionary<TConnection, PooledConnection<TConnection>> _inUse = new BoundedDictionary<TConnection, PooledConnection<TConnection>>(1000);
         private readonly SemaphoreSlim _acquireSemaphore;
         private readonly SemaphoreSlim _createLock = new(1, 1);
         private int _totalCreated;

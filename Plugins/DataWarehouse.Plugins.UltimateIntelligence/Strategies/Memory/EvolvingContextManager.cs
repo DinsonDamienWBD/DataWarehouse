@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -14,9 +14,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 public sealed class AdvancedEvolvingContextManager : IAsyncDisposable
 {
     private readonly IPersistentMemoryStore _store;
-    private readonly ConcurrentDictionary<string, ScopeMetrics> _scopeMetrics = new();
-    private readonly ConcurrentDictionary<string, List<EvolutionEvent>> _evolutionHistory = new();
-    private readonly ConcurrentDictionary<string, double> _domainExpertise = new();
+    private readonly BoundedDictionary<string, ScopeMetrics> _scopeMetrics = new BoundedDictionary<string, ScopeMetrics>(1000);
+    private readonly BoundedDictionary<string, List<EvolutionEvent>> _evolutionHistory = new BoundedDictionary<string, List<EvolutionEvent>>(1000);
+    private readonly BoundedDictionary<string, double> _domainExpertise = new BoundedDictionary<string, double>(1000);
     private readonly SemaphoreSlim _consolidationLock = new(1, 1);
 
     private long _totalConsolidations;
@@ -86,7 +86,7 @@ public sealed class AdvancedEvolvingContextManager : IAsyncDisposable
         {
             TotalContextEntries = _scopeMetrics.Values.Sum(m => m.EntryCount),
             TotalContextBytes = _scopeMetrics.Values.Sum(m => m.TotalBytes),
-            AverageComplexity = _scopeMetrics.Values.Count > 0
+            AverageComplexity = _scopeMetrics.Values.Any()
                 ? _scopeMetrics.Values.Average(m => m.ComplexityScore)
                 : 0,
             ConsolidationCycles = (int)_totalConsolidations,

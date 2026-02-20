@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -75,7 +74,7 @@ public abstract class DocGenStrategyBase
 
 public sealed class DocGenStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, DocGenStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DocGenStrategyBase> _strategies = new BoundedDictionary<string, DocGenStrategyBase>(1000);
     public int Count => _strategies.Count;
     public IReadOnlyCollection<string> RegisteredStrategies => _strategies.Keys.ToList().AsReadOnly();
     public void Register(DocGenStrategyBase strategy) => _strategies[strategy.StrategyId] = strategy;

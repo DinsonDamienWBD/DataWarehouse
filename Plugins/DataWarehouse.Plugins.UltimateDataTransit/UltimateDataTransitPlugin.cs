@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
@@ -44,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitOrchestrator, IDisposable
 {
     private readonly TransitStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, ActiveTransfer> _activeTransfers = new();
+    private readonly BoundedDictionary<string, ActiveTransfer> _activeTransfers = new BoundedDictionary<string, ActiveTransfer>(1000);
     private TransitAuditService? _auditService;
     private QoSThrottlingManager? _qosManager;
     private CostAwareRouter? _costRouter;

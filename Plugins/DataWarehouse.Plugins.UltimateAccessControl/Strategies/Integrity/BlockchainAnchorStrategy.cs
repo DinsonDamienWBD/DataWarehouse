@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class BlockchainAnchorStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BlockchainAnchor> _anchors = new();
+        private readonly BoundedDictionary<string, BlockchainAnchor> _anchors = new BoundedDictionary<string, BlockchainAnchor>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "integrity-blockchain-anchor";

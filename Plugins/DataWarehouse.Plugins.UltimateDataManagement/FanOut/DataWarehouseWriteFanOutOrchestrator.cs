@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
@@ -47,8 +46,8 @@ public enum FanOutDeploymentMode
 /// </remarks>
 public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestratorPluginBase
 {
-    private readonly ConcurrentDictionary<string, long> _writeStats = new();
-    private readonly ConcurrentDictionary<string, IFanOutStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, long> _writeStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, IFanOutStrategy> _strategies = new BoundedDictionary<string, IFanOutStrategy>(1000);
     private readonly List<IContentProcessor> _contentProcessors = new();
     private IMessageBus? _messageBus;
     private IFanOutStrategy _activeStrategy;

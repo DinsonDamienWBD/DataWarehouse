@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Scaling;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Scaling;
 /// </summary>
 public sealed class KedaScalingStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KedaScaledObject> _scaledObjects = new();
+    private readonly BoundedDictionary<string, KedaScaledObject> _scaledObjects = new BoundedDictionary<string, KedaScaledObject>(1000);
 
     public override string StrategyId => "scaling-keda";
     public override string DisplayName => "KEDA Scaling";
@@ -87,7 +87,7 @@ public sealed class KedaScalingStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class ConcurrencyLimitsStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConcurrencyConfig> _configs = new();
+    private readonly BoundedDictionary<string, ConcurrencyConfig> _configs = new BoundedDictionary<string, ConcurrencyConfig>(1000);
 
     public override string StrategyId => "scaling-concurrency-limits";
     public override string DisplayName => "Concurrency Limits";

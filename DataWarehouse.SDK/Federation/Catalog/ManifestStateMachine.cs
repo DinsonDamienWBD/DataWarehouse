@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Federation.Addressing;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Catalog;
 
@@ -32,7 +32,7 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Raft state machine for manifest")]
 internal sealed class ManifestStateMachine
 {
-    private readonly ConcurrentDictionary<ObjectIdentity, ObjectLocationEntry> _index;
+    private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _index;
     private readonly ReaderWriterLockSlim _lock;
 
     /// <summary>
@@ -40,7 +40,7 @@ internal sealed class ManifestStateMachine
     /// </summary>
     public ManifestStateMachine()
     {
-        _index = new ConcurrentDictionary<ObjectIdentity, ObjectLocationEntry>();
+        _index = new BoundedDictionary<ObjectIdentity, ObjectLocationEntry>(1000);
         _lock = new ReaderWriterLockSlim();
     }
 
@@ -210,7 +210,7 @@ internal sealed class ManifestStateMachine
             var entries = _index.Values;
             return new ManifestStatistics
             {
-                TotalObjects = entries.Count,
+                TotalObjects = entries.Count(),
                 TotalBytes = entries.Sum(e => e.SizeBytes),
                 AverageReplication = entries.Any() ? entries.Average(e => e.ReplicationFactor) : 0,
                 UniqueNodes = entries.SelectMany(e => e.NodeIds).Distinct().Count()

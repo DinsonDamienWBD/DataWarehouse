@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading.Channels;
 using DataWarehouse.SDK.AI;
@@ -37,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateStreamingData;
 public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposable
 {
     private readonly StreamingStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, StreamingPolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, StreamingPolicy> _policies = new BoundedDictionary<string, StreamingPolicy>(1000);
     private bool _disposed;
 
     // Configuration
@@ -645,7 +644,7 @@ public sealed record StreamingStatistics
 /// </summary>
 public sealed class StreamingStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IStreamingDataStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IStreamingDataStrategy> _strategies = new BoundedDictionary<string, IStreamingDataStrategy>(1000);
 
     public int Count => _strategies.Count;
 

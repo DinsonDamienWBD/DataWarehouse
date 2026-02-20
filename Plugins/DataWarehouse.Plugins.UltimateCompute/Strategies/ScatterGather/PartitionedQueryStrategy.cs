@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.ScatterGather;
 
@@ -49,7 +49,7 @@ internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
             }
 
             // Parallel partition scan with sort
-            var partitionResults = new ConcurrentDictionary<int, List<string>>();
+            var partitionResults = new BoundedDictionary<int, List<string>>(1000);
             var codeStr = task.GetCodeAsString();
 
             await Parallel.ForEachAsync(

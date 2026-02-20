@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class SelfReplicatingStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<ReplicaLocation> _replicaLocations = new();
-        private readonly ConcurrentDictionary<string, ReplicaStatus> _replicaStatus = new();
+        private readonly BoundedDictionary<string, ReplicaStatus> _replicaStatus = new BoundedDictionary<string, ReplicaStatus>(1000);
         private int _replicationFactor = 3;
         private bool _enableErasureCoding = false;
         private int _erasureDataShards = 4;

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.DataMesh;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataMesh;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 /// </summary>
 public sealed class DataMeshStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataMeshStrategy> _strategies =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDataMeshStrategy> _strategies =
+        new(1000);
 
     /// <summary>Registers a strategy.</summary>
     public void Register(IDataMeshStrategy strategy)

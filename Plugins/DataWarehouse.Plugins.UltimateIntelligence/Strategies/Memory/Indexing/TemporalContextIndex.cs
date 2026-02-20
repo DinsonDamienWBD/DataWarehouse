@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -17,10 +17,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class TemporalContextIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, TemporalEntry> _entries = new();
+    private readonly BoundedDictionary<string, TemporalEntry> _entries = new BoundedDictionary<string, TemporalEntry>(1000);
     private readonly SortedDictionary<DateTimeOffset, HashSet<string>> _creationIndex = new();
     private readonly SortedDictionary<DateTimeOffset, HashSet<string>> _accessIndex = new();
-    private readonly ConcurrentDictionary<string, TimeSpanSummary> _summaries = new();
+    private readonly BoundedDictionary<string, TimeSpanSummary> _summaries = new BoundedDictionary<string, TimeSpanSummary>(1000);
     private readonly ReaderWriterLockSlim _indexLock = new();
 
     private const int MaxEntriesPerTimeSlot = 10000;

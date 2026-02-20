@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.AIEnhanced;
 
@@ -26,7 +26,7 @@ public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
         Tags = ["ai", "optimization", "predictive"]
     };
 
-    private readonly ConcurrentDictionary<string, double> _taskPerformanceHistory = new();
+    private readonly BoundedDictionary<string, double> _taskPerformanceHistory = new BoundedDictionary<string, double>(1000);
 
     public override async Task<WorkflowResult> ExecuteAsync(
         WorkflowDefinition workflow,
@@ -104,8 +104,8 @@ public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class SelfLearningWorkflowStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<double>> _executionHistory = new();
-    private readonly ConcurrentDictionary<string, int> _failureHistory = new();
+    private readonly BoundedDictionary<string, List<double>> _executionHistory = new BoundedDictionary<string, List<double>>(1000);
+    private readonly BoundedDictionary<string, int> _failureHistory = new BoundedDictionary<string, int>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -205,7 +205,7 @@ public sealed class SelfLearningWorkflowStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, (double Mean, double StdDev)> _taskStats = new();
+    private readonly BoundedDictionary<string, (double Mean, double StdDev)> _taskStats = new BoundedDictionary<string, (double Mean, double StdDev)>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -299,7 +299,7 @@ public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class PredictiveScalingStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Queue<double>> _loadHistory = new();
+    private readonly BoundedDictionary<string, Queue<double>> _loadHistory = new BoundedDictionary<string, Queue<double>>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -415,7 +415,7 @@ public sealed class PredictiveScalingStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class IntelligentRetryStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<(bool Success, string? ErrorType)>> _retryHistory = new();
+    private readonly BoundedDictionary<string, List<(bool Success, string? ErrorType)>> _retryHistory = new BoundedDictionary<string, List<(bool Success, string? ErrorType)>>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {

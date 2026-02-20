@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
 using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
 using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 {
@@ -519,13 +519,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     public sealed class CryptoRaidStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
-        private readonly ConcurrentDictionary<string, byte[]> _diskKeys;
+        private readonly BoundedDictionary<string, byte[]> _diskKeys;
         private readonly byte[] _masterKey;
 
         public CryptoRaidStrategy(int chunkSize = 64 * 1024, byte[]? masterKey = null)
         {
             _chunkSize = chunkSize;
-            _diskKeys = new ConcurrentDictionary<string, byte[]>();
+            _diskKeys = new BoundedDictionary<string, byte[]>(1000);
             _masterKey = masterKey ?? GenerateKey();
         }
 
@@ -943,13 +943,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     public sealed class MaidStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
-        private readonly ConcurrentDictionary<string, DiskPowerState> _diskStates;
+        private readonly BoundedDictionary<string, DiskPowerState> _diskStates;
         private readonly TimeSpan _spinDownDelay;
 
         public MaidStrategy(int chunkSize = 64 * 1024, int spinDownMinutes = 10)
         {
             _chunkSize = chunkSize;
-            _diskStates = new ConcurrentDictionary<string, DiskPowerState>();
+            _diskStates = new BoundedDictionary<string, DiskPowerState>(1000);
             _spinDownDelay = TimeSpan.FromMinutes(spinDownMinutes);
         }
 

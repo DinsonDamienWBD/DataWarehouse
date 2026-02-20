@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -8,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class GeolocationServiceStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CachedLocation> _locationCache = new();
+        private readonly BoundedDictionary<string, CachedLocation> _locationCache = new BoundedDictionary<string, CachedLocation>(1000);
         private readonly List<IGeolocationProvider> _providers = new();
         private readonly SemaphoreSlim _providerLock = new(1, 1);
         private bool _disposed;
@@ -180,7 +180,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             IEnumerable<string> ipAddresses,
             CancellationToken cancellationToken = default)
         {
-            var results = new ConcurrentDictionary<string, GeolocationResult>();
+            var results = new BoundedDictionary<string, GeolocationResult>(1000);
             var tasks = ipAddresses.Distinct().Select(async ip =>
             {
                 var result = await ResolveLocationAsync(ip, cancellationToken);
@@ -209,11 +209,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
             return new GeolocationCacheStats
             {
-                TotalEntries = entries.Length,
+                TotalEntries = entries.Count(),
                 ValidEntries = entries.Count(e => e.Value.ExpiresAt > now),
                 ExpiredEntries = entries.Count(e => e.Value.ExpiresAt <= now),
-                OldestEntry = entries.Length > 0 ? entries.Min(e => e.Value.ExpiresAt.Subtract(_cacheTtl)) : (DateTime?)null,
-                NewestEntry = entries.Length > 0 ? entries.Max(e => e.Value.ExpiresAt.Subtract(_cacheTtl)) : (DateTime?)null
+                OldestEntry = entries.Any() ? entries.Min(e => e.Value.ExpiresAt.Subtract(_cacheTtl)) : (DateTime?)null,
+                NewestEntry = entries.Any() ? entries.Max(e => e.Value.ExpiresAt.Subtract(_cacheTtl)) : (DateTime?)null
             };
         }
 
@@ -707,7 +707,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </summary>
     internal sealed class LocalDatabaseProvider : IGeolocationProvider
     {
-        private readonly ConcurrentDictionary<string, string> _staticMappings = new();
+        private readonly BoundedDictionary<string, string> _staticMappings = new BoundedDictionary<string, string>(1000);
 
         public string ProviderName => "LocalDatabase";
         public bool IsEnabled { get; set; } = true;

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMicroservices.Strategies.ServiceDiscovery;
 
@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateMicroservices.Strategies.ServiceDiscover
 /// </summary>
 public sealed class ConsulServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ServiceInstance> _services = new();
+    private readonly BoundedDictionary<string, ServiceInstance> _services = new BoundedDictionary<string, ServiceInstance>(1000);
 
     public override string StrategyId => "discovery-consul";
     public override string DisplayName => "Consul Service Discovery";
@@ -63,7 +63,7 @@ public sealed class ConsulServiceDiscoveryStrategy : MicroservicesStrategyBase
 /// </summary>
 public sealed class EurekaServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ServiceInstance> _registry = new();
+    private readonly BoundedDictionary<string, ServiceInstance> _registry = new BoundedDictionary<string, ServiceInstance>(1000);
 
     public override string StrategyId => "discovery-eureka";
     public override string DisplayName => "Eureka Service Discovery";

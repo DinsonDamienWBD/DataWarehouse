@@ -1,6 +1,6 @@
 // 91.D2.5: Bad Block Remapping - Remap bad sectors automatically
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.RAID;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class BadBlockRemapping
 {
-    private readonly ConcurrentDictionary<string, DiskBadBlockMap> _diskMaps = new();
-    private readonly ConcurrentDictionary<string, RemappingStatistics> _statistics = new();
+    private readonly BoundedDictionary<string, DiskBadBlockMap> _diskMaps = new BoundedDictionary<string, DiskBadBlockMap>(1000);
+    private readonly BoundedDictionary<string, RemappingStatistics> _statistics = new BoundedDictionary<string, RemappingStatistics>(1000);
     private readonly object _remapLock = new();
 
     /// <summary>
@@ -287,8 +287,8 @@ public sealed class BadBlockRemapping
 public sealed class DiskBadBlockMap
 {
     private readonly string _diskId;
-    private readonly ConcurrentDictionary<long, long> _remappings = new();
-    private readonly ConcurrentDictionary<long, BadBlockType> _blockTypes = new();
+    private readonly BoundedDictionary<long, long> _remappings = new BoundedDictionary<long, long>(1000);
+    private readonly BoundedDictionary<long, BadBlockType> _blockTypes = new BoundedDictionary<long, BadBlockType>(1000);
     private long _nextSpareBlock;
     private readonly object _spareLock = new();
 

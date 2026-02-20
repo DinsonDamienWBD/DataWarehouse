@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Financial;
 
@@ -223,7 +224,7 @@ public sealed class FixSession
     public long IncomingSeqNum = 1;
 
     /// <summary>Sent messages for potential resend.</summary>
-    public ConcurrentDictionary<long, FixMessage> SentMessages { get; } = new();
+    public BoundedDictionary<long, FixMessage> SentMessages { get; } = new BoundedDictionary<long, FixMessage>(1000);
 
     /// <summary>Received messages.</summary>
     public ConcurrentQueue<FixMessage> ReceivedMessages { get; } = new();
@@ -261,8 +262,8 @@ internal sealed class FixStreamStrategy : StreamingDataStrategyBase
     /// <summary>FIX field delimiter (SOH character, ASCII 0x01).</summary>
     private const char Soh = '\x01';
 
-    private readonly ConcurrentDictionary<string, FixSession> _sessions = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<FixMessage>> _messageQueues = new();
+    private readonly BoundedDictionary<string, FixSession> _sessions = new BoundedDictionary<string, FixSession>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<FixMessage>> _messageQueues = new BoundedDictionary<string, ConcurrentQueue<FixMessage>>(1000);
     private long _totalMessages;
     private long _totalErrors;
 

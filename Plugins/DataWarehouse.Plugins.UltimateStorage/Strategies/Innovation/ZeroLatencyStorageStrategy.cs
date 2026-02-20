@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -40,10 +41,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enablePredictivePrefetch = true;
         private bool _enableAccessPatternLearning = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, CachedObject> _l1Cache = new();
-        private readonly ConcurrentDictionary<string, string> _l2CacheIndex = new();
-        private readonly ConcurrentDictionary<string, AccessPattern> _accessPatterns = new();
-        private readonly ConcurrentDictionary<string, CorrelationScore> _accessCorrelations = new();
+        private readonly BoundedDictionary<string, CachedObject> _l1Cache = new BoundedDictionary<string, CachedObject>(1000);
+        private readonly BoundedDictionary<string, string> _l2CacheIndex = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, AccessPattern> _accessPatterns = new BoundedDictionary<string, AccessPattern>(1000);
+        private readonly BoundedDictionary<string, CorrelationScore> _accessCorrelations = new BoundedDictionary<string, CorrelationScore>(1000);
         private readonly ConcurrentQueue<PrefetchTask> _prefetchQueue = new();
         private long _currentL1Size = 0;
         private Timer? _prefetchTimer = null;

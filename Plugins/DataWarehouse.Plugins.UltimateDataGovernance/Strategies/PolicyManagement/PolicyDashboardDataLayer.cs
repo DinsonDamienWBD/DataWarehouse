@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.PolicyManagement;
 
@@ -8,12 +8,12 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.PolicyManageme
 /// </summary>
 public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PolicyDashboardItem> _policyItems = new();
-    private readonly ConcurrentDictionary<string, List<PolicyVersionRecord>> _versionHistory = new();
-    private readonly ConcurrentDictionary<string, PolicyApprovalWorkflow> _workflows = new();
-    private readonly ConcurrentDictionary<string, PolicyTestResult> _testResults = new();
-    private readonly ConcurrentDictionary<string, PolicyEffectivenessMetric> _effectivenessMetrics = new();
-    private readonly ConcurrentDictionary<string, ComplianceGap> _complianceGaps = new();
+    private readonly BoundedDictionary<string, PolicyDashboardItem> _policyItems = new BoundedDictionary<string, PolicyDashboardItem>(1000);
+    private readonly BoundedDictionary<string, List<PolicyVersionRecord>> _versionHistory = new BoundedDictionary<string, List<PolicyVersionRecord>>(1000);
+    private readonly BoundedDictionary<string, PolicyApprovalWorkflow> _workflows = new BoundedDictionary<string, PolicyApprovalWorkflow>(1000);
+    private readonly BoundedDictionary<string, PolicyTestResult> _testResults = new BoundedDictionary<string, PolicyTestResult>(1000);
+    private readonly BoundedDictionary<string, PolicyEffectivenessMetric> _effectivenessMetrics = new BoundedDictionary<string, PolicyEffectivenessMetric>(1000);
+    private readonly BoundedDictionary<string, ComplianceGap> _complianceGaps = new BoundedDictionary<string, ComplianceGap>(1000);
 
     public override string StrategyId => "policy-dashboard-data-layer";
     public override string DisplayName => "Policy Dashboard Data Layer";

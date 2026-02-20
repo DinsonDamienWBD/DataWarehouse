@@ -1,7 +1,6 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
@@ -26,12 +25,12 @@ public sealed class RansomwareVaccinationService
     /// Tracks vaccination records for objects that have been vaccinated.
     /// Maps object ID to the most recent vaccination info for dashboard queries.
     /// </summary>
-    private readonly ConcurrentDictionary<Guid, RansomwareVaccinationInfo> _vaccinationRecords = new();
+    private readonly BoundedDictionary<Guid, RansomwareVaccinationInfo> _vaccinationRecords = new BoundedDictionary<Guid, RansomwareVaccinationInfo>(1000);
 
     /// <summary>
     /// Tracks vaccination metadata for auditing and re-vaccination decisions.
     /// </summary>
-    private readonly ConcurrentDictionary<Guid, VaccinationMetadata> _vaccinationMetadata = new();
+    private readonly BoundedDictionary<Guid, VaccinationMetadata> _vaccinationMetadata = new BoundedDictionary<Guid, VaccinationMetadata>(1000);
 
     /// <summary>
     /// Internal record tracking vaccination metadata for a protected object.

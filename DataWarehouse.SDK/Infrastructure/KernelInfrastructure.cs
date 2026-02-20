@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -241,10 +242,10 @@ public sealed class VersionCompatibility
 /// </summary>
 public sealed class PluginReloadManager : IPluginReloader, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, PluginAssemblyLoadContext> _contexts = new();
-    private readonly ConcurrentDictionary<string, ReloadPhase> _reloadStatus = new();
-    private readonly ConcurrentDictionary<string, byte[]> _preservedState = new();
-    private readonly ConcurrentDictionary<string, WeakReference<Assembly>> _loadedAssemblies = new();
+    private readonly BoundedDictionary<string, PluginAssemblyLoadContext> _contexts = new BoundedDictionary<string, PluginAssemblyLoadContext>(1000);
+    private readonly BoundedDictionary<string, ReloadPhase> _reloadStatus = new BoundedDictionary<string, ReloadPhase>(1000);
+    private readonly BoundedDictionary<string, byte[]> _preservedState = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, WeakReference<Assembly>> _loadedAssemblies = new BoundedDictionary<string, WeakReference<Assembly>>(1000);
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private readonly TimeSpan _drainTimeout;
     private readonly int _maxRetryAttempts;
@@ -995,8 +996,8 @@ public sealed class HealthCheckOptions
 /// </summary>
 public sealed class HealthCheckAggregator : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IHealthCheck> _checks = new();
-    private readonly ConcurrentDictionary<string, (HealthCheckResult Result, DateTime CachedAt)> _cache = new();
+    private readonly BoundedDictionary<string, IHealthCheck> _checks = new BoundedDictionary<string, IHealthCheck>(1000);
+    private readonly BoundedDictionary<string, (HealthCheckResult Result, DateTime CachedAt)> _cache = new BoundedDictionary<string, (HealthCheckResult Result, DateTime CachedAt)>(1000);
     private readonly HealthCheckOptions _options;
     private volatile bool _disposed;
 
@@ -1326,8 +1327,8 @@ public interface IConfigurationValidator
 /// </summary>
 public sealed class ConfigurationHotReloader : IConfigurationChangeNotifier, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, object> _currentConfig = new();
-    private readonly ConcurrentDictionary<string, object> _previousConfig = new();
+    private readonly BoundedDictionary<string, object> _currentConfig = new BoundedDictionary<string, object>(1000);
+    private readonly BoundedDictionary<string, object> _previousConfig = new BoundedDictionary<string, object>(1000);
     private readonly List<(string? Section, Func<ConfigurationChangeEvent, Task> Handler)> _handlers = new();
     private readonly object _handlersLock = new();
     private readonly FileSystemWatcher? _watcher;
@@ -1753,7 +1754,7 @@ public interface IAIProviderRegistry
 /// </summary>
 public sealed class AIProviderRegistry : IAIProviderRegistry, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IAIProviderRegistration> _providers = new();
+    private readonly BoundedDictionary<string, IAIProviderRegistration> _providers = new BoundedDictionary<string, IAIProviderRegistration>(1000);
     private readonly Timer _availabilityCheckTimer;
     private readonly TimeSpan _availabilityCheckInterval;
     private volatile bool _disposed;
@@ -2006,7 +2007,7 @@ internal sealed class TokenBucket
 /// </summary>
 public sealed class TokenBucketRateLimiter : IRateLimiter, IDisposable
 {
-    private readonly ConcurrentDictionary<string, TokenBucket> _buckets = new();
+    private readonly BoundedDictionary<string, TokenBucket> _buckets = new BoundedDictionary<string, TokenBucket>(1000);
     private readonly ConcurrentDictionary<string, Channel<TaskCompletionSource<RateLimitResult>>> _queues = new();
     private readonly RateLimitPolicy _policy;
     private readonly Timer _cleanupTimer;

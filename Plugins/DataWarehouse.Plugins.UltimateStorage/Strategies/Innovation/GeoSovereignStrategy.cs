@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -35,9 +35,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _requireExplicitConsent = true;
         private string _defaultJurisdiction = "EU";
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, StorageRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, DataResidencyRecord> _residencyRecords = new();
-        private readonly ConcurrentDictionary<string, List<ComplianceAuditEntry>> _auditLog = new();
+        private readonly BoundedDictionary<string, StorageRegion> _regions = new BoundedDictionary<string, StorageRegion>(1000);
+        private readonly BoundedDictionary<string, DataResidencyRecord> _residencyRecords = new BoundedDictionary<string, DataResidencyRecord>(1000);
+        private readonly BoundedDictionary<string, List<ComplianceAuditEntry>> _auditLog = new BoundedDictionary<string, List<ComplianceAuditEntry>>(1000);
 
         public override string StrategyId => "geo-sovereign-storage";
         public override string Name => "Geo-Sovereign Compliance Storage";

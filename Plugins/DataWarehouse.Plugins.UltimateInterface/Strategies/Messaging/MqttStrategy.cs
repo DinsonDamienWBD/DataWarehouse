@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 
@@ -36,9 +36,9 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 /// </remarks>
 internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, MqttSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, List<MqttMessage>> _retainedMessages = new();
-    private readonly ConcurrentDictionary<string, MqttSession> _sessions = new();
+    private readonly BoundedDictionary<string, MqttSubscription> _subscriptions = new BoundedDictionary<string, MqttSubscription>(1000);
+    private readonly BoundedDictionary<string, List<MqttMessage>> _retainedMessages = new BoundedDictionary<string, List<MqttMessage>>(1000);
+    private readonly BoundedDictionary<string, MqttSession> _sessions = new BoundedDictionary<string, MqttSession>(1000);
 
     public override string StrategyId => "mqtt";
     public string DisplayName => "MQTT";

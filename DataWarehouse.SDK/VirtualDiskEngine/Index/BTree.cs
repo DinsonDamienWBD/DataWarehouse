@@ -3,12 +3,12 @@ using DataWarehouse.SDK.VirtualDiskEngine.BlockAllocation;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.VirtualDiskEngine.Index;
 
@@ -28,7 +28,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     private readonly IWriteAheadLog _wal;
     private readonly int _blockSize;
     private readonly ReaderWriterLockSlim _lock;
-    private readonly ConcurrentDictionary<long, (BTreeNode Node, DateTime AccessTime)> _nodeCache;
+    private readonly BoundedDictionary<long, (BTreeNode Node, DateTime AccessTime)> _nodeCache;
     private const int MaxCachedNodes = 1000;
 
     private long _rootBlockNumber;
@@ -54,7 +54,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         _blockSize = blockSize;
         _rootBlockNumber = rootBlockNumber;
         _lock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
-        _nodeCache = new ConcurrentDictionary<long, (BTreeNode, DateTime)>();
+        _nodeCache = new BoundedDictionary<long, (BTreeNode, DateTime)>(1000);
     }
 
     /// <summary>

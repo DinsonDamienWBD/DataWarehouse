@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using static DataWarehouse.SDK.Contracts.ConsensusPluginBase;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConsensus;
 
@@ -82,7 +83,7 @@ public sealed class RaftStrategy : IRaftStrategy
 /// </summary>
 public sealed class PaxosStrategy : IRaftStrategy
 {
-    private readonly ConcurrentDictionary<int, PaxosGroupState> _groupStates = new();
+    private readonly BoundedDictionary<int, PaxosGroupState> _groupStates = new BoundedDictionary<int, PaxosGroupState>(1000);
     private readonly object _lock = new();
     private long _nextProposalNumber = 1;
     private bool _isStableLeader;
@@ -299,8 +300,8 @@ public sealed class PaxosStrategy : IRaftStrategy
     {
         public long NextSlot { get; set; }
         public int ConfiguredAcceptorCount { get; set; } = 3;
-        public ConcurrentDictionary<long, PaxosLogEntry> CommittedLog { get; } = new();
-        private readonly ConcurrentDictionary<int, AcceptorState> _acceptors = new();
+        public BoundedDictionary<long, PaxosLogEntry> CommittedLog { get; } = new BoundedDictionary<long, PaxosLogEntry>(1000);
+        private readonly BoundedDictionary<int, AcceptorState> _acceptors = new BoundedDictionary<int, AcceptorState>(1000);
 
         public AcceptorState GetAcceptor(int id) => _acceptors.GetOrAdd(id, _ => new AcceptorState());
     }
@@ -329,7 +330,7 @@ public sealed class PaxosStrategy : IRaftStrategy
 /// </summary>
 public sealed class PbftStrategy : IRaftStrategy
 {
-    private readonly ConcurrentDictionary<int, PbftGroupState> _groupStates = new();
+    private readonly BoundedDictionary<int, PbftGroupState> _groupStates = new BoundedDictionary<int, PbftGroupState>(1000);
     private readonly int _faultTolerance;
     private readonly int _totalNodes;
     private readonly int _quorumSize;
@@ -672,10 +673,10 @@ public sealed class PbftStrategy : IRaftStrategy
         public int HighWatermark { get; set; }
         public long LastApplied { get; set; }
         public HashSet<int> PreparedSet { get; } = new();
-        public ConcurrentDictionary<int, PbftMessage> PrePrepareLog { get; } = new();
-        public ConcurrentDictionary<int, ConcurrentBag<int>> PrepareMessages { get; } = new();
-        public ConcurrentDictionary<int, ConcurrentBag<int>> CommitMessages { get; } = new();
-        public ConcurrentDictionary<int, PbftCommittedEntry> CommittedEntries { get; } = new();
+        public BoundedDictionary<int, PbftMessage> PrePrepareLog { get; } = new BoundedDictionary<int, PbftMessage>(1000);
+        public BoundedDictionary<int, ConcurrentBag<int>> PrepareMessages { get; } = new BoundedDictionary<int, ConcurrentBag<int>>(1000);
+        public BoundedDictionary<int, ConcurrentBag<int>> CommitMessages { get; } = new BoundedDictionary<int, ConcurrentBag<int>>(1000);
+        public BoundedDictionary<int, PbftCommittedEntry> CommittedEntries { get; } = new BoundedDictionary<int, PbftCommittedEntry>(1000);
         public List<PbftCheckpoint> Checkpoints { get; } = new();
         public List<PbftViewChange> ViewChangeHistory { get; } = new();
 
@@ -713,7 +714,7 @@ public sealed class PbftStrategy : IRaftStrategy
 /// </summary>
 public sealed class ZabStrategy : IRaftStrategy
 {
-    private readonly ConcurrentDictionary<int, ZabGroupState> _groupStates = new();
+    private readonly BoundedDictionary<int, ZabGroupState> _groupStates = new BoundedDictionary<int, ZabGroupState>(1000);
     private readonly object _lock = new();
     private long _epoch;
     private long _counter;
@@ -1025,7 +1026,7 @@ public sealed class ZabStrategy : IRaftStrategy
     {
         public long LastCommittedZxid { get; set; }
         public List<ZabTransaction> CommittedLog { get; } = new();
-        private readonly ConcurrentDictionary<int, FollowerState> _followers = new();
+        private readonly BoundedDictionary<int, FollowerState> _followers = new BoundedDictionary<int, FollowerState>(1000);
 
         public FollowerState GetFollower(int id) => _followers.GetOrAdd(id, _ => new FollowerState());
     }

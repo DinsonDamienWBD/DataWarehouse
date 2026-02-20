@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 
@@ -63,9 +63,9 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
 
     private const int MaxRollingWindowSize = 1000;
 
-    private readonly ConcurrentDictionary<string, long> _counters = new();
-    private readonly ConcurrentDictionary<string, long> _gauges = new();
-    private readonly ConcurrentDictionary<string, RollingWindow> _distributions = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, long> _gauges = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, RollingWindow> _distributions = new BoundedDictionary<string, RollingWindow>(1000);
 
     // Alert thresholds (configurable via InitializeAsync)
     private double _expirationRateThreshold = 0.10; // 10%

@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 /// </summary>
 public sealed class IoTStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IIoTStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IIoTStrategyBase> _strategies = new BoundedDictionary<string, IIoTStrategyBase>(1000);
     private IMessageBus? _messageBus;
 
     /// <summary>

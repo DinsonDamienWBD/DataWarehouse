@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResourceManager;
 
@@ -182,8 +182,8 @@ public interface IResourceStrategy
 /// </summary>
 public abstract class ResourceStrategyBase : IResourceStrategy
 {
-    private readonly ConcurrentDictionary<string, ResourceAllocation> _allocations = new();
-    private readonly ConcurrentDictionary<string, ResourceQuota> _quotas = new();
+    private readonly BoundedDictionary<string, ResourceAllocation> _allocations = new BoundedDictionary<string, ResourceAllocation>(1000);
+    private readonly BoundedDictionary<string, ResourceQuota> _quotas = new BoundedDictionary<string, ResourceQuota>(1000);
     private bool _initialized;
 
     /// <inheritdoc/>
@@ -281,7 +281,7 @@ public abstract class ResourceStrategyBase : IResourceStrategy
 /// </summary>
 public sealed class ResourceStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IResourceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IResourceStrategy> _strategies = new BoundedDictionary<string, IResourceStrategy>(1000);
 
     /// <summary>Registers a strategy.</summary>
     public void Register(IResourceStrategy strategy)

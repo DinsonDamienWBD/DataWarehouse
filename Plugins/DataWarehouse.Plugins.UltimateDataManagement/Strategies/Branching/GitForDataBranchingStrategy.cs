@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Branching;
 
@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Branching;
 /// </remarks>
 public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectStore> _stores = new();
+    private readonly BoundedDictionary<string, ObjectStore> _stores = new BoundedDictionary<string, ObjectStore>(1000);
     private readonly object _globalLock = new();
 
     /// <summary>
@@ -35,25 +35,25 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
         private readonly object _lock = new();
 
         // Branch storage
-        public ConcurrentDictionary<string, DataBranch> Branches { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, DataBranch> Branches { get; } = new BoundedDictionary<string, DataBranch>(1000);
 
         // Block storage with deduplication (hash -> block)
-        public ConcurrentDictionary<string, DataBlock> BlocksByHash { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, DataBlock> BlocksByHash { get; } = new BoundedDictionary<string, DataBlock>(1000);
 
         // Block ID to hash mapping
-        public ConcurrentDictionary<string, string> BlockIdToHash { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, string> BlockIdToHash { get; } = new BoundedDictionary<string, string>(1000);
 
         // Pull requests
-        public ConcurrentDictionary<string, PullRequest> PullRequests { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, PullRequest> PullRequests { get; } = new BoundedDictionary<string, PullRequest>(1000);
 
         // Permissions (branchId -> principal -> permissions)
-        public ConcurrentDictionary<string, ConcurrentDictionary<string, BranchPermissionEntry>> Permissions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, BoundedDictionary<string, BranchPermissionEntry>> Permissions { get; } = new BoundedDictionary<string, BoundedDictionary<string, BranchPermissionEntry>>(1000);
 
         // Pending merge conflicts (mergeId -> conflicts)
-        public ConcurrentDictionary<string, List<MergeConflict>> PendingConflicts { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, List<MergeConflict>> PendingConflicts { get; } = new BoundedDictionary<string, List<MergeConflict>>(1000);
 
         // Deleted branches for GC
-        public ConcurrentDictionary<string, DateTime> DeletedBranches { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, DateTime> DeletedBranches { get; } = new BoundedDictionary<string, DateTime>(1000);
 
         public ObjectStore(string objectId)
         {
@@ -70,7 +70,7 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
             Branches["main"] = mainBranch;
 
             // Set default permissions for main branch
-            var mainPerms = new ConcurrentDictionary<string, BranchPermissionEntry>(StringComparer.OrdinalIgnoreCase);
+            var mainPerms = new BoundedDictionary<string, BranchPermissionEntry>(1000);
             mainPerms["*"] = new BranchPermissionEntry
             {
                 PrincipalId = "*",
@@ -176,14 +176,14 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
             // Inherit permissions from parent if requested
             if (options.InheritPermissions && store.Permissions.TryGetValue(fromBranch, out var parentPerms))
             {
-                var newPerms = new ConcurrentDictionary<string, BranchPermissionEntry>(StringComparer.OrdinalIgnoreCase);
+                var newPerms = new BoundedDictionary<string, BranchPermissionEntry>(1000);
                 foreach (var perm in parentPerms)
                     newPerms[perm.Key] = perm.Value;
                 store.Permissions[branchName] = newPerms;
             }
             else
             {
-                store.Permissions[branchName] = new ConcurrentDictionary<string, BranchPermissionEntry>(StringComparer.OrdinalIgnoreCase);
+                store.Permissions[branchName] = new BoundedDictionary<string, BranchPermissionEntry>(1000);
             }
 
             store.Branches[branchName] = newBranch;
@@ -1037,7 +1037,7 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
             return Task.FromResult(false);
 
         var branchPerms = store.Permissions.GetOrAdd(branchName,
-            _ => new ConcurrentDictionary<string, BranchPermissionEntry>(StringComparer.OrdinalIgnoreCase));
+            _ => new BoundedDictionary<string, BranchPermissionEntry>(1000));
 
         branchPerms[principalId] = new BranchPermissionEntry
         {

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -26,9 +27,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class CrossBorderExceptionsStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ExceptionRequest> _pendingRequests = new();
-        private readonly ConcurrentDictionary<string, GrantedExcep> _activeExceptions = new();
-        private readonly ConcurrentDictionary<string, ExceptionTemplate> _templates = new();
+        private readonly BoundedDictionary<string, ExceptionRequest> _pendingRequests = new BoundedDictionary<string, ExceptionRequest>(1000);
+        private readonly BoundedDictionary<string, GrantedExcep> _activeExceptions = new BoundedDictionary<string, GrantedExcep>(1000);
+        private readonly BoundedDictionary<string, ExceptionTemplate> _templates = new BoundedDictionary<string, ExceptionTemplate>(1000);
         private readonly ConcurrentBag<ExceptionAuditEntry> _auditLog = new();
 
         private int _requiredApprovals = 2;

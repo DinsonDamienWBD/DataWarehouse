@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -12,9 +13,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 public sealed class HybridMemoryStore : IPersistentMemoryStore
 {
     private readonly IPersistentMemoryStore _persistentStore;
-    private readonly ConcurrentDictionary<string, ContextEntry> _hotCache = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _accessTimes = new();
-    private readonly ConcurrentDictionary<string, long> _accessCounts = new();
+    private readonly BoundedDictionary<string, ContextEntry> _hotCache = new BoundedDictionary<string, ContextEntry>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _accessTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, long> _accessCounts = new BoundedDictionary<string, long>(1000);
     private readonly ConcurrentQueue<PendingWrite> _writeQueue = new();
     private readonly SemaphoreSlim _migrationLock = new(1, 1);
     private readonly SemaphoreSlim _flushLock = new(1, 1);
@@ -805,7 +806,7 @@ public sealed class TieredHybridMemoryStore : IPersistentMemoryStore
     private readonly HybridMemoryStore _ramToSsd;
     private readonly HybridMemoryStore _ssdToHdd;
     private readonly HybridMemoryStore _hddToCloud;
-    private readonly ConcurrentDictionary<string, StorageTier> _entryTiers = new();
+    private readonly BoundedDictionary<string, StorageTier> _entryTiers = new BoundedDictionary<string, StorageTier>(1000);
     private bool _disposed;
 
     /// <summary>

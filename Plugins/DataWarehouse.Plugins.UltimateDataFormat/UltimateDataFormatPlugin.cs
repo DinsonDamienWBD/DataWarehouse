@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -30,9 +29,9 @@ namespace DataWarehouse.Plugins.UltimateDataFormat;
 /// </summary>
 public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, IDataFormatStrategy> _registry = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<DomainFamily, List<string>> _domainIndex = new();
+    private readonly BoundedDictionary<string, IDataFormatStrategy> _registry = new BoundedDictionary<string, IDataFormatStrategy>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<DomainFamily, List<string>> _domainIndex = new BoundedDictionary<DomainFamily, List<string>>(1000);
     private bool _disposed;
 
     // Configuration

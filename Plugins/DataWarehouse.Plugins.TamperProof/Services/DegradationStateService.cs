@@ -4,7 +4,7 @@
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Infrastructure;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -42,7 +42,7 @@ public class StateChangedEventArgs : EventArgs
 /// </summary>
 internal class DegradationStateService
 {
-    private readonly ConcurrentDictionary<string, InstanceDegradationState> _instanceStates = new();
+    private readonly BoundedDictionary<string, InstanceDegradationState> _instanceStates = new BoundedDictionary<string, InstanceDegradationState>(1000);
     private readonly ILogger<DegradationStateService> _logger;
 
     /// <summary>

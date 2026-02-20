@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -185,9 +185,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class GeographicBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GeographicBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, GeographicRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, List<RegionalReplica>> _replicas = new();
+        private readonly BoundedDictionary<string, GeographicBackup> _backups = new BoundedDictionary<string, GeographicBackup>(1000);
+        private readonly BoundedDictionary<string, GeographicRegion> _regions = new BoundedDictionary<string, GeographicRegion>(1000);
+        private readonly BoundedDictionary<string, List<RegionalReplica>> _replicas = new BoundedDictionary<string, List<RegionalReplica>>(1000);
         private GeographicDistributionPolicy _policy = new();
 
         /// <summary>

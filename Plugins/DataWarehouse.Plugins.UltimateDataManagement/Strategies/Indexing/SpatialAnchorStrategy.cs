@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Spatial;
 using DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 /// </remarks>
 public sealed class SpatialAnchorStrategy : IndexingStrategyBase, ISpatialAnchorStrategy
 {
-    private readonly ConcurrentDictionary<string, SpatialAnchor> _anchors = new();
+    private readonly BoundedDictionary<string, SpatialAnchor> _anchors = new BoundedDictionary<string, SpatialAnchor>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "index.spatial-anchor-ar";

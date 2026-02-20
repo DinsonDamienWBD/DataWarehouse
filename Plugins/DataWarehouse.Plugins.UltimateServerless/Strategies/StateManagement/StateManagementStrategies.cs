@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.StateManagement;
 
@@ -11,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.StateManagement;
 /// </summary>
 public sealed class DurableEntitiesStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EntityState> _entities = new();
+    private readonly BoundedDictionary<string, EntityState> _entities = new BoundedDictionary<string, EntityState>(1000);
 
     public override string StrategyId => "state-durable-entities";
     public override string DisplayName => "Durable Entities";
@@ -107,7 +108,7 @@ public sealed class DurableEntitiesStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class StepFunctionsStateStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WorkflowExecution> _executions = new();
+    private readonly BoundedDictionary<string, WorkflowExecution> _executions = new BoundedDictionary<string, WorkflowExecution>(1000);
 
     public override string StrategyId => "state-step-functions";
     public override string DisplayName => "Step Functions State";
@@ -149,7 +150,7 @@ public sealed class StepFunctionsStateStrategy : ServerlessStrategyBase
     {
         _executions.TryGetValue(executionArn, out var execution);
         RecordOperation("GetExecution");
-        return Task.FromResult(execution);
+        return Task.FromResult<WorkflowExecution?>(execution);
     }
 
     /// <summary>Sends a task success response.</summary>
@@ -184,7 +185,7 @@ public sealed class StepFunctionsStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class RedisStateStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RedisEntry> _store = new();
+    private readonly BoundedDictionary<string, RedisEntry> _store = new BoundedDictionary<string, RedisEntry>(1000);
 
     public override string StrategyId => "state-redis";
     public override string DisplayName => "Redis State";
@@ -296,7 +297,7 @@ public sealed class RedisStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class DynamoDbStateStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DynamoDbItem> _store = new();
+    private readonly BoundedDictionary<string, DynamoDbItem> _store = new BoundedDictionary<string, DynamoDbItem>(1000);
 
     public override string StrategyId => "state-dynamodb";
     public override string DisplayName => "DynamoDB State";
@@ -391,7 +392,7 @@ public sealed class DynamoDbStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class CosmosDbStateStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CosmosDbDocument> _store = new();
+    private readonly BoundedDictionary<string, CosmosDbDocument> _store = new BoundedDictionary<string, CosmosDbDocument>(1000);
 
     public override string StrategyId => "state-cosmosdb";
     public override string DisplayName => "Cosmos DB State";

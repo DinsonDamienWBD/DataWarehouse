@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Metrics;
 
@@ -15,9 +15,9 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Metrics;
 /// </remarks>
 public sealed class PrometheusStrategy : ObservabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, double> _counters = new();
-    private readonly ConcurrentDictionary<string, double> _gauges = new();
-    private readonly ConcurrentDictionary<string, List<double>> _histogramBuckets = new();
+    private readonly BoundedDictionary<string, double> _counters = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, double> _gauges = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, List<double>> _histogramBuckets = new BoundedDictionary<string, List<double>>(1000);
     private readonly HttpClient _httpClient;
     private string _pushGatewayUrl = "http://localhost:9091";
     private string _jobName = "datawarehouse";

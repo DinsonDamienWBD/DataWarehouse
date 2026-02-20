@@ -3,7 +3,6 @@ using DataWarehouse.SDK.Contracts.Distributed;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -32,7 +31,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly List<Action<Proposal>> _commitHandlers = new();
         private readonly CancellationTokenSource _cts = new();
-        private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new();
+        private readonly BoundedDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new BoundedDictionary<string, TaskCompletionSource<bool>>(1000);
         private readonly IRaftLogStore _logStore;
 
         private RaftRole _role = RaftRole.Follower;
@@ -48,7 +47,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         // Security: Membership verification and HMAC authentication (DIST-01, DIST-02, AUTH-06)
         private const long MaxTermJump = 100;
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTermChangeByNode = new();
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastTermChangeByNode = new BoundedDictionary<string, DateTimeOffset>(1000);
         private byte[]? _clusterSecret;
 
         /// <summary>

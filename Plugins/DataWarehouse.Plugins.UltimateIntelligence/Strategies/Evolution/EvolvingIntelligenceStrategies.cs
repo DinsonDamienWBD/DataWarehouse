@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Evolution;
 
@@ -184,8 +184,8 @@ public sealed record UserProfile
 /// </summary>
 public sealed class EvolvingExpertStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EvolutionMetrics> _domainMetrics = new();
-    private readonly ConcurrentDictionary<string, List<(string Query, string Response, bool Success)>> _experienceBuffer = new();
+    private readonly BoundedDictionary<string, EvolutionMetrics> _domainMetrics = new BoundedDictionary<string, EvolutionMetrics>(1000);
+    private readonly BoundedDictionary<string, List<(string Query, string Response, bool Success)>> _experienceBuffer = new BoundedDictionary<string, List<(string Query, string Response, bool Success)>>(1000);
     private string? _storagePath;
 
     /// <inheritdoc/>
@@ -404,8 +404,8 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class AdaptiveModelStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, UserProfile> _userProfiles = new();
-    private readonly ConcurrentDictionary<string, List<(string Query, string Response, int? Rating)>> _userHistory = new();
+    private readonly BoundedDictionary<string, UserProfile> _userProfiles = new BoundedDictionary<string, UserProfile>(1000);
+    private readonly BoundedDictionary<string, List<(string Query, string Response, int? Rating)>> _userHistory = new BoundedDictionary<string, List<(string Query, string Response, int? Rating)>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "evolution-adaptive";
@@ -564,7 +564,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class ContinualLearningStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TaskMetrics> _taskMetrics = new();
+    private readonly BoundedDictionary<string, TaskMetrics> _taskMetrics = new BoundedDictionary<string, TaskMetrics>(1000);
     private readonly List<string> _learnedTasks = new();
 
     /// <inheritdoc/>
@@ -693,7 +693,7 @@ public sealed class ContinualLearningStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KnowledgePackage> _sharedKnowledge = new();
+    private readonly BoundedDictionary<string, KnowledgePackage> _sharedKnowledge = new BoundedDictionary<string, KnowledgePackage>(1000);
     private readonly string _agentId = Guid.NewGuid().ToString();
 
     /// <inheritdoc/>
@@ -847,7 +847,7 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 /// </summary>
 public sealed class MetaLearningStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MetaKnowledge> _metaKnowledge = new();
+    private readonly BoundedDictionary<string, MetaKnowledge> _metaKnowledge = new BoundedDictionary<string, MetaKnowledge>(1000);
     private double _learningEfficiency = 0.5;
 
     /// <inheritdoc/>

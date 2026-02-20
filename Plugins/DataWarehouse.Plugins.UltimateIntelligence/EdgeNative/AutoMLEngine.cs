@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -614,7 +613,7 @@ public sealed class TrainingCheckpointManager
     private readonly IMessageBus? _messageBus;
     private readonly string _checkpointDirectory;
     private readonly TimeSpan _checkpointInterval;
-    private readonly ConcurrentDictionary<string, DateTime> _lastCheckpoints;
+    private readonly BoundedDictionary<string, DateTime> _lastCheckpoints;
 
     /// <summary>
     /// Initializes the checkpoint manager.
@@ -627,7 +626,7 @@ public sealed class TrainingCheckpointManager
         _checkpointInterval = TimeSpan.FromMinutes(checkpointIntervalMinutes);
         _checkpointDirectory = Path.Combine(Path.GetTempPath(), "automl-checkpoints");
         Directory.CreateDirectory(_checkpointDirectory);
-        _lastCheckpoints = new ConcurrentDictionary<string, DateTime>();
+        _lastCheckpoints = new BoundedDictionary<string, DateTime>(1000);
     }
 
     /// <summary>
@@ -737,7 +736,7 @@ public sealed class TrainingCheckpointManager
 public sealed class ModelVersioningHook
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, ModelMetrics> _previousMetrics;
+    private readonly BoundedDictionary<string, ModelMetrics> _previousMetrics;
 
     /// <summary>
     /// Initializes the model versioning hook.
@@ -746,7 +745,7 @@ public sealed class ModelVersioningHook
     public ModelVersioningHook(IMessageBus? messageBus)
     {
         _messageBus = messageBus;
-        _previousMetrics = new ConcurrentDictionary<string, ModelMetrics>();
+        _previousMetrics = new BoundedDictionary<string, ModelMetrics>(1000);
     }
 
     /// <summary>

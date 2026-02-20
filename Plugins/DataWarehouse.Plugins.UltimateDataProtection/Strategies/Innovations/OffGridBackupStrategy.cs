@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -281,8 +281,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class OffGridBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, OffGridBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, OffGridNode> _nodes = new();
+        private readonly BoundedDictionary<string, OffGridBackup> _backups = new BoundedDictionary<string, OffGridBackup>(1000);
+        private readonly BoundedDictionary<string, OffGridNode> _nodes = new BoundedDictionary<string, OffGridNode>(1000);
         private SolarOptimizationSettings _solarSettings = new();
 
         /// <inheritdoc/>

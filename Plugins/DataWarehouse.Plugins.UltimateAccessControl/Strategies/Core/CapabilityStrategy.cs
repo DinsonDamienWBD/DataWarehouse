@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class CapabilityStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, Capability> _capabilities = new();
+        private readonly BoundedDictionary<string, Capability> _capabilities = new BoundedDictionary<string, Capability>(1000);
         private readonly byte[] _signingKey;
 
         public CapabilityStrategy()

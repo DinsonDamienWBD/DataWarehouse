@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.CDC;
 
@@ -11,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.CDC;
 /// </summary>
 public sealed class LogBasedCdcStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CdcConnector> _connectors = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<CdcEvent>> _eventQueues = new();
+    private readonly BoundedDictionary<string, CdcConnector> _connectors = new BoundedDictionary<string, CdcConnector>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<CdcEvent>> _eventQueues = new BoundedDictionary<string, ConcurrentQueue<CdcEvent>>(1000);
     private long _totalEventsCaptured;
 
     public override string StrategyId => "cdc-log-based";
@@ -186,8 +187,8 @@ public sealed class LogBasedCdcStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TriggerConfig> _triggers = new();
-    private readonly ConcurrentDictionary<string, List<ChangeRecord>> _changeTables = new();
+    private readonly BoundedDictionary<string, TriggerConfig> _triggers = new BoundedDictionary<string, TriggerConfig>(1000);
+    private readonly BoundedDictionary<string, List<ChangeRecord>> _changeTables = new BoundedDictionary<string, List<ChangeRecord>>(1000);
 
     public override string StrategyId => "cdc-trigger-based";
     public override string DisplayName => "Trigger-based CDC";
@@ -298,7 +299,7 @@ public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class TimestampBasedCdcStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TimestampTracker> _trackers = new();
+    private readonly BoundedDictionary<string, TimestampTracker> _trackers = new BoundedDictionary<string, TimestampTracker>(1000);
 
     public override string StrategyId => "cdc-timestamp-based";
     public override string DisplayName => "Timestamp-based CDC";
@@ -416,8 +417,8 @@ public sealed class TimestampBasedCdcStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class OutboxPatternCdcStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OutboxConfig> _outboxes = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<OutboxEvent>> _events = new();
+    private readonly BoundedDictionary<string, OutboxConfig> _outboxes = new BoundedDictionary<string, OutboxConfig>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<OutboxEvent>> _events = new BoundedDictionary<string, ConcurrentQueue<OutboxEvent>>(1000);
 
     public override string StrategyId => "cdc-outbox-pattern";
     public override string DisplayName => "Outbox Pattern CDC";
@@ -542,8 +543,8 @@ public sealed class OutboxPatternCdcStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class EventSourcingCdcStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EventStream> _streams = new();
-    private readonly ConcurrentDictionary<string, List<DomainEvent>> _events = new();
+    private readonly BoundedDictionary<string, EventStream> _streams = new BoundedDictionary<string, EventStream>(1000);
+    private readonly BoundedDictionary<string, List<DomainEvent>> _events = new BoundedDictionary<string, List<DomainEvent>>(1000);
 
     public override string StrategyId => "cdc-event-sourcing";
     public override string DisplayName => "Event Sourcing CDC";

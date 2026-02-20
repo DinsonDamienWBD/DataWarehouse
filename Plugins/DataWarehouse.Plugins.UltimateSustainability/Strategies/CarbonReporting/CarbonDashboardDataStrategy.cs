@@ -85,13 +85,13 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
     private static readonly TimeSpan MaxRetention = TimeSpan.FromDays(7);
 
     // Time-series storage: key = (metric, region/tenant), value = timestamped points
-    private readonly ConcurrentDictionary<string, ConcurrentBag<TimeSeriesPoint>> _timeSeries = new();
+    private readonly BoundedDictionary<string, ConcurrentBag<TimeSeriesPoint>> _timeSeries = new BoundedDictionary<string, ConcurrentBag<TimeSeriesPoint>>(1000);
 
     // Per-operation-type emission tracking
-    private readonly ConcurrentDictionary<string, double> _emissionsByOpType = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, double> _emissionsByOpType = new BoundedDictionary<string, double>(1000);
 
     // Per-tenant emission tracking
-    private readonly ConcurrentDictionary<string, TenantAccumulator> _tenantEmissions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, TenantAccumulator> _tenantEmissions = new BoundedDictionary<string, TenantAccumulator>(1000);
 
     // Green score tracking
     private readonly ConcurrentBag<TimeSeriesPoint> _greenScorePoints = new();

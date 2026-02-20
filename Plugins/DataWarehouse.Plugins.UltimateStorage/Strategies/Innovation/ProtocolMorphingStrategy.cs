@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -30,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _basePath = string.Empty;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, ProtocolMetadata> _objectProtocols = new();
-        private readonly ConcurrentDictionary<StorageProtocol, IProtocolAdapter> _protocolAdapters = new();
+        private readonly BoundedDictionary<string, ProtocolMetadata> _objectProtocols = new BoundedDictionary<string, ProtocolMetadata>(1000);
+        private readonly BoundedDictionary<StorageProtocol, IProtocolAdapter> _protocolAdapters = new BoundedDictionary<StorageProtocol, IProtocolAdapter>(1000);
 
         public override string StrategyId => "protocol-morphing";
         public override string Name => "Protocol Morphing (Multi-Protocol Adapter)";

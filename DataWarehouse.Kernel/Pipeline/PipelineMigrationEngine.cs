@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Pipeline;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel.Pipeline;
 
@@ -23,7 +23,7 @@ namespace DataWarehouse.Kernel.Pipeline;
 /// </summary>
 public class PipelineMigrationEngine : IPipelineMigrationEngine
 {
-    private readonly ConcurrentDictionary<string, MigrationJobState> _jobs = new();
+    private readonly BoundedDictionary<string, MigrationJobState> _jobs = new BoundedDictionary<string, MigrationJobState>(1000);
     private readonly IPipelineOrchestrator _orchestrator;
     private readonly IKernelContext? _kernelContext;
     private readonly ILogger? _logger;

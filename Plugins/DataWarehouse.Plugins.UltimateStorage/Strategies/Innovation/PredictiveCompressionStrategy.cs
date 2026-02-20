@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -10,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -40,8 +40,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableParallelCompression = true;
         private int _parallelChunkSize = 10_000_000; // 10MB chunks
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, FileTypeProfile> _fileTypeProfiles = new();
-        private readonly ConcurrentDictionary<string, ObjectMetadata> _objectMetadata = new();
+        private readonly BoundedDictionary<string, FileTypeProfile> _fileTypeProfiles = new BoundedDictionary<string, FileTypeProfile>(1000);
+        private readonly BoundedDictionary<string, ObjectMetadata> _objectMetadata = new BoundedDictionary<string, ObjectMetadata>(1000);
         private long _totalBytesBeforeCompression;
         private long _totalBytesAfterCompression;
         private long _compressedFiles;

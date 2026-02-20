@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 
@@ -35,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 /// </remarks>
 internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, EventStream> _streams = new();
+    private readonly BoundedDictionary<string, EventStream> _streams = new BoundedDictionary<string, EventStream>(1000);
     private long _eventIdCounter = 0;
 
     // IPluginInterfaceStrategy metadata

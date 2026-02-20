@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Storage.Services;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Storage.Services;
 /// </summary>
 public sealed class DefaultCacheManager : ICacheManager, IDisposable
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _entries = new();
+    private readonly BoundedDictionary<string, CacheEntry> _entries = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly Timer? _cleanupTimer;
     private bool _disposed;
 

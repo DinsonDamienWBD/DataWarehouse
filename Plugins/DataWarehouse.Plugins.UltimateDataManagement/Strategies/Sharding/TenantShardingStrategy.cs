@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -150,10 +150,10 @@ public enum TenantMigrationState
 /// </remarks>
 public sealed class TenantShardingStrategy : ShardingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TenantConfig> _tenants = new();
-    private readonly ConcurrentDictionary<string, List<string>> _shardToTenants = new();
-    private readonly ConcurrentDictionary<string, TenantMigrationStatus> _migrations = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, TenantConfig> _tenants = new BoundedDictionary<string, TenantConfig>(1000);
+    private readonly BoundedDictionary<string, List<string>> _shardToTenants = new BoundedDictionary<string, List<string>>(1000);
+    private readonly BoundedDictionary<string, TenantMigrationStatus> _migrations = new BoundedDictionary<string, TenantMigrationStatus>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _tenantLock = new();
     private readonly TenantIsolationMode _defaultIsolationMode;
     private readonly int _maxTenantsPerSharedShard;

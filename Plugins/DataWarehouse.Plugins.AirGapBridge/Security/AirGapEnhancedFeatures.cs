@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.EdgeComputing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Security;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.AirGapBridge.Security;
 /// </summary>
 public sealed class ClassificationLabelService
 {
-    private readonly ConcurrentDictionary<string, ClassificationLevel> _mediaClassifications = new();
-    private readonly ConcurrentDictionary<string, ClassificationLevel> _dataClassifications = new();
+    private readonly BoundedDictionary<string, ClassificationLevel> _mediaClassifications = new BoundedDictionary<string, ClassificationLevel>(1000);
+    private readonly BoundedDictionary<string, ClassificationLevel> _dataClassifications = new BoundedDictionary<string, ClassificationLevel>(1000);
     private readonly List<ClassificationViolation> _violations = new();
 
     /// <summary>
@@ -87,8 +87,8 @@ public sealed class ClassificationLabelService
 /// </summary>
 public sealed class PhysicalMediaUpdateService
 {
-    private readonly ConcurrentDictionary<string, UpdatePackage> _availableUpdates = new();
-    private readonly ConcurrentDictionary<string, InstalledVersion> _installedVersions = new();
+    private readonly BoundedDictionary<string, UpdatePackage> _availableUpdates = new BoundedDictionary<string, UpdatePackage>(1000);
+    private readonly BoundedDictionary<string, InstalledVersion> _installedVersions = new BoundedDictionary<string, InstalledVersion>(1000);
     private readonly List<UpdateHistory> _history = new();
     private readonly RSA _verificationKey;
 
@@ -237,8 +237,8 @@ public sealed class PhysicalMediaUpdateService
 /// </summary>
 public sealed class TamperEvidentService
 {
-    private readonly ConcurrentDictionary<string, DigitalSeal> _seals = new();
-    private readonly ConcurrentDictionary<string, List<CustodyTransfer>> _custodyChains = new();
+    private readonly BoundedDictionary<string, DigitalSeal> _seals = new BoundedDictionary<string, DigitalSeal>(1000);
+    private readonly BoundedDictionary<string, List<CustodyTransfer>> _custodyChains = new BoundedDictionary<string, List<CustodyTransfer>>(1000);
 
     /// <summary>
     /// Creates a digital seal for a package.
@@ -345,7 +345,7 @@ public sealed class TamperEvidentService
 /// </summary>
 public sealed class OfflineCatalogSyncService
 {
-    private readonly ConcurrentDictionary<string, CatalogEntry> _localCatalog = new();
+    private readonly BoundedDictionary<string, CatalogEntry> _localCatalog = new BoundedDictionary<string, CatalogEntry>(1000);
     private readonly List<SyncConflict> _conflicts = new();
     private int _compactionThreshold = 100;
 
@@ -466,8 +466,8 @@ public sealed class OfflineCatalogSyncService
 /// </summary>
 public sealed class TransferBandwidthEstimator
 {
-    private readonly ConcurrentDictionary<string, MediaProfile> _mediaProfiles = new();
-    private readonly ConcurrentDictionary<string, List<TransferMeasurement>> _measurements = new();
+    private readonly BoundedDictionary<string, MediaProfile> _mediaProfiles = new BoundedDictionary<string, MediaProfile>(1000);
+    private readonly BoundedDictionary<string, List<TransferMeasurement>> _measurements = new BoundedDictionary<string, List<TransferMeasurement>>(1000);
 
     public TransferBandwidthEstimator()
     {

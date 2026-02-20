@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -66,7 +66,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     public sealed class ResourceAwareLoadBalancer : ILoadBalancerStrategy
     {
         private readonly ResourceAwareConfiguration _config;
-        private readonly ConcurrentDictionary<string, NodeHealthReport> _healthReports = new();
+        private readonly BoundedDictionary<string, NodeHealthReport> _healthReports = new BoundedDictionary<string, NodeHealthReport>(1000);
 
         /// <summary>
         /// Creates a new resource-aware load balancer.

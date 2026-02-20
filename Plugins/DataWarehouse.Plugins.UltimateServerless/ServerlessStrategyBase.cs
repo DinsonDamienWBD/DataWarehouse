@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless;
 
@@ -277,7 +277,7 @@ public sealed record ServerlessStrategyCapabilities
 /// </summary>
 public abstract class ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, long> _operationCounts = new();
+    private readonly BoundedDictionary<string, long> _operationCounts = new BoundedDictionary<string, long>(1000);
     private long _totalOperations;
 
     /// <summary>Strategy unique identifier.</summary>

@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -38,9 +38,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _targetChunkSize = 512;
         private int _cacheSizeMB = 256;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, ChunkManifest> _manifests = new();
-        private readonly ConcurrentDictionary<string, byte[]> _chunkCache = new();
-        private readonly ConcurrentDictionary<string, ChunkMetadata> _chunkIndex = new();
+        private readonly BoundedDictionary<string, ChunkManifest> _manifests = new BoundedDictionary<string, ChunkManifest>(1000);
+        private readonly BoundedDictionary<string, byte[]> _chunkCache = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, ChunkMetadata> _chunkIndex = new BoundedDictionary<string, ChunkMetadata>(1000);
         private long _totalChunks;
         private long _uniqueChunks;
         private long _totalBytesBeforeDedup;

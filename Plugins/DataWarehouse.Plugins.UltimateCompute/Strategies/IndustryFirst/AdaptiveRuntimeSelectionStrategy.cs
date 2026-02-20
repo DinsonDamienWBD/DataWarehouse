@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<SelectionRecord>> _selectionHistory = new();
-    private readonly ConcurrentDictionary<string, double> _successRates = new();
+    private readonly BoundedDictionary<string, List<SelectionRecord>> _selectionHistory = new BoundedDictionary<string, List<SelectionRecord>>(1000);
+    private readonly BoundedDictionary<string, double> _successRates = new BoundedDictionary<string, double>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "compute.industryfirst.adaptiveruntime";

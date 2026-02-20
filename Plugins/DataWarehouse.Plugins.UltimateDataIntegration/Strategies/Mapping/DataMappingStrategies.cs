@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Mapping;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Mapping;
 /// </summary>
 public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SchemaMapping> _mappings = new();
+    private readonly BoundedDictionary<string, SchemaMapping> _mappings = new BoundedDictionary<string, SchemaMapping>(1000);
 
     public override string StrategyId => "mapping-schema";
     public override string DisplayName => "Schema Mapping";
@@ -208,8 +208,8 @@ public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class SemanticMappingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticMapping> _mappings = new();
-    private readonly ConcurrentDictionary<string, BusinessTerm> _businessGlossary = new();
+    private readonly BoundedDictionary<string, SemanticMapping> _mappings = new BoundedDictionary<string, SemanticMapping>(1000);
+    private readonly BoundedDictionary<string, BusinessTerm> _businessGlossary = new BoundedDictionary<string, BusinessTerm>(1000);
 
     public override string StrategyId => "mapping-semantic";
     public override string DisplayName => "Semantic Mapping";
@@ -395,7 +395,7 @@ public sealed class SemanticMappingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class HierarchicalMappingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HierarchicalMapping> _mappings = new();
+    private readonly BoundedDictionary<string, HierarchicalMapping> _mappings = new BoundedDictionary<string, HierarchicalMapping>(1000);
 
     public override string StrategyId => "mapping-hierarchical";
     public override string DisplayName => "Hierarchical Mapping";
@@ -555,7 +555,7 @@ public sealed class HierarchicalMappingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DynamicMappingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DynamicMapping> _mappings = new();
+    private readonly BoundedDictionary<string, DynamicMapping> _mappings = new BoundedDictionary<string, DynamicMapping>(1000);
 
     public override string StrategyId => "mapping-dynamic";
     public override string DisplayName => "Dynamic Mapping";
@@ -702,7 +702,7 @@ public sealed class DynamicMappingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class BidirectionalMappingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BidirectionalMapping> _mappings = new();
+    private readonly BoundedDictionary<string, BidirectionalMapping> _mappings = new BoundedDictionary<string, BidirectionalMapping>(1000);
 
     public override string StrategyId => "mapping-bidirectional";
     public override string DisplayName => "Bi-directional Mapping";

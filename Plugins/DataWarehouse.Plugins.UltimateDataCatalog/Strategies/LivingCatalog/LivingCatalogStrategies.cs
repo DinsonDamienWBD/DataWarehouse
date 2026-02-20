@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataCatalog.Strategies.LivingCatalog;
 
@@ -51,9 +51,9 @@ public sealed class SelfLearningCatalogStrategy : DataCatalogStrategyBase
         string CorrectedValue,
         DateTimeOffset Timestamp);
 
-    private readonly ConcurrentDictionary<string, CatalogEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, List<FeedbackRecord>> _feedback = new();
-    private readonly ConcurrentDictionary<string, double> _confidenceScores = new();
+    private readonly BoundedDictionary<string, CatalogEntry> _entries = new BoundedDictionary<string, CatalogEntry>(1000);
+    private readonly BoundedDictionary<string, List<FeedbackRecord>> _feedback = new BoundedDictionary<string, List<FeedbackRecord>>(1000);
+    private readonly BoundedDictionary<string, double> _confidenceScores = new BoundedDictionary<string, double>(1000);
     private readonly object _feedbackLock = new();
 
     /// <inheritdoc />
@@ -238,7 +238,7 @@ public sealed class SelfLearningCatalogStrategy : DataCatalogStrategyBase
 /// </remarks>
 public sealed class AutoTaggingStrategy : DataCatalogStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _assetTags = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _assetTags = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _tagLock = new();
 
     /// <inheritdoc />
@@ -505,8 +505,8 @@ public sealed class RelationshipDiscoveryStrategy : DataCatalogStrategyBase
         double Confidence,
         string RelationshipType);
 
-    private readonly ConcurrentDictionary<string, HashSet<string>> _assetColumns = new();
-    private readonly ConcurrentDictionary<string, List<DiscoveredRelationship>> _relationships = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _assetColumns = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, List<DiscoveredRelationship>> _relationships = new BoundedDictionary<string, List<DiscoveredRelationship>>(1000);
     private readonly object _columnsLock = new();
 
     /// <inheritdoc />
@@ -776,7 +776,7 @@ public sealed class SchemaEvolutionTrackerStrategy : DataCatalogStrategyBase
         IReadOnlyList<string> RemovedColumns,
         IReadOnlyList<string> TypeChangedColumns);
 
-    private readonly ConcurrentDictionary<string, List<SchemaVersion>> _schemaHistory = new();
+    private readonly BoundedDictionary<string, List<SchemaVersion>> _schemaHistory = new BoundedDictionary<string, List<SchemaVersion>>(1000);
     private readonly object _historyLock = new();
 
     /// <inheritdoc />
@@ -976,14 +976,14 @@ public sealed class UsagePatternLearnerStrategy : DataCatalogStrategyBase
         public DateTimeOffset FirstAccessed;
 
         /// <summary>Count of accesses by each actor (user or service).</summary>
-        public ConcurrentDictionary<string, int> AccessorCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, int> AccessorCounts { get; } = new BoundedDictionary<string, int>(1000);
 
         /// <summary>Count of each operation type (read, write, query, etc.).</summary>
-        public ConcurrentDictionary<string, int> OperationCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public BoundedDictionary<string, int> OperationCounts { get; } = new BoundedDictionary<string, int>(1000);
     }
 
-    private readonly ConcurrentDictionary<string, UsageProfile> _profiles = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, int>> _coAccess = new();
+    private readonly BoundedDictionary<string, UsageProfile> _profiles = new BoundedDictionary<string, UsageProfile>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, int>> _coAccess = new BoundedDictionary<string, BoundedDictionary<string, int>>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "living-usage-learner";
@@ -1059,10 +1059,10 @@ public sealed class UsagePatternLearnerStrategy : DataCatalogStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId2);
 
         // Record in both directions
-        var map1 = _coAccess.GetOrAdd(assetId1, _ => new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+        var map1 = _coAccess.GetOrAdd(assetId1, _ => new BoundedDictionary<string, int>(1000));
         map1.AddOrUpdate(assetId2, 1, (_, count) => count + 1);
 
-        var map2 = _coAccess.GetOrAdd(assetId2, _ => new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+        var map2 = _coAccess.GetOrAdd(assetId2, _ => new BoundedDictionary<string, int>(1000));
         map2.AddOrUpdate(assetId1, 1, (_, count) => count + 1);
     }
 

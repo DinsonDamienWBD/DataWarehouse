@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -388,8 +388,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class GamifiedBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GamifiedBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, BackupProfile> _profiles = new();
+        private readonly BoundedDictionary<string, GamifiedBackup> _backups = new BoundedDictionary<string, GamifiedBackup>(1000);
+        private readonly BoundedDictionary<string, BackupProfile> _profiles = new BoundedDictionary<string, BackupProfile>(1000);
         private readonly List<Achievement> _availableAchievements = new();
         private readonly List<GamificationNotification> _notifications = new();
 

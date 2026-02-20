@@ -1,12 +1,12 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Protocol;
 
@@ -298,7 +298,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     { yield break; }
 
-    private readonly ConcurrentDictionary<string, DicomAssociation> _associations = new();
+    private readonly BoundedDictionary<string, DicomAssociation> _associations = new BoundedDictionary<string, DicomAssociation>(1000);
 
     /// <summary>
     /// Negotiates a DICOM association with presentation contexts.

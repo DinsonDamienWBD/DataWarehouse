@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -25,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
     {
         private readonly ILogger _logger;
         private readonly IMessageBus? _messageBus;
-        private readonly ConcurrentDictionary<string, List<ThreatEvent>> _threatHistories = new();
+        private readonly BoundedDictionary<string, List<ThreatEvent>> _threatHistories = new BoundedDictionary<string, List<ThreatEvent>>(1000);
 
         public PredictiveThreatStrategy(ILogger? logger = null, IMessageBus? messageBus = null)
         {

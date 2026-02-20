@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 /// </summary>
 public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CompliancePassport> _passportCache = new();
+    private readonly BoundedDictionary<string, CompliancePassport> _passportCache = new BoundedDictionary<string, CompliancePassport>(1000);
     private byte[]? _signingKey;
 
     /// <inheritdoc/>

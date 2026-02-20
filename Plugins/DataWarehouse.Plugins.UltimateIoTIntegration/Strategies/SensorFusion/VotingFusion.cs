@@ -2,7 +2,7 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 /// </summary>
 public sealed class VotingFusion
 {
-    private readonly ConcurrentDictionary<string, int> _faultCounts = new();
+    private readonly BoundedDictionary<string, int> _faultCounts = new BoundedDictionary<string, int>(1000);
     private readonly HashSet<string> _faultySensors = new();
 
     /// <summary>

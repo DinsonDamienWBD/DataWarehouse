@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -36,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableClustering = true;
         private double _similarityThreshold = 0.75;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, SemanticMetadata> _semanticIndex = new();
-        private readonly ConcurrentDictionary<string, List<string>> _categoryIndex = new();
+        private readonly BoundedDictionary<string, SemanticMetadata> _semanticIndex = new BoundedDictionary<string, SemanticMetadata>(1000);
+        private readonly BoundedDictionary<string, List<string>> _categoryIndex = new BoundedDictionary<string, List<string>>(1000);
 
         public override string StrategyId => "semantic-organization";
         public override string Name => "Semantic Organization Storage";

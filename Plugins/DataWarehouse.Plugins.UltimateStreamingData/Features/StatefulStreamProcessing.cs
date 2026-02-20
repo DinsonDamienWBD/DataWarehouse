@@ -122,8 +122,8 @@ public sealed record WindowedAggregation<TResult>
 /// </remarks>
 internal sealed class StatefulStreamProcessing : IDisposable
 {
-    private readonly ConcurrentDictionary<string, StateEntry> _state = new();
-    private readonly ConcurrentDictionary<string, bool> _dirtyKeys = new();
+    private readonly BoundedDictionary<string, StateEntry> _state = new BoundedDictionary<string, StateEntry>(1000);
+    private readonly BoundedDictionary<string, bool> _dirtyKeys = new BoundedDictionary<string, bool>(1000);
     private readonly StatefulProcessingConfig _config;
     private readonly IMessageBus? _messageBus;
     private readonly string _namespace;

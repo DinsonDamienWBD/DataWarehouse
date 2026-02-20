@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Inference;
 
@@ -361,7 +361,7 @@ public sealed class InferredKnowledge
 /// </summary>
 public sealed class RuleEngine
 {
-    private readonly ConcurrentDictionary<string, InferenceRule> _rules = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, InferenceRule> _rules = new BoundedDictionary<string, InferenceRule>(1000);
     private readonly SemaphoreSlim _evaluationLock = new(1, 1);
     private readonly object _statsLock = new();
     private long _totalEvaluations;
@@ -887,8 +887,8 @@ public sealed record RuleEngineStatistics
 /// </summary>
 public sealed class RuleRegistry : IDisposable
 {
-    private readonly ConcurrentDictionary<string, InferenceRule> _rules = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, RuleMetadata> _metadata = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, InferenceRule> _rules = new BoundedDictionary<string, InferenceRule>(1000);
+    private readonly BoundedDictionary<string, RuleMetadata> _metadata = new BoundedDictionary<string, RuleMetadata>(1000);
     private readonly SemaphoreSlim _persistLock = new(1, 1);
     private bool _disposed;
 
@@ -1949,7 +1949,7 @@ public static class AnomalyInference
 /// </summary>
 public sealed class InferenceCache : IDisposable
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly TimeSpan _defaultTtl;
     private readonly Timer _cleanupTimer;
     private readonly object _statsLock = new();
@@ -2121,7 +2121,7 @@ public sealed record InferenceCacheStatistics
 public sealed class InferenceInvalidation
 {
     private readonly InferenceCache _cache;
-    private readonly ConcurrentDictionary<string, HashSet<string>> _sourceToKeys = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _sourceToKeys = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _mappingLock = new();
 
     /// <summary>
@@ -2290,7 +2290,7 @@ public sealed record ExplanationStep
 /// </summary>
 public sealed class ConfidenceScoring
 {
-    private readonly ConcurrentDictionary<string, ConfidenceHistory> _history = new();
+    private readonly BoundedDictionary<string, ConfidenceHistory> _history = new BoundedDictionary<string, ConfidenceHistory>(1000);
 
     /// <summary>
     /// Calculates a confidence adjustment based on various factors.

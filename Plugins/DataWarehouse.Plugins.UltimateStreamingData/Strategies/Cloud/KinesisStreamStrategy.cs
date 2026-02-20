@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Cloud;
 
@@ -214,12 +215,12 @@ public sealed record KinesisCheckpoint
 /// </summary>
 internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KinesisStream> _streams = new();
-    private readonly ConcurrentDictionary<string, List<KinesisShard>> _shards = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<KinesisRecord>> _shardData = new();
-    private readonly ConcurrentDictionary<string, KinesisConsumer> _consumers = new();
-    private readonly ConcurrentDictionary<string, KinesisCheckpoint> _checkpoints = new();
-    private readonly ConcurrentDictionary<string, long> _sequenceCounters = new();
+    private readonly BoundedDictionary<string, KinesisStream> _streams = new BoundedDictionary<string, KinesisStream>(1000);
+    private readonly BoundedDictionary<string, List<KinesisShard>> _shards = new BoundedDictionary<string, List<KinesisShard>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<KinesisRecord>> _shardData = new BoundedDictionary<string, ConcurrentQueue<KinesisRecord>>(1000);
+    private readonly BoundedDictionary<string, KinesisConsumer> _consumers = new BoundedDictionary<string, KinesisConsumer>(1000);
+    private readonly BoundedDictionary<string, KinesisCheckpoint> _checkpoints = new BoundedDictionary<string, KinesisCheckpoint>(1000);
+    private readonly BoundedDictionary<string, long> _sequenceCounters = new BoundedDictionary<string, long>(1000);
     private long _totalRecordsPut;
     private long _totalRecordsRead;
     private long _totalThrottles;

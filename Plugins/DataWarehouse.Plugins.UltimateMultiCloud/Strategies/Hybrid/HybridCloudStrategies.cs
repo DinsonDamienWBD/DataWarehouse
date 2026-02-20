@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Hybrid;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Hybrid;
 /// </summary>
 public sealed class OnPremiseIntegrationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OnPremiseEnvironment> _environments = new();
-    private readonly ConcurrentDictionary<string, SyncState> _syncStates = new();
+    private readonly BoundedDictionary<string, OnPremiseEnvironment> _environments = new BoundedDictionary<string, OnPremiseEnvironment>(1000);
+    private readonly BoundedDictionary<string, SyncState> _syncStates = new BoundedDictionary<string, SyncState>(1000);
 
     public override string StrategyId => "hybrid-onprem-integration";
     public override string StrategyName => "On-Premise Integration";
@@ -113,7 +113,7 @@ public sealed class OnPremiseIntegrationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class SecureConnectivityStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConnectionTunnel> _tunnels = new();
+    private readonly BoundedDictionary<string, ConnectionTunnel> _tunnels = new BoundedDictionary<string, ConnectionTunnel>(1000);
 
     public override string StrategyId => "hybrid-secure-connectivity";
     public override string StrategyName => "Secure Connectivity";
@@ -199,8 +199,8 @@ public sealed class SecureConnectivityStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EdgeNode> _edgeNodes = new();
-    private readonly ConcurrentDictionary<string, EdgeSyncJob> _syncJobs = new();
+    private readonly BoundedDictionary<string, EdgeNode> _edgeNodes = new BoundedDictionary<string, EdgeNode>(1000);
+    private readonly BoundedDictionary<string, EdgeSyncJob> _syncJobs = new BoundedDictionary<string, EdgeSyncJob>(1000);
 
     public override string StrategyId => "hybrid-edge-sync";
     public override string StrategyName => "Edge Synchronization";
@@ -309,8 +309,8 @@ public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class UnifiedStorageTierStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StorageLocation> _locations = new();
-    private readonly ConcurrentDictionary<string, TieringPolicy> _policies = new();
+    private readonly BoundedDictionary<string, StorageLocation> _locations = new BoundedDictionary<string, StorageLocation>(1000);
+    private readonly BoundedDictionary<string, TieringPolicy> _policies = new BoundedDictionary<string, TieringPolicy>(1000);
 
     public override string StrategyId => "hybrid-unified-storage";
     public override string StrategyName => "Unified Storage Tier";
@@ -419,8 +419,8 @@ public sealed class UnifiedStorageTierStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class CloudBurstingStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BurstConfiguration> _configs = new();
-    private readonly ConcurrentDictionary<string, ActiveBurst> _activeBursts = new();
+    private readonly BoundedDictionary<string, BurstConfiguration> _configs = new BoundedDictionary<string, BurstConfiguration>(1000);
+    private readonly BoundedDictionary<string, ActiveBurst> _activeBursts = new BoundedDictionary<string, ActiveBurst>(1000);
 
     public override string StrategyId => "hybrid-cloud-bursting";
     public override string StrategyName => "Cloud Bursting";

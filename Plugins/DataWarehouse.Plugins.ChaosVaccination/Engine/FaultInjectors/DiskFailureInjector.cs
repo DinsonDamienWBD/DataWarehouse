@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,7 +17,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Engine.FaultInjectors;
 public sealed class DiskFailureInjector : IFaultInjector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, DiskFaultState> _activeFaults = new();
+    private readonly BoundedDictionary<string, DiskFaultState> _activeFaults = new BoundedDictionary<string, DiskFaultState>(1000);
 
     /// <summary>
     /// Tracks the state of an active disk failure injection.

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 
@@ -10,11 +10,11 @@ namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 /// </summary>
 public sealed class DashboardPersistenceService
 {
-    private readonly ConcurrentDictionary<string, PersistedDashboard> _dashboards = new();
-    private readonly ConcurrentDictionary<string, List<DashboardVersion>> _versionHistory = new();
-    private readonly ConcurrentDictionary<string, WidgetConfiguration> _widgetConfigs = new();
-    private readonly ConcurrentDictionary<string, DashboardShareLink> _shareLinks = new();
-    private readonly ConcurrentDictionary<string, EmbedConfiguration> _embedConfigs = new();
+    private readonly BoundedDictionary<string, PersistedDashboard> _dashboards = new BoundedDictionary<string, PersistedDashboard>(1000);
+    private readonly BoundedDictionary<string, List<DashboardVersion>> _versionHistory = new BoundedDictionary<string, List<DashboardVersion>>(1000);
+    private readonly BoundedDictionary<string, WidgetConfiguration> _widgetConfigs = new BoundedDictionary<string, WidgetConfiguration>(1000);
+    private readonly BoundedDictionary<string, DashboardShareLink> _shareLinks = new BoundedDictionary<string, DashboardShareLink>(1000);
+    private readonly BoundedDictionary<string, EmbedConfiguration> _embedConfigs = new BoundedDictionary<string, EmbedConfiguration>(1000);
     private readonly string _storagePath;
 
     public DashboardPersistenceService(string? storagePath = null)

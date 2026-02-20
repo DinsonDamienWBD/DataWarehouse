@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -40,7 +40,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public const string DefaultGroupId = "default";
 
-        private readonly ConcurrentDictionary<string, RaftConsensusEngine> _groups = new(StringComparer.Ordinal);
+        private readonly BoundedDictionary<string, RaftConsensusEngine> _groups = new BoundedDictionary<string, RaftConsensusEngine>(1000);
         private readonly IClusterMembership _membership;
         private readonly IP2PNetwork _network;
         private readonly RaftConfiguration _defaultConfig;

@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -14,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     /// </summary>
     public sealed class HotpStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, HotpUserData> _userData = new();
+        private readonly BoundedDictionary<string, HotpUserData> _userData = new BoundedDictionary<string, HotpUserData>(1000);
         private const int DefaultDigits = 6;
         private const int LookAheadWindow = 10; // Check next 10 counter values
         private const int ResyncWindow = 100; // Larger window for resynchronization

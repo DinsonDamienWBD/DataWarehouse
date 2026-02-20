@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.FaaS;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.FaaS;
 /// </summary>
 public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LambdaFunction> _functions = new();
+    private readonly BoundedDictionary<string, LambdaFunction> _functions = new BoundedDictionary<string, LambdaFunction>(1000);
 
     public override string StrategyId => "faas-aws-lambda";
     public override string DisplayName => "AWS Lambda";
@@ -134,7 +134,7 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class AzureFunctionsFaaSStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AzureFunction> _functions = new();
+    private readonly BoundedDictionary<string, AzureFunction> _functions = new BoundedDictionary<string, AzureFunction>(1000);
 
     public override string StrategyId => "faas-azure-functions";
     public override string DisplayName => "Azure Functions";

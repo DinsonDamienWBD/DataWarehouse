@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Security;
 using DataWarehouse.Dashboard.Models;
 using System.ComponentModel.DataAnnotations;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -337,9 +337,9 @@ public enum JobState
 /// </summary>
 public sealed class InMemoryBackupService : IBackupService
 {
-    private readonly ConcurrentDictionary<string, BackupInfo> _backups = new();
-    private readonly ConcurrentDictionary<string, BackupJobStatus> _jobs = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellations = new();
+    private readonly BoundedDictionary<string, BackupInfo> _backups = new BoundedDictionary<string, BackupInfo>(1000);
+    private readonly BoundedDictionary<string, BackupJobStatus> _jobs = new BoundedDictionary<string, BackupJobStatus>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _jobCancellations = new BoundedDictionary<string, CancellationTokenSource>(1000);
     private BackupScheduleConfig _scheduleConfig = new();
     private readonly ILogger<InMemoryBackupService> _logger;
 

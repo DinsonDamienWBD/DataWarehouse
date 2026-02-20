@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -15,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 public sealed class SemanticVectorEncoder : IAIContextEncoder
 {
     private readonly int _vectorDimensions;
-    private readonly ConcurrentDictionary<string, float[]> _vocabularyVectors = new();
-    private readonly ConcurrentDictionary<string, int> _tokenFrequencies = new();
+    private readonly BoundedDictionary<string, float[]> _vocabularyVectors = new BoundedDictionary<string, float[]>(1000);
+    private readonly BoundedDictionary<string, int> _tokenFrequencies = new BoundedDictionary<string, int>(1000);
     private readonly PatternExtractor _patternExtractor = new();
     private readonly RelationshipEncoder _relationshipEncoder = new();
 
@@ -606,7 +606,7 @@ internal sealed class RelationshipEncoder
 public sealed class DifferentialContextEncoder : IAIContextEncoder
 {
     private readonly IAIContextEncoder _baseEncoder;
-    private readonly ConcurrentDictionary<string, EncodedContext> _baseStates = new();
+    private readonly BoundedDictionary<string, EncodedContext> _baseStates = new BoundedDictionary<string, EncodedContext>(1000);
 
     private long _totalOriginalBytes;
     private long _totalEncodedBytes;

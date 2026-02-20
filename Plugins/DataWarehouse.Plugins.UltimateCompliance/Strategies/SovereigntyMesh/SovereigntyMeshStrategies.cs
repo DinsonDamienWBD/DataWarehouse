@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -8,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 
@@ -33,9 +33,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 /// </remarks>
 public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, JurisdictionProfile> _jurisdictions = new();
-    private readonly ConcurrentDictionary<string, JurisdictionConflict> _conflicts = new();
-    private readonly ConcurrentDictionary<string, List<RegulatoryChange>> _regulatoryChanges = new();
+    private readonly BoundedDictionary<string, JurisdictionProfile> _jurisdictions = new BoundedDictionary<string, JurisdictionProfile>(1000);
+    private readonly BoundedDictionary<string, JurisdictionConflict> _conflicts = new BoundedDictionary<string, JurisdictionConflict>(1000);
+    private readonly BoundedDictionary<string, List<RegulatoryChange>> _regulatoryChanges = new BoundedDictionary<string, List<RegulatoryChange>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-jurisdictional-ai";
@@ -432,9 +432,9 @@ public record InferredRule
 /// </remarks>
 public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataEmbassy> _embassies = new();
-    private readonly ConcurrentDictionary<string, EmbassyChannel> _channels = new();
-    private readonly ConcurrentDictionary<string, SovereignKey> _sovereignKeys = new();
+    private readonly BoundedDictionary<string, DataEmbassy> _embassies = new BoundedDictionary<string, DataEmbassy>(1000);
+    private readonly BoundedDictionary<string, EmbassyChannel> _channels = new BoundedDictionary<string, EmbassyChannel>(1000);
+    private readonly BoundedDictionary<string, SovereignKey> _sovereignKeys = new BoundedDictionary<string, SovereignKey>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-data-embassy";
@@ -718,9 +718,9 @@ public enum DiplomaticProtocol
 /// </remarks>
 public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataResidencyPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, DataLocationRecord> _dataLocations = new();
-    private readonly ConcurrentDictionary<string, List<ResidencyViolation>> _violations = new();
+    private readonly BoundedDictionary<string, DataResidencyPolicy> _policies = new BoundedDictionary<string, DataResidencyPolicy>(1000);
+    private readonly BoundedDictionary<string, DataLocationRecord> _dataLocations = new BoundedDictionary<string, DataLocationRecord>(1000);
+    private readonly BoundedDictionary<string, List<ResidencyViolation>> _violations = new BoundedDictionary<string, List<ResidencyViolation>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-residency-enforcement";
@@ -973,8 +973,8 @@ public record ResidencyViolation
 /// </summary>
 public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TransferAgreement> _agreements = new();
-    private readonly ConcurrentDictionary<string, TransferRecord> _transferLog = new();
+    private readonly BoundedDictionary<string, TransferAgreement> _agreements = new BoundedDictionary<string, TransferAgreement>(1000);
+    private readonly BoundedDictionary<string, TransferRecord> _transferLog = new BoundedDictionary<string, TransferRecord>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-cross-border";

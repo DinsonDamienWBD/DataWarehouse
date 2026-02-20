@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Carbon;
 using DataWarehouse.SDK.Utilities;
@@ -35,7 +34,7 @@ public enum ThrottleResult
 public sealed class CarbonThrottlingStrategy : SustainabilityStrategyBase
 {
     private readonly CarbonBudgetEnforcementStrategy _enforcement;
-    private readonly ConcurrentDictionary<string, ThrottleStats> _throttleStats = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ThrottleStats> _throttleStats = new BoundedDictionary<string, ThrottleStats>(1000);
 
     private const string PluginId = "com.datawarehouse.sustainability.ultimate";
 

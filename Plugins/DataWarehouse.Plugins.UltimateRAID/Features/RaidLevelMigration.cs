@@ -1,6 +1,6 @@
 // 91.C2.4: RAID Level Migration - Convert between RAID levels online
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.RAID;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class RaidLevelMigration
 {
-    private readonly ConcurrentDictionary<string, MigrationState> _activeMigrations = new();
+    private readonly BoundedDictionary<string, MigrationState> _activeMigrations = new BoundedDictionary<string, MigrationState>(1000);
     private readonly object _migrationLock = new();
 
     /// <summary>

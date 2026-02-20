@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -44,9 +43,9 @@ namespace DataWarehouse.Plugins.UltimateConsensus;
 /// </summary>
 public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<int, RaftGroup> _raftGroups = new();
+    private readonly BoundedDictionary<int, RaftGroup> _raftGroups = new BoundedDictionary<int, RaftGroup>(1000);
     private readonly ConsistentHash _groupHash;
-    private readonly ConcurrentDictionary<string, IRaftStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IRaftStrategy> _strategies = new BoundedDictionary<string, IRaftStrategy>(1000);
     private readonly List<Action<Proposal>> _commitHandlers = new();
     private readonly object _handlerLock = new();
     private readonly string _nodeId;

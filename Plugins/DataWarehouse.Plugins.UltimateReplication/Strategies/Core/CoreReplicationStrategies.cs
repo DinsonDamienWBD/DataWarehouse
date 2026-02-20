@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 #pragma warning disable S3903 // Move into named namespace -- intentionally global to avoid ambiguity with CollectionExtensions.GetValueOrDefault
 // Extension method for IDictionary (nullable-aware, distinct from CollectionExtensions)
@@ -28,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class GCounterCrdt
     {
-        private readonly ConcurrentDictionary<string, long> _counts = new();
+        private readonly BoundedDictionary<string, long> _counts = new BoundedDictionary<string, long>(1000);
 
         public long Value => _counts.Values.Sum();
 
@@ -92,8 +93,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class ORSetCrdt<T> where T : notnull
     {
-        private readonly ConcurrentDictionary<T, HashSet<string>> _elements = new();
-        private readonly ConcurrentDictionary<string, HashSet<T>> _removed = new();
+        private readonly BoundedDictionary<T, HashSet<string>> _elements = new BoundedDictionary<T, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, HashSet<T>> _removed = new BoundedDictionary<string, HashSet<T>>(1000);
 
         public IEnumerable<T> Elements => _elements
             .Where(kv => kv.Value.Count > 0)
@@ -190,7 +191,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class CrdtReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, object> _crdtStore = new();
+        private readonly BoundedDictionary<string, object> _crdtStore = new BoundedDictionary<string, object>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -314,7 +315,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class MultiMasterStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, EnhancedVectorClock Clock, DateTimeOffset Timestamp)> _store = new();
+        private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, DateTimeOffset Timestamp)> _store = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, DateTimeOffset Timestamp)>(1000);
         private ConflictResolutionMethod _defaultResolution = ConflictResolutionMethod.LastWriteWins;
 
         /// <inheritdoc/>
@@ -437,7 +438,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class RealTimeSyncStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeStreams = new();
+        private readonly BoundedDictionary<string, CancellationTokenSource> _activeStreams = new BoundedDictionary<string, CancellationTokenSource>(1000);
         private readonly ConcurrentQueue<(string DataId, byte[] Data, EnhancedVectorClock Clock)> _changeQueue = new();
 
         /// <inheritdoc/>
@@ -572,7 +573,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
     /// </summary>
     public sealed class DeltaSyncStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, List<DeltaVersion>> _versionChains = new();
+        private readonly BoundedDictionary<string, List<DeltaVersion>> _versionChains = new BoundedDictionary<string, List<DeltaVersion>>(1000);
 
         private sealed class DeltaVersion
         {

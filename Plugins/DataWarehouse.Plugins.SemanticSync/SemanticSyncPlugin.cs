@@ -2,7 +2,6 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -46,7 +45,7 @@ namespace DataWarehouse.Plugins.SemanticSync;
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
 public sealed class SemanticSyncPlugin : OrchestrationPluginBase
 {
-    private readonly ConcurrentDictionary<string, StrategyBase> _strategies = new();
+    private readonly BoundedDictionary<string, StrategyBase> _strategies = new BoundedDictionary<string, StrategyBase>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private SemanticSyncOrchestrator? _orchestrator;
     private HybridClassifier? _hybridClassifier;

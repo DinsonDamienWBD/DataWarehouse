@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies;
 /// </summary>
 public sealed class WorkflowXComManager
 {
-    private readonly ConcurrentDictionary<string, XComEntry> _store = new();
+    private readonly BoundedDictionary<string, XComEntry> _store = new BoundedDictionary<string, XComEntry>(1000);
 
     /// <summary>Pushes a value to XCom.</summary>
     public void Push(string dagRunId, string taskId, string key, object value)
@@ -75,8 +75,8 @@ public sealed record XComEntry
 /// </summary>
 public sealed class WorkflowVersionManager
 {
-    private readonly ConcurrentDictionary<string, WorkflowVersionInfo> _versions = new();
-    private readonly ConcurrentDictionary<string, List<VersionPatch>> _patches = new();
+    private readonly BoundedDictionary<string, WorkflowVersionInfo> _versions = new BoundedDictionary<string, WorkflowVersionInfo>(1000);
+    private readonly BoundedDictionary<string, List<VersionPatch>> _patches = new BoundedDictionary<string, List<VersionPatch>>(1000);
 
     /// <summary>Registers a new workflow version.</summary>
     public void RegisterVersion(string workflowType, string version, string? changeId = null)
@@ -165,7 +165,7 @@ public sealed record VersionPatch
 /// </summary>
 public sealed class ChildWorkflowExecutor
 {
-    private readonly ConcurrentDictionary<string, ChildWorkflowRecord> _children = new();
+    private readonly BoundedDictionary<string, ChildWorkflowRecord> _children = new BoundedDictionary<string, ChildWorkflowRecord>(1000);
     private long _instanceCounter;
 
     /// <summary>Starts a child workflow from a parent execution.</summary>
@@ -266,7 +266,7 @@ public sealed record ChildWorkflowHandle
 /// </summary>
 public sealed class ActivityHeartbeatManager
 {
-    private readonly ConcurrentDictionary<string, ActivityHeartbeat> _heartbeats = new();
+    private readonly BoundedDictionary<string, ActivityHeartbeat> _heartbeats = new BoundedDictionary<string, ActivityHeartbeat>(1000);
     private readonly TimeSpan _heartbeatTimeout;
 
     public ActivityHeartbeatManager(TimeSpan? heartbeatTimeout = null)
@@ -335,7 +335,7 @@ public sealed class ActivityHeartbeat
 /// </summary>
 public sealed class WorkflowCheckpointManager
 {
-    private readonly ConcurrentDictionary<string, WorkflowCheckpoint> _checkpoints = new();
+    private readonly BoundedDictionary<string, WorkflowCheckpoint> _checkpoints = new BoundedDictionary<string, WorkflowCheckpoint>(1000);
 
     /// <summary>Saves a checkpoint of the current workflow state.</summary>
     public WorkflowCheckpoint SaveCheckpoint(string workflowInstanceId, WorkflowContext context,
@@ -387,7 +387,7 @@ public sealed record WorkflowCheckpoint
 /// </summary>
 public sealed class WorkflowTriggerManager
 {
-    private readonly ConcurrentDictionary<string, WorkflowTrigger> _triggers = new();
+    private readonly BoundedDictionary<string, WorkflowTrigger> _triggers = new BoundedDictionary<string, WorkflowTrigger>(1000);
 
     /// <summary>Registers a schedule-based (cron) trigger.</summary>
     public string RegisterScheduleTrigger(string workflowId, string cronExpression, string? timezone = null)
@@ -513,8 +513,8 @@ public sealed class WorkflowTrigger
 /// </summary>
 public sealed class FlowScheduler
 {
-    private readonly ConcurrentDictionary<string, FlowRun> _runs = new();
-    private readonly ConcurrentDictionary<string, FlowScheduleEntry> _schedules = new();
+    private readonly BoundedDictionary<string, FlowRun> _runs = new BoundedDictionary<string, FlowRun>(1000);
+    private readonly BoundedDictionary<string, FlowScheduleEntry> _schedules = new BoundedDictionary<string, FlowScheduleEntry>(1000);
     private long _runCounter;
 
     /// <summary>Creates a new scheduled flow entry.</summary>
@@ -614,7 +614,7 @@ public sealed class FlowRun
 /// </summary>
 public sealed class TaskResultPersistence
 {
-    private readonly ConcurrentDictionary<string, PersistedResult> _results = new();
+    private readonly BoundedDictionary<string, PersistedResult> _results = new BoundedDictionary<string, PersistedResult>(1000);
 
     /// <summary>Persists a task result.</summary>
     public string Persist(string taskRunId, object result, string? serializer = null)
@@ -672,7 +672,7 @@ public sealed record PersistedResult
 /// </summary>
 public sealed class WorkflowSearchAttributes
 {
-    private readonly ConcurrentDictionary<string, Dictionary<string, SearchAttributeValue>> _attributes = new();
+    private readonly BoundedDictionary<string, Dictionary<string, SearchAttributeValue>> _attributes = new BoundedDictionary<string, Dictionary<string, SearchAttributeValue>>(1000);
 
     /// <summary>Sets a search attribute on a workflow execution.</summary>
     public void Set(string workflowId, string key, object value, SearchAttributeType type = SearchAttributeType.Keyword)

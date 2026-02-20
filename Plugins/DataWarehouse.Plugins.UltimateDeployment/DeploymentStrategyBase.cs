@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -274,8 +273,8 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
 {
     private readonly DeploymentStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private readonly ConcurrentDictionary<string, DeploymentState> _activeDeployments = new();
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, DeploymentState> _activeDeployments = new BoundedDictionary<string, DeploymentState>(1000);
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private readonly HttpClient _httpClient;
     private bool _initialized;
     private DateTime? _healthCacheExpiry;

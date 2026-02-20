@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure
 {
@@ -93,7 +93,7 @@ namespace DataWarehouse.SDK.Infrastructure
             RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(100));
 
-        private readonly ConcurrentDictionary<string, object> _context;
+        private readonly BoundedDictionary<string, object> _context;
 
         /// <summary>
         /// Gets the error code associated with this exception.
@@ -128,7 +128,7 @@ namespace DataWarehouse.SDK.Infrastructure
             ErrorCode = errorCode;
             CorrelationId = correlationId ?? GenerateCorrelationId();
             Timestamp = DateTimeOffset.UtcNow;
-            _context = new ConcurrentDictionary<string, object>();
+            _context = new BoundedDictionary<string, object>(1000);
         }
 
         /// <summary>
@@ -144,7 +144,7 @@ namespace DataWarehouse.SDK.Infrastructure
             ErrorCode = errorCode;
             CorrelationId = correlationId ?? GenerateCorrelationId();
             Timestamp = DateTimeOffset.UtcNow;
-            _context = new ConcurrentDictionary<string, object>();
+            _context = new BoundedDictionary<string, object>(1000);
         }
 
         /// <summary>

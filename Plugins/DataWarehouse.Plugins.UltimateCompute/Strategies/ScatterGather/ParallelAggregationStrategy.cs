@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.ScatterGather;
 
@@ -39,7 +40,7 @@ internal sealed class ParallelAggregationStrategy : ComputeRuntimeStrategyBase
             var chunks = lines.Chunk(chunkSize).ToArray();
 
             // MAP + COMBINE phase: parallel partial aggregation per partition
-            var partialAggregates = new ConcurrentDictionary<string, long>();
+            var partialAggregates = new BoundedDictionary<string, long>(1000);
 
             await Parallel.ForEachAsync(
                 Enumerable.Range(0, chunks.Length),

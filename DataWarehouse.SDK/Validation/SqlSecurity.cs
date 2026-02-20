@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Validation;
 
@@ -50,7 +51,7 @@ public sealed class SqlSecurityAnalyzer
         @"(--[^\r\n]*)|(/\*[\s\S]*?\*/)",
         RegexOptions.Compiled);
 
-    private readonly ConcurrentDictionary<string, SqlAnalysisResult> _analysisCache = new();
+    private readonly BoundedDictionary<string, SqlAnalysisResult> _analysisCache = new BoundedDictionary<string, SqlAnalysisResult>(1000);
     private readonly int _cacheMaxSize;
 
     public SqlSecurityAnalyzer(int cacheMaxSize = 10000)

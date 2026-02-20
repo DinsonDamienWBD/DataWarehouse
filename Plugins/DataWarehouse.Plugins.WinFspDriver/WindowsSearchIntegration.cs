@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -89,7 +90,7 @@ public sealed class WindowsSearchIntegration : IDisposable
     #endregion
 
     private readonly WinFspFileSystem _fileSystem;
-    private readonly ConcurrentDictionary<string, IndexedFileInfo> _indexedFiles;
+    private readonly BoundedDictionary<string, IndexedFileInfo> _indexedFiles;
     private readonly ConcurrentQueue<IndexOperation> _pendingOperations;
     private readonly SemaphoreSlim _indexLock;
     private readonly Timer _indexTimer;
@@ -115,7 +116,7 @@ public sealed class WindowsSearchIntegration : IDisposable
     public WindowsSearchIntegration(WinFspFileSystem fileSystem)
     {
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        _indexedFiles = new ConcurrentDictionary<string, IndexedFileInfo>(StringComparer.OrdinalIgnoreCase);
+        _indexedFiles = new BoundedDictionary<string, IndexedFileInfo>(1000);
         _pendingOperations = new ConcurrentQueue<IndexOperation>();
         _indexLock = new SemaphoreSlim(1, 1);
         _cts = new CancellationTokenSource();

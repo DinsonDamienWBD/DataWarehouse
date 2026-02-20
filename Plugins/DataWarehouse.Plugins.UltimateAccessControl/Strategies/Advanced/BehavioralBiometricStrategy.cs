@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
 {
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
     public sealed class BehavioralBiometricStrategy : AccessControlStrategyBase
     {
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, BehavioralProfile> _profiles = new();
+        private readonly BoundedDictionary<string, BehavioralProfile> _profiles = new BoundedDictionary<string, BehavioralProfile>(1000);
 
         public BehavioralBiometricStrategy(ILogger? logger = null)
         {

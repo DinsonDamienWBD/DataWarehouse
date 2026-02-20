@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.ParallelExecution;
 
@@ -125,8 +126,8 @@ public sealed class WorkerPoolStrategy : WorkflowStrategyBase
         };
 
         var channel = Channel.CreateUnbounded<WorkflowTask>();
-        var completed = new ConcurrentDictionary<string, bool>();
-        var running = new ConcurrentDictionary<string, bool>();
+        var completed = new BoundedDictionary<string, bool>(1000);
+        var running = new BoundedDictionary<string, bool>(1000);
 
         foreach (var task in workflow.Tasks.Where(t => t.Dependencies.Count == 0))
             await channel.Writer.WriteAsync(task, cancellationToken);
@@ -355,7 +356,7 @@ public sealed class AdaptiveParallelStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
         var currentParallelism = Math.Min(4, workflow.MaxParallelism);
         var executionTimes = new ConcurrentBag<double>();
 
@@ -437,8 +438,8 @@ public sealed class SpeculativeParallelStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
-        var speculativeTasks = new ConcurrentDictionary<string, CancellationTokenSource>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
+        var speculativeTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
         foreach (var task in workflow.GetTopologicalOrder())
         {

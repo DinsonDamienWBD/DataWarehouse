@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Quota;
 
@@ -449,9 +449,9 @@ public interface IIntelligenceAuthProvider
 /// </summary>
 public class InMemoryAuthProvider : IIntelligenceAuthProvider
 {
-    private readonly ConcurrentDictionary<string, string> _apiKeyToUserId = new();
-    private readonly ConcurrentDictionary<string, UserQuota> _quotas = new();
-    private readonly ConcurrentDictionary<string, Dictionary<string, string>> _byokKeys = new();
+    private readonly BoundedDictionary<string, string> _apiKeyToUserId = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, UserQuota> _quotas = new BoundedDictionary<string, UserQuota>(1000);
+    private readonly BoundedDictionary<string, Dictionary<string, string>> _byokKeys = new BoundedDictionary<string, Dictionary<string, string>>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InMemoryAuthProvider"/> class.
@@ -476,7 +476,7 @@ public class InMemoryAuthProvider : IIntelligenceAuthProvider
     public Task<string?> ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
     {
         _apiKeyToUserId.TryGetValue(apiKey, out var userId);
-        return Task.FromResult(userId);
+        return Task.FromResult<string?>(userId);
     }
 
     /// <inheritdoc/>
@@ -699,7 +699,7 @@ public class CostEstimator
 /// </summary>
 public class RateLimiter
 {
-    private readonly ConcurrentDictionary<string, UserRateLimitState> _states = new();
+    private readonly BoundedDictionary<string, UserRateLimitState> _states = new BoundedDictionary<string, UserRateLimitState>(1000);
 
     private class UserRateLimitState
     {

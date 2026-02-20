@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -13,8 +13,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// </summary>
     public sealed class RemediationWorkflowsStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RemediationWorkflow> _workflows = new();
-        private readonly ConcurrentDictionary<string, RemediationExecution> _executions = new();
+        private readonly BoundedDictionary<string, RemediationWorkflow> _workflows = new BoundedDictionary<string, RemediationWorkflow>(1000);
+        private readonly BoundedDictionary<string, RemediationExecution> _executions = new BoundedDictionary<string, RemediationExecution>(1000);
         private Timer? _monitorTimer;
 
         /// <inheritdoc/>

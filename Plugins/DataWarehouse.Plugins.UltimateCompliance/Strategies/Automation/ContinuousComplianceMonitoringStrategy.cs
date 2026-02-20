@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -14,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// </summary>
     public sealed class ContinuousComplianceMonitoringStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ComplianceMetric> _metrics = new();
-        private readonly ConcurrentDictionary<string, ComplianceAlert> _alerts = new();
+        private readonly BoundedDictionary<string, ComplianceMetric> _metrics = new BoundedDictionary<string, ComplianceMetric>(1000);
+        private readonly BoundedDictionary<string, ComplianceAlert> _alerts = new BoundedDictionary<string, ComplianceAlert>(1000);
         private readonly ConcurrentQueue<ComplianceSnapshot> _snapshots = new();
         private Timer? _monitoringTimer;
         private Timer? _snapshotTimer;

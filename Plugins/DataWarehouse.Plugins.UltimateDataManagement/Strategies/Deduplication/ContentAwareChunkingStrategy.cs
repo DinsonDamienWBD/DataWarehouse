@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class ContentAwareChunkingStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _chunkStore = new();
-    private readonly ConcurrentDictionary<string, ObjectContentMap> _objectMaps = new();
+    private readonly BoundedDictionary<string, byte[]> _chunkStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, ObjectContentMap> _objectMaps = new BoundedDictionary<string, ObjectContentMap>(1000);
     private readonly Dictionary<string, IContentChunker> _chunkers = new();
     private readonly DefaultContentChunker _defaultChunker;
 

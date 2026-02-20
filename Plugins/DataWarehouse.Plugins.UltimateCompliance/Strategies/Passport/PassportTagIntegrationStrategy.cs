@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -48,7 +48,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     /// Per-object tag cache. Key = objectId, Value = tag dictionary.
     /// In production with Phase 55, this becomes the read-through cache backed by tag storage.
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, object>> _objectTags = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, object>> _objectTags = new BoundedDictionary<string, BoundedDictionary<string, object>>(1000);
 
     // ==================================================================================
     // Strategy identity
@@ -199,7 +199,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(passport);
         IncrementCounter("passport_tag.set_tags");
 
-        var tagDict = new ConcurrentDictionary<string, object>(PassportToTags(passport));
+        var tagDict = new BoundedDictionary<string, object>(1000);
         _objectTags.AddOrUpdate(objectId, tagDict, (_, _) => tagDict);
     }
 

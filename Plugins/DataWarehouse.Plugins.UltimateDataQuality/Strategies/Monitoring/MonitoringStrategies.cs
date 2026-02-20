@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality.Strategies.Monitoring;
 
@@ -306,10 +307,10 @@ public sealed class DateRange
 /// </summary>
 public sealed class RealTimeMonitoringStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<QualityMetric>> _metrics = new();
-    private readonly ConcurrentDictionary<string, QualityThreshold> _thresholds = new();
+    private readonly BoundedDictionary<string, List<QualityMetric>> _metrics = new BoundedDictionary<string, List<QualityMetric>>(1000);
+    private readonly BoundedDictionary<string, QualityThreshold> _thresholds = new BoundedDictionary<string, QualityThreshold>(1000);
     private readonly ConcurrentQueue<QualityAlert> _alerts = new();
-    private readonly ConcurrentDictionary<string, QualitySla> _slas = new();
+    private readonly BoundedDictionary<string, QualitySla> _slas = new BoundedDictionary<string, QualitySla>(1000);
     private readonly int _maxMetricHistory = 1000;
 
     /// <inheritdoc/>
@@ -659,7 +660,7 @@ public sealed class QualityMetricSummary
 /// </summary>
 public sealed class AnomalyDetectionStrategy : DataQualityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AnomalyDetector> _detectors = new();
+    private readonly BoundedDictionary<string, AnomalyDetector> _detectors = new BoundedDictionary<string, AnomalyDetector>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "anomaly-detection";

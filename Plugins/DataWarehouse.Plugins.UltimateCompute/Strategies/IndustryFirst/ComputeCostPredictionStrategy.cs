@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class ComputeCostPredictionStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<ExecutionRecord>> _history = new();
+    private readonly BoundedDictionary<string, List<ExecutionRecord>> _history = new BoundedDictionary<string, List<ExecutionRecord>>(1000);
     private const int MaxHistoryPerRuntime = 1000;
     private const double DefaultCostPerVcpuSecond = 0.0000125; // ~$0.045/hr
 

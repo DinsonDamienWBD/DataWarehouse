@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -31,10 +32,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class DataRetentionPolicyStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RetentionPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, DataRetentionRecord> _records = new();
-        private readonly ConcurrentDictionary<string, RetentionHold> _holds = new();
-        private readonly ConcurrentDictionary<string, RetentionSchedule> _schedules = new();
+        private readonly BoundedDictionary<string, RetentionPolicy> _policies = new BoundedDictionary<string, RetentionPolicy>(1000);
+        private readonly BoundedDictionary<string, DataRetentionRecord> _records = new BoundedDictionary<string, DataRetentionRecord>(1000);
+        private readonly BoundedDictionary<string, RetentionHold> _holds = new BoundedDictionary<string, RetentionHold>(1000);
+        private readonly BoundedDictionary<string, RetentionSchedule> _schedules = new BoundedDictionary<string, RetentionSchedule>(1000);
         private readonly ConcurrentBag<RetentionAuditEntry> _auditLog = new();
 
         private TimeSpan _defaultRetention = TimeSpan.FromDays(365 * 3); // 3 years default

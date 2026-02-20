@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
 {
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class StreamingFullBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BackupCatalogEntry> _backupCatalog = new();
-        private readonly ConcurrentDictionary<string, byte[]> _backupData = new();
+        private readonly BoundedDictionary<string, BackupCatalogEntry> _backupCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private readonly BoundedDictionary<string, byte[]> _backupData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "streaming-full-backup";
@@ -275,7 +275,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
         protected override Task<BackupCatalogEntry?> GetBackupInfoCoreAsync(string backupId, CancellationToken ct)
         {
             _backupCatalog.TryGetValue(backupId, out var entry);
-            return Task.FromResult(entry);
+            return Task.FromResult<BackupCatalogEntry?>(entry);
         }
 
         /// <inheritdoc/>
@@ -299,8 +299,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class ParallelFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly ConcurrentDictionary<string, BackupCatalogEntry> _sharedCatalog = new();
-        private static readonly ConcurrentDictionary<string, byte[]> _sharedData = new();
+        private static readonly BoundedDictionary<string, BackupCatalogEntry> _sharedCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private static readonly BoundedDictionary<string, byte[]> _sharedData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "parallel-full-backup";
@@ -486,9 +486,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class BlockLevelFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly ConcurrentDictionary<string, BackupCatalogEntry> _blockCatalog = new();
-        private static readonly ConcurrentDictionary<string, HashSet<string>> _blockHashes = new();
-        private static readonly ConcurrentDictionary<string, byte[]> _blockData = new();
+        private static readonly BoundedDictionary<string, BackupCatalogEntry> _blockCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private static readonly BoundedDictionary<string, HashSet<string>> _blockHashes = new BoundedDictionary<string, HashSet<string>>(1000);
+        private static readonly BoundedDictionary<string, byte[]> _blockData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "block-level-full-backup";
@@ -698,9 +698,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class SnapMirrorFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly ConcurrentDictionary<string, BackupCatalogEntry> _snapCatalog = new();
-        private static readonly ConcurrentDictionary<string, List<DateTimeOffset>> _snapTimestamps = new();
-        private static readonly ConcurrentDictionary<string, byte[]> _snapData = new();
+        private static readonly BoundedDictionary<string, BackupCatalogEntry> _snapCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private static readonly BoundedDictionary<string, List<DateTimeOffset>> _snapTimestamps = new BoundedDictionary<string, List<DateTimeOffset>>(1000);
+        private static readonly BoundedDictionary<string, byte[]> _snapData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "snapmirror-full-backup";

@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurity
 {
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.MilitarySecurit
     /// </summary>
     public sealed class MilitarySecurityStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ClassificationMarking> _markings = new();
+        private readonly BoundedDictionary<string, ClassificationMarking> _markings = new BoundedDictionary<string, ClassificationMarking>(1000);
 
         public override string StrategyId => "military-classification";
         public override string StrategyName => "Military Classification";

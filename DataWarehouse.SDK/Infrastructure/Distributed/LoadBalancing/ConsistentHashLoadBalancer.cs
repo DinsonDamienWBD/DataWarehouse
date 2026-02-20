@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -18,7 +18,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     public sealed class ConsistentHashLoadBalancer : ILoadBalancerStrategy
     {
         private readonly ConsistentHashRing _ring;
-        private readonly ConcurrentDictionary<string, NodeHealthReport> _healthReports = new();
+        private readonly BoundedDictionary<string, NodeHealthReport> _healthReports = new BoundedDictionary<string, NodeHealthReport>(1000);
         private readonly HashSet<string> _currentRingNodes = new(StringComparer.Ordinal);
         private readonly object _syncLock = new();
 

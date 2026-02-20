@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -21,11 +22,11 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 public sealed partial class FullTextIndexStrategy : IndexingStrategyBase
 {
     // Inverted index: term -> (docId -> positions)
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, List<int>>> _index = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, List<int>>> _index = new BoundedDictionary<string, BoundedDictionary<string, List<int>>>(1000);
     // Document store: docId -> document info
-    private readonly ConcurrentDictionary<string, IndexedDocument> _documents = new();
+    private readonly BoundedDictionary<string, IndexedDocument> _documents = new BoundedDictionary<string, IndexedDocument>(1000);
     // Term document frequency: term -> count of documents containing term
-    private readonly ConcurrentDictionary<string, int> _documentFrequency = new();
+    private readonly BoundedDictionary<string, int> _documentFrequency = new BoundedDictionary<string, int>(1000);
 
     private readonly HashSet<string> _stopWords;
     private readonly bool _enableStemming;
@@ -186,7 +187,7 @@ public sealed partial class FullTextIndexStrategy : IndexingStrategyBase
         // Update inverted index
         foreach (var (term, positions) in termPositions)
         {
-            var termDocs = _index.GetOrAdd(term, _ => new ConcurrentDictionary<string, List<int>>());
+            var termDocs = _index.GetOrAdd(term, _ => new BoundedDictionary<string, List<int>>(1000));
             termDocs[objectId] = positions;
 
             // Update document frequency

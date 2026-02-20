@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,9 +18,9 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _chunkStore = new();
-    private readonly ConcurrentDictionary<string, VersionChain> _versionChains = new();
-    private readonly ConcurrentDictionary<string, VersionEntry> _versions = new();
+    private readonly BoundedDictionary<string, byte[]> _chunkStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, VersionChain> _versionChains = new BoundedDictionary<string, VersionChain>(1000);
+    private readonly BoundedDictionary<string, VersionEntry> _versions = new BoundedDictionary<string, VersionEntry>(1000);
     private readonly double _deltaThreshold;
     private readonly int _maxChainLength;
     private readonly int _chunkSize;

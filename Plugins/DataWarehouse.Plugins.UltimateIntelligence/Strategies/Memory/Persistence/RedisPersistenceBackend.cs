@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -86,9 +87,9 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated Redis data structures
-    private readonly ConcurrentDictionary<string, RedisEntry> _store = new();
-    private readonly ConcurrentDictionary<string, SortedSet<string>> _tierSets = new();
-    private readonly ConcurrentDictionary<string, SortedSet<string>> _scopeSets = new();
+    private readonly BoundedDictionary<string, RedisEntry> _store = new BoundedDictionary<string, RedisEntry>(1000);
+    private readonly BoundedDictionary<string, SortedSet<string>> _tierSets = new BoundedDictionary<string, SortedSet<string>>(1000);
+    private readonly BoundedDictionary<string, SortedSet<string>> _scopeSets = new BoundedDictionary<string, SortedSet<string>>(1000);
     private readonly ConcurrentQueue<StreamEntry> _changeStream = new();
 
     // Simulated connection pool

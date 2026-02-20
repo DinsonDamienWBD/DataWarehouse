@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -31,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability;
 public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 {
     private readonly SustainabilityStrategyRegistry _registry = new();
-    private readonly ConcurrentDictionary<string, ISustainabilityStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ISustainabilityStrategy> _strategies = new BoundedDictionary<string, ISustainabilityStrategy>(1000);
     private ISustainabilityStrategy? _activeStrategy;
 
 

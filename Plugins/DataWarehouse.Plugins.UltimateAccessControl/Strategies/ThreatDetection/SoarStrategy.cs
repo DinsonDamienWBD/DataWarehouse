@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -16,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     public sealed class SoarStrategy : AccessControlStrategyBase
     {
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, SecurityPlaybook> _playbooks = new();
-        private readonly ConcurrentDictionary<string, IncidentResponse> _activeIncidents = new();
+        private readonly BoundedDictionary<string, SecurityPlaybook> _playbooks = new BoundedDictionary<string, SecurityPlaybook>(1000);
+        private readonly BoundedDictionary<string, IncidentResponse> _activeIncidents = new BoundedDictionary<string, IncidentResponse>(1000);
         private readonly ConcurrentQueue<ContainmentAction> _containmentQueue = new();
 
         public SoarStrategy(ILogger? logger = null)

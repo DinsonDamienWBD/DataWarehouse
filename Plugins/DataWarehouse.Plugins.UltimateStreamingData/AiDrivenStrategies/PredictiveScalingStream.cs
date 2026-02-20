@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
@@ -150,8 +149,8 @@ public sealed record StreamWorkloadMetrics
 /// </remarks>
 internal sealed class PredictiveScalingStream : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MetricsHistory> _metricsHistory = new();
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastScaleAction = new();
+    private readonly BoundedDictionary<string, MetricsHistory> _metricsHistory = new BoundedDictionary<string, MetricsHistory>(1000);
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastScaleAction = new BoundedDictionary<string, DateTimeOffset>(1000);
     private readonly IMessageBus? _messageBus;
     private readonly PredictiveScalingConfig _config;
     private long _totalRecommendations;

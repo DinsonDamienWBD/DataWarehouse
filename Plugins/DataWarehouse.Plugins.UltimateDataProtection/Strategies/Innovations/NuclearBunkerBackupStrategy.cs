@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -489,9 +489,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class NuclearBunkerBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BunkerBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, BunkerFacility> _facilities = new();
-        private readonly ConcurrentDictionary<string, PhysicalAccessRequest> _accessRequests = new();
+        private readonly BoundedDictionary<string, BunkerBackup> _backups = new BoundedDictionary<string, BunkerBackup>(1000);
+        private readonly BoundedDictionary<string, BunkerFacility> _facilities = new BoundedDictionary<string, BunkerFacility>(1000);
+        private readonly BoundedDictionary<string, PhysicalAccessRequest> _accessRequests = new BoundedDictionary<string, PhysicalAccessRequest>(1000);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NuclearBunkerBackupStrategy"/> class.

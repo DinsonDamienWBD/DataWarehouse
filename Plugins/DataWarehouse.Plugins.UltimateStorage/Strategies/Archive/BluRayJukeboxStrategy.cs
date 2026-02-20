@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 {
@@ -53,8 +53,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private TimeSpan _verificationTimeout = TimeSpan.FromMinutes(10);
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, BluRayDiscInfo> _discInventory = new();
-        private readonly ConcurrentDictionary<string, string> _objectToDiscMap = new();
+        private readonly BoundedDictionary<string, BluRayDiscInfo> _discInventory = new BoundedDictionary<string, BluRayDiscInfo>(1000);
+        private readonly BoundedDictionary<string, string> _objectToDiscMap = new BoundedDictionary<string, string>(1000);
         private BluRayDiscCatalog? _catalog;
         private IntPtr _driveHandle = IntPtr.Zero;
         private string? _currentLoadedDisc = null;
@@ -1277,7 +1277,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class BluRayDiscCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly ConcurrentDictionary<string, BluRayCatalogEntry> _entries = new();
+        private readonly BoundedDictionary<string, BluRayCatalogEntry> _entries = new BoundedDictionary<string, BluRayCatalogEntry>(1000);
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private BluRayDiscCatalog(string catalogPath)
@@ -1330,7 +1330,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         public Task<BluRayCatalogEntry?> GetEntryAsync(string key, CancellationToken ct)
         {
             _entries.TryGetValue(key, out var entry);
-            return Task.FromResult(entry);
+            return Task.FromResult<BluRayCatalogEntry?>(entry);
         }
 
         /// <summary>

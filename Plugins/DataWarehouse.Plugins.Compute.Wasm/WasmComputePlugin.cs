@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Compute.Wasm;
 
@@ -38,15 +39,15 @@ public class WasmComputePlugin : WasmFunctionPluginBase
 
     #region Fields
 
-    private readonly ConcurrentDictionary<string, WasmModule> _modules = new();
-    private readonly ConcurrentDictionary<string, List<FunctionVersion>> _versionHistory = new();
-    private readonly ConcurrentDictionary<string, WasmFunctionChain> _chains = new();
-    private readonly ConcurrentDictionary<string, ScheduledFunction> _scheduledFunctions = new();
-    private readonly ConcurrentDictionary<string, EventSubscription> _eventSubscriptions = new();
-    private readonly ConcurrentDictionary<string, ExecutionMetrics> _metrics = new();
-    private readonly ConcurrentDictionary<string, List<ExecutionLogEntry>> _executionLogs = new();
+    private readonly BoundedDictionary<string, WasmModule> _modules = new BoundedDictionary<string, WasmModule>(1000);
+    private readonly BoundedDictionary<string, List<FunctionVersion>> _versionHistory = new BoundedDictionary<string, List<FunctionVersion>>(1000);
+    private readonly BoundedDictionary<string, WasmFunctionChain> _chains = new BoundedDictionary<string, WasmFunctionChain>(1000);
+    private readonly BoundedDictionary<string, ScheduledFunction> _scheduledFunctions = new BoundedDictionary<string, ScheduledFunction>(1000);
+    private readonly BoundedDictionary<string, EventSubscription> _eventSubscriptions = new BoundedDictionary<string, EventSubscription>(1000);
+    private readonly BoundedDictionary<string, ExecutionMetrics> _metrics = new BoundedDictionary<string, ExecutionMetrics>(1000);
+    private readonly BoundedDictionary<string, List<ExecutionLogEntry>> _executionLogs = new BoundedDictionary<string, List<ExecutionLogEntry>>(1000);
     private readonly ConcurrentQueue<PrioritizedExecution> _executionQueue = new();
-    private readonly ConcurrentDictionary<string, FunctionTemplate> _templates = new();
+    private readonly BoundedDictionary<string, FunctionTemplate> _templates = new BoundedDictionary<string, FunctionTemplate>(1000);
 
     private readonly SemaphoreSlim _executionSemaphore;
     private readonly object _schedulerLock = new();
@@ -1330,7 +1331,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
         CancellationToken ct = default)
     {
         _templates.TryGetValue(templateId, out var template);
-        return Task.FromResult(template);
+        return Task.FromResult<FunctionTemplate?>(template);
     }
 
     #endregion

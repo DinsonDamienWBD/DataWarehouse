@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 {
@@ -51,8 +51,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private int _maxRetryAttempts = 3;
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, CartridgeInfo> _cartridgeInventory = new();
-        private readonly ConcurrentDictionary<string, string> _objectToCartridgeMap = new();
+        private readonly BoundedDictionary<string, CartridgeInfo> _cartridgeInventory = new BoundedDictionary<string, CartridgeInfo>(1000);
+        private readonly BoundedDictionary<string, string> _objectToCartridgeMap = new BoundedDictionary<string, string>(1000);
         private OpticalCatalog? _catalog;
         private HttpClient? _httpClient;
         private string? _currentLoadedCartridge = null;
@@ -967,7 +967,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class OpticalCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly ConcurrentDictionary<string, OpticalCatalogEntry> _entries = new();
+        private readonly BoundedDictionary<string, OpticalCatalogEntry> _entries = new BoundedDictionary<string, OpticalCatalogEntry>(1000);
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private OpticalCatalog(string catalogPath)
@@ -1008,7 +1008,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         public Task<OpticalCatalogEntry?> GetEntryAsync(string key, CancellationToken ct)
         {
             _entries.TryGetValue(key, out var entry);
-            return Task.FromResult(entry);
+            return Task.FromResult<OpticalCatalogEntry?>(entry);
         }
 
         public Task<List<OpticalCatalogEntry>> ListEntriesAsync(string? prefix, CancellationToken ct)

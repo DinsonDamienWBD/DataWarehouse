@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Channels;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit.Strategies.Distributed;
 
@@ -59,12 +60,12 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
     /// <summary>
     /// Thread-safe storage of active swarm states keyed by transfer ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, SwarmState> _swarmStates = new();
+    private readonly BoundedDictionary<string, SwarmState> _swarmStates = new BoundedDictionary<string, SwarmState>(1000);
 
     /// <summary>
     /// Set of banned peer IDs that failed SHA-256 integrity verification.
     /// </summary>
-    private readonly ConcurrentDictionary<string, bool> _bannedPeers = new();
+    private readonly BoundedDictionary<string, bool> _bannedPeers = new BoundedDictionary<string, bool>(1000);
 
     /// <summary>
     /// HTTP client used for tracker communication and piece downloads.
@@ -195,7 +196,7 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
                 TotalSize = totalSize,
                 PieceSize = pieceSize,
                 Pieces = pieces,
-                Peers = new ConcurrentDictionary<string, SwarmPeer>(),
+                Peers = new BoundedDictionary<string, SwarmPeer>(1000),
                 PieceQueue = pieceChannel,
                 ConcurrentDownloadLimit = ConcurrentDownloadLimitPerPeer,
                 Request = request
@@ -931,7 +932,7 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
         /// Thread-safe dictionary of active peers keyed by peer ID.
         /// Peer records are replaced atomically for state updates.
         /// </summary>
-        public required ConcurrentDictionary<string, SwarmPeer> Peers { get; init; }
+        public required BoundedDictionary<string, SwarmPeer> Peers { get; init; }
 
         /// <summary>
         /// Bounded channel for pending piece indices. Provides backpressure to prevent

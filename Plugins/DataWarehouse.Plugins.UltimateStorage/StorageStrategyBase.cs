@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage
 {
@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
     /// </summary>
     public abstract class UltimateStorageStrategyBase : StorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, object> _configuration = new();
+        private readonly BoundedDictionary<string, object> _configuration = new BoundedDictionary<string, object>(1000);
         private long _totalBytesStored;
         private long _totalBytesRetrieved;
         private long _totalBytesDeleted;

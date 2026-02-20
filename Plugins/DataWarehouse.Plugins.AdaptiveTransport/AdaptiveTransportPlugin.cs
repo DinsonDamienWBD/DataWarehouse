@@ -44,9 +44,9 @@ namespace DataWarehouse.Plugins.AdaptiveTransport;
 /// </summary>
 public sealed class AdaptiveTransportPlugin : StreamingPluginBase
 {
-    private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
-    private readonly ConcurrentDictionary<string, NetworkQualityMetrics> _endpointMetrics = new();
-    private readonly ConcurrentDictionary<Guid, PendingTransfer> _pendingTransfers = new();
+    private readonly BoundedDictionary<string, ConnectionPool> _connectionPools = new BoundedDictionary<string, ConnectionPool>(1000);
+    private readonly BoundedDictionary<string, NetworkQualityMetrics> _endpointMetrics = new BoundedDictionary<string, NetworkQualityMetrics>(1000);
+    private readonly BoundedDictionary<Guid, PendingTransfer> _pendingTransfers = new BoundedDictionary<Guid, PendingTransfer>(1000);
     private readonly SemaphoreSlim _switchLock = new(1, 1);
     private readonly Timer _qualityMonitorTimer;
     private readonly AdaptiveTransportConfig _config;
@@ -623,7 +623,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
         var sw = Stopwatch.StartNew();
         var transferId = Guid.NewGuid();
         var chunks = ChunkData(data, _config.UdpChunkSize);
-        var acked = new ConcurrentDictionary<int, bool>();
+        var acked = new BoundedDictionary<int, bool>(1000);
 
         try
         {
@@ -767,9 +767,9 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     /// Receives ACKs with congestion control feedback. Each ACK triggers additive increase
     /// and RTT measurement via EWMA for the AIMD controller.
     /// </summary>
-    private async Task ReceiveAcksWithCongestionAsync(UdpClient client, ConcurrentDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
+    private async Task ReceiveAcksWithCongestionAsync(UdpClient client, BoundedDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
     {
-        var sendTimestamps = new ConcurrentDictionary<int, DateTime>();
+        var sendTimestamps = new BoundedDictionary<int, DateTime>(1000);
         try
         {
             while (acked.Count < totalChunks && !ct.IsCancellationRequested)
@@ -807,7 +807,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
         }
     }
 
-    private async Task ReceiveAcksAsync(UdpClient client, ConcurrentDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
+    private async Task ReceiveAcksAsync(UdpClient client, BoundedDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
     {
         try
         {
@@ -2158,7 +2158,7 @@ internal sealed class ConnectionPool : IAsyncDisposable
 {
     private readonly TransportProtocol _protocol;
     private readonly AdaptiveTransportConfig _config;
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<PooledConnection>> _endpointPools = new();
+    private readonly BoundedDictionary<string, ConcurrentQueue<PooledConnection>> _endpointPools = new BoundedDictionary<string, ConcurrentQueue<PooledConnection>>(1000);
     private readonly Timer _healthCheckTimer;
     private int _activeConnections;
     private int _totalConnections;

@@ -6,7 +6,6 @@ using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Storage.Fabric;
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,7 +41,7 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
 {
     private readonly BackendRegistryImpl _registry = new();
     private readonly AddressRouter _router = new();
-    private readonly ConcurrentDictionary<string, HealthStatus> _healthCache = new();
+    private readonly BoundedDictionary<string, HealthStatus> _healthCache = new BoundedDictionary<string, HealthStatus>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private volatile bool _initialized;
 

@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SovereigntyMesh;
 
@@ -63,8 +63,8 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     // State
     // ==================================================================================
 
-    private readonly ConcurrentDictionary<string, CacheEntry> _routingCache = new();
-    private readonly ConcurrentDictionary<string, string> _backendJurisdictionMap = new();
+    private readonly BoundedDictionary<string, CacheEntry> _routingCache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly BoundedDictionary<string, string> _backendJurisdictionMap = new BoundedDictionary<string, string>(1000);
 
     private ISovereigntyMesh? _sovereigntyMesh;
     private string _defaultJurisdiction = "US";

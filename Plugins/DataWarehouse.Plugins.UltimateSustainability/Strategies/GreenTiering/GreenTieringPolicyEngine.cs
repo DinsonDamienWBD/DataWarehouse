@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.GreenTiering;
 
@@ -96,7 +97,7 @@ public sealed record GreenTieringPolicy
 /// </summary>
 public sealed class GreenTieringPolicyEngine : IDisposable
 {
-    private readonly ConcurrentDictionary<string, GreenTieringPolicy> _policies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, GreenTieringPolicy> _policies = new BoundedDictionary<string, GreenTieringPolicy>(1000);
     private readonly string _persistencePath;
     private Timer? _saveTimer;
     private volatile bool _dirty;

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,8 +18,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class VariableBlockDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _chunkStore = new();
-    private readonly ConcurrentDictionary<string, ObjectChunkMap> _objectMaps = new();
+    private readonly BoundedDictionary<string, byte[]> _chunkStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, ObjectChunkMap> _objectMaps = new BoundedDictionary<string, ObjectChunkMap>(1000);
     private readonly int _minChunkSize;
     private readonly int _maxChunkSize;
     private readonly int _avgChunkSize;

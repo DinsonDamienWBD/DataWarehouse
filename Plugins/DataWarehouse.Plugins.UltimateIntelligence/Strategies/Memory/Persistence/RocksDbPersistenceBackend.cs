@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -85,10 +86,10 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     // Simulated column families per tier
-    private readonly ConcurrentDictionary<MemoryTier, ConcurrentDictionary<string, MemoryRecord>> _columnFamilies = new();
-    private readonly ConcurrentDictionary<string, MemoryTier> _recordTierMap = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _scopeIndex = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
+    private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, MemoryRecord>> _columnFamilies = new BoundedDictionary<MemoryTier, BoundedDictionary<string, MemoryRecord>>(1000);
+    private readonly BoundedDictionary<string, MemoryTier> _recordTierMap = new BoundedDictionary<string, MemoryTier>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
 
     // WAL simulation
     private readonly ConcurrentQueue<WalEntry> _walQueue = new();
@@ -135,7 +136,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
         // Initialize column families for each tier
         foreach (var tier in Enum.GetValues<MemoryTier>())
         {
-            _columnFamilies[tier] = new ConcurrentDictionary<string, MemoryRecord>();
+            _columnFamilies[tier] = new BoundedDictionary<string, MemoryRecord>(1000);
         }
 
         // Initialize data directory

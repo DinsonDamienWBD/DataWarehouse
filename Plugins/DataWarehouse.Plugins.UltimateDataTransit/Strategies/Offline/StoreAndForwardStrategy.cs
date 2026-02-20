@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit.Strategies.Offline;
 
@@ -47,7 +47,7 @@ internal sealed class StoreAndForwardStrategy : DataTransitStrategyBase
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private readonly ConcurrentDictionary<string, string> _activePackages = new();
+    private readonly BoundedDictionary<string, string> _activePackages = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "transit-store-and-forward";

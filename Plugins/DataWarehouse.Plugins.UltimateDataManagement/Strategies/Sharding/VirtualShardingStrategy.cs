@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -97,9 +97,9 @@ public sealed class VirtualShardMigrationPlan
 /// </remarks>
 public sealed class VirtualShardingStrategy : ShardingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VirtualShard> _virtualShards = new();
-    private readonly ConcurrentDictionary<string, string> _aliasToVirtual = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, VirtualShard> _virtualShards = new BoundedDictionary<string, VirtualShard>(1000);
+    private readonly BoundedDictionary<string, string> _aliasToVirtual = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _mappingLock = new();
     private readonly int _virtualShardsCount;
     private readonly int _cacheMaxSize;

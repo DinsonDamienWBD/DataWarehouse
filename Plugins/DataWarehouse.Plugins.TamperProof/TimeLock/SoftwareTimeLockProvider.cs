@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.TamperProof.TimeLock;
 [SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
 public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
 {
-    private readonly ConcurrentDictionary<Guid, TimeLockEntry> _locks = new();
+    private readonly BoundedDictionary<Guid, TimeLockEntry> _locks = new BoundedDictionary<Guid, TimeLockEntry>(1000);
 
     /// <summary>
     /// Internal record representing a locked object's state.

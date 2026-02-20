@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,10 +32,10 @@ namespace DataWarehouse.Plugins.UltimateDataCatalog;
 public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataCatalogStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, CatalogAsset> _assets = new();
-    private readonly ConcurrentDictionary<string, CatalogRelationship> _relationships = new();
-    private readonly ConcurrentDictionary<string, BusinessTerm> _glossary = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, CatalogAsset> _assets = new BoundedDictionary<string, CatalogAsset>(1000);
+    private readonly BoundedDictionary<string, CatalogRelationship> _relationships = new BoundedDictionary<string, CatalogRelationship>(1000);
+    private readonly BoundedDictionary<string, BusinessTerm> _glossary = new BoundedDictionary<string, BusinessTerm>(1000);
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;
@@ -493,7 +492,7 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
 /// </summary>
 public sealed class DataCatalogStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataCatalogStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IDataCatalogStrategy> _strategies = new BoundedDictionary<string, IDataCatalogStrategy>(1000);
 
     /// <summary>Gets the count of registered strategies.</summary>
     public int Count => _strategies.Count;

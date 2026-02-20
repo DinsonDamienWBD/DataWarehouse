@@ -3,9 +3,9 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.FuseDriver;
 /// </summary>
 public sealed class ExtendedAttributes
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte[]>> _attributes = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, byte[]>> _attributes = new BoundedDictionary<string, BoundedDictionary<string, byte[]>>(1000);
     private readonly object _syncLock = new();
 
     /// <summary>
@@ -126,7 +126,7 @@ public sealed class ExtendedAttributes
 
         lock (_syncLock)
         {
-            var attrs = _attributes.GetOrAdd(normalizedPath, _ => new ConcurrentDictionary<string, byte[]>());
+            var attrs = _attributes.GetOrAdd(normalizedPath, _ => new BoundedDictionary<string, byte[]>(1000));
             var exists = attrs.ContainsKey(name);
 
             // Check flags
@@ -271,7 +271,7 @@ public sealed class ExtendedAttributes
             return;
         }
 
-        var destAttrs = _attributes.GetOrAdd(normalizedDest, _ => new ConcurrentDictionary<string, byte[]>());
+        var destAttrs = _attributes.GetOrAdd(normalizedDest, _ => new BoundedDictionary<string, byte[]>(1000));
 
         foreach (var kvp in sourceAttrs)
         {
@@ -417,7 +417,7 @@ public sealed class ExtendedAttributes
 
         lock (_syncLock)
         {
-            var attrs = _attributes.GetOrAdd(normalizedPath, _ => new ConcurrentDictionary<string, byte[]>());
+            var attrs = _attributes.GetOrAdd(normalizedPath, _ => new BoundedDictionary<string, byte[]>(1000));
 
             foreach (var kvp in attributes)
             {

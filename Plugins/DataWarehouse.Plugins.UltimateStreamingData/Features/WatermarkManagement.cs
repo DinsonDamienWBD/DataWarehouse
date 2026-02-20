@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
@@ -152,7 +151,7 @@ public sealed record WatermarkEventResult
 /// </remarks>
 internal sealed class WatermarkManagement : IDisposable
 {
-    private readonly ConcurrentDictionary<string, PartitionWatermarkState> _partitions = new();
+    private readonly BoundedDictionary<string, PartitionWatermarkState> _partitions = new BoundedDictionary<string, PartitionWatermarkState>(1000);
     private readonly WatermarkConfig _config;
     private readonly IMessageBus? _messageBus;
     private readonly Timer? _periodicTimer;
@@ -497,6 +496,6 @@ internal sealed class WatermarkManagement : IDisposable
         public long LateEventsAccepted;
         public long EventsDiscarded;
         public DateTimeOffset LastUpdated = DateTimeOffset.UtcNow;
-        public readonly ConcurrentDictionary<string, DateTimeOffset> PendingWindows = new();
+        public readonly BoundedDictionary<string, DateTimeOffset> PendingWindows = new BoundedDictionary<string, DateTimeOffset>(1000);
     }
 }

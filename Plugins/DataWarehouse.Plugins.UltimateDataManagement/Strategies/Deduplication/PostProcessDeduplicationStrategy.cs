@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PendingData> _pendingDedup = new();
-    private readonly ConcurrentDictionary<string, byte[]> _dataStore = new();
+    private readonly BoundedDictionary<string, PendingData> _pendingDedup = new BoundedDictionary<string, PendingData>(1000);
+    private readonly BoundedDictionary<string, byte[]> _dataStore = new BoundedDictionary<string, byte[]>(1000);
     private readonly ConcurrentQueue<string> _dedupQueue = new();
     private readonly Timer _batchTimer;
     private readonly SemaphoreSlim _batchLock = new(1, 1);

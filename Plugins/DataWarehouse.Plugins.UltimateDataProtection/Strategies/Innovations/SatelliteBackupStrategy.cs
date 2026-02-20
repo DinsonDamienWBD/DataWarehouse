@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -243,9 +243,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class SatelliteBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SatelliteBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, SatelliteTransfer> _activeTransfers = new();
-        private readonly ConcurrentDictionary<SatelliteProvider, SatelliteUplinkConfiguration> _providerConfigs = new();
+        private readonly BoundedDictionary<string, SatelliteBackup> _backups = new BoundedDictionary<string, SatelliteBackup>(1000);
+        private readonly BoundedDictionary<string, SatelliteTransfer> _activeTransfers = new BoundedDictionary<string, SatelliteTransfer>(1000);
+        private readonly BoundedDictionary<SatelliteProvider, SatelliteUplinkConfiguration> _providerConfigs = new BoundedDictionary<SatelliteProvider, SatelliteUplinkConfiguration>(1000);
         private SatelliteConnectionStatus _connectionStatus = new();
 
         /// <inheritdoc/>

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class PolicyBasedRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CompliancePolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, PolicyAssignment> _assignments = new();
+    private readonly BoundedDictionary<string, CompliancePolicy> _policies = new BoundedDictionary<string, CompliancePolicy>(1000);
+    private readonly BoundedDictionary<string, PolicyAssignment> _assignments = new BoundedDictionary<string, PolicyAssignment>(1000);
     private readonly List<PolicyAuditEntry> _auditLog = new();
     private readonly object _auditLock = new();
 

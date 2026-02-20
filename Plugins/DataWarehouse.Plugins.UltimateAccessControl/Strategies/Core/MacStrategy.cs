@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -23,8 +23,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class MacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SecurityClearanceLevel> _subjectClearances = new();
-        private readonly ConcurrentDictionary<string, SecurityClassification> _resourceClassifications = new();
+        private readonly BoundedDictionary<string, SecurityClearanceLevel> _subjectClearances = new BoundedDictionary<string, SecurityClearanceLevel>(1000);
+        private readonly BoundedDictionary<string, SecurityClassification> _resourceClassifications = new BoundedDictionary<string, SecurityClassification>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "mac";

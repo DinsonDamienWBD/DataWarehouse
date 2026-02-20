@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud;
 public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly MultiCloudStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, CloudProviderState> _providers = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, CloudProviderState> _providers = new BoundedDictionary<string, CloudProviderState>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Statistics

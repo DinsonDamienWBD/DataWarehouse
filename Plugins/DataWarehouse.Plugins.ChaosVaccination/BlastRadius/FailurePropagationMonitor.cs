@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -17,7 +16,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.BlastRadius
     [SdkCompatibility("5.0.0", Notes = "Phase 61: Blast radius enforcement")]
     public sealed class FailurePropagationMonitor : IDisposable
     {
-        private readonly ConcurrentDictionary<string, FailureEvent> _recentFailures = new();
+        private readonly BoundedDictionary<string, FailureEvent> _recentFailures = new BoundedDictionary<string, FailureEvent>(1000);
         private readonly IsolationZoneManager _zoneManager;
         private readonly IMessageBus? _messageBus;
         private readonly TimeSpan _slidingWindow;

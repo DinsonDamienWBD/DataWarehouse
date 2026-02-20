@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFirst;
 
@@ -12,8 +12,8 @@ namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFir
 /// </summary>
 internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastProcessed = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _dependencies = new();
+    private readonly BoundedDictionary<string, DateTimeOffset> _lastProcessed = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _dependencies = new BoundedDictionary<string, HashSet<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "industryfirst-incremental";

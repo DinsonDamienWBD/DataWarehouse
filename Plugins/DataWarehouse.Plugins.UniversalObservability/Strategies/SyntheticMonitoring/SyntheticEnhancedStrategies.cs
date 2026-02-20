@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.SyntheticMonitoring;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.SyntheticMonit
 /// </summary>
 public sealed class SslCertificateMonitorService
 {
-    private readonly ConcurrentDictionary<string, SslCertificateInfo> _certificateCache = new();
-    private readonly ConcurrentDictionary<string, List<SslAlert>> _alerts = new();
+    private readonly BoundedDictionary<string, SslCertificateInfo> _certificateCache = new BoundedDictionary<string, SslCertificateInfo>(1000);
+    private readonly BoundedDictionary<string, List<SslAlert>> _alerts = new BoundedDictionary<string, List<SslAlert>>(1000);
     private readonly HttpClient _httpClient;
     private readonly int _expirationWarningDays;
 
@@ -141,9 +141,9 @@ public sealed class SslCertificateMonitorService
 /// </summary>
 public sealed class AlertTriggerEngine
 {
-    private readonly ConcurrentDictionary<string, AlertRule> _rules = new();
-    private readonly ConcurrentDictionary<string, List<AlertEvent>> _firedAlerts = new();
-    private readonly ConcurrentDictionary<string, AlertState> _alertStates = new();
+    private readonly BoundedDictionary<string, AlertRule> _rules = new BoundedDictionary<string, AlertRule>(1000);
+    private readonly BoundedDictionary<string, List<AlertEvent>> _firedAlerts = new BoundedDictionary<string, List<AlertEvent>>(1000);
+    private readonly BoundedDictionary<string, AlertState> _alertStates = new BoundedDictionary<string, AlertState>(1000);
 
     /// <summary>
     /// Creates an alert rule.
@@ -269,7 +269,7 @@ public sealed class AlertTriggerEngine
 /// </summary>
 public sealed class ResponseTimeMeasurementService
 {
-    private readonly ConcurrentDictionary<string, List<double>> _measurements = new();
+    private readonly BoundedDictionary<string, List<double>> _measurements = new BoundedDictionary<string, List<double>>(1000);
     private const int MaxMeasurementsPerTarget = 10000;
 
     /// <summary>

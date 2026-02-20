@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -201,9 +201,9 @@ public sealed class ScheduledOperation
 /// </remarks>
 public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CarbonIntensity> _regionIntensities = new();
-    private readonly ConcurrentDictionary<string, ScheduledOperation> _scheduledOperations = new();
-    private readonly ConcurrentDictionary<string, CarbonFootprint> _operationFootprints = new();
+    private readonly BoundedDictionary<string, CarbonIntensity> _regionIntensities = new BoundedDictionary<string, CarbonIntensity>(1000);
+    private readonly BoundedDictionary<string, ScheduledOperation> _scheduledOperations = new BoundedDictionary<string, ScheduledOperation>(1000);
+    private readonly BoundedDictionary<string, CarbonFootprint> _operationFootprints = new BoundedDictionary<string, CarbonFootprint>(1000);
     private readonly object _statsLock = new();
     private double _totalCO2eGrams;
     private double _totalEnergyKwh;

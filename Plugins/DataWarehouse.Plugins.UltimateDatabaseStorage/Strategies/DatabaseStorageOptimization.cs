@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies;
 /// </summary>
 public sealed class DatabaseIndexManager
 {
-    private readonly ConcurrentDictionary<string, IndexDefinition> _indexes = new();
-    private readonly ConcurrentDictionary<string, IndexUsageStats> _usageStats = new();
+    private readonly BoundedDictionary<string, IndexDefinition> _indexes = new BoundedDictionary<string, IndexDefinition>(1000);
+    private readonly BoundedDictionary<string, IndexUsageStats> _usageStats = new BoundedDictionary<string, IndexUsageStats>(1000);
 
     /// <summary>Creates an index on a collection/table.</summary>
     public IndexDefinition CreateIndex(string collection, string indexName, IndexType type,
@@ -146,8 +146,8 @@ public sealed record IndexRecommendation
 /// </summary>
 public sealed class CompactionPolicyManager
 {
-    private readonly ConcurrentDictionary<string, CompactionPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, CompactionHistory> _history = new();
+    private readonly BoundedDictionary<string, CompactionPolicy> _policies = new BoundedDictionary<string, CompactionPolicy>(1000);
+    private readonly BoundedDictionary<string, CompactionHistory> _history = new BoundedDictionary<string, CompactionHistory>(1000);
     private long _totalCompactions;
 
     /// <summary>Registers a compaction policy for a table/collection.</summary>
@@ -264,8 +264,8 @@ public sealed record CompactionHistory
 /// </summary>
 public sealed class QueryOptimizer
 {
-    private readonly ConcurrentDictionary<string, QueryPlan> _planCache = new();
-    private readonly ConcurrentDictionary<string, TableStatistics> _statistics = new();
+    private readonly BoundedDictionary<string, QueryPlan> _planCache = new BoundedDictionary<string, QueryPlan>(1000);
+    private readonly BoundedDictionary<string, TableStatistics> _statistics = new BoundedDictionary<string, TableStatistics>(1000);
     private long _plansGenerated;
     private long _cacheHits;
 
@@ -408,7 +408,7 @@ public sealed record OptimizerMetrics
 /// </summary>
 public sealed class StorageCacheIntegration
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly int _maxEntries;
     private long _hits;
     private long _misses;

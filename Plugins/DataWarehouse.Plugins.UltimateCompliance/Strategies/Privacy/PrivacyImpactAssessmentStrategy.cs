@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -30,9 +31,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class PrivacyImpactAssessmentStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PrivacyImpactAssessment> _assessments = new();
-        private readonly ConcurrentDictionary<string, DpiaTemplate> _templates = new();
-        private readonly ConcurrentDictionary<string, RiskCategory> _riskCategories = new();
+        private readonly BoundedDictionary<string, PrivacyImpactAssessment> _assessments = new BoundedDictionary<string, PrivacyImpactAssessment>(1000);
+        private readonly BoundedDictionary<string, DpiaTemplate> _templates = new BoundedDictionary<string, DpiaTemplate>(1000);
+        private readonly BoundedDictionary<string, RiskCategory> _riskCategories = new BoundedDictionary<string, RiskCategory>(1000);
         private readonly ConcurrentBag<DpiaAuditEntry> _auditLog = new();
 
         private double _highRiskThreshold = 15.0;

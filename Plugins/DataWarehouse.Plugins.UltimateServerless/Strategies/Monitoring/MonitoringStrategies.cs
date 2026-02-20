@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Monitoring;
 
@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.Monitoring;
 /// </summary>
 public sealed class DistributedTracingStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TraceSegment> _traces = new();
+    private readonly BoundedDictionary<string, TraceSegment> _traces = new BoundedDictionary<string, TraceSegment>(1000);
 
     public override string StrategyId => "monitoring-distributed-tracing";
     public override string DisplayName => "Distributed Tracing";
@@ -92,7 +92,7 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class CloudWatchMetricsStrategy : ServerlessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<MetricDataPoint>> _metrics = new();
+    private readonly BoundedDictionary<string, List<MetricDataPoint>> _metrics = new BoundedDictionary<string, List<MetricDataPoint>>(1000);
 
     public override string StrategyId => "monitoring-cloudwatch-metrics";
     public override string DisplayName => "CloudWatch Metrics";

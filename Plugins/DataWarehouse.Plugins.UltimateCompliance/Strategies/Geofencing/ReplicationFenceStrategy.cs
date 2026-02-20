@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -23,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class ReplicationFenceStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ReplicationTopology> _topologies = new();
-        private readonly ConcurrentDictionary<string, SovereigntyBoundary> _boundaries = new();
-        private readonly ConcurrentDictionary<string, ReplicationFenceRule> _rules = new();
+        private readonly BoundedDictionary<string, ReplicationTopology> _topologies = new BoundedDictionary<string, ReplicationTopology>(1000);
+        private readonly BoundedDictionary<string, SovereigntyBoundary> _boundaries = new BoundedDictionary<string, SovereigntyBoundary>(1000);
+        private readonly BoundedDictionary<string, ReplicationFenceRule> _rules = new BoundedDictionary<string, ReplicationFenceRule>(1000);
         private readonly ConcurrentBag<ReplicationFenceEvent> _auditLog = new();
 
         private bool _enforceMode = true;

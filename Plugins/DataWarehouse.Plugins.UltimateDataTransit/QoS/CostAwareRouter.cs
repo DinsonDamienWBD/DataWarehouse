@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.Transit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit.QoS;
 
@@ -94,7 +94,7 @@ internal enum RoutingPolicy
 internal sealed class CostAwareRouter
 {
     private readonly RoutingPolicy _defaultPolicy;
-    private readonly ConcurrentDictionary<string, TransitCostProfile> _costProfiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, TransitCostProfile> _costProfiles = new BoundedDictionary<string, TransitCostProfile>(1000);
 
     /// <summary>
     /// Number of bytes in one gigabyte, used for cost calculations.

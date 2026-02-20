@@ -2,9 +2,9 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -71,7 +71,7 @@ public sealed class ThumbnailProvider : IDisposable
     #endregion
 
     private readonly WinFspFileSystem _fileSystem;
-    private readonly ConcurrentDictionary<string, ThumbnailCacheEntry> _cache;
+    private readonly BoundedDictionary<string, ThumbnailCacheEntry> _cache;
     private readonly SemaphoreSlim _cacheLock;
     private readonly long _maxCacheSize;
     private readonly TimeSpan _cacheTtl;
@@ -94,7 +94,7 @@ public sealed class ThumbnailProvider : IDisposable
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _maxCacheSize = maxCacheSizeBytes;
         _cacheTtl = TimeSpan.FromMinutes(cacheTtlMinutes);
-        _cache = new ConcurrentDictionary<string, ThumbnailCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        _cache = new BoundedDictionary<string, ThumbnailCacheEntry>(1000);
         _cacheLock = new SemaphoreSlim(1, 1);
 
         // Start cleanup timer
@@ -158,7 +158,7 @@ public sealed class ThumbnailProvider : IDisposable
         int requestedSize,
         CancellationToken cancellationToken = default)
     {
-        var results = new ConcurrentDictionary<string, ThumbnailData?>(StringComparer.OrdinalIgnoreCase);
+        var results = new BoundedDictionary<string, ThumbnailData?>(1000);
         var normalizedSize = NormalizeSize(requestedSize);
 
         await Parallel.ForEachAsync(

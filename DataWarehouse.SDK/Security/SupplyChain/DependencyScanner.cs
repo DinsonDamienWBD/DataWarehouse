@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -655,7 +654,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
         private readonly ILogger<DependencyScanner>? _logger;
 
         private readonly SemaphoreSlim _rateLimiter = new(10, 10);
-        private readonly ConcurrentDictionary<string, (DependencyScanResult Result, DateTimeOffset CachedAt)> _cache = new();
+        private readonly BoundedDictionary<string, (DependencyScanResult Result, DateTimeOffset CachedAt)> _cache = new BoundedDictionary<string, (DependencyScanResult Result, DateTimeOffset CachedAt)>(1000);
         private Timer? _scanTimer;
         private DependencyScanResult? _lastScanResult;
 

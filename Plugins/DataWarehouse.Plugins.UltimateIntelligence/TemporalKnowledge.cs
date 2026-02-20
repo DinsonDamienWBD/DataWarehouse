@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -783,8 +783,8 @@ public enum StorageTier
 /// </summary>
 public sealed class KnowledgeTimeStore
 {
-    private readonly ConcurrentDictionary<string, SortedList<DateTimeOffset, TemporalKnowledgeEntry>> _timePartitionedStore = new();
-    private readonly ConcurrentDictionary<string, ReaderWriterLockSlim> _locks = new();
+    private readonly BoundedDictionary<string, SortedList<DateTimeOffset, TemporalKnowledgeEntry>> _timePartitionedStore = new BoundedDictionary<string, SortedList<DateTimeOffset, TemporalKnowledgeEntry>>(1000);
+    private readonly BoundedDictionary<string, ReaderWriterLockSlim> _locks = new BoundedDictionary<string, ReaderWriterLockSlim>(1000);
     private readonly object _globalLock = new();
 
     /// <summary>
@@ -979,7 +979,7 @@ public sealed class KnowledgeTimeStore
 public sealed class SnapshotManager
 {
     private readonly KnowledgeTimeStore _timeStore;
-    private readonly ConcurrentDictionary<string, KnowledgeSnapshot> _snapshots = new();
+    private readonly BoundedDictionary<string, KnowledgeSnapshot> _snapshots = new BoundedDictionary<string, KnowledgeSnapshot>(1000);
     private readonly ReaderWriterLockSlim _lock = new();
 
     /// <summary>
@@ -1398,7 +1398,7 @@ public sealed class TimelineBuilder
 /// </summary>
 public sealed class TemporalIndex
 {
-    private readonly ConcurrentDictionary<string, SortedSet<DateTimeOffset>> _knowledgeTimestamps = new();
+    private readonly BoundedDictionary<string, SortedSet<DateTimeOffset>> _knowledgeTimestamps = new BoundedDictionary<string, SortedSet<DateTimeOffset>>(1000);
     private readonly SortedDictionary<DateTimeOffset, HashSet<string>> _timestampToKnowledge = new();
     private readonly ReaderWriterLockSlim _lock = new();
 
@@ -1830,7 +1830,7 @@ public sealed class BetweenQueryHandler
 public sealed class ChangeDetector
 {
     private readonly KnowledgeTimeStore _timeStore;
-    private readonly ConcurrentDictionary<string, KnowledgeChange> _recentChanges = new();
+    private readonly BoundedDictionary<string, KnowledgeChange> _recentChanges = new BoundedDictionary<string, KnowledgeChange>(1000);
     private DateTimeOffset _lastDetectionTime = DateTimeOffset.MinValue;
     private readonly ReaderWriterLockSlim _lock = new();
 
@@ -2383,7 +2383,7 @@ public sealed class RetentionPolicy
 public sealed class TemporalCompaction
 {
     private readonly KnowledgeTimeStore _timeStore;
-    private readonly ConcurrentDictionary<string, CompactionSummary> _summaries = new();
+    private readonly BoundedDictionary<string, CompactionSummary> _summaries = new BoundedDictionary<string, CompactionSummary>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TemporalCompaction"/> class.
@@ -2530,9 +2530,9 @@ public sealed class CompactionSummary
 public sealed class TemporalTiering
 {
     private readonly KnowledgeTimeStore _hotStore;
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<DateTimeOffset, TemporalKnowledgeEntry>> _warmStore = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<DateTimeOffset, byte[]>> _coldStore = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<DateTimeOffset, byte[]>> _archiveStore = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<DateTimeOffset, TemporalKnowledgeEntry>> _warmStore = new BoundedDictionary<string, BoundedDictionary<DateTimeOffset, TemporalKnowledgeEntry>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<DateTimeOffset, byte[]>> _coldStore = new BoundedDictionary<string, BoundedDictionary<DateTimeOffset, byte[]>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<DateTimeOffset, byte[]>> _archiveStore = new BoundedDictionary<string, BoundedDictionary<DateTimeOffset, byte[]>>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TemporalTiering"/> class.
@@ -2661,7 +2661,7 @@ public sealed class TemporalTiering
         return null;
     }
 
-    private static TemporalKnowledgeEntry? FindAtTimestamp(ConcurrentDictionary<DateTimeOffset, TemporalKnowledgeEntry> data, DateTimeOffset timestamp)
+    private static TemporalKnowledgeEntry? FindAtTimestamp(BoundedDictionary<DateTimeOffset, TemporalKnowledgeEntry> data, DateTimeOffset timestamp)
     {
         TemporalKnowledgeEntry? result = null;
         foreach (var kvp in data.OrderBy(k => k.Key))
@@ -2674,7 +2674,7 @@ public sealed class TemporalTiering
         return result;
     }
 
-    private static TemporalKnowledgeEntry? FindCompressedAtTimestamp(ConcurrentDictionary<DateTimeOffset, byte[]> data, DateTimeOffset timestamp)
+    private static TemporalKnowledgeEntry? FindCompressedAtTimestamp(BoundedDictionary<DateTimeOffset, byte[]> data, DateTimeOffset timestamp)
     {
         byte[]? compressed = null;
         foreach (var kvp in data.OrderBy(k => k.Key))
@@ -2707,7 +2707,7 @@ public sealed class TemporalTiering
 
                 if (!_coldStore.TryGetValue(kvp.Key, out var coldData))
                 {
-                    coldData = new ConcurrentDictionary<DateTimeOffset, byte[]>();
+                    coldData = new BoundedDictionary<DateTimeOffset, byte[]>(1000);
                     _coldStore[kvp.Key] = coldData;
                 }
 
@@ -2738,7 +2738,7 @@ public sealed class TemporalTiering
 
                 if (!_archiveStore.TryGetValue(kvp.Key, out var archiveData))
                 {
-                    archiveData = new ConcurrentDictionary<DateTimeOffset, byte[]>();
+                    archiveData = new BoundedDictionary<DateTimeOffset, byte[]>(1000);
                     _archiveStore[kvp.Key] = archiveData;
                 }
 

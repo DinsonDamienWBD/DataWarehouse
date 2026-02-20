@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,8 +18,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class SubFileDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ChunkData> _chunkStore = new();
-    private readonly ConcurrentDictionary<string, FileManifest> _fileManifests = new();
+    private readonly BoundedDictionary<string, ChunkData> _chunkStore = new BoundedDictionary<string, ChunkData>(1000);
+    private readonly BoundedDictionary<string, FileManifest> _fileManifests = new BoundedDictionary<string, FileManifest>(1000);
     private readonly SemaphoreSlim _gcLock = new(1, 1);
     private readonly Timer _gcTimer;
     private readonly int _chunkSize;

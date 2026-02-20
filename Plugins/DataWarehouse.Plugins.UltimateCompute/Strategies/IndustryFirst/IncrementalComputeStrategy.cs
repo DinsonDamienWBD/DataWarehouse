@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class IncrementalComputeStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CachedSegment> _cache = new();
+    private readonly BoundedDictionary<string, CachedSegment> _cache = new BoundedDictionary<string, CachedSegment>(1000);
     private const int DefaultMaxCacheEntries = 10_000;
 
     /// <inheritdoc/>
@@ -81,7 +81,7 @@ internal sealed class IncrementalComputeStrategy : ComputeRuntimeStrategyBase
             }
 
             // Re-execute only changed segments
-            var recomputedResults = new ConcurrentDictionary<int, string>();
+            var recomputedResults = new BoundedDictionary<int, string>(1000);
             if (changedIndices.Count > 0)
             {
                 var codePath = Path.GetTempFileName() + ".sh";

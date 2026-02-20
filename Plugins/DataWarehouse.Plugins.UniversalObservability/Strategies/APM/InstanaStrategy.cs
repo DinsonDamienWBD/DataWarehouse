@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.APM;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.APM;
 public sealed class InstanaStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, double> _metrics = new();
+    private readonly BoundedDictionary<string, double> _metrics = new BoundedDictionary<string, double>(1000);
     private string _agentEndpoint = "http://localhost:42699";
     private string _agentKey = "";
 

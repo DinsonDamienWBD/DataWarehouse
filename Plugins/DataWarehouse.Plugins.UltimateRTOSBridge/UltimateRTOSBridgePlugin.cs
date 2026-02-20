@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -50,7 +49,7 @@ namespace DataWarehouse.Plugins.UltimateRTOSBridge;
 /// </remarks>
 public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, IRtosStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IRtosStrategy> _strategies = new BoundedDictionary<string, IRtosStrategy>(1000);
     private IRtosStrategy? _defaultStrategy;
     private bool _initialized;
     private bool _disposed;

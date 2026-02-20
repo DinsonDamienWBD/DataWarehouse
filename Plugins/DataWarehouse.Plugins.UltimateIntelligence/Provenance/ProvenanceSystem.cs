@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Provenance;
 
@@ -312,8 +313,8 @@ public sealed record KnowledgeSignature
 /// </summary>
 public sealed class ProvenanceRecorder : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, ProvenanceRecord> _records = new();
-    private readonly ConcurrentDictionary<string, List<TransformationRecord>> _pendingTransformations = new();
+    private readonly BoundedDictionary<string, ProvenanceRecord> _records = new BoundedDictionary<string, ProvenanceRecord>(1000);
+    private readonly BoundedDictionary<string, List<TransformationRecord>> _pendingTransformations = new BoundedDictionary<string, List<TransformationRecord>>(1000);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly IProvenanceStore? _store;
     private bool _disposed;
@@ -734,8 +735,8 @@ public sealed record ProvenanceQuery
 /// </summary>
 public sealed class TransformationTracker
 {
-    private readonly ConcurrentDictionary<string, TransformationPipeline> _activePipelines = new();
-    private readonly ConcurrentDictionary<string, List<TransformationRecord>> _history = new();
+    private readonly BoundedDictionary<string, TransformationPipeline> _activePipelines = new BoundedDictionary<string, TransformationPipeline>(1000);
+    private readonly BoundedDictionary<string, List<TransformationRecord>> _history = new BoundedDictionary<string, List<TransformationRecord>>(1000);
     private readonly ProvenanceRecorder _recorder;
 
     /// <summary>
@@ -986,9 +987,9 @@ public sealed record TransformationStep
 /// </summary>
 public sealed class LineageGraph
 {
-    private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, List<LineageEdge>> _outgoingEdges = new();
-    private readonly ConcurrentDictionary<string, List<LineageEdge>> _incomingEdges = new();
+    private readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
+    private readonly BoundedDictionary<string, List<LineageEdge>> _outgoingEdges = new BoundedDictionary<string, List<LineageEdge>>(1000);
+    private readonly BoundedDictionary<string, List<LineageEdge>> _incomingEdges = new BoundedDictionary<string, List<LineageEdge>>(1000);
     private readonly ProvenanceRecorder _recorder;
 
     /// <summary>
@@ -1390,7 +1391,7 @@ public sealed record LineageGraphStatistics
 /// </summary>
 public sealed class KnowledgeSigner : IDisposable
 {
-    private readonly ConcurrentDictionary<string, SigningKey> _keys = new();
+    private readonly BoundedDictionary<string, SigningKey> _keys = new BoundedDictionary<string, SigningKey>(1000);
     private bool _disposed;
 
     /// <summary>
@@ -1579,7 +1580,7 @@ public sealed class KnowledgeSigner : IDisposable
 /// </summary>
 public sealed class SignatureVerifier : IDisposable
 {
-    private readonly ConcurrentDictionary<string, VerificationKey> _publicKeys = new();
+    private readonly BoundedDictionary<string, VerificationKey> _publicKeys = new BoundedDictionary<string, VerificationKey>(1000);
     private bool _disposed;
 
     /// <summary>
@@ -2152,7 +2153,7 @@ public sealed class TamperDetector
         Dictionary<string, byte[]> checks,
         CancellationToken ct = default)
     {
-        var results = new ConcurrentDictionary<string, TamperDetectionResult>();
+        var results = new BoundedDictionary<string, TamperDetectionResult>(1000);
 
         await Parallel.ForEachAsync(checks, ct, async (kvp, token) =>
         {
@@ -2605,7 +2606,7 @@ public interface IAuditLogStore
 public sealed class AccessRecorder
 {
     private readonly KnowledgeAuditLog _auditLog;
-    private readonly ConcurrentDictionary<string, List<AccessRecord>> _recentAccess = new();
+    private readonly BoundedDictionary<string, List<AccessRecord>> _recentAccess = new BoundedDictionary<string, List<AccessRecord>>(1000);
     private const int MaxRecentPerKnowledge = 100;
 
     /// <summary>

@@ -13,7 +13,7 @@ public sealed class TestMessageBus : IMessageBus
 {
     private readonly ConcurrentDictionary<string, List<Func<PluginMessage, Task>>> _handlers = new();
     private readonly ConcurrentDictionary<string, List<Func<PluginMessage, Task<MessageResponse>>>> _responseHandlers = new();
-    private readonly ConcurrentDictionary<string, MessageResponse> _configuredResponses = new();
+    private readonly BoundedDictionary<string, MessageResponse> _configuredResponses = new BoundedDictionary<string, MessageResponse>(1000);
     private readonly ConcurrentBag<(string Topic, PluginMessage Message)> _publishedMessages = new();
 
     /// <summary>

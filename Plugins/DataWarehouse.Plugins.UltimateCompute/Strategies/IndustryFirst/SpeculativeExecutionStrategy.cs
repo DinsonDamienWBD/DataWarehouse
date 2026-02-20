@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, int> _winnerStats = new();
-    private readonly ConcurrentDictionary<string, int> _totalRaces = new();
+    private readonly BoundedDictionary<string, int> _winnerStats = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<string, int> _totalRaces = new BoundedDictionary<string, int>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "compute.industryfirst.speculative";
@@ -52,7 +52,7 @@ internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
             var timeout = GetEffectiveTimeout(task);
             using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-            var results = new ConcurrentDictionary<string, (bool success, string output, string error, TimeSpan elapsed)>();
+            var results = new BoundedDictionary<string, (bool success, string output, string error, TimeSpan elapsed)>(1000);
             string? winner = null;
             var winnerOutput = Array.Empty<byte>();
             var winnerLogs = "";

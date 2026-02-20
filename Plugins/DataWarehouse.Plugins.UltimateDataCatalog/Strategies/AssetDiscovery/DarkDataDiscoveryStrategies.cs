@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataCatalog.Strategies.AssetDiscovery;
 
@@ -110,7 +110,7 @@ public sealed record DarkDataScanConfig(
 /// </remarks>
 public sealed class UntaggedObjectScanStrategy : ConsciousnessStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DateTime> _scanWatermarks = new();
+    private readonly BoundedDictionary<string, DateTime> _scanWatermarks = new BoundedDictionary<string, DateTime>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "dark-data-untagged-scan";
@@ -536,7 +536,7 @@ public sealed class DarkDataDiscoveryOrchestrator : ConsciousnessStrategyBase
     private readonly UntaggedObjectScanStrategy _untaggedScanner = new();
     private readonly OrphanedDataScanStrategy _orphanedScanner = new();
     private readonly ShadowDataScanStrategy _shadowScanner = new();
-    private readonly ConcurrentDictionary<DateTime, DarkDataScanResult> _scanHistory = new();
+    private readonly BoundedDictionary<DateTime, DarkDataScanResult> _scanHistory = new BoundedDictionary<DateTime, DarkDataScanResult>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "dark-data-orchestrator";

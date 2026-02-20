@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 {
@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
     /// </remarks>
     public sealed class MerkleTreeStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, MerkleTree> _trees = new();
+        private readonly BoundedDictionary<string, MerkleTree> _trees = new BoundedDictionary<string, MerkleTree>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "integrity-merkle";

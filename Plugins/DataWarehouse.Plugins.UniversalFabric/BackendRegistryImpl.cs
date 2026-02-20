@@ -2,9 +2,9 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Storage.Fabric;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using DataWarehouse.SDK.Utilities;
 
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UniversalFabric;
 /// </summary>
 public sealed class BackendRegistryImpl : IBackendRegistry
 {
-    private readonly ConcurrentDictionary<string, (BackendDescriptor Descriptor, IStorageStrategy Strategy)> _backends = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, (BackendDescriptor Descriptor, IStorageStrategy Strategy)> _backends = new BoundedDictionary<string, (BackendDescriptor Descriptor, IStorageStrategy Strategy)>(1000);
 
     /// <inheritdoc/>
     public event Action<BackendDescriptor, bool>? BackendChanged;

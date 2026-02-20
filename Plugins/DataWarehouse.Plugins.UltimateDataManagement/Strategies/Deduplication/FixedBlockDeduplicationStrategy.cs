@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -18,8 +18,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class FixedBlockDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _blockStore = new();
-    private readonly ConcurrentDictionary<string, ObjectBlockMap> _objectMaps = new();
+    private readonly BoundedDictionary<string, byte[]> _blockStore = new BoundedDictionary<string, byte[]>(1000);
+    private readonly BoundedDictionary<string, ObjectBlockMap> _objectMaps = new BoundedDictionary<string, ObjectBlockMap>(1000);
     private readonly int _blockSize;
     private readonly int _minBlockSize;
     private readonly int _maxBlockSize;

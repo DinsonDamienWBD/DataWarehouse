@@ -56,10 +56,10 @@ internal sealed class AccessPatternRecord
 /// </remarks>
 public sealed class PredictiveCacheStrategy : CachingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
-    private readonly ConcurrentDictionary<string, int> _accessCounts = new();
-    private readonly ConcurrentDictionary<string, List<string>> _sequentialPatterns = new(); // key -> next keys
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, int> _accessCounts = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<string, List<string>> _sequentialPatterns = new BoundedDictionary<string, List<string>>(1000); // key -> next keys
     private readonly ConcurrentQueue<AccessPatternRecord> _accessHistory = new();
     private readonly object _tagLock = new();
     private readonly object _patternLock = new();

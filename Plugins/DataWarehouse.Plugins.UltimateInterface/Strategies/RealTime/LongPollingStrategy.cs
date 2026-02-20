@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 
@@ -32,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 /// </remarks>
 internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, ClientState> _clients = new();
-    private readonly ConcurrentDictionary<string, DataQueue> _topicQueues = new();
+    private readonly BoundedDictionary<string, ClientState> _clients = new BoundedDictionary<string, ClientState>(1000);
+    private readonly BoundedDictionary<string, DataQueue> _topicQueues = new BoundedDictionary<string, DataQueue>(1000);
 
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "long-polling";

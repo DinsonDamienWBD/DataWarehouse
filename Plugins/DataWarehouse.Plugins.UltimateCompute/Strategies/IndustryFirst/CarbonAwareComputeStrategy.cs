@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 
@@ -21,8 +21,8 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 /// </remarks>
 internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CarbonRecord> _emissions = new();
-    private readonly ConcurrentDictionary<string, double> _regionIntensity = new();
+    private readonly BoundedDictionary<string, CarbonRecord> _emissions = new BoundedDictionary<string, CarbonRecord>(1000);
+    private readonly BoundedDictionary<string, double> _regionIntensity = new BoundedDictionary<string, double>(1000);
     private const double DefaultCarbonIntensity = 400.0; // gCO2e/kWh (global average)
     private const double DefaultTdpWatts = 65.0; // Average server CPU TDP
     private const double MaxDeferralMinutes = 60.0;

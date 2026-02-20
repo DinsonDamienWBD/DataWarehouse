@@ -2,8 +2,8 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearning;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearni
 /// </summary>
 public sealed class ModelDistributor
 {
-    private readonly ConcurrentDictionary<string, ModelWeights> _nodeWeights = new();
+    private readonly BoundedDictionary<string, ModelWeights> _nodeWeights = new BoundedDictionary<string, ModelWeights>(1000);
 
     /// <summary>
     /// Distributes model weights to specified edge nodes.
@@ -88,7 +88,7 @@ public sealed class ModelDistributor
     public Task<ModelWeights?> GetLatestWeightsAsync(string nodeId, CancellationToken ct = default)
     {
         _nodeWeights.TryGetValue(nodeId, out var weights);
-        return Task.FromResult(weights);
+        return Task.FromResult<ModelWeights?>(weights);
     }
 
     /// <summary>

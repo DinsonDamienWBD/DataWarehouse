@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly ConcurrentQueue<SatelliteBundle> _uploadQueue = new();
         private readonly ConcurrentQueue<SatelliteBundle> _downloadQueue = new();
-        private readonly ConcurrentDictionary<string, ObjectMetadata> _metadata = new();
+        private readonly BoundedDictionary<string, ObjectMetadata> _metadata = new BoundedDictionary<string, ObjectMetadata>(1000);
         private Timer? _transmissionTimer;
         private bool _satelliteOnline = false;
         private int _latencyMs = 600; // 600ms typical satellite latency

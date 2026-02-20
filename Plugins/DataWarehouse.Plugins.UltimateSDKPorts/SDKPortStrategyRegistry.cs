@@ -1,11 +1,11 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSDKPorts;
 
 /// <summary>Registry for SDK port strategies.</summary>
 public sealed class SDKPortStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, SDKPortStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, SDKPortStrategyBase> _strategies = new BoundedDictionary<string, SDKPortStrategyBase>(1000);
 
     public int Count => _strategies.Count;
     public IReadOnlyCollection<string> RegisteredStrategies => _strategies.Keys.ToList().AsReadOnly();

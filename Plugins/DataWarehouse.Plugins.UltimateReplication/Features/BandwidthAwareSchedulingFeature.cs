@@ -28,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, BandwidthSample> _linkBandwidth = new();
+        private readonly BoundedDictionary<string, BandwidthSample> _linkBandwidth = new BoundedDictionary<string, BandwidthSample>(1000);
         private readonly ConcurrentQueue<ScheduledTransfer> _deferredQueue = new();
-        private readonly ConcurrentDictionary<string, ScheduledTransfer> _activeTransfers = new();
+        private readonly BoundedDictionary<string, ScheduledTransfer> _activeTransfers = new BoundedDictionary<string, ScheduledTransfer>(1000);
         private readonly double _highUtilizationThreshold;
         private readonly double _lowUtilizationThreshold;
         private readonly long _largeTransferThresholdBytes;

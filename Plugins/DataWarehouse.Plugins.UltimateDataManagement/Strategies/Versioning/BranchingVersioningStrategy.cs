@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 /// </remarks>
 public sealed class BranchingVersioningStrategy : VersioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BranchStore> _stores = new();
+    private readonly BoundedDictionary<string, BranchStore> _stores = new BoundedDictionary<string, BranchStore>(1000);
     private const string DefaultBranch = "main";
 
     /// <summary>

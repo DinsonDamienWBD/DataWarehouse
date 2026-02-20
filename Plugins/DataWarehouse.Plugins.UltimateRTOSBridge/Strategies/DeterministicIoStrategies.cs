@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRTOSBridge.Strategies;
 
@@ -30,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateRTOSBridge.Strategies;
 /// </remarks>
 public sealed class DeterministicIoStrategy : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IoChannel> _channels = new();
+    private readonly BoundedDictionary<string, IoChannel> _channels = new BoundedDictionary<string, IoChannel>(1000);
     private readonly PriorityQueue<ScheduledOperation, int> _priorityQueue = new();
     private readonly Stopwatch _latencyTimer = new();
     private readonly object _queueLock = new();
@@ -279,8 +280,8 @@ public sealed class DeterministicIoStrategy : RtosStrategyBase
 /// </remarks>
 public sealed class SafetyCertificationStrategy : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SafetyContext> _safetyContexts = new();
-    private readonly ConcurrentDictionary<string, List<SafetyViolation>> _violations = new();
+    private readonly BoundedDictionary<string, SafetyContext> _safetyContexts = new BoundedDictionary<string, SafetyContext>(1000);
+    private readonly BoundedDictionary<string, List<SafetyViolation>> _violations = new BoundedDictionary<string, List<SafetyViolation>>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -554,8 +555,8 @@ public sealed class SafetyCertificationStrategy : RtosStrategyBase
 /// </remarks>
 public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, WatchdogContext> _watchdogs = new();
-    private readonly ConcurrentDictionary<string, Timer> _timers = new();
+    private readonly BoundedDictionary<string, WatchdogContext> _watchdogs = new BoundedDictionary<string, WatchdogContext>(1000);
+    private readonly BoundedDictionary<string, Timer> _timers = new BoundedDictionary<string, Timer>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -787,8 +788,8 @@ public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
 /// </remarks>
 public sealed class PriorityInversionPreventionStrategy : RtosStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ResourceLock> _locks = new();
-    private readonly ConcurrentDictionary<int, TaskInfo> _tasks = new();
+    private readonly BoundedDictionary<string, ResourceLock> _locks = new BoundedDictionary<string, ResourceLock>(1000);
+    private readonly BoundedDictionary<int, TaskInfo> _tasks = new BoundedDictionary<int, TaskInfo>(1000);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>

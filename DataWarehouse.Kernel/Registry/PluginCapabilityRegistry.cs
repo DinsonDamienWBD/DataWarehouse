@@ -12,10 +12,10 @@ namespace DataWarehouse.Kernel.Registry;
 /// </summary>
 public sealed class PluginCapabilityRegistry : IPluginCapabilityRegistry, IDisposable
 {
-    private readonly ConcurrentDictionary<string, RegisteredCapability> _capabilities = new();
-    private readonly ConcurrentDictionary<CapabilityCategory, ConcurrentBag<string>> _byCategory = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _byPlugin = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _byTag = new();
+    private readonly BoundedDictionary<string, RegisteredCapability> _capabilities = new BoundedDictionary<string, RegisteredCapability>(1000);
+    private readonly BoundedDictionary<CapabilityCategory, ConcurrentBag<string>> _byCategory = new BoundedDictionary<CapabilityCategory, ConcurrentBag<string>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byPlugin = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byTag = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
 
     private readonly List<Action<RegisteredCapability>> _onRegistered = new();
     private readonly List<Action<string>> _onUnregistered = new();

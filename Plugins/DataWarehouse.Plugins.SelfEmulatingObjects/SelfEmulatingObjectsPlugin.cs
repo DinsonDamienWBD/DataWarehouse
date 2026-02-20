@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -28,7 +27,7 @@ public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
     private IKernelContext? _context;
     private WasmViewer.ViewerBundler? _bundler;
     private WasmViewer.ViewerRuntime? _runtime;
-    private readonly ConcurrentDictionary<string, List<WasmViewer.SelfEmulatingObjectSnapshot>> _snapshots = new();
+    private readonly BoundedDictionary<string, List<WasmViewer.SelfEmulatingObjectSnapshot>> _snapshots = new BoundedDictionary<string, List<WasmViewer.SelfEmulatingObjectSnapshot>>(1000);
 
     public override string Id => "com.datawarehouse.selfemulating";
     public override string Name => "Self-Emulating Objects";

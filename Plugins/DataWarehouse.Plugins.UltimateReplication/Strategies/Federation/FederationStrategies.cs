@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Federation
 {
@@ -133,9 +134,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Federation
     /// </summary>
     public sealed class FederationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, FederatedDataSource> _sources = new();
-        private readonly ConcurrentDictionary<string, UnifiedSchema> _schemas = new();
-        private readonly ConcurrentDictionary<string, DistributedTransaction> _activeTransactions = new();
+        private readonly BoundedDictionary<string, FederatedDataSource> _sources = new BoundedDictionary<string, FederatedDataSource>(1000);
+        private readonly BoundedDictionary<string, UnifiedSchema> _schemas = new BoundedDictionary<string, UnifiedSchema>(1000);
+        private readonly BoundedDictionary<string, DistributedTransaction> _activeTransactions = new BoundedDictionary<string, DistributedTransaction>(1000);
 
         private sealed class DistributedTransaction
         {
@@ -419,8 +420,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Federation
     /// </summary>
     public sealed class FederatedQueryStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, FederatedDataSource> _sources = new();
-        private readonly ConcurrentDictionary<string, List<string>> _shardMappings = new();
+        private readonly BoundedDictionary<string, FederatedDataSource> _sources = new BoundedDictionary<string, FederatedDataSource>(1000);
+        private readonly BoundedDictionary<string, List<string>> _shardMappings = new BoundedDictionary<string, List<string>>(1000);
         private ReadPreference _defaultReadPreference = ReadPreference.PrimaryPreferred;
 
         /// <inheritdoc/>

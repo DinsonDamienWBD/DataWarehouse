@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
     /// </summary>
     public sealed class ComplianceReportService
     {
-        private readonly ConcurrentDictionary<string, FrameworkComplianceReport> _reportCache = new();
+        private readonly BoundedDictionary<string, FrameworkComplianceReport> _reportCache = new BoundedDictionary<string, FrameworkComplianceReport>(1000);
         private readonly IReadOnlyCollection<IComplianceStrategy> _strategies;
         private readonly IMessageBus? _messageBus;
         private readonly string _pluginId;

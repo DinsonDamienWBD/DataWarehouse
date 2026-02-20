@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
 {
@@ -32,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
     /// </remarks>
     public sealed class CasbinStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CasbinPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, List<string>> _roleAssignments = new();
+        private readonly BoundedDictionary<string, CasbinPolicy> _policies = new BoundedDictionary<string, CasbinPolicy>(1000);
+        private readonly BoundedDictionary<string, List<string>> _roleAssignments = new BoundedDictionary<string, List<string>>(1000);
         private string _modelType = "RBAC";
         private bool _enableInheritance = true;
 

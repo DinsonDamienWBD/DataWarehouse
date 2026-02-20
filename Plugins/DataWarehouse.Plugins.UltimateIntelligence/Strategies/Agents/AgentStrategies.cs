@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.AI;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Agents;
 
@@ -155,7 +156,7 @@ public sealed record AgentState
 /// </summary>
 public abstract class AgentStrategyBase : FeatureStrategyBase
 {
-    protected readonly ConcurrentDictionary<string, ToolDefinition> _tools = new();
+    protected readonly BoundedDictionary<string, ToolDefinition> _tools = new BoundedDictionary<string, ToolDefinition>(1000);
     protected readonly ConcurrentQueue<AgentAction> _executionHistory = new();
     protected AgentState _currentState = new AgentState { IsRunning = false };
     protected CancellationTokenSource? _executionCts;
@@ -425,7 +426,7 @@ Your next Thought:";
 public sealed class AutoGptAgentStrategy : AgentStrategyBase
 {
     private readonly ConcurrentQueue<string> _taskQueue = new();
-    private readonly ConcurrentDictionary<string, object> _memory = new();
+    private readonly BoundedDictionary<string, object> _memory = new BoundedDictionary<string, object>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "agent-autogpt";
@@ -591,7 +592,7 @@ Final Answer:";
 /// </summary>
 public sealed class CrewAiAgentStrategy : AgentStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AgentRole> _crew = new();
+    private readonly BoundedDictionary<string, AgentRole> _crew = new BoundedDictionary<string, AgentRole>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "agent-crewai";

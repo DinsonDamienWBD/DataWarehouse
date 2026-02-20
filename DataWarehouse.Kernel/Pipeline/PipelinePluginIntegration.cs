@@ -1,7 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Pipeline;
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel.Pipeline
 {
@@ -11,8 +11,8 @@ namespace DataWarehouse.Kernel.Pipeline
     /// </summary>
     public class PipelinePluginIntegration
     {
-        private readonly ConcurrentDictionary<string, IDataTransformation> _resolvedStageCache = new();
-        private readonly ConcurrentDictionary<string, IDataTerminal> _terminalCache = new();
+        private readonly BoundedDictionary<string, IDataTransformation> _resolvedStageCache = new BoundedDictionary<string, IDataTransformation>(1000);
+        private readonly BoundedDictionary<string, IDataTerminal> _terminalCache = new BoundedDictionary<string, IDataTerminal>(1000);
 
         /// <summary>
         /// Resolves the encryption strategy from the pipeline policy.

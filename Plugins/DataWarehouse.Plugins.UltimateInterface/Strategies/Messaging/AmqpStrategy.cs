@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 
@@ -36,9 +36,9 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Messaging;
 /// </remarks>
 internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, AmqpExchange> _exchanges = new();
-    private readonly ConcurrentDictionary<string, AmqpQueue> _queues = new();
-    private readonly ConcurrentDictionary<string, AmqpBinding> _bindings = new();
+    private readonly BoundedDictionary<string, AmqpExchange> _exchanges = new BoundedDictionary<string, AmqpExchange>(1000);
+    private readonly BoundedDictionary<string, AmqpQueue> _queues = new BoundedDictionary<string, AmqpQueue>(1000);
+    private readonly BoundedDictionary<string, AmqpBinding> _bindings = new BoundedDictionary<string, AmqpBinding>(1000);
 
     public override string StrategyId => "amqp";
     public string DisplayName => "AMQP";

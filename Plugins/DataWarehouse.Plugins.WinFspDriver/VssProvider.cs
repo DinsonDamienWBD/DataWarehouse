@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -11,7 +11,7 @@ public sealed class VssProvider : IDisposable
 {
     private readonly VssConfig _config;
     private readonly WinFspFileSystem _fileSystem;
-    private readonly ConcurrentDictionary<Guid, ShadowCopyInfo> _shadowCopies;
+    private readonly BoundedDictionary<Guid, ShadowCopyInfo> _shadowCopies;
     private readonly SemaphoreSlim _snapshotLock;
     private bool _registered;
     private bool _disposed;
@@ -25,7 +25,7 @@ public sealed class VssProvider : IDisposable
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        _shadowCopies = new ConcurrentDictionary<Guid, ShadowCopyInfo>();
+        _shadowCopies = new BoundedDictionary<Guid, ShadowCopyInfo>(1000);
         _snapshotLock = new SemaphoreSlim(1, 1);
     }
 

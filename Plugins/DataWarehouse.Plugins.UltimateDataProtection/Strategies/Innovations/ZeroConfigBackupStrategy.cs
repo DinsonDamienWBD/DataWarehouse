@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -305,9 +305,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class ZeroConfigBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ZeroConfigBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, SetupWizardState> _wizards = new();
-        private readonly ConcurrentDictionary<string, DiscoveredStorageTarget> _discoveredTargets = new();
+        private readonly BoundedDictionary<string, ZeroConfigBackup> _backups = new BoundedDictionary<string, ZeroConfigBackup>(1000);
+        private readonly BoundedDictionary<string, SetupWizardState> _wizards = new BoundedDictionary<string, SetupWizardState>(1000);
+        private readonly BoundedDictionary<string, DiscoveredStorageTarget> _discoveredTargets = new BoundedDictionary<string, DiscoveredStorageTarget>(1000);
         private IntelligentDefaults? _activeDefaults;
 
         /// <inheritdoc/>

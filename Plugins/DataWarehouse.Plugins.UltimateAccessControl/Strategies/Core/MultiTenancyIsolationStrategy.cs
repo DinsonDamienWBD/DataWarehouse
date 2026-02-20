@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -24,12 +24,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class MultiTenancyIsolationStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TenantDefinition> _tenants = new();
-        private readonly ConcurrentDictionary<string, TenantMembership> _memberships = new();
-        private readonly ConcurrentDictionary<string, CrossTenantGrant> _crossTenantGrants = new();
-        private readonly ConcurrentDictionary<string, TenantHierarchy> _hierarchies = new();
-        private readonly ConcurrentDictionary<string, ImpersonationSession> _impersonationSessions = new();
-        private readonly ConcurrentDictionary<string, TenantResourceQuota> _quotas = new();
+        private readonly BoundedDictionary<string, TenantDefinition> _tenants = new BoundedDictionary<string, TenantDefinition>(1000);
+        private readonly BoundedDictionary<string, TenantMembership> _memberships = new BoundedDictionary<string, TenantMembership>(1000);
+        private readonly BoundedDictionary<string, CrossTenantGrant> _crossTenantGrants = new BoundedDictionary<string, CrossTenantGrant>(1000);
+        private readonly BoundedDictionary<string, TenantHierarchy> _hierarchies = new BoundedDictionary<string, TenantHierarchy>(1000);
+        private readonly BoundedDictionary<string, ImpersonationSession> _impersonationSessions = new BoundedDictionary<string, ImpersonationSession>(1000);
+        private readonly BoundedDictionary<string, TenantResourceQuota> _quotas = new BoundedDictionary<string, TenantResourceQuota>(1000);
         private IsolationLevel _defaultIsolationLevel = IsolationLevel.Strict;
 
         /// <inheritdoc/>

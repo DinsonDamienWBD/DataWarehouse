@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.AI;
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -9,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 /// </summary>
 public sealed class AccessPatternLearningStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessPatternModel> _userModels = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, AccessPatternModel> _applicationModels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, AccessPatternModel> _userModels = new BoundedDictionary<string, AccessPatternModel>(1000);
+    private readonly BoundedDictionary<string, AccessPatternModel> _applicationModels = new BoundedDictionary<string, AccessPatternModel>(1000);
     private readonly ConcurrentQueue<AccessEvent> _eventBuffer = new();
     private readonly object _trainingLock = new();
     private DateTime _lastTraining = DateTime.MinValue;
@@ -407,7 +408,7 @@ public sealed class PatternLearningSummary
 public sealed class PrefetchPredictionStrategy : FeatureStrategyBase
 {
     private readonly AccessPatternLearningStrategy _patternLearning;
-    private readonly ConcurrentDictionary<string, PrefetchState> _prefetchStates = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, PrefetchState> _prefetchStates = new BoundedDictionary<string, PrefetchState>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-prefetch-prediction";
@@ -611,7 +612,7 @@ public sealed class PrefetchStatistics
 public sealed class CacheOptimizationStrategy : FeatureStrategyBase
 {
     private readonly AccessPatternLearningStrategy _patternLearning;
-    private readonly ConcurrentDictionary<string, CacheEntry> _cacheState = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, CacheEntry> _cacheState = new BoundedDictionary<string, CacheEntry>(1000);
     private long _cacheHits;
     private long _cacheMisses;
 

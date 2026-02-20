@@ -30,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class ZeroKnowledgeBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ZeroKnowledgeBackupMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, CommitmentProof> _proofs = new();
+        private readonly BoundedDictionary<string, ZeroKnowledgeBackupMetadata> _backups = new BoundedDictionary<string, ZeroKnowledgeBackupMetadata>(1000);
+        private readonly BoundedDictionary<string, CommitmentProof> _proofs = new BoundedDictionary<string, CommitmentProof>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "zero-knowledge";

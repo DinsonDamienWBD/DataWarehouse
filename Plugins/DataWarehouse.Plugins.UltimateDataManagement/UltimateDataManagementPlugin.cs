@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -38,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateDataManagement;
 public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataManagementStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, DataManagementPolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DataManagementPolicy> _policies = new BoundedDictionary<string, DataManagementPolicy>(1000);
     private bool _disposed;
 
     // Configuration

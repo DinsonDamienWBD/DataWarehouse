@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
@@ -25,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public sealed class CrossBackendMigrationFeature : IDisposable
     {
         private readonly StorageStrategyRegistry _registry;
-        private readonly ConcurrentDictionary<string, MigrationJob> _activeJobs = new();
-        private readonly ConcurrentDictionary<string, MigrationHistory> _migrationHistory = new();
+        private readonly BoundedDictionary<string, MigrationJob> _activeJobs = new BoundedDictionary<string, MigrationJob>(1000);
+        private readonly BoundedDictionary<string, MigrationHistory> _migrationHistory = new BoundedDictionary<string, MigrationHistory>(1000);
         private bool _disposed;
 
         // Configuration

@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -37,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableMetadataExtraction = true;
         private bool _enableThumbnails = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, string> _contentHashes = new();
-        private readonly ConcurrentDictionary<string, ContentMetadata> _contentMetadata = new();
+        private readonly BoundedDictionary<string, string> _contentHashes = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, ContentMetadata> _contentMetadata = new BoundedDictionary<string, ContentMetadata>(1000);
 
         public override string StrategyId => "content-aware-storage";
         public override string Name => "Content-Aware Storage";

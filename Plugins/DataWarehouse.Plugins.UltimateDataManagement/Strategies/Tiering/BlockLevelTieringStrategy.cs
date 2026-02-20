@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -24,11 +25,11 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 /// </remarks>
 public sealed class BlockLevelTieringStrategy : TieringStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectBlockMap> _blockMaps = new();
-    private readonly ConcurrentDictionary<string, BlockAccessStats> _blockStats = new();
-    private readonly ConcurrentDictionary<string, BlockHeatmap> _heatmaps = new();
-    private readonly ConcurrentDictionary<string, PrefetchPrediction> _prefetchPredictions = new();
-    private readonly ConcurrentDictionary<string, DatabaseFileInfo> _databaseFiles = new();
+    private readonly BoundedDictionary<string, ObjectBlockMap> _blockMaps = new BoundedDictionary<string, ObjectBlockMap>(1000);
+    private readonly BoundedDictionary<string, BlockAccessStats> _blockStats = new BoundedDictionary<string, BlockAccessStats>(1000);
+    private readonly BoundedDictionary<string, BlockHeatmap> _heatmaps = new BoundedDictionary<string, BlockHeatmap>(1000);
+    private readonly BoundedDictionary<string, PrefetchPrediction> _prefetchPredictions = new BoundedDictionary<string, PrefetchPrediction>(1000);
+    private readonly BoundedDictionary<string, DatabaseFileInfo> _databaseFiles = new BoundedDictionary<string, DatabaseFileInfo>(1000);
     private readonly ConcurrentQueue<RebalanceEvent> _rebalanceQueue = new();
     private readonly Timer? _rebalanceTimer;
     private readonly object _rebalanceLock = new();

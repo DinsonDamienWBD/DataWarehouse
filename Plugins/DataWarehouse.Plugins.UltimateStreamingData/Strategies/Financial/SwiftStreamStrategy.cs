@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Financial;
 
@@ -217,10 +218,10 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
 
     private static readonly Regex CurrencyRegex = new(@"^[A-Z]{3}$", RegexOptions.Compiled);
 
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<SwiftMessage>> _outboundQueues = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<SwiftMessage>> _inboundQueues = new();
-    private readonly ConcurrentDictionary<string, SwiftDeliveryNotification> _deliveryLog = new();
-    private readonly ConcurrentDictionary<string, SwiftMessage> _messageStore = new();
+    private readonly BoundedDictionary<string, ConcurrentQueue<SwiftMessage>> _outboundQueues = new BoundedDictionary<string, ConcurrentQueue<SwiftMessage>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<SwiftMessage>> _inboundQueues = new BoundedDictionary<string, ConcurrentQueue<SwiftMessage>>(1000);
+    private readonly BoundedDictionary<string, SwiftDeliveryNotification> _deliveryLog = new BoundedDictionary<string, SwiftDeliveryNotification>(1000);
+    private readonly BoundedDictionary<string, SwiftMessage> _messageStore = new BoundedDictionary<string, SwiftMessage>(1000);
     private long _totalMessages;
     private long _totalDeliveries;
 

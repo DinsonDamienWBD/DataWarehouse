@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
@@ -44,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateConnector;
 public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase
 {
     private readonly ConnectionStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
 
     /// <inheritdoc/>

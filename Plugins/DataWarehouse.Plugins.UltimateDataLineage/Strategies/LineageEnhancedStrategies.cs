@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 
@@ -8,7 +8,7 @@ namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 /// </summary>
 public sealed class LineageVersioningStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<LineageSnapshot>> _snapshots = new();
+    private readonly BoundedDictionary<string, List<LineageSnapshot>> _snapshots = new BoundedDictionary<string, List<LineageSnapshot>>(1000);
     private int _globalVersion;
 
     public override string StrategyId => "lineage-versioning";
@@ -246,8 +246,8 @@ public sealed class LineageDiffStrategy : LineageStrategyBase
 /// </summary>
 public sealed class CrossSystemLineageStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SystemRegistration> _systems = new();
-    private readonly ConcurrentDictionary<string, List<CrossSystemEdge>> _crossEdges = new();
+    private readonly BoundedDictionary<string, SystemRegistration> _systems = new BoundedDictionary<string, SystemRegistration>(1000);
+    private readonly BoundedDictionary<string, List<CrossSystemEdge>> _crossEdges = new BoundedDictionary<string, List<CrossSystemEdge>>(1000);
 
     public override string StrategyId => "cross-system-lineage";
     public override string DisplayName => "Cross-System Lineage";

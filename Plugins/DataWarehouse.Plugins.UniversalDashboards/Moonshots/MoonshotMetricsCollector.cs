@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Moonshots;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Moonshots;
 
@@ -22,8 +23,8 @@ public sealed class MoonshotMetricsCollector : IDisposable
 {
     private readonly IMessageBus _messageBus;
     private readonly ILogger<MoonshotMetricsCollector> _logger;
-    private readonly ConcurrentDictionary<MoonshotId, MoonshotMetricState> _states = new();
-    private readonly ConcurrentDictionary<(MoonshotId, string), ConcurrentQueue<MoonshotTrendPoint>> _trendBuffers = new();
+    private readonly BoundedDictionary<MoonshotId, MoonshotMetricState> _states = new BoundedDictionary<MoonshotId, MoonshotMetricState>(1000);
+    private readonly BoundedDictionary<(MoonshotId, string), ConcurrentQueue<MoonshotTrendPoint>> _trendBuffers = new BoundedDictionary<(MoonshotId, string), ConcurrentQueue<MoonshotTrendPoint>>(1000);
     private readonly List<IDisposable> _subscriptions = new();
     private Timer? _trendTimer;
     private bool _disposed;

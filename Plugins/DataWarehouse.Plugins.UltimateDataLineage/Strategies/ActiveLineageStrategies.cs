@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage.Strategies;
 
@@ -30,7 +30,7 @@ internal sealed record TransformationRecord(
 /// </remarks>
 internal sealed class SelfTrackingDataStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<TransformationRecord>> _objectHistory = new();
+    private readonly BoundedDictionary<string, List<TransformationRecord>> _objectHistory = new BoundedDictionary<string, List<TransformationRecord>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "active-self-tracking";
@@ -328,9 +328,9 @@ internal sealed class SelfTrackingDataStrategy : LineageStrategyBase
 /// </remarks>
 internal sealed class RealTimeLineageCaptureStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _captureTimestamps = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _upstreamLinks = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _downstreamLinks = new();
+    private readonly BoundedDictionary<string, DateTimeOffset> _captureTimestamps = new BoundedDictionary<string, DateTimeOffset>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _upstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _downstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "active-realtime-capture";
@@ -516,7 +516,7 @@ internal sealed class RealTimeLineageCaptureStrategy : LineageStrategyBase
 /// </remarks>
 internal sealed class LineageInferenceStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dictionary<string, string>> _schemaCache = new();
+    private readonly BoundedDictionary<string, Dictionary<string, string>> _schemaCache = new BoundedDictionary<string, Dictionary<string, string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "active-inference";
@@ -732,8 +732,8 @@ internal sealed class LineageInferenceStrategy : LineageStrategyBase
 /// </remarks>
 internal sealed class ImpactAnalysisEngineStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, double> _nodeCriticality = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _dependencies = new();
+    private readonly BoundedDictionary<string, double> _nodeCriticality = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _dependencies = new BoundedDictionary<string, HashSet<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "active-impact-engine";
@@ -1023,8 +1023,8 @@ internal sealed class ImpactAnalysisEngineStrategy : LineageStrategyBase
 /// </remarks>
 internal sealed class LineageVisualizationStrategy : LineageStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HashSet<string>> _upstreamLinks = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _downstreamLinks = new();
+    private readonly BoundedDictionary<string, HashSet<string>> _upstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _downstreamLinks = new BoundedDictionary<string, HashSet<string>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "active-visualization";

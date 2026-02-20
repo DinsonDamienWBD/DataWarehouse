@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.VectorStores;
 
@@ -464,7 +465,7 @@ public sealed class ChromaVectorStrategy : VectorStoreStrategyBase
 /// </summary>
 public sealed class PgVectorStrategy : VectorStoreStrategyBase
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, VectorEntry> _store = new();
+    private readonly BoundedDictionary<string, VectorEntry> _store = new BoundedDictionary<string, VectorEntry>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "vector-pgvector";
@@ -532,7 +533,7 @@ public sealed class PgVectorStrategy : VectorStoreStrategyBase
         return ExecuteWithTrackingAsync(() =>
         {
             _store.TryGetValue(id, out var entry);
-            return Task.FromResult(entry);
+            return Task.FromResult<VectorEntry?>(entry);
         });
     }
 

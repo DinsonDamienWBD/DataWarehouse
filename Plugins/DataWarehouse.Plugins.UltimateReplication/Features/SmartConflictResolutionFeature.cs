@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -34,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, ConflictResolutionRecord> _resolutionHistory = new();
+        private readonly BoundedDictionary<string, ConflictResolutionRecord> _resolutionHistory = new BoundedDictionary<string, ConflictResolutionRecord>(1000);
         private readonly TimeSpan _intelligenceTimeout;
         private bool _disposed;
         private IDisposable? _conflictSubscription;

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class SizeBasedRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TenantQuota> _quotas = new();
+    private readonly BoundedDictionary<string, TenantQuota> _quotas = new BoundedDictionary<string, TenantQuota>(1000);
     private readonly long _globalQuotaBytes;
     private readonly double _warningThreshold;
     private readonly double _criticalThreshold;

@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 {
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public sealed class EnvelopeVerification
     {
-        private readonly ConcurrentDictionary<string, EnvelopeCapabilityReport> _capabilityCache = new();
+        private readonly BoundedDictionary<string, EnvelopeCapabilityReport> _capabilityCache = new BoundedDictionary<string, EnvelopeCapabilityReport>(1000);
         private readonly IKeyStoreRegistry _registry;
         private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(30);
 

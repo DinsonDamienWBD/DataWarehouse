@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Security;
 
@@ -18,7 +19,7 @@ namespace DataWarehouse.SDK.Security;
 /// </summary>
 public sealed class AccessVerificationMatrix
 {
-    private readonly ConcurrentDictionary<HierarchyLevel, ConcurrentBag<HierarchyAccessRule>> _rules = new();
+    private readonly BoundedDictionary<HierarchyLevel, ConcurrentBag<HierarchyAccessRule>> _rules = new BoundedDictionary<HierarchyLevel, ConcurrentBag<HierarchyAccessRule>>(1000);
     private readonly object _evaluationLock = new();
 
     public AccessVerificationMatrix()

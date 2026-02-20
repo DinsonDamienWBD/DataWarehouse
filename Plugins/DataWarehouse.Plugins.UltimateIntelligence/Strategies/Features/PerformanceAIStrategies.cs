@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -14,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 /// </remarks>
 public sealed class MlIoSchedulerStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IoQueueState> _queues = new();
-    private readonly ConcurrentDictionary<string, SchedulingDecision> _recentDecisions = new();
+    private readonly BoundedDictionary<string, IoQueueState> _queues = new BoundedDictionary<string, IoQueueState>(1000);
+    private readonly BoundedDictionary<string, SchedulingDecision> _recentDecisions = new BoundedDictionary<string, SchedulingDecision>(1000);
     private readonly ConcurrentQueue<IoRequest> _pendingRequests = new();
     private readonly SemaphoreSlim _schedulerLock = new(1, 1);
 
@@ -408,8 +409,8 @@ Return JSON:
 /// </summary>
 public sealed class AiPredictivePrefetchStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessSequence> _accessSequences = new();
-    private readonly ConcurrentDictionary<string, PrefetchModel> _prefetchModels = new();
+    private readonly BoundedDictionary<string, AccessSequence> _accessSequences = new BoundedDictionary<string, AccessSequence>(1000);
+    private readonly BoundedDictionary<string, PrefetchModel> _prefetchModels = new BoundedDictionary<string, PrefetchModel>(1000);
     private readonly ConcurrentQueue<PrefetchRequest> _prefetchQueue = new();
 
     /// <inheritdoc/>
@@ -789,7 +790,7 @@ Return JSON:
 /// </summary>
 public sealed class LatencyOptimizerStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LatencyProfile> _latencyProfiles = new();
+    private readonly BoundedDictionary<string, LatencyProfile> _latencyProfiles = new BoundedDictionary<string, LatencyProfile>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-latency-optimizer";

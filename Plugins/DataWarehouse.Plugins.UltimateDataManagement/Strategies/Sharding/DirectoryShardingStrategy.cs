@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
 
@@ -52,8 +52,8 @@ public sealed class DirectoryEntry
 /// </remarks>
 public sealed class DirectoryShardingStrategy : ShardingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DirectoryEntry> _directory = new();
-    private readonly ConcurrentDictionary<string, string> _cache = new();
+    private readonly BoundedDictionary<string, DirectoryEntry> _directory = new BoundedDictionary<string, DirectoryEntry>(1000);
+    private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _directoryLock = new();
     private readonly int _cacheMaxSize;
     private readonly string? _persistencePath;

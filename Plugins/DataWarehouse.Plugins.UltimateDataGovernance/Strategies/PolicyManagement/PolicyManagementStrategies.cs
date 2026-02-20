@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.PolicyManagement;
 
@@ -6,7 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.PolicyManageme
 
 public sealed class PolicyDefinitionStrategy : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PolicyDefinition> _policies = new();
+    private readonly BoundedDictionary<string, PolicyDefinition> _policies = new BoundedDictionary<string, PolicyDefinition>(1000);
 
     public override string StrategyId => "policy-definition";
     public override string DisplayName => "Policy Definition";
@@ -71,8 +71,8 @@ public sealed record PolicyDefinition
 
 public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PolicyDefinition> _activePolicies = new();
-    private readonly ConcurrentDictionary<string, List<PolicyViolation>> _violations = new();
+    private readonly BoundedDictionary<string, PolicyDefinition> _activePolicies = new BoundedDictionary<string, PolicyDefinition>(1000);
+    private readonly BoundedDictionary<string, List<PolicyViolation>> _violations = new BoundedDictionary<string, List<PolicyViolation>>(1000);
 
     public override string StrategyId => "policy-enforcement";
     public override string DisplayName => "Policy Enforcement";

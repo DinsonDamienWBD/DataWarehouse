@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -293,8 +293,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class BackupConfidenceScoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ConfidenceBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, List<BackupOutcome>> _outcomeHistory = new();
+        private readonly BoundedDictionary<string, ConfidenceBackup> _backups = new BoundedDictionary<string, ConfidenceBackup>(1000);
+        private readonly BoundedDictionary<string, List<BackupOutcome>> _outcomeHistory = new BoundedDictionary<string, List<BackupOutcome>>(1000);
         private readonly List<ScoreTrend> _scoreTrends = new();
         private PredictionModel _model = new();
 

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
 {
@@ -78,9 +79,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
     /// </summary>
     public sealed class KafkaConnectCdcStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<CdcEvent>> _partitions = new();
-        private readonly ConcurrentDictionary<string, long> _consumerOffsets = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Offset)> _dataStore = new();
+        private readonly BoundedDictionary<string, ConcurrentQueue<CdcEvent>> _partitions = new BoundedDictionary<string, ConcurrentQueue<CdcEvent>>(1000);
+        private readonly BoundedDictionary<string, long> _consumerOffsets = new BoundedDictionary<string, long>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long Offset)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Offset)>(1000);
         private int _partitionCount = 8;
         private string _bootstrapServers = "localhost:9092";
         private bool _enableExactlyOnce = true;
@@ -250,10 +251,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
     /// </summary>
     public sealed class DebeziumCdcStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ConnectorConfig> _connectors = new();
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<CdcEvent>> _changeStreams = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int SchemaVersion)> _dataStore = new();
-        private readonly ConcurrentDictionary<int, string> _schemaRegistry = new();
+        private readonly BoundedDictionary<string, ConnectorConfig> _connectors = new BoundedDictionary<string, ConnectorConfig>(1000);
+        private readonly BoundedDictionary<string, ConcurrentQueue<CdcEvent>> _changeStreams = new BoundedDictionary<string, ConcurrentQueue<CdcEvent>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, int SchemaVersion)> _dataStore = new BoundedDictionary<string, (byte[] Data, int SchemaVersion)>(1000);
+        private readonly BoundedDictionary<int, string> _schemaRegistry = new BoundedDictionary<int, string>(1000);
         private bool _snapshotOnStart = true;
 
         /// <summary>
@@ -434,8 +435,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
     /// </summary>
     public sealed class MaxwellCdcStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<MaxwellEvent>> _streams = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long BinlogPosition)> _dataStore = new();
+        private readonly BoundedDictionary<string, ConcurrentQueue<MaxwellEvent>> _streams = new BoundedDictionary<string, ConcurrentQueue<MaxwellEvent>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long BinlogPosition)> _dataStore = new BoundedDictionary<string, (byte[] Data, long BinlogPosition)>(1000);
         private string? _currentBinlog;
         private long _currentPosition;
         private bool _bootstrapEnabled = true;
@@ -595,9 +596,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
     /// </summary>
     public sealed class CanalCdcStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CanalInstance> _instances = new();
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<CanalEntry>> _entries = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, long Position)> _dataStore = new();
+        private readonly BoundedDictionary<string, CanalInstance> _instances = new BoundedDictionary<string, CanalInstance>(1000);
+        private readonly BoundedDictionary<string, ConcurrentQueue<CanalEntry>> _entries = new BoundedDictionary<string, ConcurrentQueue<CanalEntry>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, long Position)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Position)>(1000);
 
         /// <summary>
         /// Canal instance configuration.

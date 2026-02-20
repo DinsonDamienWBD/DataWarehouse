@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Security;
 
@@ -14,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Security;
 /// </summary>
 public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, UnifiedIdentity> _identities = new();
-    private readonly ConcurrentDictionary<string, List<ProviderRoleMapping>> _roleMappings = new();
+    private readonly BoundedDictionary<string, UnifiedIdentity> _identities = new BoundedDictionary<string, UnifiedIdentity>(1000);
+    private readonly BoundedDictionary<string, List<ProviderRoleMapping>> _roleMappings = new BoundedDictionary<string, List<ProviderRoleMapping>>(1000);
 
     public override string StrategyId => "security-unified-iam";
     public override string StrategyName => "Unified IAM";
@@ -95,7 +96,7 @@ public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EncryptionKeyInfo> _keys = new();
+    private readonly BoundedDictionary<string, EncryptionKeyInfo> _keys = new BoundedDictionary<string, EncryptionKeyInfo>(1000);
 
     public override string StrategyId => "security-cross-cloud-encryption";
     public override string StrategyName => "Cross-Cloud Encryption";
@@ -181,8 +182,8 @@ public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class CrossCloudComplianceStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CompliancePolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, List<ComplianceViolation>> _violations = new();
+    private readonly BoundedDictionary<string, CompliancePolicy> _policies = new BoundedDictionary<string, CompliancePolicy>(1000);
+    private readonly BoundedDictionary<string, List<ComplianceViolation>> _violations = new BoundedDictionary<string, List<ComplianceViolation>>(1000);
 
     public override string StrategyId => "security-compliance-enforcement";
     public override string StrategyName => "Cross-Cloud Compliance";
@@ -292,8 +293,8 @@ public sealed class CrossCloudComplianceStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class ZeroTrustNetworkStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TrustPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, AccessDecision> _recentDecisions = new();
+    private readonly BoundedDictionary<string, TrustPolicy> _policies = new BoundedDictionary<string, TrustPolicy>(1000);
+    private readonly BoundedDictionary<string, AccessDecision> _recentDecisions = new BoundedDictionary<string, AccessDecision>(1000);
 
     public override string StrategyId => "security-zero-trust";
     public override string StrategyName => "Zero-Trust Network";
@@ -388,8 +389,8 @@ public sealed class ZeroTrustNetworkStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SecretEntry> _secrets = new();
-    private readonly ConcurrentDictionary<string, List<SecretAccess>> _accessLog = new();
+    private readonly BoundedDictionary<string, SecretEntry> _secrets = new BoundedDictionary<string, SecretEntry>(1000);
+    private readonly BoundedDictionary<string, List<SecretAccess>> _accessLog = new BoundedDictionary<string, List<SecretAccess>>(1000);
 
     public override string StrategyId => "security-secrets-management";
     public override string StrategyName => "Cross-Cloud Secrets";
@@ -477,7 +478,7 @@ public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
 /// </summary>
 public sealed class CrossCloudThreatDetectionStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ThreatIndicator> _indicators = new();
+    private readonly BoundedDictionary<string, ThreatIndicator> _indicators = new BoundedDictionary<string, ThreatIndicator>(1000);
     private readonly ConcurrentQueue<SecurityEvent> _events = new();
 
     public override string StrategyId => "security-threat-detection";
@@ -770,8 +771,8 @@ public sealed class ThreatAnalysisResult
 public sealed class SiemIntegrationStrategy : MultiCloudStrategyBase
 {
     private readonly ConcurrentQueue<SecurityEvent> _eventQueue = new();
-    private readonly ConcurrentDictionary<string, SiemEndpoint> _endpoints = new();
-    private readonly ConcurrentDictionary<string, long> _eventCounts = new();
+    private readonly BoundedDictionary<string, SiemEndpoint> _endpoints = new BoundedDictionary<string, SiemEndpoint>(1000);
+    private readonly BoundedDictionary<string, long> _eventCounts = new BoundedDictionary<string, long>(1000);
 
     public override string StrategyId => "security-siem-integration";
     public override string StrategyName => "SIEM Integration";

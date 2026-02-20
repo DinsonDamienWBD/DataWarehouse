@@ -1,19 +1,19 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 {
     /// <summary>Snowflake bulk import strategy using COPY INTO or Snowpipe streaming.</summary>
     public class SnowflakeImportStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+        private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "snowflake-import";
         public override string Name => "Snowflake Import";

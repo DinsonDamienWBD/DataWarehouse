@@ -1,8 +1,8 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Services;
 
@@ -198,7 +198,7 @@ public sealed class ConversationSession
 /// </summary>
 public sealed class ConversationContextManager : IDisposable
 {
-    private readonly ConcurrentDictionary<string, ConversationSession> _sessions = new();
+    private readonly BoundedDictionary<string, ConversationSession> _sessions = new BoundedDictionary<string, ConversationSession>(1000);
     private readonly Timer _cleanupTimer;
     private readonly TimeSpan _sessionTimeout;
     private readonly int _maxSessions;

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -33,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateDeployment;
 /// </summary>
 public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, IDeploymentStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, DeploymentState> _activeDeployments = new();
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, IDeploymentStrategy> _strategies = new BoundedDictionary<string, IDeploymentStrategy>(1000);
+    private readonly BoundedDictionary<string, DeploymentState> _activeDeployments = new BoundedDictionary<string, DeploymentState>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
 

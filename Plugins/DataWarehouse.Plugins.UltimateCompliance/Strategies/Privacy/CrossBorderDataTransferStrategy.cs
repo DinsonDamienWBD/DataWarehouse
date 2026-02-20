@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -30,10 +31,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class CrossBorderDataTransferStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TransferMechanism> _mechanisms = new();
-        private readonly ConcurrentDictionary<string, CountryAssessment> _countryAssessments = new();
-        private readonly ConcurrentDictionary<string, DataTransferRecord> _transfers = new();
-        private readonly ConcurrentDictionary<string, TransferImpactAssessment> _tias = new();
+        private readonly BoundedDictionary<string, TransferMechanism> _mechanisms = new BoundedDictionary<string, TransferMechanism>(1000);
+        private readonly BoundedDictionary<string, CountryAssessment> _countryAssessments = new BoundedDictionary<string, CountryAssessment>(1000);
+        private readonly BoundedDictionary<string, DataTransferRecord> _transfers = new BoundedDictionary<string, DataTransferRecord>(1000);
+        private readonly BoundedDictionary<string, TransferImpactAssessment> _tias = new BoundedDictionary<string, TransferImpactAssessment>(1000);
         private readonly ConcurrentBag<TransferAuditEntry> _auditLog = new();
 
         private bool _requireTia = true;

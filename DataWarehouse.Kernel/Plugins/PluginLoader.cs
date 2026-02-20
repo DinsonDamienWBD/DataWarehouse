@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Edge.Memory;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -85,7 +84,7 @@ namespace DataWarehouse.Kernel.Plugins
     /// </summary>
     public sealed class PluginLoader : IPluginReloader, IDisposable
     {
-        private readonly ConcurrentDictionary<string, PluginContext> _loadedPlugins = new();
+        private readonly BoundedDictionary<string, PluginContext> _loadedPlugins = new BoundedDictionary<string, PluginContext>(1000);
         private readonly PluginRegistry _registry;
         private readonly IKernelContext _kernelContext;
         private readonly string _pluginDirectory;

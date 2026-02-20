@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow.Strategies.ErrorHandling;
 
@@ -91,7 +92,7 @@ public sealed class ExponentialBackoffRetryStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class CircuitBreakerStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CircuitState> _circuits = new();
+    private readonly BoundedDictionary<string, CircuitState> _circuits = new BoundedDictionary<string, CircuitState>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -237,7 +238,7 @@ public sealed class FallbackStrategy : WorkflowStrategyBase
 /// </summary>
 public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _bulkheads = new();
+    private readonly BoundedDictionary<string, SemaphoreSlim> _bulkheads = new BoundedDictionary<string, SemaphoreSlim>(1000);
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -271,7 +272,7 @@ public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
             Parameters = parameters ?? new()
         };
 
-        var completed = new ConcurrentDictionary<string, TaskResult>();
+        var completed = new BoundedDictionary<string, TaskResult>(1000);
 
         var tasks = workflow.GetTopologicalOrder().Select(async task =>
         {

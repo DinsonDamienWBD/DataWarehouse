@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.NLP;
 
@@ -945,7 +945,7 @@ public sealed class EntityExtractor
 {
     private readonly EntityExtractorOptions _options;
     private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
-    private readonly ConcurrentDictionary<string, Regex> _compiledPatterns = new();
+    private readonly BoundedDictionary<string, Regex> _compiledPatterns = new BoundedDictionary<string, Regex>(1000);
 
     /// <summary>
     /// Creates a new EntityExtractor.
@@ -1439,7 +1439,7 @@ public sealed class ResponseGeneratorOptions
 public sealed class UnifiedVectorStore : IAsyncDisposable
 {
     private readonly UnifiedVectorStoreOptions _options;
-    private readonly ConcurrentDictionary<string, IVectorStoreBackend> _backends = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IVectorStoreBackend> _backends = new BoundedDictionary<string, IVectorStoreBackend>(1000);
     private readonly Func<string, CancellationToken, Task<float[]>>? _embeddingProvider;
     private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
     private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -1696,7 +1696,7 @@ public sealed class SemanticIndexer
 {
     private readonly SemanticIndexerOptions _options;
     private readonly UnifiedVectorStore _vectorStore;
-    private readonly ConcurrentDictionary<string, IndexStats> _indexStats = new();
+    private readonly BoundedDictionary<string, IndexStats> _indexStats = new BoundedDictionary<string, IndexStats>(1000);
 
     /// <summary>
     /// Creates a new SemanticIndexer.
@@ -2083,9 +2083,9 @@ public sealed class SemanticSearchOptions
 public sealed class UnifiedKnowledgeGraph : IAsyncDisposable
 {
     private readonly UnifiedKnowledgeGraphOptions _options;
-    private readonly ConcurrentDictionary<string, KnowledgeNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, KnowledgeEdge> _edges = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _nodeEdges = new();
+    private readonly BoundedDictionary<string, KnowledgeNode> _nodes = new BoundedDictionary<string, KnowledgeNode>(1000);
+    private readonly BoundedDictionary<string, KnowledgeEdge> _edges = new BoundedDictionary<string, KnowledgeEdge>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _nodeEdges = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
     private readonly SemaphoreSlim _modifyLock = new(1, 1);
     private bool _disposed;

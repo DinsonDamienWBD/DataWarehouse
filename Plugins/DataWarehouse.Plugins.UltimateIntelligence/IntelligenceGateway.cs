@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -1037,8 +1037,8 @@ public class ChannelClosedException : Exception
 /// </remarks>
 public abstract class IntelligenceGatewayBase : IIntelligenceGateway, IProviderRouter, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IIntelligenceStrategy> _providers = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, IntelligenceSessionBase> _sessions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IIntelligenceStrategy> _providers = new BoundedDictionary<string, IIntelligenceStrategy>(1000);
+    private readonly BoundedDictionary<string, IntelligenceSessionBase> _sessions = new BoundedDictionary<string, IntelligenceSessionBase>(1000);
     private readonly object _statsLock = new();
 
     private long _totalRequests;
@@ -1846,7 +1846,7 @@ public abstract class IntelligenceChannelBase : IIntelligenceChannel
 /// </remarks>
 public abstract class KnowledgeHandlerBase
 {
-    private readonly ConcurrentDictionary<string, CachedKnowledge> _cache = new();
+    private readonly BoundedDictionary<string, CachedKnowledge> _cache = new BoundedDictionary<string, CachedKnowledge>(1000);
     private readonly TimeSpan _defaultCacheDuration = TimeSpan.FromMinutes(5);
 
     /// <summary>

@@ -1,8 +1,8 @@
-﻿using DataWarehouse.SDK.Attributes;
+using DataWarehouse.SDK.Attributes;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
-using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Services
 {
@@ -14,10 +14,10 @@ namespace DataWarehouse.SDK.Services
     public class PluginRegistry
     {
         // Primary Store: Map PluginID -> Plugin Instance
-        private readonly ConcurrentDictionary<string, IPlugin> _plugins = new(StringComparer.OrdinalIgnoreCase);
+        private readonly BoundedDictionary<string, IPlugin> _plugins = new BoundedDictionary<string, IPlugin>(1000);
 
         // Type Index: Map InterfaceType -> List of PluginIDs
-        private readonly ConcurrentDictionary<Type, List<string>> _typeIndex = new();
+        private readonly BoundedDictionary<Type, List<string>> _typeIndex = new BoundedDictionary<Type, List<string>>(1000);
 
         private OperatingMode _currentMode = OperatingMode.Laptop; // Default
 

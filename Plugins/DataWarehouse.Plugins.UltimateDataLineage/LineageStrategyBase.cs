@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage;
 
@@ -201,10 +201,10 @@ public interface ILineageStrategy
 /// </summary>
 public abstract class LineageStrategyBase : ILineageStrategy
 {
-    protected readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
-    protected readonly ConcurrentDictionary<string, LineageEdge> _edges = new();
-    protected readonly ConcurrentDictionary<string, List<ProvenanceRecord>> _provenance = new();
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    protected readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
+    protected readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
+    protected readonly BoundedDictionary<string, List<ProvenanceRecord>> _provenance = new BoundedDictionary<string, List<ProvenanceRecord>>(1000);
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
@@ -398,7 +398,7 @@ public abstract class LineageStrategyBase : ILineageStrategy
 /// </summary>
 public sealed class LineageStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, ILineageStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, ILineageStrategy> _strategies = new BoundedDictionary<string, ILineageStrategy>(1000);
 
     /// <summary>Registers a strategy.</summary>
     public void Register(ILineageStrategy strategy)

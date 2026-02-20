@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 
@@ -29,9 +30,9 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.IoT;
 /// </summary>
 internal sealed class CoapStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, CoapResourceState> _resources = new();
-    private readonly ConcurrentDictionary<string, List<StreamMessage>> _resourceHistory = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, CoapObserverState>> _observers = new();
+    private readonly BoundedDictionary<string, CoapResourceState> _resources = new BoundedDictionary<string, CoapResourceState>(1000);
+    private readonly BoundedDictionary<string, List<StreamMessage>> _resourceHistory = new BoundedDictionary<string, List<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, CoapObserverState>> _observers = new BoundedDictionary<string, BoundedDictionary<string, CoapObserverState>>(1000);
     private long _nextMessageId;
     private long _nextObserveSequence;
     private long _totalPublished;
@@ -209,7 +210,7 @@ internal sealed class CoapStreamStrategy : StreamingDataStrategyBase, IStreaming
         var observerId = consumerGroup?.ConsumerId ?? Guid.NewGuid().ToString("N");
 
         // Register as observer (GET with Observe option)
-        var resourceObservers = _observers.GetOrAdd(resourceUri, _ => new ConcurrentDictionary<string, CoapObserverState>());
+        var resourceObservers = _observers.GetOrAdd(resourceUri, _ => new BoundedDictionary<string, CoapObserverState>(1000));
         var observerState = resourceObservers.GetOrAdd(observerId, _ => new CoapObserverState
         {
             ObserverId = observerId,

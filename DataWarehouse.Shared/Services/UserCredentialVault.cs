@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.Shared.Models;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Services;
 
@@ -23,16 +24,16 @@ namespace DataWarehouse.Shared.Services;
 public sealed class UserCredentialVault : IUserCredentialVault, IDisposable
 {
     // Storage: userId -> providerId -> encrypted credential
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte[]>> _userCredentials = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, byte[]>> _userCredentials = new BoundedDictionary<string, BoundedDictionary<string, byte[]>>(1000);
 
     // Organization credentials: orgId -> providerId -> encrypted credential
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte[]>> _organizationCredentials = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, byte[]>> _organizationCredentials = new BoundedDictionary<string, BoundedDictionary<string, byte[]>>(1000);
 
     // Instance-level credentials: providerId -> encrypted credential
-    private readonly ConcurrentDictionary<string, byte[]> _instanceCredentials = new();
+    private readonly BoundedDictionary<string, byte[]> _instanceCredentials = new BoundedDictionary<string, byte[]>(1000);
 
     // User to organization mapping
-    private readonly ConcurrentDictionary<string, string> _userOrganizations = new();
+    private readonly BoundedDictionary<string, string> _userOrganizations = new BoundedDictionary<string, string>(1000);
 
     // Audit log
     private readonly ConcurrentQueue<CredentialAccessAudit> _auditLog = new();
@@ -509,17 +510,17 @@ public sealed class UserCredentialVault : IUserCredentialVault, IDisposable
 
     #region Private Methods
 
-    private ConcurrentDictionary<string, byte[]> GetUserStorage(string userId)
+    private BoundedDictionary<string, byte[]> GetUserStorage(string userId)
     {
-        return _userCredentials.GetOrAdd(userId, _ => new ConcurrentDictionary<string, byte[]>());
+        return _userCredentials.GetOrAdd(userId, _ => new BoundedDictionary<string, byte[]>(1000));
     }
 
-    private ConcurrentDictionary<string, byte[]> GetOrganizationStorage(string organizationId)
+    private BoundedDictionary<string, byte[]> GetOrganizationStorage(string organizationId)
     {
-        return _organizationCredentials.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, byte[]>());
+        return _organizationCredentials.GetOrAdd(organizationId, _ => new BoundedDictionary<string, byte[]>(1000));
     }
 
-    private ConcurrentDictionary<string, byte[]> GetStorageForScope(
+    private BoundedDictionary<string, byte[]> GetStorageForScope(
         CredentialScope scope,
         string userId,
         string? organizationId)

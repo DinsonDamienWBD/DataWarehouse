@@ -1,19 +1,19 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 {
     /// <summary>Oracle bulk import strategy using SQL*Loader or External Tables for high-performance data ingestion.</summary>
     public class OracleImportStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+        private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "oracle-import";
         public override string Name => "Oracle Bulk Import";

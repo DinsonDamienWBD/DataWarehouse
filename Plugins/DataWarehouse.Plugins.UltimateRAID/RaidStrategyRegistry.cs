@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID;
 
@@ -40,7 +40,7 @@ public interface IRaidStrategyRegistry
 /// </summary>
 public sealed class RaidStrategyRegistry : IRaidStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IRaidStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IRaidStrategy> _strategies = new BoundedDictionary<string, IRaidStrategy>(1000);
     private volatile string _defaultStrategyId = "raid1";
 
     /// <inheritdoc/>

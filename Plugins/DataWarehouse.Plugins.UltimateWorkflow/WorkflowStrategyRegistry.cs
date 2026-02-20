@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateWorkflow;
 
@@ -7,7 +7,7 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 /// </summary>
 public sealed class WorkflowStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, WorkflowStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, WorkflowStrategyBase> _strategies = new BoundedDictionary<string, WorkflowStrategyBase>(1000);
 
     /// <summary>Number of registered strategies.</summary>
     public int Count => _strategies.Count;

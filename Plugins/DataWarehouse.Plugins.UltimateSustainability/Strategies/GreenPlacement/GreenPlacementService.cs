@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Carbon;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +28,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
     private readonly WattTimeGridApiStrategy _wattTimeStrategy;
     private readonly ElectricityMapsApiStrategy _electricityMapsStrategy;
     private readonly BackendGreenScoreRegistry _registry;
-    private readonly ConcurrentDictionary<string, GridCarbonData> _regionGridCache = new();
+    private readonly BoundedDictionary<string, GridCarbonData> _regionGridCache = new BoundedDictionary<string, GridCarbonData>(1000);
     private IDisposable? _backendRegistrationSubscription;
     private IMessageBus? _messageBus;
 

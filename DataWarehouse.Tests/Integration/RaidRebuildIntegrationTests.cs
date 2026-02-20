@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using DataWarehouse.Plugins.UltimateRAID.Strategies.Standard;
 using DataWarehouse.SDK.Contracts.RAID;
 using FluentAssertions;
 using Xunit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Integration;
 
@@ -19,7 +19,7 @@ public class RaidRebuildIntegrationTests
     /// </summary>
     private class InMemoryDisk
     {
-        private readonly ConcurrentDictionary<long, byte[]> _blocks = new();
+        private readonly BoundedDictionary<long, byte[]> _blocks = new BoundedDictionary<long, byte[]>(1000);
         public string Id { get; }
         public long Capacity { get; }
         public DiskHealthStatus HealthStatus { get; set; }

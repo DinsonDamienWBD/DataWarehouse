@@ -1,10 +1,10 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.Shared.Models;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Services;
 
@@ -15,22 +15,22 @@ namespace DataWarehouse.Shared.Services;
 public sealed class UserAuthenticationService : IUserAuthenticationService, IDisposable
 {
     // Session storage: sessionId -> session
-    private readonly ConcurrentDictionary<string, UserSession> _sessions = new();
+    private readonly BoundedDictionary<string, UserSession> _sessions = new BoundedDictionary<string, UserSession>(1000);
 
     // User storage: userId -> user info (for demo purposes)
-    private readonly ConcurrentDictionary<string, StoredUser> _users = new();
+    private readonly BoundedDictionary<string, StoredUser> _users = new BoundedDictionary<string, StoredUser>(1000);
 
     // API key storage: apiKey hash -> userId
-    private readonly ConcurrentDictionary<string, string> _apiKeys = new();
+    private readonly BoundedDictionary<string, string> _apiKeys = new BoundedDictionary<string, string>(1000);
 
     // Current session per context (thread-local for multi-threaded scenarios)
     private readonly AsyncLocal<UserSession?> _currentSession = new();
 
     // Impersonation stack per session
-    private readonly ConcurrentDictionary<string, Stack<UserSession>> _impersonationStack = new();
+    private readonly BoundedDictionary<string, Stack<UserSession>> _impersonationStack = new BoundedDictionary<string, Stack<UserSession>>(1000);
 
     // Rate limiting: userId -> (attempt count, window start)
-    private readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new();
+    private readonly BoundedDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new BoundedDictionary<string, (int Count, DateTime WindowStart)>(1000);
 
     /// <summary>
     /// D04 (CVSS 3.7): PBKDF2 iteration count per NIST SP 800-63B minimum recommendation.
@@ -44,7 +44,7 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
     private const int LegacyPbkdf2Iterations = 100_000;
 
     // SSO provider handlers
-    private readonly ConcurrentDictionary<string, ISsoProviderHandler> _ssoProviders = new();
+    private readonly BoundedDictionary<string, ISsoProviderHandler> _ssoProviders = new BoundedDictionary<string, ISsoProviderHandler>(1000);
 
     // Configuration
     private readonly AuthenticationServiceConfig _config;

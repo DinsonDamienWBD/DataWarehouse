@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Storage.Migration;
 using Xunit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Storage.ZeroGravity;
 
@@ -36,7 +36,7 @@ public sealed class MigrationEngineTests : IDisposable
 
     private BackgroundMigrationEngine CreateEngine(int batchSize = 10)
     {
-        var inMemoryStore = new ConcurrentDictionary<string, byte[]>();
+        var inMemoryStore = new BoundedDictionary<string, byte[]>(1000);
 
         var engine = new BackgroundMigrationEngine(_forwardingTable, _checkpointStore, batchSize);
         engine.ReadObjectAsync = (key, node, ct) =>

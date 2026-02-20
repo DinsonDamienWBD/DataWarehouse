@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
 {
@@ -78,8 +78,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     /// </summary>
     public sealed class StarTopologyStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TopologyNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new();
+        private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _hubNodeId;
 
         /// <inheritdoc/>
@@ -233,8 +233,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     /// </summary>
     public sealed class MeshTopologyStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TopologyNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)> _dataStore = new();
+        private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)> _dataStore = new BoundedDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)>(1000);
         private int _minConnections = 2;
 
         /// <inheritdoc/>
@@ -382,7 +382,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     public sealed class ChainTopologyStrategy : EnhancedReplicationStrategyBase
     {
         private readonly List<TopologyNode> _chain = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int ChainPosition)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, int ChainPosition)> _dataStore = new BoundedDictionary<string, (byte[] Data, int ChainPosition)>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -525,8 +525,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     /// </summary>
     public sealed class TreeTopologyStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TopologyNode> _nodes = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int Depth)> _dataStore = new();
+        private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, int Depth)> _dataStore = new BoundedDictionary<string, (byte[] Data, int Depth)>(1000);
         private string? _rootNodeId;
         private int _maxFanOut = 5;
 
@@ -715,7 +715,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     public sealed class RingTopologyStrategy : EnhancedReplicationStrategyBase
     {
         private readonly List<TopologyNode> _ring = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int RingPosition)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, int RingPosition)> _dataStore = new BoundedDictionary<string, (byte[] Data, int RingPosition)>(1000);
         private bool _bidirectional = false;
 
         /// <inheritdoc/>
@@ -886,9 +886,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     /// </summary>
     public sealed class HierarchicalTopologyStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TopologyNode> _nodes = new();
-        private readonly ConcurrentDictionary<int, List<string>> _levels = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int Level)> _dataStore = new();
+        private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
+        private readonly BoundedDictionary<int, List<string>> _levels = new BoundedDictionary<int, List<string>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, int Level)> _dataStore = new BoundedDictionary<string, (byte[] Data, int Level)>(1000);
         private int _maxLevels = 4;
 
         /// <inheritdoc/>

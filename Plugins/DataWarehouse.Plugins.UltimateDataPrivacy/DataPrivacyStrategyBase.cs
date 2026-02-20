@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataPrivacy;
 
@@ -49,7 +49,7 @@ public interface IDataPrivacyStrategy
 /// </summary>
 public abstract class DataPrivacyStrategyBase : IDataPrivacyStrategy
 {
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
@@ -106,7 +106,7 @@ public abstract class DataPrivacyStrategyBase : IDataPrivacyStrategy
 /// <summary>Registry for data privacy strategies.</summary>
 public sealed class DataPrivacyStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataPrivacyStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IDataPrivacyStrategy> _strategies = new BoundedDictionary<string, IDataPrivacyStrategy>(1000);
 
     public int Count => _strategies.Count;
 

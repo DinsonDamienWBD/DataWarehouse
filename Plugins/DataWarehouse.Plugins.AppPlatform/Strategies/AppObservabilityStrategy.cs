@@ -35,7 +35,7 @@ internal sealed class AppObservabilityStrategy
     /// <summary>
     /// Thread-safe dictionary storing per-app observability configurations keyed by AppId.
     /// </summary>
-    private readonly ConcurrentDictionary<string, AppObservabilityConfig> _configs = new();
+    private readonly BoundedDictionary<string, AppObservabilityConfig> _configs = new BoundedDictionary<string, AppObservabilityConfig>(1000);
 
     /// <summary>
     /// Message bus for communicating with UniversalObservability.
@@ -130,7 +130,7 @@ internal sealed class AppObservabilityStrategy
     public Task<AppObservabilityConfig?> GetObservabilityConfigAsync(string appId)
     {
         _configs.TryGetValue(appId, out var config);
-        return Task.FromResult(config);
+        return Task.FromResult<AppObservabilityConfig?>(config);
     }
 
     /// <summary>

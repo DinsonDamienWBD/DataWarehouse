@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.AppPlatform.Models;
@@ -35,21 +34,21 @@ internal sealed class AppAiWorkflowStrategy
     /// <summary>
     /// Thread-safe dictionary storing per-app AI workflow configurations keyed by AppId.
     /// </summary>
-    private readonly ConcurrentDictionary<string, AppAiWorkflowConfig> _configs = new();
+    private readonly BoundedDictionary<string, AppAiWorkflowConfig> _configs = new BoundedDictionary<string, AppAiWorkflowConfig>(1000);
 
     /// <summary>
     /// Thread-safe dictionary storing per-app AI usage tracking keyed by AppId.
     /// Active concurrent request counts are managed via <see cref="Interlocked"/> operations
     /// on the values in <see cref="_concurrentCounts"/> for atomicity.
     /// </summary>
-    private readonly ConcurrentDictionary<string, AiUsageTracking> _usageTracking = new();
+    private readonly BoundedDictionary<string, AiUsageTracking> _usageTracking = new BoundedDictionary<string, AiUsageTracking>(1000);
 
     /// <summary>
     /// Thread-safe counters for active concurrent requests per app.
     /// Managed via <see cref="Interlocked.Increment(ref int)"/> and
     /// <see cref="Interlocked.Decrement(ref int)"/> for lock-free thread safety.
     /// </summary>
-    private readonly ConcurrentDictionary<string, int> _concurrentCounts = new();
+    private readonly BoundedDictionary<string, int> _concurrentCounts = new BoundedDictionary<string, int>(1000);
 
     /// <summary>
     /// Message bus for communicating with UltimateIntelligence.
@@ -156,7 +155,7 @@ internal sealed class AppAiWorkflowStrategy
     public Task<AppAiWorkflowConfig?> GetWorkflowAsync(string appId)
     {
         _configs.TryGetValue(appId, out var config);
-        return Task.FromResult(config);
+        return Task.FromResult<AppAiWorkflowConfig?>(config);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 
@@ -8,9 +8,9 @@ namespace DataWarehouse.Plugins.UniversalDashboards.Strategies;
 /// </summary>
 public sealed class DashboardAccessControlService
 {
-    private readonly ConcurrentDictionary<string, DashboardPermissions> _permissions = new();
-    private readonly ConcurrentDictionary<string, List<DashboardAccessGrant>> _grants = new();
-    private readonly ConcurrentDictionary<string, List<DashboardAccessAuditEntry>> _auditLog = new();
+    private readonly BoundedDictionary<string, DashboardPermissions> _permissions = new BoundedDictionary<string, DashboardPermissions>(1000);
+    private readonly BoundedDictionary<string, List<DashboardAccessGrant>> _grants = new BoundedDictionary<string, List<DashboardAccessGrant>>(1000);
+    private readonly BoundedDictionary<string, List<DashboardAccessAuditEntry>> _auditLog = new BoundedDictionary<string, List<DashboardAccessAuditEntry>>(1000);
 
     /// <summary>
     /// Sets permissions for a dashboard.

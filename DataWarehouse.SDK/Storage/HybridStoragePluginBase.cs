@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.SDK.Storage;
 
@@ -121,7 +120,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// <summary>
     /// Instance health cache for quick lookups.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, InstanceHealthStatus> _healthCache = new();
+    protected readonly BoundedDictionary<string, InstanceHealthStatus> _healthCache = new BoundedDictionary<string, InstanceHealthStatus>(1000);
 
     /// <summary>
     /// Health monitoring timer.

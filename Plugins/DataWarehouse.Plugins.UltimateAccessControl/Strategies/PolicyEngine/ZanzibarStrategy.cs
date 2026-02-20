@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
 {
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
     /// </remarks>
     public sealed class ZanzibarStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RelationshipTuple> _tuples = new();
+        private readonly BoundedDictionary<string, RelationshipTuple> _tuples = new BoundedDictionary<string, RelationshipTuple>(1000);
         private readonly HttpClient _httpClient = new();
         private string? _zanzibarEndpoint;
         private TimeSpan _requestTimeout = TimeSpan.FromSeconds(5);

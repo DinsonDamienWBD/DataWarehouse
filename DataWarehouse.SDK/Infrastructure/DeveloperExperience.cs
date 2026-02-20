@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -930,8 +930,8 @@ public sealed class ConfigCommand : ICliCommand
 /// </summary>
 public sealed class GraphQLGateway : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, GraphQLService> _services = new();
-    private readonly ConcurrentDictionary<string, GraphQLType> _types = new();
+    private readonly BoundedDictionary<string, GraphQLService> _services = new BoundedDictionary<string, GraphQLService>(1000);
+    private readonly BoundedDictionary<string, GraphQLType> _types = new BoundedDictionary<string, GraphQLType>(1000);
     private readonly GraphQLGatewayOptions _options;
     private readonly IGraphQLMetrics? _metrics;
     private volatile bool _disposed;

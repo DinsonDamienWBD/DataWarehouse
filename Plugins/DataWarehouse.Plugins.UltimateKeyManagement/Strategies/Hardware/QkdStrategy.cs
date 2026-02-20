@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 {
@@ -31,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     /// </summary>
     public sealed class QkdStrategy : KeyStoreStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _qkdKeys = new();
-        private readonly ConcurrentDictionary<string, QkdSessionInfo> _sessions = new();
+        private readonly BoundedDictionary<string, byte[]> _qkdKeys = new BoundedDictionary<string, byte[]>(1000);
+        private readonly BoundedDictionary<string, QkdSessionInfo> _sessions = new BoundedDictionary<string, QkdSessionInfo>(1000);
         private readonly SemaphoreSlim _qkdLock = new(1, 1);
         private string _qkdDeviceEndpoint = "";
         private QkdProtocol _protocol = QkdProtocol.BB84;

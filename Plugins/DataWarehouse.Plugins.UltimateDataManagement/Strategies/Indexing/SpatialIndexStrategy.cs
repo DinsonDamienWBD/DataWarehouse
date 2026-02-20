@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -23,7 +23,7 @@ public sealed class SpatialIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Indexed spatial documents storage.
     /// </summary>
-    private readonly ConcurrentDictionary<string, SpatialDocument> _documents = new();
+    private readonly BoundedDictionary<string, SpatialDocument> _documents = new BoundedDictionary<string, SpatialDocument>(1000);
 
     /// <summary>
     /// R-tree root node for spatial indexing.

@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 {
@@ -30,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     public class WebhookConnectorStrategy : UltimateStorageStrategyBase
     {
         private readonly ConcurrentQueue<WebhookEvent> _eventQueue = new();
-        private readonly ConcurrentDictionary<string, WebhookEvent> _eventCache = new();
+        private readonly BoundedDictionary<string, WebhookEvent> _eventCache = new BoundedDictionary<string, WebhookEvent>(1000);
         private string? _webhookSecret;
         private int _maxQueueSize = 10000;
         private int _replayWindowSeconds = 300; // 5 minutes

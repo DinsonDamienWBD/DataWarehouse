@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -40,9 +40,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _challengeIntervalSeconds = 300;
         private bool _enableAutomaticChallenges = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, StorageProvider> _providers = new();
-        private readonly ConcurrentDictionary<string, StoredObjectRecord> _objectRecords = new();
-        private readonly ConcurrentDictionary<string, byte[]> _localCache = new();
+        private readonly BoundedDictionary<string, StorageProvider> _providers = new BoundedDictionary<string, StorageProvider>(1000);
+        private readonly BoundedDictionary<string, StoredObjectRecord> _objectRecords = new BoundedDictionary<string, StoredObjectRecord>(1000);
+        private readonly BoundedDictionary<string, byte[]> _localCache = new BoundedDictionary<string, byte[]>(1000);
         private Timer? _challengeTimer = null;
 
         public override string StrategyId => "crypto-economic-storage";

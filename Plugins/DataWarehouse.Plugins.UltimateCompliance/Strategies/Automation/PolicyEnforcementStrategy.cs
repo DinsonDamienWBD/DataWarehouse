@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -14,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// </summary>
     public sealed class PolicyEnforcementStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, CompliancePolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, PolicyViolationLog> _violationLog = new();
+        private readonly BoundedDictionary<string, CompliancePolicy> _policies = new BoundedDictionary<string, CompliancePolicy>(1000);
+        private readonly BoundedDictionary<string, PolicyViolationLog> _violationLog = new BoundedDictionary<string, PolicyViolationLog>(1000);
         private EnforcementMode _enforcementMode = EnforcementMode.Enforce;
 
         /// <inheritdoc/>

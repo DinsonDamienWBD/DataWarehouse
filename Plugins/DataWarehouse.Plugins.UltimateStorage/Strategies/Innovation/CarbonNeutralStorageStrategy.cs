@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableTimeShifting = true;
         private bool _enableCarbonOffsets = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, ObjectCarbonMetadata> _carbonMetadata = new();
+        private readonly BoundedDictionary<string, ObjectCarbonMetadata> _carbonMetadata = new BoundedDictionary<string, ObjectCarbonMetadata>(1000);
         private double _totalEnergyConsumedKWh;
         private double _totalRenewableEnergyKWh;
         private double _totalCarbonEmittedKg;

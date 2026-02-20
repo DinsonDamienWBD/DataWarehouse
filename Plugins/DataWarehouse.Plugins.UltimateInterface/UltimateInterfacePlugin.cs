@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -60,8 +59,8 @@ namespace DataWarehouse.Plugins.UltimateInterface;
 public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private readonly InterfaceStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, InterfaceHealthStatus> _healthStatus = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, InterfaceHealthStatus> _healthStatus = new BoundedDictionary<string, InterfaceHealthStatus>(1000);
     private bool _disposed;
 
     // Configuration
@@ -913,7 +912,7 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
 /// </summary>
 public sealed class InterfaceStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IPluginInterfaceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IPluginInterfaceStrategy> _strategies = new BoundedDictionary<string, IPluginInterfaceStrategy>(1000);
 
     public int Count => _strategies.Count;
 

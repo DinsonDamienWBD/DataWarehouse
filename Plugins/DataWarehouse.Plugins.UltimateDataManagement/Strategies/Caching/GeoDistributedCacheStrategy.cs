@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
@@ -138,9 +139,9 @@ public sealed class GeoDistributedCacheConfig
 /// </remarks>
 public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _localCache = new();
-    private readonly ConcurrentDictionary<string, CacheRegion> _regions = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
+    private readonly BoundedDictionary<string, CacheEntry> _localCache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly BoundedDictionary<string, CacheRegion> _regions = new BoundedDictionary<string, CacheRegion>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly ConcurrentQueue<InvalidationEvent> _invalidationQueue = new();
     private readonly object _tagLock = new();
 

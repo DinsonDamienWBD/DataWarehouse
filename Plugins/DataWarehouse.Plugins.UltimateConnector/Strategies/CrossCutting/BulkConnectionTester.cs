@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 {
@@ -22,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class BulkConnectionTester
     {
-        private readonly ConcurrentDictionary<string, StrategyRegistration> _registrations = new();
+        private readonly BoundedDictionary<string, StrategyRegistration> _registrations = new BoundedDictionary<string, StrategyRegistration>(1000);
         private readonly ILogger? _logger;
         private readonly int _maxParallelism;
 

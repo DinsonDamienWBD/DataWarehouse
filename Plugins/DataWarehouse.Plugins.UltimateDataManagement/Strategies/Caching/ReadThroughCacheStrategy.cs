@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
 
@@ -89,8 +89,8 @@ internal sealed class ReadThroughEntry
 /// </remarks>
 public sealed class ReadThroughCacheStrategy : CachingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ReadThroughEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _tagIndex = new();
+    private readonly BoundedDictionary<string, ReadThroughEntry> _cache = new BoundedDictionary<string, ReadThroughEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _tagLock = new();
     private readonly SemaphoreSlim _loadSemaphore;
     private readonly ReadThroughCacheConfig _config;

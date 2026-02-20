@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
@@ -21,7 +20,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
     private readonly IMessageBus _messageBus;
     private readonly KnowledgeAggregator _aggregator;
     private readonly List<IDisposable> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<KnowledgeResponse>> _pendingRequests = new();
+    private readonly BoundedDictionary<string, TaskCompletionSource<KnowledgeResponse>> _pendingRequests = new BoundedDictionary<string, TaskCompletionSource<KnowledgeResponse>>(1000);
     private bool _disposed;
 
     /// <summary>

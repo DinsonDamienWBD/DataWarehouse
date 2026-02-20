@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Storage.Fabric;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 
@@ -21,8 +21,8 @@ namespace DataWarehouse.Plugins.UniversalFabric.Migration;
 public class LiveMigrationEngine
 {
     private readonly IStorageFabric _fabric;
-    private readonly ConcurrentDictionary<string, MigrationJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCts = new();
+    private readonly BoundedDictionary<string, MigrationJob> _jobs = new BoundedDictionary<string, MigrationJob>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _jobCts = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
     /// <summary>
     /// Creates a new LiveMigrationEngine backed by the given storage fabric.

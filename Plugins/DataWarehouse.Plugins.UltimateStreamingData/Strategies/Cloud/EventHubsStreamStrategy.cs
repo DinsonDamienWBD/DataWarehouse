@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Cloud;
 
@@ -243,13 +244,13 @@ public sealed record PartitionOwnership
 /// </summary>
 internal sealed class EventHubsStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EventHubConfig> _hubs = new();
-    private readonly ConcurrentDictionary<string, List<EventHubPartition>> _partitions = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<EventHubEvent>> _partitionData = new();
-    private readonly ConcurrentDictionary<string, EventHubConsumerGroup> _consumerGroups = new();
-    private readonly ConcurrentDictionary<string, EventHubCheckpoint> _checkpoints = new();
-    private readonly ConcurrentDictionary<string, PartitionOwnership> _ownership = new();
-    private readonly ConcurrentDictionary<string, long> _sequenceCounters = new();
+    private readonly BoundedDictionary<string, EventHubConfig> _hubs = new BoundedDictionary<string, EventHubConfig>(1000);
+    private readonly BoundedDictionary<string, List<EventHubPartition>> _partitions = new BoundedDictionary<string, List<EventHubPartition>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<EventHubEvent>> _partitionData = new BoundedDictionary<string, ConcurrentQueue<EventHubEvent>>(1000);
+    private readonly BoundedDictionary<string, EventHubConsumerGroup> _consumerGroups = new BoundedDictionary<string, EventHubConsumerGroup>(1000);
+    private readonly BoundedDictionary<string, EventHubCheckpoint> _checkpoints = new BoundedDictionary<string, EventHubCheckpoint>(1000);
+    private readonly BoundedDictionary<string, PartitionOwnership> _ownership = new BoundedDictionary<string, PartitionOwnership>(1000);
+    private readonly BoundedDictionary<string, long> _sequenceCounters = new BoundedDictionary<string, long>(1000);
     private long _totalEventsSent;
     private long _totalEventsReceived;
 

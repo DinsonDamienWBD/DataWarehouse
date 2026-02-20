@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.ELT;
 
@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.ELT;
 /// </summary>
 public sealed class CloudNativeEltStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EltPipeline> _pipelines = new();
+    private readonly BoundedDictionary<string, EltPipeline> _pipelines = new BoundedDictionary<string, EltPipeline>(1000);
     private long _totalTransformationsExecuted;
 
     public override string StrategyId => "elt-cloud-native";
@@ -138,8 +138,8 @@ public sealed class CloudNativeEltStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DbtProject> _projects = new();
-    private readonly ConcurrentDictionary<string, DbtModel> _models = new();
+    private readonly BoundedDictionary<string, DbtProject> _projects = new BoundedDictionary<string, DbtProject>(1000);
+    private readonly BoundedDictionary<string, DbtModel> _models = new BoundedDictionary<string, DbtModel>(1000);
 
     public override string StrategyId => "elt-dbt-style";
     public override string DisplayName => "dbt-Style Transformation";
@@ -285,7 +285,7 @@ public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class ReverseEltStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ReverseEltSync> _syncs = new();
+    private readonly BoundedDictionary<string, ReverseEltSync> _syncs = new BoundedDictionary<string, ReverseEltSync>(1000);
 
     public override string StrategyId => "elt-reverse";
     public override string DisplayName => "Reverse ELT";
@@ -404,7 +404,7 @@ public sealed class ReverseEltStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class MedallionArchitectureStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MedallionPipeline> _pipelines = new();
+    private readonly BoundedDictionary<string, MedallionPipeline> _pipelines = new BoundedDictionary<string, MedallionPipeline>(1000);
 
     public override string StrategyId => "elt-medallion";
     public override string DisplayName => "Medallion Architecture";
@@ -514,8 +514,8 @@ public sealed class MedallionArchitectureStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class SemanticLayerStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticModel> _models = new();
-    private readonly ConcurrentDictionary<string, MetricDefinition> _metrics = new();
+    private readonly BoundedDictionary<string, SemanticModel> _models = new BoundedDictionary<string, SemanticModel>(1000);
+    private readonly BoundedDictionary<string, MetricDefinition> _metrics = new BoundedDictionary<string, MetricDefinition>(1000);
 
     public override string StrategyId => "elt-semantic-layer";
     public override string DisplayName => "Semantic Layer";

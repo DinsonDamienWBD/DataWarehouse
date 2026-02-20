@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -6,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 
@@ -27,10 +27,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 /// </summary>
 internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, NatsStreamState> _streams = new();
-    private readonly ConcurrentDictionary<string, List<StreamMessage>> _subjectMessages = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, NatsConsumerState>> _consumers = new();
-    private readonly ConcurrentDictionary<string, bool> _deduplicationIds = new();
+    private readonly BoundedDictionary<string, NatsStreamState> _streams = new BoundedDictionary<string, NatsStreamState>(1000);
+    private readonly BoundedDictionary<string, List<StreamMessage>> _subjectMessages = new BoundedDictionary<string, List<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, NatsConsumerState>> _consumers = new BoundedDictionary<string, BoundedDictionary<string, NatsConsumerState>>(1000);
+    private readonly BoundedDictionary<string, bool> _deduplicationIds = new BoundedDictionary<string, bool>(1000);
     private long _nextSequence;
     private long _totalPublished;
 
@@ -226,7 +226,7 @@ internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreaming
         var consumerIndex = 0;
         if (groupId != null)
         {
-            var streamConsumers = _consumers.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, NatsConsumerState>());
+            var streamConsumers = _consumers.GetOrAdd(streamName, _ => new BoundedDictionary<string, NatsConsumerState>(1000));
             var consumerId = consumerGroup?.ConsumerId ?? Guid.NewGuid().ToString("N");
             streamConsumers.TryAdd(consumerId, new NatsConsumerState
             {
@@ -349,7 +349,7 @@ internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreaming
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var streamConsumers = _consumers.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, NatsConsumerState>());
+        var streamConsumers = _consumers.GetOrAdd(streamName, _ => new BoundedDictionary<string, NatsConsumerState>(1000));
         var consumerId = consumerGroup.ConsumerId ?? consumerGroup.GroupId;
         streamConsumers.AddOrUpdate(consumerId,
             new NatsConsumerState { ConsumerId = consumerId, GroupId = consumerGroup.GroupId, LastDeliveredSeq = offset.Offset },

@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -40,8 +40,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableCostOptimization = true;
         private bool _enablePredictiveAnalytics = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, StoredObjectInfo> _objects = new();
-        private readonly ConcurrentDictionary<DateTime, DailyCostMetrics> _costHistory = new();
+        private readonly BoundedDictionary<string, StoredObjectInfo> _objects = new BoundedDictionary<string, StoredObjectInfo>(1000);
+        private readonly BoundedDictionary<DateTime, DailyCostMetrics> _costHistory = new BoundedDictionary<DateTime, DailyCostMetrics>(1000);
         private decimal _currentMonthSpend = 0;
         private Timer? _costAnalysisTimer = null;
 

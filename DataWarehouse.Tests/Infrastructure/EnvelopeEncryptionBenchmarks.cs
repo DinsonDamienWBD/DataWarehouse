@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -8,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Security;
 using Xunit;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Tests.Infrastructure
 {
@@ -35,7 +35,7 @@ namespace DataWarehouse.Tests.Infrastructure
 
         private sealed class BenchmarkKeyStore : IKeyStore
         {
-            private readonly ConcurrentDictionary<string, byte[]> _keys = new();
+            private readonly BoundedDictionary<string, byte[]> _keys = new BoundedDictionary<string, byte[]>(1000);
 
             public Task<string> GetCurrentKeyIdAsync() => Task.FromResult("benchmark-key");
 
@@ -59,7 +59,7 @@ namespace DataWarehouse.Tests.Infrastructure
 
         private sealed class BenchmarkEnvelopeKeyStore : IEnvelopeKeyStore
         {
-            private readonly ConcurrentDictionary<string, byte[]> _keks = new();
+            private readonly BoundedDictionary<string, byte[]> _keks = new BoundedDictionary<string, byte[]>(1000);
 
             public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-WRAP" };
             public bool SupportsHsmKeyGeneration => false;

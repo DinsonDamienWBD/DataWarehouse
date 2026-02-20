@@ -1,8 +1,8 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared;
 
@@ -73,7 +73,7 @@ public sealed class EndpointChangeEvent
 /// </summary>
 public sealed class DynamicEndpointGenerator : IDisposable
 {
-    private readonly ConcurrentDictionary<string, EndpointDescriptor> _endpoints = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, EndpointDescriptor> _endpoints = new BoundedDictionary<string, EndpointDescriptor>(1000);
     private readonly IPluginCapabilityRegistry? _capabilityRegistry;
     private readonly IDisposable? _registeredSubscription;
     private readonly IDisposable? _unregisteredSubscription;

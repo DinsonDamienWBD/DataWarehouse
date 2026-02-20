@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -127,9 +127,9 @@ public sealed class ClassificationResult
 /// </summary>
 public sealed class DataClassificationStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ClassificationRule> _rules = new();
-    private readonly ConcurrentDictionary<string, ClassificationResult> _classificationCache = new();
-    private readonly ConcurrentDictionary<ClassificationLabel, long> _labelCounts = new();
+    private readonly BoundedDictionary<string, ClassificationRule> _rules = new BoundedDictionary<string, ClassificationRule>(1000);
+    private readonly BoundedDictionary<string, ClassificationResult> _classificationCache = new BoundedDictionary<string, ClassificationResult>(1000);
+    private readonly BoundedDictionary<ClassificationLabel, long> _labelCounts = new BoundedDictionary<ClassificationLabel, long>(1000);
     private readonly SemaphoreSlim _mlLock = new(1, 1);
     private bool _mlAvailable;
 

@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
 {
@@ -17,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     public sealed class SelectiveReplicationStrategy : EnhancedReplicationStrategyBase
     {
         private readonly ConcurrentDictionary<string, Func<byte[], IDictionary<string, string>?, bool>> _filters = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, bool Selected)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, bool Selected)> _dataStore = new BoundedDictionary<string, (byte[] Data, bool Selected)>(1000);
         private bool _defaultAllow = true;
 
         /// <inheritdoc/>
@@ -147,7 +148,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     public sealed class FilteredReplicationStrategy : EnhancedReplicationStrategyBase
     {
         private readonly ConcurrentDictionary<string, Func<byte[], IDictionary<string, string>?, bool>> _targetFilters = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)> _dataStore = new BoundedDictionary<string, (byte[] Data, HashSet<string> ReplicatedTo)>(1000);
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -266,7 +267,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     /// </summary>
     public sealed class CompressionReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] CompressedData, byte[] OriginalData, double CompressionRatio)> _dataStore = new();
+        private readonly BoundedDictionary<string, (byte[] CompressedData, byte[] OriginalData, double CompressionRatio)> _dataStore = new BoundedDictionary<string, (byte[] CompressedData, byte[] OriginalData, double CompressionRatio)>(1000);
         private CompressionAlgorithm _algorithm = CompressionAlgorithm.Gzip;
         private CompressionLevel _level = CompressionLevel.Optimal;
         private int _minSizeForCompression = 1024; // 1KB minimum
@@ -451,8 +452,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     /// </summary>
     public sealed class EncryptionReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] EncryptedData, byte[] IV)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, byte[]> _nodeKeys = new();
+        private readonly BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)> _dataStore = new BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)>(1000);
+        private readonly BoundedDictionary<string, byte[]> _nodeKeys = new BoundedDictionary<string, byte[]>(1000);
         private byte[] _masterKey = new byte[32];
         private EncryptionAlgorithm _algorithm = EncryptionAlgorithm.AES256;
 
@@ -624,9 +625,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     /// </summary>
     public sealed class ThrottleReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<string, (byte[] Data, DateTimeOffset QueuedAt)> _dataStore = new();
-        private readonly ConcurrentDictionary<string, ThrottleConfig> _targetThrottles = new();
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _targetSemaphores = new();
+        private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset QueuedAt)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset QueuedAt)>(1000);
+        private readonly BoundedDictionary<string, ThrottleConfig> _targetThrottles = new BoundedDictionary<string, ThrottleConfig>(1000);
+        private readonly BoundedDictionary<string, SemaphoreSlim> _targetSemaphores = new BoundedDictionary<string, SemaphoreSlim>(1000);
         private int _globalBytesPerSecond = 10_000_000; // 10 MB/s default
         private int _globalConcurrentOps = 10;
         private readonly SemaphoreSlim _globalSemaphore;
@@ -801,8 +802,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     /// </summary>
     public sealed class PriorityReplicationStrategy : EnhancedReplicationStrategyBase
     {
-        private readonly ConcurrentDictionary<int, ConcurrentQueue<PendingReplication>> _priorityQueues = new();
-        private readonly ConcurrentDictionary<string, (byte[] Data, int Priority)> _dataStore = new();
+        private readonly BoundedDictionary<int, ConcurrentQueue<PendingReplication>> _priorityQueues = new BoundedDictionary<int, ConcurrentQueue<PendingReplication>>(1000);
+        private readonly BoundedDictionary<string, (byte[] Data, int Priority)> _dataStore = new BoundedDictionary<string, (byte[] Data, int Priority)>(1000);
         private int _priorityLevels = 5;
         private readonly CancellationTokenSource _workerCts = new();
         private Task? _workerTask;

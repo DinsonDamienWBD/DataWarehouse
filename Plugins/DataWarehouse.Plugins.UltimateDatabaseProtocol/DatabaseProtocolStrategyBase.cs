@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -486,7 +485,7 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
     protected ConnectionParameters? CurrentParameters;
 
     // Transaction tracking
-    protected readonly ConcurrentDictionary<string, object> ActiveTransactions = new();
+    protected readonly BoundedDictionary<string, object> ActiveTransactions = new BoundedDictionary<string, object>(1000);
 
     // Buffer pool helper method for protocol encoding
     protected static byte[] RentBuffer(int size) => ArrayPool<byte>.Shared.Rent(size);
@@ -1175,7 +1174,7 @@ public interface IDatabaseProtocolStrategyRegistry
 /// </summary>
 public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDatabaseProtocolStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDatabaseProtocolStrategy> _strategies = new BoundedDictionary<string, IDatabaseProtocolStrategy>(1000);
 
     /// <inheritdoc/>
     public void Register(IDatabaseProtocolStrategy strategy)

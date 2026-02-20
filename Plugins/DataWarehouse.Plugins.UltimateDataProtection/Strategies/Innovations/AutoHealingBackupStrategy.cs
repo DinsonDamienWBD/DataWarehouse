@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -272,10 +272,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class AutoHealingBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AutoHealingBackup> _backups = new();
-        private readonly ConcurrentDictionary<string, List<RedundantBlock>> _redundantBlocks = new();
-        private readonly ConcurrentDictionary<string, CorruptionScanResult> _scanResults = new();
-        private readonly ConcurrentDictionary<string, HealingResult> _healingResults = new();
+        private readonly BoundedDictionary<string, AutoHealingBackup> _backups = new BoundedDictionary<string, AutoHealingBackup>(1000);
+        private readonly BoundedDictionary<string, List<RedundantBlock>> _redundantBlocks = new BoundedDictionary<string, List<RedundantBlock>>(1000);
+        private readonly BoundedDictionary<string, CorruptionScanResult> _scanResults = new BoundedDictionary<string, CorruptionScanResult>(1000);
+        private readonly BoundedDictionary<string, HealingResult> _healingResults = new BoundedDictionary<string, HealingResult>(1000);
         private AutoHealingConfiguration _config = new();
 
         /// <inheritdoc/>

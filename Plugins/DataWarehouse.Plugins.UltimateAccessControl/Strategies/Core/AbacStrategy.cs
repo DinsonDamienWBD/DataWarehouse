@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -24,8 +24,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class AbacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, AbacPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, Func<AccessContext, bool>> _customConditions = new();
+        private readonly BoundedDictionary<string, AbacPolicy> _policies = new BoundedDictionary<string, AbacPolicy>(1000);
+        private readonly BoundedDictionary<string, Func<AccessContext, bool>> _customConditions = new BoundedDictionary<string, Func<AccessContext, bool>>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "abac";

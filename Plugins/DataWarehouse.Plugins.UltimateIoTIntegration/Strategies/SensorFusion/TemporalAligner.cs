@@ -2,7 +2,7 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 /// </summary>
 public sealed class TemporalAligner
 {
-    private readonly ConcurrentDictionary<string, List<SensorReading>> _buffers = new();
+    private readonly BoundedDictionary<string, List<SensorReading>> _buffers = new BoundedDictionary<string, List<SensorReading>>(1000);
     private readonly int _maxBufferSize;
     private readonly double _toleranceMs;
 

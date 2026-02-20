@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -18,10 +17,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public sealed class KeyEscrowRecovery : IDisposable
     {
-        private readonly ConcurrentDictionary<string, EscrowConfiguration> _escrowConfigs = new();
-        private readonly ConcurrentDictionary<string, RecoveryRequest> _recoveryRequests = new();
-        private readonly ConcurrentDictionary<string, EscrowAgent> _agents = new();
-        private readonly ConcurrentDictionary<string, EscrowedKeyInfo> _escrowedKeys = new();
+        private readonly BoundedDictionary<string, EscrowConfiguration> _escrowConfigs = new BoundedDictionary<string, EscrowConfiguration>(1000);
+        private readonly BoundedDictionary<string, RecoveryRequest> _recoveryRequests = new BoundedDictionary<string, RecoveryRequest>(1000);
+        private readonly BoundedDictionary<string, EscrowAgent> _agents = new BoundedDictionary<string, EscrowAgent>(1000);
+        private readonly BoundedDictionary<string, EscrowedKeyInfo> _escrowedKeys = new BoundedDictionary<string, EscrowedKeyInfo>(1000);
         private readonly IKeyStore _keyStore;
         private readonly IMessageBus? _messageBus;
         private readonly SemaphoreSlim _escrowLock = new(1, 1);

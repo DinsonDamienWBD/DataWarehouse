@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.RateLimiting;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Replication;
 
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Replication;
 /// </summary>
 public sealed class SynchronousCrossCloudReplicationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ReplicationTopology> _topologies = new();
+    private readonly BoundedDictionary<string, ReplicationTopology> _topologies = new BoundedDictionary<string, ReplicationTopology>(1000);
 
     public override string StrategyId => "replication-sync-cross-cloud";
     public override string StrategyName => "Synchronous Cross-Cloud Replication";
@@ -96,7 +97,7 @@ public sealed class SynchronousCrossCloudReplicationStrategy : MultiCloudStrateg
 public sealed class AsynchronousCrossCloudReplicationStrategy : MultiCloudStrategyBase
 {
     private readonly ConcurrentQueue<ReplicationTask> _replicationQueue = new();
-    private readonly ConcurrentDictionary<string, long> _replicationLag = new();
+    private readonly BoundedDictionary<string, long> _replicationLag = new BoundedDictionary<string, long>(1000);
 
     public override string StrategyId => "replication-async-cross-cloud";
     public override string StrategyName => "Asynchronous Cross-Cloud Replication";
@@ -160,7 +161,7 @@ public sealed class AsynchronousCrossCloudReplicationStrategy : MultiCloudStrate
 /// </summary>
 public sealed class BidirectionalCrossCloudReplicationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VectorClock> _vectorClocks = new();
+    private readonly BoundedDictionary<string, VectorClock> _vectorClocks = new BoundedDictionary<string, VectorClock>(1000);
 
     public override string StrategyId => "replication-bidirectional-cross-cloud";
     public override string StrategyName => "Bidirectional Cross-Cloud Replication";
@@ -217,7 +218,7 @@ public sealed class BidirectionalCrossCloudReplicationStrategy : MultiCloudStrat
 /// </summary>
 public sealed class GeoRoutedReplicationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, GeoRegion> _regions = new();
+    private readonly BoundedDictionary<string, GeoRegion> _regions = new BoundedDictionary<string, GeoRegion>(1000);
 
     public override string StrategyId => "replication-geo-routed";
     public override string StrategyName => "Geo-Routed Replication";
@@ -577,7 +578,7 @@ public sealed class BandwidthThrottledReplicationStrategy : MultiCloudStrategyBa
 /// </summary>
 public sealed class CrdtReplicationStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LwwElement> _lwwRegister = new();
+    private readonly BoundedDictionary<string, LwwElement> _lwwRegister = new BoundedDictionary<string, LwwElement>(1000);
 
     public override string StrategyId => "replication-crdt";
     public override string StrategyName => "CRDT Conflict-Free Replication";

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance;
 
@@ -56,7 +56,7 @@ public interface IDataGovernanceStrategy
 /// </summary>
 public abstract class DataGovernanceStrategyBase : IDataGovernanceStrategy
 {
-    private readonly ConcurrentDictionary<string, long> _counters = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private bool _initialized;
     private bool _disposed;
     private DateTime? _healthCacheExpiry;
@@ -129,7 +129,7 @@ public enum HealthStatus
 /// </summary>
 public sealed class DataGovernanceStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataGovernanceStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, IDataGovernanceStrategy> _strategies = new BoundedDictionary<string, IDataGovernanceStrategy>(1000);
 
     public int Count => _strategies.Count;
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience.Strategies.DisasterRecovery;
 
@@ -370,7 +371,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
 /// </summary>
 public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RecoveryPoint> _recoveryPoints = new();
+    private readonly BoundedDictionary<string, RecoveryPoint> _recoveryPoints = new BoundedDictionary<string, RecoveryPoint>(1000);
     private readonly int _maxRecoveryPoints;
     private readonly TimeSpan _retentionPeriod;
     private RecoveryPoint? _lastCheckpoint;
@@ -618,7 +619,7 @@ public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
 /// </summary>
 public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RegionState> _regions = new();
+    private readonly BoundedDictionary<string, RegionState> _regions = new BoundedDictionary<string, RegionState>(1000);
     private string? _primaryRegionId;
     private DisasterRecoveryMode _mode = DisasterRecoveryMode.Normal;
     private readonly bool _activeActive;
@@ -911,7 +912,7 @@ public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
 /// </summary>
 public sealed class StateCheckpointStrategy : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, byte[]> _stateStore = new();
+    private readonly BoundedDictionary<string, byte[]> _stateStore = new BoundedDictionary<string, byte[]>(1000);
     private readonly ConcurrentQueue<(string checkpointId, DateTimeOffset timestamp)> _checkpointHistory = new();
     private readonly int _maxCheckpoints;
     private readonly Func<CancellationToken, Task<byte[]>>? _stateSerializer;
@@ -1329,7 +1330,7 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
 /// </summary>
 public sealed class BackupCoordinationStrategy : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BackupJob> _backupJobs = new();
+    private readonly BoundedDictionary<string, BackupJob> _backupJobs = new BoundedDictionary<string, BackupJob>(1000);
     private readonly TimeSpan _backupInterval;
     private readonly int _retainBackups;
     private DateTimeOffset _lastBackup = DateTimeOffset.MinValue;

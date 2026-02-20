@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Transformation;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.Transformatio
 /// </summary>
 public sealed class TypeConversionStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TypeMapping> _typeMappings = new();
+    private readonly BoundedDictionary<string, TypeMapping> _typeMappings = new BoundedDictionary<string, TypeMapping>(1000);
 
     public override string StrategyId => "transform-type-conversion";
     public override string DisplayName => "Type Conversion";
@@ -228,7 +228,7 @@ public sealed class AggregationStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DataCleansingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CleansingRule> _rules = new();
+    private readonly BoundedDictionary<string, CleansingRule> _rules = new BoundedDictionary<string, CleansingRule>(1000);
 
     public override string StrategyId => "transform-cleansing";
     public override string DisplayName => "Data Cleansing";
@@ -388,8 +388,8 @@ public sealed class DataCleansingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DataEnrichmentStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EnrichmentSource> _sources = new();
-    private readonly ConcurrentDictionary<string, Dictionary<string, object>> _cache = new();
+    private readonly BoundedDictionary<string, EnrichmentSource> _sources = new BoundedDictionary<string, EnrichmentSource>(1000);
+    private readonly BoundedDictionary<string, Dictionary<string, object>> _cache = new BoundedDictionary<string, Dictionary<string, object>>(1000);
 
     public override string StrategyId => "transform-enrichment";
     public override string DisplayName => "Data Enrichment";
@@ -522,7 +522,7 @@ public sealed class DataEnrichmentStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class DataNormalizationStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, NormalizationRule> _rules = new();
+    private readonly BoundedDictionary<string, NormalizationRule> _rules = new BoundedDictionary<string, NormalizationRule>(1000);
 
     public override string StrategyId => "transform-normalization";
     public override string DisplayName => "Data Normalization";

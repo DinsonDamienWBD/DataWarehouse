@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -9,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -30,11 +30,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class FederatedIdentityStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, IdentityProvider> _identityProviders = new();
-        private readonly ConcurrentDictionary<string, FederatedSession> _sessions = new();
-        private readonly ConcurrentDictionary<string, IdentityMapping> _identityMappings = new();
-        private readonly ConcurrentDictionary<string, TokenCache> _tokenCache = new();
-        private readonly ConcurrentDictionary<string, ClaimsTransformation> _claimsTransformations = new();
+        private readonly BoundedDictionary<string, IdentityProvider> _identityProviders = new BoundedDictionary<string, IdentityProvider>(1000);
+        private readonly BoundedDictionary<string, FederatedSession> _sessions = new BoundedDictionary<string, FederatedSession>(1000);
+        private readonly BoundedDictionary<string, IdentityMapping> _identityMappings = new BoundedDictionary<string, IdentityMapping>(1000);
+        private readonly BoundedDictionary<string, TokenCache> _tokenCache = new BoundedDictionary<string, TokenCache>(1000);
+        private readonly BoundedDictionary<string, ClaimsTransformation> _claimsTransformations = new BoundedDictionary<string, ClaimsTransformation>(1000);
         private readonly HttpClient _httpClient;
 
         private TimeSpan _sessionTimeout = TimeSpan.FromHours(8);

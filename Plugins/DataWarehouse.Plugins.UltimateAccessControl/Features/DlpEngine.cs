@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -13,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class DlpEngine
     {
-        private readonly ConcurrentDictionary<string, DlpPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, Regex> _regexCache = new();
+        private readonly BoundedDictionary<string, DlpPolicy> _policies = new BoundedDictionary<string, DlpPolicy>(1000);
+        private readonly BoundedDictionary<string, Regex> _regexCache = new BoundedDictionary<string, Regex>(1000);
         private readonly ConcurrentQueue<DlpViolation> _violations = new();
         private readonly int _maxViolationHistorySize = 1000;
 

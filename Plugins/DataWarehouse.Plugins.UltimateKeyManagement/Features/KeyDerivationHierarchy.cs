@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 {
@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public sealed class KeyDerivationHierarchy : IDisposable
     {
-        private readonly ConcurrentDictionary<string, DerivedKeyInfo> _derivedKeys = new();
-        private readonly ConcurrentDictionary<string, MasterKeyInfo> _masterKeys = new();
+        private readonly BoundedDictionary<string, DerivedKeyInfo> _derivedKeys = new BoundedDictionary<string, DerivedKeyInfo>(1000);
+        private readonly BoundedDictionary<string, MasterKeyInfo> _masterKeys = new BoundedDictionary<string, MasterKeyInfo>(1000);
         private readonly IKeyStore _keyStore;
         private readonly SemaphoreSlim _derivationLock = new(1, 1);
         private bool _disposed;

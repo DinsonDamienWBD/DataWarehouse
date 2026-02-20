@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -13,8 +13,8 @@ public sealed class WinFspFileSystem : IDisposable
 {
     private readonly WinFspConfig _config;
     private readonly IStorageProvider? _storageProvider;
-    private readonly ConcurrentDictionary<string, FileEntry> _entries;
-    private readonly ConcurrentDictionary<string, byte[]> _fileData;
+    private readonly BoundedDictionary<string, FileEntry> _entries;
+    private readonly BoundedDictionary<string, byte[]> _fileData;
     private readonly ReaderWriterLockSlim _entriesLock;
     private IntPtr _fileSystemHandle;
     private WinFspNative.FspFileSystemInterface _interface;
@@ -31,8 +31,8 @@ public sealed class WinFspFileSystem : IDisposable
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _storageProvider = storageProvider;
-        _entries = new ConcurrentDictionary<string, FileEntry>(StringComparer.OrdinalIgnoreCase);
-        _fileData = new ConcurrentDictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        _entries = new BoundedDictionary<string, FileEntry>(1000);
+        _fileData = new BoundedDictionary<string, byte[]>(1000);
         _entriesLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
         // Initialize root directory

@@ -1,10 +1,10 @@
 using DataWarehouse.SDK.Contracts;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.Distributed
 {
@@ -51,7 +51,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT types")]
     internal sealed class SdkGCounter : ICrdtType
     {
-        private readonly ConcurrentDictionary<string, long> _counts = new();
+        private readonly BoundedDictionary<string, long> _counts = new BoundedDictionary<string, long>(1000);
 
         /// <summary>
         /// The total counter value (sum of all per-node counts).
@@ -324,9 +324,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT types")]
     internal sealed class SdkORSet : ICrdtType
     {
-        private readonly ConcurrentDictionary<string, HashSet<string>> _addSet = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _removeSet = new();
-        internal readonly ConcurrentDictionary<string, DateTimeOffset> _removeTimestamps = new();
+        private readonly BoundedDictionary<string, HashSet<string>> _addSet = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _removeSet = new BoundedDictionary<string, HashSet<string>>(1000);
+        internal readonly BoundedDictionary<string, DateTimeOffset> _removeTimestamps = new BoundedDictionary<string, DateTimeOffset>(1000);
 
         /// <summary>
         /// Tombstone count threshold for automatic GC after Merge(). Default: 10000.
@@ -430,8 +430,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         private static void MergeSets(
-            ConcurrentDictionary<string, HashSet<string>> source,
-            ConcurrentDictionary<string, HashSet<string>> target)
+            BoundedDictionary<string, HashSet<string>> source,
+            BoundedDictionary<string, HashSet<string>> target)
         {
             foreach (var (element, tags) in source)
             {
@@ -447,8 +447,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         private static void MergeTimestamps(
-            ConcurrentDictionary<string, DateTimeOffset> source,
-            ConcurrentDictionary<string, DateTimeOffset> target)
+            BoundedDictionary<string, DateTimeOffset> source,
+            BoundedDictionary<string, DateTimeOffset> target)
         {
             foreach (var (key, timestamp) in source)
             {
@@ -635,7 +635,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         private static Dictionary<string, List<string>> SerializeTagSets(
-            ConcurrentDictionary<string, HashSet<string>> sets)
+            BoundedDictionary<string, HashSet<string>> sets)
         {
             var dict = new Dictionary<string, List<string>>();
             foreach (var (element, tags) in sets)
@@ -650,7 +650,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         private static void DeserializeTagSets(
             Dictionary<string, List<string>>? source,
-            ConcurrentDictionary<string, HashSet<string>> target)
+            BoundedDictionary<string, HashSet<string>> target)
         {
             if (source == null) return;
             foreach (var (element, tags) in source)
@@ -660,7 +660,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         private static Dictionary<string, string>? SerializeTimestamps(
-            ConcurrentDictionary<string, DateTimeOffset> timestamps)
+            BoundedDictionary<string, DateTimeOffset> timestamps)
         {
             if (timestamps.IsEmpty) return null;
             var dict = new Dictionary<string, string>();
@@ -673,7 +673,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         private static void DeserializeTimestamps(
             Dictionary<string, string>? source,
-            ConcurrentDictionary<string, DateTimeOffset> target)
+            BoundedDictionary<string, DateTimeOffset> target)
         {
             if (source == null) return;
             foreach (var (key, value) in source)

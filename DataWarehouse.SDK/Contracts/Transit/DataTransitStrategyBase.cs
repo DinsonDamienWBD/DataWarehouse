@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Concurrent;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Transit
 {
@@ -76,7 +76,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         /// Thread-safe dictionary tracking active transfer cancellation tokens.
         /// Keyed by transfer ID.
         /// </summary>
-        protected readonly ConcurrentDictionary<string, CancellationTokenSource> ActiveTransferCancellations = new();
+        protected readonly BoundedDictionary<string, CancellationTokenSource> ActiveTransferCancellations = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DataTransitStrategyBase"/> class.

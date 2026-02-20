@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
 {
@@ -27,8 +28,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
     /// </summary>
     public sealed class XacmlStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, XacmlPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, XacmlPolicySet> _policySets = new();
+        private readonly BoundedDictionary<string, XacmlPolicy> _policies = new BoundedDictionary<string, XacmlPolicy>(1000);
+        private readonly BoundedDictionary<string, XacmlPolicySet> _policySets = new BoundedDictionary<string, XacmlPolicySet>(1000);
         private readonly ConcurrentDictionary<string, Func<string, Task<object?>>> _pipResolvers = new();
         private RuleCombiningAlgorithm _defaultCombiningAlgorithm = RuleCombiningAlgorithm.DenyOverrides;
 

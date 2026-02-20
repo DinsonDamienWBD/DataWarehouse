@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies.RealTime;
 
@@ -11,9 +12,9 @@ namespace DataWarehouse.Plugins.UniversalDashboards.Strategies.RealTime;
 /// </summary>
 public sealed class LiveDashboardStrategy : DashboardStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
-    private readonly ConcurrentDictionary<string, List<ClientWebSocket>> _subscribers = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _pushCancellations = new();
+    private readonly BoundedDictionary<string, Dashboard> _dashboards = new BoundedDictionary<string, Dashboard>(1000);
+    private readonly BoundedDictionary<string, List<ClientWebSocket>> _subscribers = new BoundedDictionary<string, List<ClientWebSocket>>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _pushCancellations = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
     public override string StrategyId => "live-dashboard";
     public override string StrategyName => "Live Dashboard";
@@ -174,7 +175,7 @@ public sealed class LiveDashboardStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class WebSocketUpdatesStrategy : DashboardStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
+    private readonly BoundedDictionary<string, Dashboard> _dashboards = new BoundedDictionary<string, Dashboard>(1000);
     private ClientWebSocket? _serverSocket;
 
     public override string StrategyId => "websocket-updates";
@@ -274,8 +275,8 @@ public sealed class WebSocketUpdatesStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class StreamingVisualizationStrategy : DashboardStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<DataPoint>> _dataStreams = new();
+    private readonly BoundedDictionary<string, Dashboard> _dashboards = new BoundedDictionary<string, Dashboard>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<DataPoint>> _dataStreams = new BoundedDictionary<string, ConcurrentQueue<DataPoint>>(1000);
     private const int MaxPointsPerStream = 10000;
 
     public override string StrategyId => "streaming-viz";
@@ -391,7 +392,7 @@ public sealed class StreamingVisualizationStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class EventDrivenDashboardStrategy : DashboardStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
+    private readonly BoundedDictionary<string, Dashboard> _dashboards = new BoundedDictionary<string, Dashboard>(1000);
     private readonly ConcurrentDictionary<string, List<Action<DashboardEvent>>> _eventHandlers = new();
 
     public override string StrategyId => "event-driven";

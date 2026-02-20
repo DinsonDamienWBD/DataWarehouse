@@ -1,6 +1,5 @@
 using DataWarehouse.SDK.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -69,7 +68,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// Cache for pending request responses.
         /// </summary>
-        private readonly ConcurrentDictionary<string, TaskCompletionSource<MessageResponse>> _pendingRequests = new();
+        private readonly BoundedDictionary<string, TaskCompletionSource<MessageResponse>> _pendingRequests = new BoundedDictionary<string, TaskCompletionSource<MessageResponse>>(1000);
 
         /// <summary>
         /// Subscriptions to Intelligence topics.

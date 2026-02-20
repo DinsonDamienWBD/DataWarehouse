@@ -1,9 +1,9 @@
 using DataWarehouse.SDK.Primitives.Configuration;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
@@ -22,7 +22,7 @@ namespace DataWarehouse.SDK.Contracts
         private bool _disposed;
         protected bool _initialized;
         private readonly object _lifecycleLock = new();
-        private readonly ConcurrentDictionary<string, long> _counters = new();
+        private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private readonly SemaphoreSlim _healthCacheLock = new(1, 1);
         private StrategyHealthCheckResult? _cachedHealth;
         private DateTime? _healthCacheExpiry;

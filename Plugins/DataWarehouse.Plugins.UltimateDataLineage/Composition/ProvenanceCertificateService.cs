@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -37,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateDataLineage.Composition
         private readonly ILogger? _logger;
 
         // Bounded certificate store per Phase 23 memory safety
-        private readonly ConcurrentDictionary<string, List<ProvenanceCertificate>> _certificateStore = new();
+        private readonly BoundedDictionary<string, List<ProvenanceCertificate>> _certificateStore = new BoundedDictionary<string, List<ProvenanceCertificate>>(1000);
         private const int MaxCertificatesPerObject = 10000;
 
         private readonly List<IDisposable> _subscriptions = new();

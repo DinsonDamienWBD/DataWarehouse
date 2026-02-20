@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Utilities;
 namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.DeploymentPatterns;
 
 /// <summary>
@@ -526,8 +527,8 @@ public sealed class RecreateStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ABTestingStrategy : DeploymentStrategyBase
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _experimentStates = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DeploymentState> _experimentStates = new BoundedDictionary<string, DeploymentState>(1000);
     private DateTimeOffset? _lastHealthCheck;
     private bool _lastHealthCheckResult = true;
 
@@ -736,8 +737,8 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
 /// </summary>
 public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counters = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeploymentState> _shadowStates = new();
+    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, DeploymentState> _shadowStates = new BoundedDictionary<string, DeploymentState>(1000);
     private readonly System.Collections.Concurrent.ConcurrentQueue<string> _pendingRequests = new();
     private DateTimeOffset? _lastHealthCheck;
     private bool _lastHealthCheckResult = true;

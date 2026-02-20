@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -115,8 +114,8 @@ public sealed class UserConfigurationSystem
     private readonly IPluginCapabilityRegistry _capabilityRegistry;
     private readonly ConfigurationHierarchy _hierarchy;
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, IUserOverridable> _overridables = new();
-    private readonly ConcurrentDictionary<string, ConfigurableFeature> _features = new();
+    private readonly BoundedDictionary<string, IUserOverridable> _overridables = new BoundedDictionary<string, IUserOverridable>(1000);
+    private readonly BoundedDictionary<string, ConfigurableFeature> _features = new BoundedDictionary<string, ConfigurableFeature>(1000);
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {

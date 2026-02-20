@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -7,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Federation;
 
@@ -285,10 +285,10 @@ public sealed record HealthCheckResult
 /// </summary>
 public sealed class InstanceRegistry : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, InstanceInfo> _instances = new();
-    private readonly ConcurrentDictionary<string, HttpClient> _httpClients = new();
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _requestSemaphores = new();
-    private readonly ConcurrentDictionary<string, Timer> _healthCheckTimers = new();
+    private readonly BoundedDictionary<string, InstanceInfo> _instances = new BoundedDictionary<string, InstanceInfo>(1000);
+    private readonly BoundedDictionary<string, HttpClient> _httpClients = new BoundedDictionary<string, HttpClient>(1000);
+    private readonly BoundedDictionary<string, SemaphoreSlim> _requestSemaphores = new BoundedDictionary<string, SemaphoreSlim>(1000);
+    private readonly BoundedDictionary<string, Timer> _healthCheckTimers = new BoundedDictionary<string, Timer>(1000);
     private readonly object _lock = new();
     private bool _disposed;
 
@@ -849,8 +849,8 @@ public sealed class FederationProtocol : IAsyncDisposable
 {
     private readonly InstanceRegistry _registry;
     private readonly ECDsa? _signingKey;
-    private readonly ConcurrentDictionary<string, ECDsa> _instancePublicKeys = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<FederationMessage>> _pendingResponses = new();
+    private readonly BoundedDictionary<string, ECDsa> _instancePublicKeys = new BoundedDictionary<string, ECDsa>(1000);
+    private readonly BoundedDictionary<string, TaskCompletionSource<FederationMessage>> _pendingResponses = new BoundedDictionary<string, TaskCompletionSource<FederationMessage>>(1000);
     private readonly SemaphoreSlim _sendLock = new(100);
     private bool _disposed;
 
@@ -1376,8 +1376,8 @@ public sealed class QueryFanOut
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
         // Execute queries in parallel
-        var instanceResponses = new ConcurrentDictionary<string, FederatedQueryResponse>();
-        var instanceErrors = new ConcurrentDictionary<string, string>();
+        var instanceResponses = new BoundedDictionary<string, FederatedQueryResponse>(1000);
+        var instanceErrors = new BoundedDictionary<string, string>(1000);
 
         var queryTasks = orderedInstances.Select(async instance =>
         {
@@ -1785,7 +1785,7 @@ public sealed class ConflictResolver
 /// </summary>
 public sealed class LatencyOptimizer
 {
-    private readonly ConcurrentDictionary<string, LatencyProfile> _latencyProfiles = new();
+    private readonly BoundedDictionary<string, LatencyProfile> _latencyProfiles = new BoundedDictionary<string, LatencyProfile>(1000);
 
     /// <summary>
     /// Configuration for the latency optimizer.
@@ -2126,8 +2126,8 @@ public sealed record FederationStatistics
 /// </summary>
 public sealed class InstanceAuthentication
 {
-    private readonly ConcurrentDictionary<string, AuthenticationEntry> _authenticatedInstances = new();
-    private readonly ConcurrentDictionary<string, X509Certificate2> _instanceCertificates = new();
+    private readonly BoundedDictionary<string, AuthenticationEntry> _authenticatedInstances = new BoundedDictionary<string, AuthenticationEntry>(1000);
+    private readonly BoundedDictionary<string, X509Certificate2> _instanceCertificates = new BoundedDictionary<string, X509Certificate2>(1000);
     private readonly RSA? _jwtSigningKey;
     private readonly string? _jwtIssuer;
 
@@ -2435,8 +2435,8 @@ internal sealed record AuthenticationEntry
 /// </summary>
 public sealed class KnowledgeACL
 {
-    private readonly ConcurrentDictionary<string, InstanceACL> _instanceAcls = new();
-    private readonly ConcurrentDictionary<string, DomainACL> _domainAcls = new();
+    private readonly BoundedDictionary<string, InstanceACL> _instanceAcls = new BoundedDictionary<string, InstanceACL>(1000);
+    private readonly BoundedDictionary<string, DomainACL> _domainAcls = new BoundedDictionary<string, DomainACL>(1000);
 
     /// <summary>
     /// Default access policy for instances not explicitly configured.

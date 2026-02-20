@@ -81,16 +81,17 @@ namespace DataWarehouse.Kernel.Messaging
     /// Bounded concurrent dictionary that enforces a maximum capacity.
     /// When capacity is reached, oldest entries are evicted.
     /// </summary>
-    internal sealed class BoundedConcurrentDictionary<TKey, TValue> where TKey : notnull
+    internal sealed class BoundedBoundedDictionary<TKey, TValue> where TKey : notnull
     {
-        private readonly ConcurrentDictionary<TKey, TValue> _dictionary = new();
+        private readonly BoundedDictionary<TKey, TValue> _dictionary;
         private readonly ConcurrentQueue<TKey> _keyOrder = new();
         private readonly int _maxCapacity;
         private readonly object _evictionLock = new();
 
-        public BoundedConcurrentDictionary(int maxCapacity)
+        public BoundedBoundedDictionary(int maxCapacity)
         {
             _maxCapacity = maxCapacity > 0 ? maxCapacity : int.MaxValue;
+            _dictionary = new BoundedDictionary<TKey, TValue>(_maxCapacity);
         }
 
         public int Count => _dictionary.Count;
@@ -107,9 +108,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
 
-        public ICollection<TValue> Values => _dictionary.Values;
+        public IEnumerable<TValue> Values => _dictionary.Values;
 
-        public ICollection<TKey> Keys => _dictionary.Keys;
+        public IEnumerable<TKey> Keys => _dictionary.Keys;
 
         public void AddOrUpdate(TKey key, TValue value)
         {
@@ -171,9 +172,9 @@ namespace DataWarehouse.Kernel.Messaging
     /// </summary>
     public class AdvancedMessageBus : MessageBusBase, IAdvancedMessageBus
     {
-        private readonly BoundedConcurrentDictionary<string, PendingMessage> _pendingMessages;
-        private readonly BoundedConcurrentDictionary<string, MessageGroup> _messageGroups;
-        private readonly ConcurrentDictionary<string, FilteredSubscription> _filteredSubscriptions = new();
+        private readonly BoundedBoundedDictionary<string, PendingMessage> _pendingMessages;
+        private readonly BoundedBoundedDictionary<string, MessageGroup> _messageGroups;
+        private readonly BoundedDictionary<string, FilteredSubscription> _filteredSubscriptions = new BoundedDictionary<string, FilteredSubscription>(1000);
         private readonly MessageBusStatistics _statistics = new();
         private readonly IKernelContext _context;
         private readonly AdvancedMessageBusConfig _config;
@@ -182,7 +183,7 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly object _statsLock = new();
 
         // BUS-03: Per-publisher rate limiting to prevent flooding DoS
-        private readonly ConcurrentDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new();
+        private readonly BoundedDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new BoundedDictionary<string, SlidingWindowRateLimiter>(1000);
 
         // Thread-safe subscription storage - uses ThreadSafeSubscriptionList for atomic operations
         private readonly ConcurrentDictionary<string, ThreadSafeSubscriptionList<Func<PluginMessage, Task>>> _subscriptions = new();
@@ -193,8 +194,8 @@ namespace DataWarehouse.Kernel.Messaging
             _config = config ?? new AdvancedMessageBusConfig();
 
             // Initialize bounded collections with configured limits
-            _pendingMessages = new BoundedConcurrentDictionary<string, PendingMessage>(_config.MaxPendingMessages);
-            _messageGroups = new BoundedConcurrentDictionary<string, MessageGroup>(_config.MaxMessageGroups);
+            _pendingMessages = new BoundedBoundedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
+            _messageGroups = new BoundedBoundedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
 
             // Start background timers
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));

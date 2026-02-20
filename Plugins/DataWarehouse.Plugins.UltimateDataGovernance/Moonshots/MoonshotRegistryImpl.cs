@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using DataWarehouse.SDK.Moonshots;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Moonshots;
 
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Moonshots;
 /// </summary>
 public sealed class MoonshotRegistryImpl : IMoonshotRegistry
 {
-    private readonly ConcurrentDictionary<MoonshotId, MoonshotRegistration> _registrations = new();
+    private readonly BoundedDictionary<MoonshotId, MoonshotRegistration> _registrations = new BoundedDictionary<MoonshotId, MoonshotRegistration>(1000);
 
     /// <inheritdoc />
     public event EventHandler<MoonshotStatusChangedEventArgs>? StatusChanged;

@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using DataWarehouse.Plugins.AirGapBridge.Core;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Detection;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.AirGapBridge.Detection;
 /// </summary>
 public sealed class DeviceSentinel : IDisposable
 {
-    private readonly ConcurrentDictionary<string, AirGapDevice> _devices = new();
-    private readonly ConcurrentDictionary<string, FileSystemWatcher> _watchers = new();
+    private readonly BoundedDictionary<string, AirGapDevice> _devices = new BoundedDictionary<string, AirGapDevice>(1000);
+    private readonly BoundedDictionary<string, FileSystemWatcher> _watchers = new BoundedDictionary<string, FileSystemWatcher>(1000);
     private readonly CancellationTokenSource _cts = new();
     private readonly IHardwareDetector _hardwareDetector;
     private Task? _monitoringTask;

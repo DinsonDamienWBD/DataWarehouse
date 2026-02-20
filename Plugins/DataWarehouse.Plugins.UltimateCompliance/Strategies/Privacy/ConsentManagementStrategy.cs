@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -32,11 +33,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class ConsentManagementStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ConsentRecord> _consents = new();
-        private readonly ConcurrentDictionary<string, ConsentPurpose> _purposes = new();
-        private readonly ConcurrentDictionary<string, ConsentPreference> _preferences = new();
+        private readonly BoundedDictionary<string, ConsentRecord> _consents = new BoundedDictionary<string, ConsentRecord>(1000);
+        private readonly BoundedDictionary<string, ConsentPurpose> _purposes = new BoundedDictionary<string, ConsentPurpose>(1000);
+        private readonly BoundedDictionary<string, ConsentPreference> _preferences = new BoundedDictionary<string, ConsentPreference>(1000);
         private readonly ConcurrentBag<ConsentAuditEntry> _auditLog = new();
-        private readonly ConcurrentDictionary<string, ConsentVersion> _versions = new();
+        private readonly BoundedDictionary<string, ConsentVersion> _versions = new BoundedDictionary<string, ConsentVersion>(1000);
 
         private TimeSpan _defaultConsentExpiry = TimeSpan.FromDays(365);
         private int _ageOfMajority = 16; // GDPR default

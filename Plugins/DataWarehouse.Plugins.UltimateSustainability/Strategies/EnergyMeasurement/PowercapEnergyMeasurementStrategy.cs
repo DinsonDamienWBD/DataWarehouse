@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts.Carbon;
 using CarbonEnergyMeasurement = DataWarehouse.SDK.Contracts.Carbon.EnergyMeasurement;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyMeasurement;
 
@@ -16,7 +16,7 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
     private const string PowercapBasePath = "/sys/class/powercap";
     private const long MaxEnergyUj = (long)uint.MaxValue;
 
-    private readonly ConcurrentDictionary<string, string> _zonePaths = new();
+    private readonly BoundedDictionary<string, string> _zonePaths = new BoundedDictionary<string, string>(1000);
     private string? _primaryZonePath;
 
     /// <inheritdoc/>

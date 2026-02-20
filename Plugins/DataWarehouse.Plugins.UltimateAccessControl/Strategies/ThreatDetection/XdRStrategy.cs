@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 {
@@ -13,9 +14,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
     /// </summary>
     public sealed class XdRStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ThreatInvestigation> _activeInvestigations = new();
+        private readonly BoundedDictionary<string, ThreatInvestigation> _activeInvestigations = new BoundedDictionary<string, ThreatInvestigation>(1000);
         private readonly ConcurrentQueue<CorrelatedThreatEvent> _eventTimeline = new();
-        private readonly ConcurrentDictionary<string, CrossDomainThreatProfile> _profiles = new();
+        private readonly BoundedDictionary<string, CrossDomainThreatProfile> _profiles = new BoundedDictionary<string, CrossDomainThreatProfile>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "xdr";

@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class SovereigntyClassificationStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ClassificationCache> _classificationCache = new();
+        private readonly BoundedDictionary<string, ClassificationCache> _classificationCache = new BoundedDictionary<string, ClassificationCache>(1000);
         private readonly Dictionary<string, Regex> _piiPatterns = new();
         private readonly Dictionary<string, List<string>> _jurisdictionRegulations = new();
 
@@ -182,7 +182,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
             return new ClassificationCacheStats
             {
-                TotalEntries = entries.Length,
+                TotalEntries = entries.Count(),
                 ValidEntries = entries.Count(e => e.Value.ExpiresAt > now),
                 ExpiredEntries = entries.Count(e => e.Value.ExpiresAt <= now)
             };
@@ -398,7 +398,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private List<ClassificationSignal> AnalyzePiiPatterns(string content)
         {
             var signals = new List<ClassificationSignal>();
-            var jurisdictionMatches = new ConcurrentDictionary<string, int>();
+            var jurisdictionMatches = new BoundedDictionary<string, int>(1000);
 
             foreach (var (patternName, regex) in _piiPatterns)
             {

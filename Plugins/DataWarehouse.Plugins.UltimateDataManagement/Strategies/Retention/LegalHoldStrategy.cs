@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,9 +16,9 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class LegalHoldStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LegalHold> _holds = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _objectHolds = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _custodianHolds = new();
+    private readonly BoundedDictionary<string, LegalHold> _holds = new BoundedDictionary<string, LegalHold>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _objectHolds = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _custodianHolds = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly List<HoldAuditEntry> _auditLog = new();
     private readonly object _auditLock = new();
 

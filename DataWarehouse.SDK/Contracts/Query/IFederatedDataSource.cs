@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Query;
 
@@ -251,7 +252,7 @@ public interface IFederatedDataSourceRegistry
 /// </summary>
 public sealed class InMemoryFederatedDataSourceRegistry : IFederatedDataSourceRegistry
 {
-    private readonly ConcurrentDictionary<string, IFederatedDataSource> _sources = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IFederatedDataSource> _sources = new BoundedDictionary<string, IFederatedDataSource>(1000);
 
     /// <inheritdoc />
     public void RegisterSource(IFederatedDataSource source)

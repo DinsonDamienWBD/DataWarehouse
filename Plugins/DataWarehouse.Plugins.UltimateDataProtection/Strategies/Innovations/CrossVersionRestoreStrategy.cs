@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 
@@ -29,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class CrossVersionRestoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SchemaSnapshot> _schemaSnapshots = new();
-        private readonly ConcurrentDictionary<string, MigrationPipeline> _migrationPipelines = new();
-        private readonly ConcurrentDictionary<string, MigrationState> _activeMigrations = new();
+        private readonly BoundedDictionary<string, SchemaSnapshot> _schemaSnapshots = new BoundedDictionary<string, SchemaSnapshot>(1000);
+        private readonly BoundedDictionary<string, MigrationPipeline> _migrationPipelines = new BoundedDictionary<string, MigrationPipeline>(1000);
+        private readonly BoundedDictionary<string, MigrationState> _activeMigrations = new BoundedDictionary<string, MigrationState>(1000);
 
         /// <summary>
         /// Built-in transformation types.

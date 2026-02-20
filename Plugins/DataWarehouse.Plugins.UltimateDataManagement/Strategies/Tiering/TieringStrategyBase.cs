@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Tiering;
 
@@ -329,9 +329,9 @@ public interface ITieringStrategy : IDataManagementStrategy
 /// </summary>
 public abstract class TieringStrategyBase : DataManagementStrategyBase, ITieringStrategy
 {
-    private readonly ConcurrentDictionary<string, TierRecommendation> _pendingRecommendations = new();
-    private readonly ConcurrentDictionary<StorageTier, long> _objectsPerTier = new();
-    private readonly ConcurrentDictionary<StorageTier, long> _bytesPerTier = new();
+    private readonly BoundedDictionary<string, TierRecommendation> _pendingRecommendations = new BoundedDictionary<string, TierRecommendation>(1000);
+    private readonly BoundedDictionary<StorageTier, long> _objectsPerTier = new BoundedDictionary<StorageTier, long>(1000);
+    private readonly BoundedDictionary<StorageTier, long> _bytesPerTier = new BoundedDictionary<StorageTier, long>(1000);
     private long _totalObjectsEvaluated;
     private long _totalObjectsMoved;
     private long _totalBytesMoved;
@@ -609,8 +609,8 @@ public interface IStorageTierHandler
 /// </summary>
 public sealed class InMemoryStorageTierHandler : IStorageTierHandler
 {
-    private readonly ConcurrentDictionary<string, DataObject> _objects = new();
-    private readonly ConcurrentDictionary<string, StorageTier> _tiers = new();
+    private readonly BoundedDictionary<string, DataObject> _objects = new BoundedDictionary<string, DataObject>(1000);
+    private readonly BoundedDictionary<string, StorageTier> _tiers = new BoundedDictionary<string, StorageTier>(1000);
 
     /// <summary>
     /// Registers an object with its initial tier.
@@ -652,6 +652,6 @@ public sealed class InMemoryStorageTierHandler : IStorageTierHandler
     public Task<DataObject?> GetObjectMetadataAsync(string objectId, CancellationToken ct = default)
     {
         _objects.TryGetValue(objectId, out var obj);
-        return Task.FromResult(obj);
+        return Task.FromResult<DataObject?>(obj);
     }
 }

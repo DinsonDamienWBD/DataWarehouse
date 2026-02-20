@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts.Consciousness
 {
@@ -79,7 +79,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     /// </summary>
     public abstract class ConsciousnessStrategyBase : IConsciousnessStrategy
     {
-        private readonly ConcurrentDictionary<string, long> _counters = new();
+        private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private bool _initialized;
         private bool _disposed;
         private DateTime? _healthCacheExpiry;
@@ -179,7 +179,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     /// </summary>
     public sealed class ConsciousnessStrategyRegistry
     {
-        private readonly ConcurrentDictionary<string, IConsciousnessStrategy> _strategies = new();
+        private readonly BoundedDictionary<string, IConsciousnessStrategy> _strategies = new BoundedDictionary<string, IConsciousnessStrategy>(1000);
 
         /// <summary>Gets the number of registered strategies.</summary>
         public int Count => _strategies.Count;

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwareness;
 
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwarenes
 /// </summary>
 public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ScheduledWorkload> _pendingWorkloads = new();
+    private readonly BoundedDictionary<string, ScheduledWorkload> _pendingWorkloads = new BoundedDictionary<string, ScheduledWorkload>(1000);
     private readonly ConcurrentQueue<CompletedWorkload> _completedWorkloads = new();
     private Timer? _schedulerTimer;
     private Func<Task<double>>? _carbonIntensityProvider;

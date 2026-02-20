@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -26,9 +27,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class AttestationStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, NodeAttestation> _attestations = new();
-        private readonly ConcurrentDictionary<string, AttestationPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, TrustAnchor> _trustAnchors = new();
+        private readonly BoundedDictionary<string, NodeAttestation> _attestations = new BoundedDictionary<string, NodeAttestation>(1000);
+        private readonly BoundedDictionary<string, AttestationPolicy> _policies = new BoundedDictionary<string, AttestationPolicy>(1000);
+        private readonly BoundedDictionary<string, TrustAnchor> _trustAnchors = new BoundedDictionary<string, TrustAnchor>(1000);
         private readonly ConcurrentBag<AttestationEvent> _events = new();
 
         private TimeSpan _attestationValidityPeriod = TimeSpan.FromHours(24);

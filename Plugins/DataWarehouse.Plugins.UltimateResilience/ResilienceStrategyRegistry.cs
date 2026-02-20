@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience;
 
@@ -42,7 +42,7 @@ public interface IResilienceStrategyRegistry
 /// </summary>
 public sealed class ResilienceStrategyRegistry : IResilienceStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IResilienceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IResilienceStrategy> _strategies = new BoundedDictionary<string, IResilienceStrategy>(1000);
 
     /// <inheritdoc/>
     public IResilienceStrategy? GetStrategy(string strategyId)

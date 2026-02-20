@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -18,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     public sealed class AuditTrailGenerationStrategy : ComplianceStrategyBase
     {
         private readonly ConcurrentQueue<AuditEntry> _auditQueue = new();
-        private readonly ConcurrentDictionary<string, AuditChain> _auditChains = new();
+        private readonly BoundedDictionary<string, AuditChain> _auditChains = new BoundedDictionary<string, AuditChain>(1000);
         private string? _previousHash;
         private long _sequenceNumber;
         private Timer? _flushTimer;

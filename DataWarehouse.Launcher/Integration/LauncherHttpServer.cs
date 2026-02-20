@@ -1,12 +1,12 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using DataWarehouse.Shared;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Launcher.Integration;
 
@@ -28,7 +28,7 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     private DynamicEndpointGenerator? _endpointGenerator;
 
     // Rate limiting: max 100 requests per minute per IP
-    private static readonly ConcurrentDictionary<string, (int Count, DateTime Window)> _rateLimits = new();
+    private static readonly BoundedDictionary<string, (int Count, DateTime Window)> _rateLimits = new BoundedDictionary<string, (int Count, DateTime Window)>(1000);
     private const int MaxRequestsPerMinute = 100;
 
     // Trusted proxy IPs for X-Forwarded-For handling (loopback by default)

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Indexing;
 
@@ -22,7 +22,7 @@ public sealed class TemporalIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Document storage by object ID.
     /// </summary>
-    private readonly ConcurrentDictionary<string, TemporalDocument> _documents = new();
+    private readonly BoundedDictionary<string, TemporalDocument> _documents = new BoundedDictionary<string, TemporalDocument>(1000);
 
     /// <summary>
     /// B-tree index: timestamp ticks -> list of object IDs at that timestamp.
@@ -37,7 +37,7 @@ public sealed class TemporalIndexStrategy : IndexingStrategyBase
     /// <summary>
     /// Downsampled data caches for different granularities.
     /// </summary>
-    private readonly ConcurrentDictionary<TimeBucket, ConcurrentDictionary<long, AggregatedBucket>> _downsampledCache = new();
+    private readonly BoundedDictionary<TimeBucket, BoundedDictionary<long, AggregatedBucket>> _downsampledCache = new BoundedDictionary<TimeBucket, BoundedDictionary<long, AggregatedBucket>>(1000);
 
     /// <summary>
     /// Current retention policy.
@@ -248,7 +248,7 @@ public sealed class TemporalIndexStrategy : IndexingStrategyBase
         // Initialize downsampled caches
         foreach (TimeBucket bucket in Enum.GetValues<TimeBucket>())
         {
-            _downsampledCache[bucket] = new ConcurrentDictionary<long, AggregatedBucket>();
+            _downsampledCache[bucket] = new BoundedDictionary<long, AggregatedBucket>(1000);
         }
 
         // Setup automatic cleanup if enabled

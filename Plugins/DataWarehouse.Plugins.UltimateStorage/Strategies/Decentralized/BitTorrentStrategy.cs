@@ -4,7 +4,6 @@ using MonoTorrent.BEncoding;
 using MonoTorrent.Client;
 using MonoTorrent.Dht;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 {
@@ -52,9 +52,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _autoStartSeeding = true;
         private bool _keepSeeding = true;
         private int _pieceLength = 256 * 1024; // 256 KB default piece size
-        private readonly ConcurrentDictionary<string, TorrentManager> _torrents = new();
-        private readonly ConcurrentDictionary<string, InfoHash> _keyToInfoHashMap = new();
-        private readonly ConcurrentDictionary<InfoHash, string> _infoHashToKeyMap = new();
+        private readonly BoundedDictionary<string, TorrentManager> _torrents = new BoundedDictionary<string, TorrentManager>(1000);
+        private readonly BoundedDictionary<string, InfoHash> _keyToInfoHashMap = new BoundedDictionary<string, InfoHash>(1000);
+        private readonly BoundedDictionary<InfoHash, string> _infoHashToKeyMap = new BoundedDictionary<InfoHash, string>(1000);
         private readonly SemaphoreSlim _engineLock = new(1, 1);
 
         public override string StrategyId => "bittorrent";

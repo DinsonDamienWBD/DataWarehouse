@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -32,8 +31,8 @@ namespace DataWarehouse.Plugins.UniversalDashboards;
 /// </summary>
 public sealed class UniversalDashboardsPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, DashboardStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, DashboardStrategyBase> _strategies = new BoundedDictionary<string, DashboardStrategyBase>(1000);
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
 

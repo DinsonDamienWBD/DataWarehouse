@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.ETL;
 
@@ -12,8 +13,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.ETL;
 /// </summary>
 public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EtlJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, JobExecution> _executions = new();
+    private readonly BoundedDictionary<string, EtlJob> _jobs = new BoundedDictionary<string, EtlJob>(1000);
+    private readonly BoundedDictionary<string, JobExecution> _executions = new BoundedDictionary<string, JobExecution>(1000);
     private long _totalRecordsProcessed;
 
     public override string StrategyId => "etl-classic";
@@ -222,7 +223,7 @@ public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class StreamingEtlPipelineStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StreamingEtlJob> _jobs = new();
+    private readonly BoundedDictionary<string, StreamingEtlJob> _jobs = new BoundedDictionary<string, StreamingEtlJob>(1000);
     private long _totalEventsProcessed;
 
     public override string StrategyId => "etl-streaming";
@@ -348,7 +349,7 @@ public sealed class StreamingEtlPipelineStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class MicroBatchEtlPipelineStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MicroBatchJob> _jobs = new();
+    private readonly BoundedDictionary<string, MicroBatchJob> _jobs = new BoundedDictionary<string, MicroBatchJob>(1000);
     private long _totalBatchesProcessed;
 
     public override string StrategyId => "etl-microbatch";
@@ -461,7 +462,7 @@ public sealed class MicroBatchEtlPipelineStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class ParallelEtlPipelineStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ParallelEtlJob> _jobs = new();
+    private readonly BoundedDictionary<string, ParallelEtlJob> _jobs = new BoundedDictionary<string, ParallelEtlJob>(1000);
 
     public override string StrategyId => "etl-parallel";
     public override string DisplayName => "Parallel ETL Pipeline";
@@ -571,8 +572,8 @@ public sealed class ParallelEtlPipelineStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class IncrementalEtlPipelineStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, IncrementalEtlJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, WatermarkState> _watermarks = new();
+    private readonly BoundedDictionary<string, IncrementalEtlJob> _jobs = new BoundedDictionary<string, IncrementalEtlJob>(1000);
+    private readonly BoundedDictionary<string, WatermarkState> _watermarks = new BoundedDictionary<string, WatermarkState>(1000);
 
     public override string StrategyId => "etl-incremental";
     public override string DisplayName => "Incremental ETL Pipeline";

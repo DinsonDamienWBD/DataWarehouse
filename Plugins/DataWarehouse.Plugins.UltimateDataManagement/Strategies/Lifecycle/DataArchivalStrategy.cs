@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -328,9 +328,9 @@ public enum RetrievalStatus
 /// </summary>
 public sealed class DataArchivalStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ArchiveMetadata> _archives = new();
-    private readonly ConcurrentDictionary<string, ArchiveRetrievalStatus> _retrievals = new();
-    private readonly ConcurrentDictionary<ArchiveTier, long> _bytesPerTier = new();
+    private readonly BoundedDictionary<string, ArchiveMetadata> _archives = new BoundedDictionary<string, ArchiveMetadata>(1000);
+    private readonly BoundedDictionary<string, ArchiveRetrievalStatus> _retrievals = new BoundedDictionary<string, ArchiveRetrievalStatus>(1000);
+    private readonly BoundedDictionary<ArchiveTier, long> _bytesPerTier = new BoundedDictionary<ArchiveTier, long>(1000);
     private readonly SemaphoreSlim _archiveLock = new(4, 4); // Max 4 concurrent archives
     private long _totalArchived;
     private long _totalBytesArchived;

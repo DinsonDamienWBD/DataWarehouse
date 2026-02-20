@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.IntelligentGovernance;
 
@@ -34,8 +34,8 @@ public sealed class PolicyRecommendationStrategy : DataGovernanceStrategyBase
         "AI-powered policy recommendation engine that analyzes data characteristics, sensitivity classifications, and compliance requirements to automatically recommend appropriate governance policies.";
     public override string[] Tags => ["ai", "recommendation", "policy", "automated-governance", "industry-first"];
 
-    private readonly ConcurrentDictionary<string, DataProfile> _dataProfiles = new();
-    private readonly ConcurrentDictionary<string, PolicyTemplate> _policyTemplates = new();
+    private readonly BoundedDictionary<string, DataProfile> _dataProfiles = new BoundedDictionary<string, DataProfile>(1000);
+    private readonly BoundedDictionary<string, PolicyTemplate> _policyTemplates = new BoundedDictionary<string, PolicyTemplate>(1000);
 
     /// <summary>
     /// Data profile describing a data asset's characteristics for policy matching.
@@ -277,8 +277,8 @@ public sealed class ComplianceGapDetectorStrategy : DataGovernanceStrategyBase
         "Automatically identifies compliance gaps by comparing actual data handling practices against registered regulatory framework requirements, highlighting areas needing remediation.";
     public override string[] Tags => ["compliance-gap", "regulatory", "remediation", "audit", "industry-first"];
 
-    private readonly ConcurrentDictionary<string, FrameworkRequirements> _frameworks = new();
-    private readonly ConcurrentDictionary<string, DataHandlingPractice> _practices = new();
+    private readonly BoundedDictionary<string, FrameworkRequirements> _frameworks = new BoundedDictionary<string, FrameworkRequirements>(1000);
+    private readonly BoundedDictionary<string, DataHandlingPractice> _practices = new BoundedDictionary<string, DataHandlingPractice>(1000);
 
     /// <summary>
     /// A single compliance requirement within a regulatory framework.
@@ -295,7 +295,7 @@ public sealed class ComplianceGapDetectorStrategy : DataGovernanceStrategyBase
     public sealed record FrameworkRequirements(
         string FrameworkId,
         string Name,
-        ConcurrentDictionary<string, Requirement> Requirements);
+        BoundedDictionary<string, Requirement> Requirements);
 
     /// <summary>
     /// The set of controls implemented for a specific data asset.
@@ -376,7 +376,7 @@ public sealed class ComplianceGapDetectorStrategy : DataGovernanceStrategyBase
         _frameworks[frameworkId] = new FrameworkRequirements(
             frameworkId,
             name,
-            new ConcurrentDictionary<string, Requirement>(requirements));
+            new BoundedDictionary<string, Requirement>(1000));
     }
 
     /// <summary>
@@ -491,7 +491,7 @@ public sealed class SensitivityClassifierStrategy : DataGovernanceStrategyBase
         "Automatically classifies data sensitivity levels using regex pattern detection for PII, PHI, PCI, and confidential data, with configurable classification rules and confidence scoring.";
     public override string[] Tags => ["sensitivity", "classification", "pii-detection", "auto-classify", "industry-first"];
 
-    private readonly ConcurrentDictionary<string, List<ClassificationRule>> _rules = new();
+    private readonly BoundedDictionary<string, List<ClassificationRule>> _rules = new BoundedDictionary<string, List<ClassificationRule>>(1000);
 
     /// <summary>
     /// Classification rule with a compiled regex pattern for detecting sensitive data.
@@ -741,8 +741,8 @@ public sealed class RetentionOptimizerStrategy : DataGovernanceStrategyBase
         "Optimizes data retention periods based on value scoring (access frequency, business criticality), regulatory minimums, and storage cost analysis to recommend when data should be archived or deleted.";
     public override string[] Tags => ["retention", "optimization", "cost-analysis", "lifecycle", "industry-first"];
 
-    private readonly ConcurrentDictionary<string, DataRetentionProfile> _profiles = new();
-    private readonly ConcurrentDictionary<string, RegulatoryMinimum> _regulatoryMinimums = new();
+    private readonly BoundedDictionary<string, DataRetentionProfile> _profiles = new BoundedDictionary<string, DataRetentionProfile>(1000);
+    private readonly BoundedDictionary<string, RegulatoryMinimum> _regulatoryMinimums = new BoundedDictionary<string, RegulatoryMinimum>(1000);
 
     /// <summary>
     /// Profile describing a data asset's retention-relevant characteristics.

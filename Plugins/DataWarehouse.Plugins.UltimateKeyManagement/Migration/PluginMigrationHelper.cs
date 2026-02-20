@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
 {
@@ -25,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
     public sealed class PluginMigrationHelper : IDisposable
     {
         private readonly MigrationHelperConfig _config;
-        private readonly ConcurrentDictionary<string, PluginReferenceInfo> _detectedReferences = new();
+        private readonly BoundedDictionary<string, PluginReferenceInfo> _detectedReferences = new BoundedDictionary<string, PluginReferenceInfo>(1000);
         private readonly ConcurrentBag<MigrationSuggestion> _suggestions = new();
         private readonly List<MigrationAction> _completedActions = new();
         private bool _disposed;
@@ -505,7 +506,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
     {
         private readonly UltimateKeyManagementPlugin _ultimatePlugin;
         private readonly MigrationHelperConfig _config;
-        private readonly ConcurrentDictionary<string, string> _legacyIdMappings = new();
+        private readonly BoundedDictionary<string, string> _legacyIdMappings = new BoundedDictionary<string, string>(1000);
 
         internal CompatibilityShim(UltimateKeyManagementPlugin ultimatePlugin, MigrationHelperConfig config)
         {

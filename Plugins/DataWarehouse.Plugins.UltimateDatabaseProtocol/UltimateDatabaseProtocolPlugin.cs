@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -39,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol;
 public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
     private readonly DatabaseProtocolStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
     private bool _initialized;

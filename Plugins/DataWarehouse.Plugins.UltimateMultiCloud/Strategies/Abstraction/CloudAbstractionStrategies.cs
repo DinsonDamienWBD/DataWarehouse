@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Google.Cloud.Storage.V1;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Abstraction;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Abstraction;
 /// </summary>
 public sealed class UnifiedCloudApiStrategy : MultiCloudStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CloudProviderAdapter> _adapters = new();
+    private readonly BoundedDictionary<string, CloudProviderAdapter> _adapters = new BoundedDictionary<string, CloudProviderAdapter>(1000);
 
     public override string StrategyId => "abstraction-unified-api";
     public override string StrategyName => "Unified Cloud API";

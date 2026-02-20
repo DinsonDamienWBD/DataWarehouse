@@ -5,7 +5,6 @@ using PlanNode = DataWarehouse.SDK.Contracts.QueryPlanNode;
 using QueryPlanNode = DataWarehouse.SDK.Contracts.QueryPlanNode;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -55,14 +54,14 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
     };
 
     // Virtual table registry with schema caching
-    internal readonly ConcurrentDictionary<string, VirtualTableSchema> _tableRegistry = new(StringComparer.OrdinalIgnoreCase);
-    internal readonly ConcurrentDictionary<string, CachedTableData> _tableDataCache = new(StringComparer.OrdinalIgnoreCase);
+    internal readonly BoundedDictionary<string, VirtualTableSchema> _tableRegistry = new BoundedDictionary<string, VirtualTableSchema>(1000);
+    internal readonly BoundedDictionary<string, CachedTableData> _tableDataCache = new BoundedDictionary<string, CachedTableData>(1000);
 
     // Query plan and result cache (LRU-style with capacity limit)
     private readonly QueryCache _queryCache = new(maxEntries: 1000);
 
     // Partition metadata for pruning
-    private readonly ConcurrentDictionary<string, PartitionMetadata> _partitionMetadata = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, PartitionMetadata> _partitionMetadata = new BoundedDictionary<string, PartitionMetadata>(1000);
 
     // File read callback for reading data from storage
     internal Func<string, CancellationToken, Task<Stream?>>? _fileReader;
@@ -496,7 +495,7 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
     public override Task<VirtualTableSchema?> GetTableSchemaAsync(string tableName, CancellationToken ct = default)
     {
         _tableRegistry.TryGetValue(tableName, out var schema);
-        return Task.FromResult(schema);
+        return Task.FromResult<VirtualTableSchema?>(schema);
     }
 
     /// <inheritdoc />
@@ -2653,7 +2652,7 @@ internal enum PredicateOperator
 internal class QueryCache
 {
     private readonly int _maxEntries;
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly object _cleanupLock = new();
 
     public QueryCache(int maxEntries = 1000)

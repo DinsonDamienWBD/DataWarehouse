@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 
@@ -25,10 +26,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 /// </summary>
 internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, PulsarTopicState> _topics = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, List<StreamMessage>>> _partitionData = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, PulsarSubscriptionState>> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, long> _deduplicationIds = new();
+    private readonly BoundedDictionary<string, PulsarTopicState> _topics = new BoundedDictionary<string, PulsarTopicState>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>> _partitionData = new BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>>(1000);
+    private readonly BoundedDictionary<string, BoundedDictionary<string, PulsarSubscriptionState>> _subscriptions = new BoundedDictionary<string, BoundedDictionary<string, PulsarSubscriptionState>>(1000);
+    private readonly BoundedDictionary<string, long> _deduplicationIds = new BoundedDictionary<string, long>(1000);
     private long _nextMessageId;
     private long _totalPublished;
 
@@ -141,7 +142,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
             }
         }
 
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
         var partitionMessages = topicPartitions.GetOrAdd(partition, _ => new List<StreamMessage>());
 
         long offset;
@@ -185,7 +186,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
             throw new StreamingException($"Topic '{streamName}' does not exist.");
 
         var subscriptionName = consumerGroup?.GroupId ?? $"sub-{Guid.NewGuid():N}";
-        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, PulsarSubscriptionState>());
+        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new BoundedDictionary<string, PulsarSubscriptionState>(1000));
         var subState = topicSubs.GetOrAdd(subscriptionName, _ => new PulsarSubscriptionState
         {
             SubscriptionName = subscriptionName,
@@ -193,7 +194,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
             CurrentOffset = options?.StartOffset?.Offset ?? 0
         });
 
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
 
         // Deliver messages based on subscription mode
         for (int p = 0; p < Math.Max(1, topic.PartitionCount) && !ct.IsCancellationRequested; p++)
@@ -242,10 +243,10 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
         if (!_topics.TryAdd(streamName, topic))
             throw new StreamingException($"Topic '{streamName}' already exists.");
 
-        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new ConcurrentDictionary<int, List<StreamMessage>>());
+        var topicPartitions = _partitionData.GetOrAdd(streamName, _ => new BoundedDictionary<int, List<StreamMessage>>(1000));
         for (int i = 0; i < topic.PartitionCount; i++)
         {
-            topicPartitions.TryAdd(i, new List<StreamMessage>());
+            topicPartitions.TryAdd(i, new List<StreamMessage>(1000));
         }
 
         return Task.CompletedTask;
@@ -328,7 +329,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, PulsarSubscriptionState>());
+        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new BoundedDictionary<string, PulsarSubscriptionState>(1000));
         var subState = topicSubs.GetOrAdd(consumerGroup.GroupId, _ => new PulsarSubscriptionState
         {
             SubscriptionName = consumerGroup.GroupId,
@@ -351,7 +352,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
         ArgumentException.ThrowIfNullOrWhiteSpace(streamName);
         ArgumentNullException.ThrowIfNull(consumerGroup);
 
-        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new ConcurrentDictionary<string, PulsarSubscriptionState>());
+        var topicSubs = _subscriptions.GetOrAdd(streamName, _ => new BoundedDictionary<string, PulsarSubscriptionState>(1000));
         long offset = 0;
         if (topicSubs.TryGetValue(consumerGroup.GroupId, out var subState))
             offset = subState.CurrentOffset;

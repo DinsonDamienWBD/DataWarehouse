@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
 using PublishResult = DataWarehouse.SDK.Contracts.Streaming.PublishResult;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 
@@ -27,11 +28,11 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.MessageQueue;
 /// </summary>
 internal sealed class RabbitMqStreamStrategy : StreamingDataStrategyBase, IStreamingStrategy
 {
-    private readonly ConcurrentDictionary<string, RabbitExchangeState> _exchanges = new();
-    private readonly ConcurrentDictionary<string, RabbitQueueState> _queues = new();
-    private readonly ConcurrentDictionary<string, List<QueueBinding>> _bindings = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<StreamMessage>> _queueMessages = new();
-    private readonly ConcurrentDictionary<string, long> _consumerOffsets = new();
+    private readonly BoundedDictionary<string, RabbitExchangeState> _exchanges = new BoundedDictionary<string, RabbitExchangeState>(1000);
+    private readonly BoundedDictionary<string, RabbitQueueState> _queues = new BoundedDictionary<string, RabbitQueueState>(1000);
+    private readonly BoundedDictionary<string, List<QueueBinding>> _bindings = new BoundedDictionary<string, List<QueueBinding>>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<StreamMessage>> _queueMessages = new BoundedDictionary<string, ConcurrentQueue<StreamMessage>>(1000);
+    private readonly BoundedDictionary<string, long> _consumerOffsets = new BoundedDictionary<string, long>(1000);
     private long _totalPublished;
     private long _nextDeliveryTag;
 

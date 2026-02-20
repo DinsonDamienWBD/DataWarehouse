@@ -1,19 +1,19 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
 {
     /// <summary>Exabyte-scale sharding strategy for distributing petabytes of data across thousands of nodes using consistent hashing.</summary>
     public class ExascaleShardingStrategy : UltimateStorageStrategyBase
     {
-        private readonly ConcurrentDictionary<string, byte[]> _store = new();
+        private readonly BoundedDictionary<string, byte[]> _store = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "exascale-sharding";
         public override string Name => "Exascale Sharding Strategy";

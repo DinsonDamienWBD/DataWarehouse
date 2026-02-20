@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 /// </remarks>
 public sealed class BiTemporalVersioningStrategy : VersioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, BiTemporalObjectStore> _stores = new();
+    private readonly BoundedDictionary<string, BiTemporalObjectStore> _stores = new BoundedDictionary<string, BiTemporalObjectStore>(1000);
     private TimeSpan _defaultValidTimeDuration = TimeSpan.FromDays(36500); // ~100 years
 
     /// <summary>

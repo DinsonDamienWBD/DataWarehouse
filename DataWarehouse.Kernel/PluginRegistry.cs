@@ -1,6 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel
 {
@@ -16,8 +16,8 @@ namespace DataWarehouse.Kernel
     /// </summary>
     public sealed class PluginRegistry : IPluginRegistry
     {
-        private readonly ConcurrentDictionary<string, IPlugin> _plugins = new();
-        private readonly ConcurrentDictionary<PluginCategory, List<IPlugin>> _byCategory = new();
+        private readonly BoundedDictionary<string, IPlugin> _plugins = new BoundedDictionary<string, IPlugin>(1000);
+        private readonly BoundedDictionary<PluginCategory, List<IPlugin>> _byCategory = new BoundedDictionary<PluginCategory, List<IPlugin>>(1000);
         private readonly object _categoryLock = new();
         private OperatingMode _operatingMode = OperatingMode.Workstation;
 

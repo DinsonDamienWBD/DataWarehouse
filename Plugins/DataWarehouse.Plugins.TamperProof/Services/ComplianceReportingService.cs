@@ -3,10 +3,10 @@
 
 using DataWarehouse.SDK.Contracts.TamperProof;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
 
@@ -77,10 +77,10 @@ public class ComplianceReportingService : IComplianceReportingService
     private readonly ILogger<ComplianceReportingService> _logger;
 
     // In-memory storage for violations and attestations (production would use persistent storage)
-    private readonly ConcurrentDictionary<Guid, ComplianceViolation> _violations = new();
-    private readonly ConcurrentDictionary<string, AttestationRecord> _attestations = new();
-    private readonly ConcurrentDictionary<Guid, BlockTrackingInfo> _trackedBlocks = new();
-    private readonly ConcurrentDictionary<string, LegalHoldInfo> _legalHolds = new();
+    private readonly BoundedDictionary<Guid, ComplianceViolation> _violations = new BoundedDictionary<Guid, ComplianceViolation>(1000);
+    private readonly BoundedDictionary<string, AttestationRecord> _attestations = new BoundedDictionary<string, AttestationRecord>(1000);
+    private readonly BoundedDictionary<Guid, BlockTrackingInfo> _trackedBlocks = new BoundedDictionary<Guid, BlockTrackingInfo>(1000);
+    private readonly BoundedDictionary<string, LegalHoldInfo> _legalHolds = new BoundedDictionary<string, LegalHoldInfo>(1000);
 
     /// <summary>
     /// Creates a new compliance reporting service instance.

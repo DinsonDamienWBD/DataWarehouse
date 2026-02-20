@@ -7,7 +7,6 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
@@ -50,7 +49,7 @@ namespace DataWarehouse.Plugins.WinFspDriver;
 public sealed class WinFspDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private readonly WinFspConfig _config;
-    private readonly ConcurrentDictionary<string, WinFspMountedInstance> _mountedInstances;
+    private readonly BoundedDictionary<string, WinFspMountedInstance> _mountedInstances;
     private readonly SemaphoreSlim _mountLock;
     private readonly BitLockerIntegration? _bitLockerIntegration;
     private IStorageProvider? _storageProvider;
@@ -105,7 +104,7 @@ public sealed class WinFspDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.I
     public WinFspDriverPlugin(WinFspConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _mountedInstances = new ConcurrentDictionary<string, WinFspMountedInstance>(StringComparer.OrdinalIgnoreCase);
+        _mountedInstances = new BoundedDictionary<string, WinFspMountedInstance>(1000);
         _mountLock = new SemaphoreSlim(1, 1);
 
         // Initialize BitLocker integration if running on Windows

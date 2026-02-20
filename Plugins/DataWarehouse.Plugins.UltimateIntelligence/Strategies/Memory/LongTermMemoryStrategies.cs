@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -446,10 +446,10 @@ public abstract class LongTermMemoryStrategyBase : IntelligenceStrategyBase
 /// </summary>
 public sealed class MemGptStrategy : LongTermMemoryStrategyBase, ITierAwareMemoryStrategy
 {
-    private readonly ConcurrentDictionary<string, MemoryEntry> _workingMemory = new();
-    private readonly ConcurrentDictionary<string, MemoryEntry> _shortTermMemory = new();
-    private readonly ConcurrentDictionary<string, MemoryEntry> _longTermMemory = new();
-    private readonly ConcurrentDictionary<string, MemoryTier> _memoryTiers = new();
+    private readonly BoundedDictionary<string, MemoryEntry> _workingMemory = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, MemoryEntry> _shortTermMemory = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, MemoryEntry> _longTermMemory = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, MemoryTier> _memoryTiers = new BoundedDictionary<string, MemoryTier>(1000);
     private DateTime _lastConsolidation = DateTime.UtcNow;
 
     private const int MaxWorkingMemory = 100;
@@ -795,9 +795,9 @@ public sealed class MemGptStrategy : LongTermMemoryStrategyBase, ITierAwareMemor
 /// </summary>
 public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwareMemoryStrategy
 {
-    private readonly ConcurrentDictionary<string, MemoryEntry> _episodes = new();
-    private readonly ConcurrentDictionary<string, List<string>> _episodeBoundaries = new();
-    private readonly ConcurrentDictionary<string, MemoryTier> _memoryTiers = new();
+    private readonly BoundedDictionary<string, MemoryEntry> _episodes = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, List<string>> _episodeBoundaries = new BoundedDictionary<string, List<string>>(1000);
+    private readonly BoundedDictionary<string, MemoryTier> _memoryTiers = new BoundedDictionary<string, MemoryTier>(1000);
     private DateTime _lastConsolidation = DateTime.UtcNow;
 
     /// <inheritdoc/>
@@ -1048,9 +1048,9 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
 /// </summary>
 public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAwareMemoryStrategy
 {
-    private readonly ConcurrentDictionary<string, MemoryEntry> _cache = new();
-    private readonly ConcurrentDictionary<string, MemoryEntry> _longTermStorage = new();
-    private readonly ConcurrentDictionary<string, MemoryTier> _memoryTiers = new();
+    private readonly BoundedDictionary<string, MemoryEntry> _cache = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, MemoryEntry> _longTermStorage = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, MemoryTier> _memoryTiers = new BoundedDictionary<string, MemoryTier>(1000);
     private DateTime _lastConsolidation = DateTime.UtcNow;
 
     /// <inheritdoc/>
@@ -1295,8 +1295,8 @@ public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAware
 /// </summary>
 public sealed class PgVectorMemoryStrategy : LongTermMemoryStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MemoryEntry> _memories = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _entityRelationships = new();
+    private readonly BoundedDictionary<string, MemoryEntry> _memories = new BoundedDictionary<string, MemoryEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _entityRelationships = new BoundedDictionary<string, HashSet<string>>(1000);
     private DateTime _lastConsolidation = DateTime.UtcNow;
 
     /// <inheritdoc/>
@@ -1557,7 +1557,7 @@ public sealed class HybridMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
     private readonly RedisMemoryStrategy _workingMemory;
     private readonly ChromaMemoryStrategy _episodicMemory;
     private readonly PgVectorMemoryStrategy _semanticMemory;
-    private readonly ConcurrentDictionary<string, MemoryTier> _memoryTiers = new();
+    private readonly BoundedDictionary<string, MemoryTier> _memoryTiers = new BoundedDictionary<string, MemoryTier>(1000);
     private DateTime _lastConsolidation = DateTime.UtcNow;
 
     /// <inheritdoc/>

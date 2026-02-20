@@ -1,7 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -12,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 {
@@ -60,8 +60,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
         private readonly SemaphoreSlim _ioLock = new(10, 10);
         private readonly SemaphoreSlim _mmapLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, MemoryMappedFile> _memoryMaps = new();
-        private readonly ConcurrentDictionary<string, ScmMetrics> _metricsCache = new();
+        private readonly BoundedDictionary<string, MemoryMappedFile> _memoryMaps = new BoundedDictionary<string, MemoryMappedFile>(1000);
+        private readonly BoundedDictionary<string, ScmMetrics> _metricsCache = new BoundedDictionary<string, ScmMetrics>(1000);
         private readonly Queue<string> _pendingFlushes = new();
         private readonly object _flushLock = new();
 
@@ -88,11 +88,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private WearLevelingInfo? _cachedWearInfo;
 
         // CXL memory pooling
-        private readonly ConcurrentDictionary<int, CxlMemoryPool> _cxlPools = new();
+        private readonly BoundedDictionary<int, CxlMemoryPool> _cxlPools = new BoundedDictionary<int, CxlMemoryPool>(1000);
         private int _currentNumaNode = 0;
 
         // NUMA topology (simplified)
-        private readonly ConcurrentDictionary<int, NumaNode> _numaTopology = new();
+        private readonly BoundedDictionary<int, NumaNode> _numaTopology = new BoundedDictionary<int, NumaNode>(1000);
 
         public override string StrategyId => "scm";
         public override string Name => "Storage Class Memory (SCM)";

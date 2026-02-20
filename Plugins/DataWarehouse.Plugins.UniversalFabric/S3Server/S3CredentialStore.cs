@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Storage.Fabric;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalFabric.S3Server;
 
@@ -27,7 +28,7 @@ namespace DataWarehouse.Plugins.UniversalFabric.S3Server;
 /// </remarks>
 public sealed class S3CredentialStore
 {
-    private readonly ConcurrentDictionary<string, S3Credentials> _credentials = new(StringComparer.Ordinal);
+    private readonly BoundedDictionary<string, S3Credentials> _credentials = new BoundedDictionary<string, S3Credentials>(1000);
     private readonly string _storagePath;
     private readonly object _persistLock = new();
 

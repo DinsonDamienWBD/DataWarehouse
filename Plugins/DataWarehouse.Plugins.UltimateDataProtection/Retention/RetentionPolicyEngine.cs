@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.Plugins.UltimateDataProtection.Catalog;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
 {
@@ -8,7 +8,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
     /// </summary>
     public sealed class RetentionPolicyEngine
     {
-        private readonly ConcurrentDictionary<string, RetentionPolicy> _policies = new();
+        private readonly BoundedDictionary<string, RetentionPolicy> _policies = new BoundedDictionary<string, RetentionPolicy>(1000);
         private readonly BackupCatalog _catalog;
         private readonly DataProtectionStrategyRegistry _registry;
 

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Cloud;
 
@@ -234,12 +235,12 @@ public sealed record PubSubSnapshot
 /// </summary>
 internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PubSubTopic> _topics = new();
-    private readonly ConcurrentDictionary<string, PubSubSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<PubSubMessage>> _subscriptionQueues = new();
-    private readonly ConcurrentDictionary<string, PubSubMessage> _pendingAcks = new();
-    private readonly ConcurrentDictionary<string, PubSubSnapshot> _snapshots = new();
-    private readonly ConcurrentDictionary<string, int> _deliveryAttempts = new();
+    private readonly BoundedDictionary<string, PubSubTopic> _topics = new BoundedDictionary<string, PubSubTopic>(1000);
+    private readonly BoundedDictionary<string, PubSubSubscription> _subscriptions = new BoundedDictionary<string, PubSubSubscription>(1000);
+    private readonly BoundedDictionary<string, ConcurrentQueue<PubSubMessage>> _subscriptionQueues = new BoundedDictionary<string, ConcurrentQueue<PubSubMessage>>(1000);
+    private readonly BoundedDictionary<string, PubSubMessage> _pendingAcks = new BoundedDictionary<string, PubSubMessage>(1000);
+    private readonly BoundedDictionary<string, PubSubSnapshot> _snapshots = new BoundedDictionary<string, PubSubSnapshot>(1000);
+    private readonly BoundedDictionary<string, int> _deliveryAttempts = new BoundedDictionary<string, int>(1000);
     private long _messageIdCounter;
     private long _totalPublished;
     private long _totalDelivered;

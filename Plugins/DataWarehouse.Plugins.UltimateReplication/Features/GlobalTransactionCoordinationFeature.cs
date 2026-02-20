@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -33,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, TransactionState> _activeTransactions = new();
-        private readonly ConcurrentDictionary<string, TransactionLog> _transactionLog = new();
+        private readonly BoundedDictionary<string, TransactionState> _activeTransactions = new BoundedDictionary<string, TransactionState>(1000);
+        private readonly BoundedDictionary<string, TransactionLog> _transactionLog = new BoundedDictionary<string, TransactionLog>(1000);
         private readonly TimeSpan _prepareTimeout;
         private readonly TimeSpan _commitTimeout;
         private bool _disposed;
@@ -112,7 +111,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 Data = data,
                 Metadata = metadata ?? new Dictionary<string, string>(),
                 CreatedAt = DateTimeOffset.UtcNow,
-                Votes = new ConcurrentDictionary<string, ParticipantVote>()
+                Votes = new BoundedDictionary<string, ParticipantVote>(1000)
             };
 
             _activeTransactions[transactionId] = state;
@@ -184,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 Data = data,
                 Metadata = metadata ?? new Dictionary<string, string>(),
                 CreatedAt = DateTimeOffset.UtcNow,
-                Votes = new ConcurrentDictionary<string, ParticipantVote>()
+                Votes = new BoundedDictionary<string, ParticipantVote>(1000)
             };
 
             _activeTransactions[transactionId] = state;
@@ -539,7 +538,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         /// <summary>Transaction metadata.</summary>
         public required IReadOnlyDictionary<string, string> Metadata { get; init; }
         /// <summary>Participant votes.</summary>
-        public required ConcurrentDictionary<string, ParticipantVote> Votes { get; init; }
+        public required BoundedDictionary<string, ParticipantVote> Votes { get; init; }
         /// <summary>When transaction was created.</summary>
         public DateTimeOffset CreatedAt { get; init; }
     }

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 
@@ -33,8 +34,8 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 /// </remarks>
 internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, SocketIoConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, SocketIoNamespace> _namespaces = new();
+    private readonly BoundedDictionary<string, SocketIoConnection> _connections = new BoundedDictionary<string, SocketIoConnection>(1000);
+    private readonly BoundedDictionary<string, SocketIoNamespace> _namespaces = new BoundedDictionary<string, SocketIoNamespace>(1000);
 
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "socket-io";
@@ -377,7 +378,7 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
     private sealed class SocketIoNamespace
     {
         public string Name { get; }
-        private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _rooms = new();
+        private readonly BoundedDictionary<string, ConcurrentBag<string>> _rooms = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
         private readonly ConcurrentBag<string> _connections = new();
 
         public SocketIoNamespace(string name)
@@ -388,7 +389,7 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
         public void AddConnection(string sid) => _connections.Add(sid);
         public void RemoveConnection(string sid) { /* ConcurrentBag doesn't support removal */ }
 
-        public void BroadcastEvent(string eventName, string data, ConcurrentDictionary<string, SocketIoConnection> connections)
+        public void BroadcastEvent(string eventName, string data, BoundedDictionary<string, SocketIoConnection> connections)
         {
             var packet = $"2{Name},[{JsonSerializer.Serialize(eventName)},{data}]";
             foreach (var connId in _connections)

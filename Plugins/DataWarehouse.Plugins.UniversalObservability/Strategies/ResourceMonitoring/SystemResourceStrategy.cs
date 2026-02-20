@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.Observability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UniversalObservability.Strategies.ResourceMonitoring;
 
@@ -20,8 +20,8 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.ResourceMonito
 /// </remarks>
 public sealed class SystemResourceStrategy : ObservabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, double> _lastValues = new();
-    private readonly ConcurrentDictionary<string, ResourceThreshold> _thresholds = new();
+    private readonly BoundedDictionary<string, double> _lastValues = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, ResourceThreshold> _thresholds = new BoundedDictionary<string, ResourceThreshold>(1000);
     private Process? _currentProcess;
     private Timer? _collectionTimer;
     private int _collectionIntervalMs = 5000;

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 /// </remarks>
 public sealed class TaggingVersioningStrategy : VersioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TagStore> _stores = new();
+    private readonly BoundedDictionary<string, TagStore> _stores = new BoundedDictionary<string, TagStore>(1000);
 
     /// <summary>
     /// Metadata for a tag.

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
     {
         private readonly IMessageBus? _messageBus;
         private readonly string _pluginId;
-        private readonly ConcurrentDictionary<string, AlertRecord> _alertHistory = new();
-        private readonly ConcurrentDictionary<string, DateTime> _deduplicationCache = new();
+        private readonly BoundedDictionary<string, AlertRecord> _alertHistory = new BoundedDictionary<string, AlertRecord>(1000);
+        private readonly BoundedDictionary<string, DateTime> _deduplicationCache = new BoundedDictionary<string, DateTime>(1000);
         private readonly TimeSpan _deduplicationWindow;
         private readonly TimeSpan _escalationTimeout;
         private long _alertSequence;

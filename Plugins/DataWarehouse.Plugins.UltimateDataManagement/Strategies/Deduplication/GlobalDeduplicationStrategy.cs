@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -19,10 +19,10 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 /// </remarks>
 public sealed class GlobalDeduplicationStrategy : DeduplicationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, VolumeInfo> _volumes = new();
-    private readonly ConcurrentDictionary<string, NodeInfo> _nodes = new();
-    private readonly ConcurrentDictionary<string, GlobalHashEntry> _globalIndex = new();
-    private readonly ConcurrentDictionary<string, byte[]> _dataStore = new();
+    private readonly BoundedDictionary<string, VolumeInfo> _volumes = new BoundedDictionary<string, VolumeInfo>(1000);
+    private readonly BoundedDictionary<string, NodeInfo> _nodes = new BoundedDictionary<string, NodeInfo>(1000);
+    private readonly BoundedDictionary<string, GlobalHashEntry> _globalIndex = new BoundedDictionary<string, GlobalHashEntry>(1000);
+    private readonly BoundedDictionary<string, byte[]> _dataStore = new BoundedDictionary<string, byte[]>(1000);
     private readonly SemaphoreSlim _globalLock = new(1, 1);
     private readonly int _replicationFactor;
     private readonly int _virtualNodes;

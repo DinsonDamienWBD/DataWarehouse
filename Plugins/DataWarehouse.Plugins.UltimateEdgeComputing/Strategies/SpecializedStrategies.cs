@@ -2,9 +2,9 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.EdgeComputing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateEdgeComputing;
 
@@ -90,7 +90,7 @@ internal sealed class ComprehensiveEdgeStrategy : IEdgeComputingStrategy
 internal sealed class IoTGatewayStrategy : IEdgeComputingStrategy
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, object> _sensorData = new();
+    private readonly BoundedDictionary<string, object> _sensorData = new BoundedDictionary<string, object>(1000);
 
     public IoTGatewayStrategy(IMessageBus? messageBus)
     {
@@ -245,7 +245,7 @@ public sealed class SimpleFusedSensorResult
 internal sealed class FogComputingStrategy : IEdgeComputingStrategy
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, FogNode> _fogNodes = new();
+    private readonly BoundedDictionary<string, FogNode> _fogNodes = new BoundedDictionary<string, FogNode>(1000);
 
     public FogComputingStrategy(IMessageBus? messageBus)
     {
@@ -446,7 +446,7 @@ public sealed class MecOffloadResult
 internal sealed class CdnEdgeStrategy : IEdgeComputingStrategy
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, CachedContent> _cache = new();
+    private readonly BoundedDictionary<string, CachedContent> _cache = new BoundedDictionary<string, CachedContent>(1000);
 
     public CdnEdgeStrategy(IMessageBus? messageBus)
     {

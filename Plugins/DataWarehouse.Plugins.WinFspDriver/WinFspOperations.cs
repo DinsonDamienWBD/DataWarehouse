@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Principal;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
 
@@ -15,7 +15,7 @@ public sealed class WinFspOperations : IDisposable
     private readonly WinFspCacheManager _cacheManager;
     private readonly WinFspSecurityHandler _securityHandler;
     private readonly WinFspConfig _config;
-    private readonly ConcurrentDictionary<IntPtr, OpenFileContext> _openFiles;
+    private readonly BoundedDictionary<IntPtr, OpenFileContext> _openFiles;
     private readonly SemaphoreSlim _operationSemaphore;
     private readonly ReaderWriterLockSlim _renameLock;
     private long _nextFileHandle;
@@ -34,7 +34,7 @@ public sealed class WinFspOperations : IDisposable
         _cacheManager = cacheManager ?? throw new ArgumentNullException(nameof(cacheManager));
         _securityHandler = securityHandler ?? throw new ArgumentNullException(nameof(securityHandler));
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _openFiles = new ConcurrentDictionary<IntPtr, OpenFileContext>();
+        _openFiles = new BoundedDictionary<IntPtr, OpenFileContext>(1000);
         _operationSemaphore = new SemaphoreSlim(_config.MaxConcurrentOperations, _config.MaxConcurrentOperations);
         _renameLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
     }

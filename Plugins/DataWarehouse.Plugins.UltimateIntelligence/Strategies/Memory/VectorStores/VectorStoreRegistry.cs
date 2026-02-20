@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -61,8 +61,8 @@ public sealed class VectorStoreRegistration
 /// </remarks>
 public sealed class VectorStoreRegistry
 {
-    private readonly ConcurrentDictionary<string, VectorStoreRegistration> _registrations = new();
-    private readonly ConcurrentDictionary<string, IProductionVectorStore> _instances = new();
+    private readonly BoundedDictionary<string, VectorStoreRegistration> _registrations = new BoundedDictionary<string, VectorStoreRegistration>(1000);
+    private readonly BoundedDictionary<string, IProductionVectorStore> _instances = new BoundedDictionary<string, IProductionVectorStore>(1000);
     private static readonly Lazy<VectorStoreRegistry> _instance = new(() => new VectorStoreRegistry());
 
     /// <summary>

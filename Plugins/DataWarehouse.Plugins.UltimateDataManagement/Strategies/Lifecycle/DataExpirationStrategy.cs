@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
 
@@ -322,8 +323,8 @@ public sealed class BulkExpirationResult
 /// </summary>
 public sealed class DataExpirationStrategy : LifecycleStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ExpirationPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, ExpirationTracker> _trackers = new();
+    private readonly BoundedDictionary<string, ExpirationPolicy> _policies = new BoundedDictionary<string, ExpirationPolicy>(1000);
+    private readonly BoundedDictionary<string, ExpirationTracker> _trackers = new BoundedDictionary<string, ExpirationTracker>(1000);
     private readonly ConcurrentQueue<ExpirationEvent> _eventQueue = new();
     private readonly List<Action<ExpirationEvent>> _eventHandlers = new();
     private readonly SemaphoreSlim _processLock = new(1, 1);

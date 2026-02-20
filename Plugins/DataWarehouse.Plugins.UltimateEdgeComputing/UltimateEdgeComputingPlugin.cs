@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateEdgeComputing;
 /// </summary>
 public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IEdgeComputingStrategy
 {
-    private readonly ConcurrentDictionary<string, EC.IEdgeComputingStrategy> _strategies = new();
+    private readonly BoundedDictionary<string, EC.IEdgeComputingStrategy> _strategies = new BoundedDictionary<string, EC.IEdgeComputingStrategy>(1000);
     private EC.EdgeComputingConfiguration _config = new();
     private bool _initialized;
 
@@ -190,8 +190,8 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
 internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, EC.EdgeNodeInfo> _nodes = new();
-    private readonly ConcurrentDictionary<string, EC.EdgeCluster> _clusters = new();
+    private readonly BoundedDictionary<string, EC.EdgeNodeInfo> _nodes = new BoundedDictionary<string, EC.EdgeNodeInfo>(1000);
+    private readonly BoundedDictionary<string, EC.EdgeCluster> _clusters = new BoundedDictionary<string, EC.EdgeCluster>(1000);
     private readonly Timer _healthCheckTimer;
 
     public event EventHandler<EC.EdgeNodeStatusChangedEventArgs>? NodeStatusChanged;
@@ -342,8 +342,8 @@ internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager
 internal sealed class EdgeDataSynchronizerImpl : EC.IEdgeDataSynchronizer
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, EC.SyncStatus> _syncStatus = new();
-    private readonly ConcurrentDictionary<string, EC.SyncSchedule> _schedules = new();
+    private readonly BoundedDictionary<string, EC.SyncStatus> _syncStatus = new BoundedDictionary<string, EC.SyncStatus>(1000);
+    private readonly BoundedDictionary<string, EC.SyncSchedule> _schedules = new BoundedDictionary<string, EC.SyncSchedule>(1000);
 
     public event EventHandler<EC.SyncCompletedEventArgs>? SyncCompleted;
     public event EventHandler<EC.SyncConflictEventArgs>? ConflictDetected;
@@ -428,9 +428,9 @@ internal sealed class EdgeDataSynchronizerImpl : EC.IEdgeDataSynchronizer
 internal sealed class OfflineOperationManagerImpl : EC.IOfflineOperationManager
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<EC.OfflineOperation>> _operationQueues = new();
-    private readonly ConcurrentDictionary<string, bool> _offlineStatus = new();
-    private readonly ConcurrentDictionary<string, EC.OfflineStorageInfo> _storageInfo = new();
+    private readonly BoundedDictionary<string, ConcurrentQueue<EC.OfflineOperation>> _operationQueues = new BoundedDictionary<string, ConcurrentQueue<EC.OfflineOperation>>(1000);
+    private readonly BoundedDictionary<string, bool> _offlineStatus = new BoundedDictionary<string, bool>(1000);
+    private readonly BoundedDictionary<string, EC.OfflineStorageInfo> _storageInfo = new BoundedDictionary<string, EC.OfflineStorageInfo>(1000);
 
     public event EventHandler<EC.ConnectivityChangedEventArgs>? ConnectivityChanged;
 
@@ -496,8 +496,8 @@ internal sealed class OfflineOperationManagerImpl : EC.IOfflineOperationManager
 internal sealed class EdgeCloudCommunicatorImpl : EC.IEdgeCloudCommunicator
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, EC.CommunicationChannel> _channels = new();
-    private readonly ConcurrentDictionary<string, EC.ConnectionStatus> _connectionStatus = new();
+    private readonly BoundedDictionary<string, EC.CommunicationChannel> _channels = new BoundedDictionary<string, EC.CommunicationChannel>(1000);
+    private readonly BoundedDictionary<string, EC.ConnectionStatus> _connectionStatus = new BoundedDictionary<string, EC.ConnectionStatus>(1000);
 
     public event EventHandler<EC.CloudMessageReceivedEventArgs>? CloudMessageReceived;
 
@@ -554,7 +554,7 @@ internal sealed class EdgeCloudCommunicatorImpl : EC.IEdgeCloudCommunicator
 internal sealed class EdgeAnalyticsEngineImpl : EC.IEdgeAnalyticsEngine
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, EC.AnalyticsModel> _deployedModels = new();
+    private readonly BoundedDictionary<string, EC.AnalyticsModel> _deployedModels = new BoundedDictionary<string, EC.AnalyticsModel>(1000);
 
     public event EventHandler<EC.AnomalyDetectedEventArgs>? AnomalyDetected;
 
@@ -618,8 +618,8 @@ internal sealed class EdgeAnalyticsEngineImpl : EC.IEdgeAnalyticsEngine
 internal sealed class EdgeSecurityManagerImpl : EC.IEdgeSecurityManager
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, string> _tokens = new();
-    private readonly ConcurrentDictionary<string, EC.SecurityPolicy> _policies = new();
+    private readonly BoundedDictionary<string, string> _tokens = new BoundedDictionary<string, string>(1000);
+    private readonly BoundedDictionary<string, EC.SecurityPolicy> _policies = new BoundedDictionary<string, EC.SecurityPolicy>(1000);
 
     public event EventHandler<EC.SecurityIncidentEventArgs>? SecurityIncidentDetected;
 
@@ -680,8 +680,8 @@ internal sealed class EdgeSecurityManagerImpl : EC.IEdgeSecurityManager
 internal sealed class EdgeResourceManagerImpl : EC.IEdgeResourceManager
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, EC.ResourceAllocation> _allocations = new();
-    private readonly ConcurrentDictionary<string, EC.ResourceLimits> _limits = new();
+    private readonly BoundedDictionary<string, EC.ResourceAllocation> _allocations = new BoundedDictionary<string, EC.ResourceAllocation>(1000);
+    private readonly BoundedDictionary<string, EC.ResourceLimits> _limits = new BoundedDictionary<string, EC.ResourceLimits>(1000);
 
     public event EventHandler<EC.ResourceThresholdEventArgs>? ResourceThresholdExceeded;
 
@@ -739,8 +739,8 @@ internal sealed class MultiEdgeOrchestratorImpl : EC.IMultiEdgeOrchestrator
 {
     private readonly IMessageBus? _messageBus;
     private readonly EC.IEdgeNodeManager _nodeManager;
-    private readonly ConcurrentDictionary<string, EC.WorkloadDefinition> _workloads = new();
-    private readonly ConcurrentDictionary<string, EC.OrchestrationPolicy> _policies = new();
+    private readonly BoundedDictionary<string, EC.WorkloadDefinition> _workloads = new BoundedDictionary<string, EC.WorkloadDefinition>(1000);
+    private readonly BoundedDictionary<string, EC.OrchestrationPolicy> _policies = new BoundedDictionary<string, EC.OrchestrationPolicy>(1000);
 
     public event EventHandler<EC.TopologyChangedEventArgs>? TopologyChanged;
 

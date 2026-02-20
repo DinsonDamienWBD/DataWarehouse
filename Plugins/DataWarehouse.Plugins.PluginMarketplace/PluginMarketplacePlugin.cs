@@ -3,7 +3,6 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -39,13 +38,13 @@ namespace DataWarehouse.Plugins.PluginMarketplace;
 /// </summary>
 public sealed class PluginMarketplacePlugin : PlatformPluginBase
 {
-    private readonly ConcurrentDictionary<string, PluginCatalogEntry> _catalog = new();
-    private readonly ConcurrentDictionary<string, List<PluginVersionInfo>> _versionHistory = new();
-    private readonly ConcurrentDictionary<string, List<PluginReviewEntry>> _reviews = new();
-    private readonly ConcurrentDictionary<string, CertificationResult> _certifications = new();
-    private readonly ConcurrentDictionary<string, List<DeveloperRevenueRecord>> _revenueRecords = new();
-    private readonly ConcurrentDictionary<string, List<PluginUsageEvent>> _usageEvents = new();
-    private readonly ConcurrentDictionary<string, PluginUsageAnalytics> _monthlyAnalytics = new();
+    private readonly BoundedDictionary<string, PluginCatalogEntry> _catalog = new BoundedDictionary<string, PluginCatalogEntry>(1000);
+    private readonly BoundedDictionary<string, List<PluginVersionInfo>> _versionHistory = new BoundedDictionary<string, List<PluginVersionInfo>>(1000);
+    private readonly BoundedDictionary<string, List<PluginReviewEntry>> _reviews = new BoundedDictionary<string, List<PluginReviewEntry>>(1000);
+    private readonly BoundedDictionary<string, CertificationResult> _certifications = new BoundedDictionary<string, CertificationResult>(1000);
+    private readonly BoundedDictionary<string, List<DeveloperRevenueRecord>> _revenueRecords = new BoundedDictionary<string, List<DeveloperRevenueRecord>>(1000);
+    private readonly BoundedDictionary<string, List<PluginUsageEvent>> _usageEvents = new BoundedDictionary<string, List<PluginUsageEvent>>(1000);
+    private readonly BoundedDictionary<string, PluginUsageAnalytics> _monthlyAnalytics = new BoundedDictionary<string, PluginUsageAnalytics>(1000);
     private readonly SemaphoreSlim _catalogLock = new(1, 1);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly PluginMarketplaceConfig _config;

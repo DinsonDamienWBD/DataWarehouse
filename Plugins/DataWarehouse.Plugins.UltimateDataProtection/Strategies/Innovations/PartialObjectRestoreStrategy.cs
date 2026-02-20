@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 
@@ -29,8 +28,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class PartialObjectRestoreStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, BackupObjectCatalog> _objectCatalogs = new();
-        private readonly ConcurrentDictionary<string, ObjectExtractionState> _activeExtractions = new();
+        private readonly BoundedDictionary<string, BackupObjectCatalog> _objectCatalogs = new BoundedDictionary<string, BackupObjectCatalog>(1000);
+        private readonly BoundedDictionary<string, ObjectExtractionState> _activeExtractions = new BoundedDictionary<string, ObjectExtractionState>(1000);
 
         /// <summary>
         /// Supported object types for partial restoration.

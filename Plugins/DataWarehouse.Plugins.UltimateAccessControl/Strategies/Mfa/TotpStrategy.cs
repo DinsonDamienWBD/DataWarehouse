@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 {
@@ -14,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
     /// </summary>
     public sealed class TotpStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, TotpUserData> _userSecrets = new();
-        private readonly ConcurrentDictionary<string, long> _lastUsedTimeSteps = new();
+        private readonly BoundedDictionary<string, TotpUserData> _userSecrets = new BoundedDictionary<string, TotpUserData>(1000);
+        private readonly BoundedDictionary<string, long> _lastUsedTimeSteps = new BoundedDictionary<string, long>(1000);
         private const int DefaultPeriod = 30; // seconds
         private const int DefaultDigits = 6;
         private const int TimeStepWindow = 1; // Allow ±30 seconds for clock skew

@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.SemanticStorage;
 
@@ -34,10 +34,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.SemanticStorage;
 /// </remarks>
 public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, OntologyClass> _classes = new();
-    private readonly ConcurrentDictionary<string, OntologyProperty> _properties = new();
-    private readonly ConcurrentDictionary<string, OntologyInstance> _instances = new();
-    private readonly ConcurrentDictionary<string, Ontology> _ontologies = new();
+    private readonly BoundedDictionary<string, OntologyClass> _classes = new BoundedDictionary<string, OntologyClass>(1000);
+    private readonly BoundedDictionary<string, OntologyProperty> _properties = new BoundedDictionary<string, OntologyProperty>(1000);
+    private readonly BoundedDictionary<string, OntologyInstance> _instances = new BoundedDictionary<string, OntologyInstance>(1000);
+    private readonly BoundedDictionary<string, Ontology> _ontologies = new BoundedDictionary<string, Ontology>(1000);
     private readonly ReaderWriterLockSlim _lock = new();
 
     /// <inheritdoc/>
@@ -575,10 +575,10 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
 /// </remarks>
 public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticLink> _links = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _outgoingLinks = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _incomingLinks = new();
-    private readonly ConcurrentDictionary<string, DataNode> _nodes = new();
+    private readonly BoundedDictionary<string, SemanticLink> _links = new BoundedDictionary<string, SemanticLink>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _outgoingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _incomingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, DataNode> _nodes = new BoundedDictionary<string, DataNode>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-linking";
@@ -980,7 +980,7 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
 /// </remarks>
 public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticFingerprint> _fingerprints = new();
+    private readonly BoundedDictionary<string, SemanticFingerprint> _fingerprints = new BoundedDictionary<string, SemanticFingerprint>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-meaning-preservation";
@@ -1361,8 +1361,8 @@ public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
 /// </remarks>
 public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StoredDataWithContext> _storage = new();
-    private readonly ConcurrentDictionary<string, List<AccessContext>> _accessHistory = new();
+    private readonly BoundedDictionary<string, StoredDataWithContext> _storage = new BoundedDictionary<string, StoredDataWithContext>(1000);
+    private readonly BoundedDictionary<string, List<AccessContext>> _accessHistory = new BoundedDictionary<string, List<AccessContext>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-context-aware-storage";
@@ -1727,8 +1727,8 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
 /// </remarks>
 public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticValidationRule> _rules = new();
-    private readonly ConcurrentDictionary<string, SemanticSchema> _schemas = new();
+    private readonly BoundedDictionary<string, SemanticValidationRule> _rules = new BoundedDictionary<string, SemanticValidationRule>(1000);
+    private readonly BoundedDictionary<string, SemanticSchema> _schemas = new BoundedDictionary<string, SemanticSchema>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-validation";
@@ -2077,9 +2077,9 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 /// </remarks>
 public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticMapping> _mappings = new();
-    private readonly ConcurrentDictionary<string, VocabularyAlignment> _alignments = new();
-    private readonly ConcurrentDictionary<string, StandardVocabulary> _vocabularies = new();
+    private readonly BoundedDictionary<string, SemanticMapping> _mappings = new BoundedDictionary<string, SemanticMapping>(1000);
+    private readonly BoundedDictionary<string, VocabularyAlignment> _alignments = new BoundedDictionary<string, VocabularyAlignment>(1000);
+    private readonly BoundedDictionary<string, StandardVocabulary> _vocabularies = new BoundedDictionary<string, StandardVocabulary>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-interoperability";

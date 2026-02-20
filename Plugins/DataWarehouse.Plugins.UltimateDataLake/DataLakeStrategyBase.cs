@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.DataLake;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLake;
 
@@ -8,8 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataLake;
 /// </summary>
 public sealed class DataLakeStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IDataLakeStrategy> _strategies =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, IDataLakeStrategy> _strategies =
+        new(1000);
 
     /// <summary>Registers a strategy.</summary>
     public void Register(IDataLakeStrategy strategy)

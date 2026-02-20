@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.AiEnhanced;
 
@@ -243,8 +243,8 @@ public sealed class DataObjectInfo
 /// </remarks>
 public sealed class PredictiveDataLifecycleStrategy : AiEnhancedStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DataObjectInfo> _trackedObjects = new();
-    private readonly ConcurrentDictionary<string, LifecyclePrediction> _predictions = new();
+    private readonly BoundedDictionary<string, DataObjectInfo> _trackedObjects = new BoundedDictionary<string, DataObjectInfo>(1000);
+    private readonly BoundedDictionary<string, LifecyclePrediction> _predictions = new BoundedDictionary<string, LifecyclePrediction>(1000);
     private readonly TimeSpan _predictionCacheTtl;
     private readonly object _analysisLock = new();
 

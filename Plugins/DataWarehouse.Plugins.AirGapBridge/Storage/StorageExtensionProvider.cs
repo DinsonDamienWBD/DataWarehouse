@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using DataWarehouse.Plugins.AirGapBridge.Core;
 using DataWarehouse.Plugins.AirGapBridge.Detection;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Storage;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.AirGapBridge.Storage;
 /// </summary>
 public sealed class StorageExtensionProvider : IDisposable, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, MountedStorage> _mountedStorages = new();
-    private readonly ConcurrentDictionary<string, OfflineIndexEntry> _offlineIndex = new();
+    private readonly BoundedDictionary<string, MountedStorage> _mountedStorages = new BoundedDictionary<string, MountedStorage>(1000);
+    private readonly BoundedDictionary<string, OfflineIndexEntry> _offlineIndex = new BoundedDictionary<string, OfflineIndexEntry>(1000);
     private readonly string _indexStoragePath;
     private bool _disposed;
 
@@ -527,7 +527,7 @@ public sealed class MountedStorage
     public int BlobCount { get; set; }
     public int PendingOperations { get; set; }
     public bool SafeToRemove { get; set; }
-    public ConcurrentDictionary<string, StorageIndexEntry> Index { get; } = new();
+    public BoundedDictionary<string, StorageIndexEntry> Index { get; } = new BoundedDictionary<string, StorageIndexEntry>(1000);
 }
 
 /// <summary>

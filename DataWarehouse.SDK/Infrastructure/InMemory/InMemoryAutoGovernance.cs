@@ -1,11 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure.InMemory
 {
@@ -17,7 +17,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryAutoGovernance : IAutoGovernance
     {
-        private readonly ConcurrentDictionary<string, GovernancePolicy> _policies = new();
+        private readonly BoundedDictionary<string, GovernancePolicy> _policies = new BoundedDictionary<string, GovernancePolicy>(1000);
 
         /// <inheritdoc />
         public event Action<GovernanceEvent>? OnGovernanceEvent;

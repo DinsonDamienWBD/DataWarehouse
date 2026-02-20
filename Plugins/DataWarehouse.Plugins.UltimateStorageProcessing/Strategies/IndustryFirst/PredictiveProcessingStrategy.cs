@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFirst;
 
@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateStorageProcessing.Strategies.IndustryFir
 /// </summary>
 internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AccessStats> _accessHistory = new();
+    private readonly BoundedDictionary<string, AccessStats> _accessHistory = new BoundedDictionary<string, AccessStats>(1000);
     private const double Alpha = 0.3; // EMA smoothing factor
 
     /// <inheritdoc/>

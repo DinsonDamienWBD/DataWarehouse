@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Persistence;
 
@@ -71,8 +71,8 @@ public sealed class AzureBlobPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated containers and blobs
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, AzureBlob>> _containers = new();
-    private readonly ConcurrentDictionary<string, (string Container, string BlobName)> _idIndex = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, AzureBlob>> _containers = new BoundedDictionary<string, BoundedDictionary<string, AzureBlob>>(1000);
+    private readonly BoundedDictionary<string, (string Container, string BlobName)> _idIndex = new BoundedDictionary<string, (string Container, string BlobName)>(1000);
     private readonly SemaphoreSlim _uploadSemaphore;
 
     private bool _disposed;
@@ -110,7 +110,7 @@ public sealed class AzureBlobPersistenceBackend : IProductionPersistenceBackend
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var containerName = GetContainerName(tier);
-                _containers[containerName] = new ConcurrentDictionary<string, AzureBlob>();
+                _containers[containerName] = new BoundedDictionary<string, AzureBlob>(1000);
             }
             _isConnected = true;
         }
@@ -598,8 +598,8 @@ public sealed class S3PersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated buckets and objects
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, S3Object>> _buckets = new();
-    private readonly ConcurrentDictionary<string, (string Bucket, string Key)> _idIndex = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, S3Object>> _buckets = new BoundedDictionary<string, BoundedDictionary<string, S3Object>>(1000);
+    private readonly BoundedDictionary<string, (string Bucket, string Key)> _idIndex = new BoundedDictionary<string, (string Bucket, string Key)>(1000);
     private readonly SemaphoreSlim _operationSemaphore;
 
     private bool _disposed;
@@ -636,7 +636,7 @@ public sealed class S3PersistenceBackend : IProductionPersistenceBackend
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var bucketName = GetBucketName(tier);
-                _buckets[bucketName] = new ConcurrentDictionary<string, S3Object>();
+                _buckets[bucketName] = new BoundedDictionary<string, S3Object>(1000);
             }
             _isConnected = true;
         }
@@ -1085,8 +1085,8 @@ public sealed class GcsPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceCircuitBreaker _circuitBreaker;
 
     // Simulated buckets and objects
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, GcsObject>> _buckets = new();
-    private readonly ConcurrentDictionary<string, (string Bucket, string ObjectName)> _idIndex = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, GcsObject>> _buckets = new BoundedDictionary<string, BoundedDictionary<string, GcsObject>>(1000);
+    private readonly BoundedDictionary<string, (string Bucket, string ObjectName)> _idIndex = new BoundedDictionary<string, (string Bucket, string ObjectName)>(1000);
     private readonly SemaphoreSlim _operationSemaphore;
 
     private bool _disposed;
@@ -1122,7 +1122,7 @@ public sealed class GcsPersistenceBackend : IProductionPersistenceBackend
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var bucketName = GetBucketName(tier);
-                _buckets[bucketName] = new ConcurrentDictionary<string, GcsObject>();
+                _buckets[bucketName] = new BoundedDictionary<string, GcsObject>(1000);
             }
             _isConnected = true;
         }

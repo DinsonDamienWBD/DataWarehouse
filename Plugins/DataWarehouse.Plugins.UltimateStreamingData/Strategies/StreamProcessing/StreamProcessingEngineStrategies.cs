@@ -1,8 +1,8 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.StreamProcessing;
 
@@ -14,10 +14,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.StreamProcessin
 /// </summary>
 public sealed class KafkaStreamProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KafkaTopic> _topics = new();
-    private readonly ConcurrentDictionary<string, ConsumerGroupState> _consumerGroups = new();
-    private readonly ConcurrentDictionary<string, List<KafkaRecord>> _topicData = new();
-    private readonly ConcurrentDictionary<string, long> _offsets = new();
+    private readonly BoundedDictionary<string, KafkaTopic> _topics = new BoundedDictionary<string, KafkaTopic>(1000);
+    private readonly BoundedDictionary<string, ConsumerGroupState> _consumerGroups = new BoundedDictionary<string, ConsumerGroupState>(1000);
+    private readonly BoundedDictionary<string, List<KafkaRecord>> _topicData = new BoundedDictionary<string, List<KafkaRecord>>(1000);
+    private readonly BoundedDictionary<string, long> _offsets = new BoundedDictionary<string, long>(1000);
     private long _nextOffset;
 
     public override string StrategyId => "streaming-kafka";
@@ -169,7 +169,7 @@ public sealed class KafkaStreamProcessingStrategy : StreamingDataStrategyBase
         var consumerGroup = _consumerGroups.GetOrAdd(groupId, _ => new ConsumerGroupState
         {
             GroupId = groupId,
-            CommittedOffsets = new ConcurrentDictionary<string, long>()
+            CommittedOffsets = new BoundedDictionary<string, long>(1000)
         });
 
         var startOffset = fromOffset ?? consumerGroup.CommittedOffsets.GetValueOrDefault(topic, 0);
@@ -260,7 +260,7 @@ public sealed record ProduceResult
 internal sealed class ConsumerGroupState
 {
     public required string GroupId { get; init; }
-    public ConcurrentDictionary<string, long> CommittedOffsets { get; init; } = new();
+    public BoundedDictionary<string, long> CommittedOffsets { get; init; } = new BoundedDictionary<string, long>(1000);
 }
 
 #endregion
@@ -273,9 +273,9 @@ internal sealed class ConsumerGroupState
 /// </summary>
 public sealed class PulsarStreamProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PulsarTopic> _topics = new();
-    private readonly ConcurrentDictionary<string, PulsarSubscription> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, List<PulsarMessage>> _topicData = new();
+    private readonly BoundedDictionary<string, PulsarTopic> _topics = new BoundedDictionary<string, PulsarTopic>(1000);
+    private readonly BoundedDictionary<string, PulsarSubscription> _subscriptions = new BoundedDictionary<string, PulsarSubscription>(1000);
+    private readonly BoundedDictionary<string, List<PulsarMessage>> _topicData = new BoundedDictionary<string, List<PulsarMessage>>(1000);
     private long _nextMessageId;
 
     public override string StrategyId => "streaming-pulsar";
@@ -503,8 +503,8 @@ public sealed record PulsarSendResult
 /// </summary>
 public sealed class FlinkStreamProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, FlinkJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, FlinkSavepoint> _savepoints = new();
+    private readonly BoundedDictionary<string, FlinkJob> _jobs = new BoundedDictionary<string, FlinkJob>(1000);
+    private readonly BoundedDictionary<string, FlinkSavepoint> _savepoints = new BoundedDictionary<string, FlinkSavepoint>(1000);
 
     public override string StrategyId => "streaming-flink";
     public override string DisplayName => "Apache Flink Stream Processing";
@@ -619,7 +619,7 @@ public sealed class FlinkStreamProcessingStrategy : StreamingDataStrategyBase
     public Task<FlinkJob?> GetJobAsync(string jobId, CancellationToken ct = default)
     {
         _jobs.TryGetValue(jobId, out var job);
-        return Task.FromResult(job);
+        return Task.FromResult<FlinkJob?>(job);
     }
 
     /// <summary>
@@ -687,7 +687,7 @@ public enum SavepointStatus { InProgress, Completed, Failed }
 /// </summary>
 public sealed class SparkStreamingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SparkStreamingQuery> _queries = new();
+    private readonly BoundedDictionary<string, SparkStreamingQuery> _queries = new BoundedDictionary<string, SparkStreamingQuery>(1000);
 
     public override string StrategyId => "streaming-spark";
     public override string DisplayName => "Apache Spark Structured Streaming";
@@ -756,7 +756,7 @@ public sealed class SparkStreamingStrategy : StreamingDataStrategyBase
     public Task<SparkStreamingQuery?> GetQueryAsync(string queryId, CancellationToken ct = default)
     {
         _queries.TryGetValue(queryId, out var query);
-        return Task.FromResult(query);
+        return Task.FromResult<SparkStreamingQuery?>(query);
     }
 
     /// <summary>
@@ -849,8 +849,8 @@ public sealed record QueryProgress
 /// </summary>
 public sealed class RedisStreamsStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<RedisStreamEntry>> _streams = new();
-    private readonly ConcurrentDictionary<string, RedisConsumerGroup> _consumerGroups = new();
+    private readonly BoundedDictionary<string, List<RedisStreamEntry>> _streams = new BoundedDictionary<string, List<RedisStreamEntry>>(1000);
+    private readonly BoundedDictionary<string, RedisConsumerGroup> _consumerGroups = new BoundedDictionary<string, RedisConsumerGroup>(1000);
     private long _entryIdCounter;
 
     public override string StrategyId => "streaming-redis";
@@ -951,7 +951,7 @@ public sealed class RedisStreamsStrategy : StreamingDataStrategyBase
             Name = groupName,
             StreamKey = streamKey,
             LastDeliveredId = startId ?? "0-0",
-            Consumers = new ConcurrentDictionary<string, RedisConsumer>()
+            Consumers = new BoundedDictionary<string, RedisConsumer>(1000)
         };
 
         _consumerGroups[$"{streamKey}:{groupName}"] = group;
@@ -1028,7 +1028,7 @@ internal sealed class RedisConsumerGroup
     public required string Name { get; init; }
     public required string StreamKey { get; init; }
     public string LastDeliveredId { get; set; } = "0-0";
-    public ConcurrentDictionary<string, RedisConsumer> Consumers { get; init; } = new();
+    public BoundedDictionary<string, RedisConsumer> Consumers { get; init; } = new BoundedDictionary<string, RedisConsumer>(1000);
 }
 
 internal sealed class RedisConsumer
@@ -1047,8 +1047,8 @@ internal sealed class RedisConsumer
 /// </summary>
 public sealed class KinesisStreamProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KinesisStream> _streams = new();
-    private readonly ConcurrentDictionary<string, List<KinesisRecord>> _shardData = new();
+    private readonly BoundedDictionary<string, KinesisStream> _streams = new BoundedDictionary<string, KinesisStream>(1000);
+    private readonly BoundedDictionary<string, List<KinesisRecord>> _shardData = new BoundedDictionary<string, List<KinesisRecord>>(1000);
 
     public override string StrategyId => "streaming-kinesis";
     public override string DisplayName => "Amazon Kinesis Data Streams";
@@ -1200,7 +1200,7 @@ public sealed class KinesisStreamProcessingStrategy : StreamingDataStrategyBase
     public Task<KinesisStream?> DescribeStreamAsync(string streamName, CancellationToken ct = default)
     {
         _streams.TryGetValue(streamName, out var stream);
-        return Task.FromResult(stream);
+        return Task.FromResult<KinesisStream?>(stream);
     }
 }
 

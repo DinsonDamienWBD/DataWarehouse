@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Migration;
 
@@ -20,8 +20,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Migration;
 /// </remarks>
 public sealed class DeprecationManager
 {
-    private readonly ConcurrentDictionary<string, DeprecationInfo> _deprecatedPlugins = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, long> _deprecationWarningCounts = new();
+    private readonly BoundedDictionary<string, DeprecationInfo> _deprecatedPlugins = new BoundedDictionary<string, DeprecationInfo>(1000);
+    private readonly BoundedDictionary<string, long> _deprecationWarningCounts = new BoundedDictionary<string, long>(1000);
     private readonly object _lock = new();
 
     /// <summary>

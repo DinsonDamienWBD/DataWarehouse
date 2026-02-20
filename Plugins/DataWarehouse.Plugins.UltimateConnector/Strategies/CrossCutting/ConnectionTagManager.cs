@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 {
@@ -18,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class ConnectionTagManager
     {
-        private readonly ConcurrentDictionary<string, ConnectionTagSet> _tags = new();
+        private readonly BoundedDictionary<string, ConnectionTagSet> _tags = new BoundedDictionary<string, ConnectionTagSet>(1000);
 
         /// <summary>
         /// Well-known tag keys for standard connection categorization.
@@ -221,7 +222,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
         private sealed class ConnectionTagSet
         {
             public string ConnectionId { get; }
-            public ConcurrentDictionary<string, string> Tags { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public BoundedDictionary<string, string> Tags { get; } = new BoundedDictionary<string, string>(1000);
             public DateTimeOffset CreatedAt { get; }
             public DateTimeOffset LastModified { get; set; }
 

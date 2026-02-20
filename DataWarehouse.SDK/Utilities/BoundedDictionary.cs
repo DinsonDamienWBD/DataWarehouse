@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Utilities
 {
@@ -27,7 +28,7 @@ namespace DataWarehouse.SDK.Utilities
     /// </summary>
     /// <typeparam name="TKey">The type of keys. Must be non-null.</typeparam>
     /// <typeparam name="TValue">The type of values.</typeparam>
-    public sealed class BoundedDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IDisposable, IAsyncDisposable
+    public sealed class BoundedDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IReadOnlyDictionary<TKey, TValue>, IDisposable, IAsyncDisposable
         where TKey : notnull
     {
         // --- backing store ---
@@ -89,6 +90,22 @@ namespace DataWarehouse.SDK.Utilities
             {
                 _debounceTimer = new Timer(OnDebounceElapsed, null, Timeout.Infinite, Timeout.Infinite);
             }
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="BoundedDictionary{TKey,TValue}"/> with the specified capacity and key comparer.
+        /// </summary>
+        /// <param name="maxCapacity">Maximum number of entries. Must be greater than zero.</param>
+        /// <param name="comparer">The equality comparer to use for keys.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="maxCapacity"/> is less than 1.</exception>
+        public BoundedDictionary(int maxCapacity, IEqualityComparer<TKey> comparer)
+        {
+            if (maxCapacity < 1)
+                throw new ArgumentOutOfRangeException(nameof(maxCapacity), "Capacity must be at least 1.");
+
+            _maxCapacity = maxCapacity;
+            _map = new Dictionary<TKey, LinkedListNode<(TKey Key, TValue Value)>>(maxCapacity, comparer);
+            _lru = new LinkedList<(TKey Key, TValue Value)>();
         }
 
         // -------------------------------------------------------------------------
@@ -270,6 +287,37 @@ namespace DataWarehouse.SDK.Utilities
         }
 
         /// <summary>
+        /// Returns the existing value for the key, or adds and returns <paramref name="value"/>
+        /// if the key does not exist. This overload matches the
+        /// <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}"/> simple-value overload.
+        /// </summary>
+        /// <param name="key">The key to look up or add.</param>
+        /// <param name="value">The value to add if the key does not exist.</param>
+        /// <returns>The existing or newly added value.</returns>
+        public TValue GetOrAdd(TKey key, TValue value)
+        {
+            bool added;
+            TValue result;
+            _lock.EnterWriteLock();
+            try
+            {
+                if (_map.TryGetValue(key, out var node))
+                {
+                    MoveToFront(node);
+                    return node.Value.Value;
+                }
+                result = value;
+                EnsureCapacity();
+                var newNode = _lru.AddFirst((key, result));
+                _map[key] = newNode;
+                added = true;
+            }
+            finally { _lock.ExitWriteLock(); }
+            if (added) SchedulePersist();
+            return result;
+        }
+
+        /// <summary>
         /// Returns the existing value for the key, or adds and returns a new value produced by
         /// <paramref name="valueFactory"/> if the key does not exist.
         /// </summary>
@@ -336,6 +384,40 @@ namespace DataWarehouse.SDK.Utilities
         }
 
         /// <summary>
+        /// Adds a key/value pair, or updates the value of an existing key. The add value is produced
+        /// by <paramref name="addValueFactory"/> when the key does not exist.
+        /// This overload matches <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}"/>
+        /// factory-based AddOrUpdate.
+        /// </summary>
+        public TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
+        {
+            if (addValueFactory is null) throw new ArgumentNullException(nameof(addValueFactory));
+            if (updateValueFactory is null) throw new ArgumentNullException(nameof(updateValueFactory));
+            TValue result;
+            _lock.EnterWriteLock();
+            try
+            {
+                if (_map.TryGetValue(key, out var node))
+                {
+                    result = updateValueFactory(key, node.Value.Value);
+                    _lru.Remove(node);
+                    var updated = _lru.AddFirst((key, result));
+                    _map[key] = updated;
+                }
+                else
+                {
+                    result = addValueFactory(key);
+                    EnsureCapacity();
+                    var newNode = _lru.AddFirst((key, result));
+                    _map[key] = newNode;
+                }
+            }
+            finally { _lock.ExitWriteLock(); }
+            SchedulePersist();
+            return result;
+        }
+
+        /// <summary>
         /// Determines whether the dictionary contains the specified key.
         /// </summary>
         /// <param name="key">The key to check.</param>
@@ -345,6 +427,36 @@ namespace DataWarehouse.SDK.Utilities
             _lock.EnterReadLock();
             try { return _map.ContainsKey(key); }
             finally { _lock.ExitReadLock(); }
+        }
+
+        /// <summary>
+        /// Attempts to update the value associated with <paramref name="key"/>
+        /// only if the current value equals <paramref name="comparisonValue"/>.
+        /// This is the atomic compare-and-swap equivalent of
+        /// <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}.TryUpdate"/>.
+        /// </summary>
+        /// <param name="key">The key to update.</param>
+        /// <param name="newValue">The new value to set.</param>
+        /// <param name="comparisonValue">The value to compare against the current value.</param>
+        /// <returns><c>true</c> if the value was updated; <c>false</c> if the key was not found or comparison failed.</returns>
+        public bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                if (!_map.TryGetValue(key, out var node))
+                    return false;
+
+                // Compare using default equality
+                if (!EqualityComparer<TValue>.Default.Equals(node.Value.Value, comparisonValue))
+                    return false;
+
+                _lru.Remove(node);
+                var updated = _lru.AddFirst((key, newValue));
+                _map[key] = updated;
+                return true;
+            }
+            finally { _lock.ExitWriteLock(); }
         }
 
         /// <summary>
@@ -378,6 +490,32 @@ namespace DataWarehouse.SDK.Utilities
             }
             finally { _lock.ExitReadLock(); }
         }
+
+        /// <summary>Returns true if the dictionary contains no entries.</summary>
+        public bool IsEmpty => Count == 0;
+
+        // -------------------------------------------------------------------------
+        // IReadOnlyDictionary<TKey, TValue> explicit implementation
+        // -------------------------------------------------------------------------
+
+        /// <inheritdoc cref="IReadOnlyDictionary{TKey,TValue}.Keys"/>
+        IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
+
+        /// <inheritdoc cref="IReadOnlyDictionary{TKey,TValue}.Values"/>
+        IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
+
+        /// <inheritdoc cref="IReadOnlyDictionary{TKey,TValue}.this"/>
+        TValue IReadOnlyDictionary<TKey, TValue>.this[TKey key] => this[key];
+
+        /// <summary>
+        /// Attempts to get a value by key without throwing.
+        /// Implements <see cref="IReadOnlyDictionary{TKey,TValue}.TryGetValue"/>.
+        /// </summary>
+        bool IReadOnlyDictionary<TKey, TValue>.TryGetValue(TKey key, out TValue value) =>
+            TryGetValue(key, out value);
+
+        /// <inheritdoc cref="IReadOnlyCollection{T}.Count"/>
+        int IReadOnlyCollection<KeyValuePair<TKey, TValue>>.Count => Count;
 
         // -------------------------------------------------------------------------
         // Persistence

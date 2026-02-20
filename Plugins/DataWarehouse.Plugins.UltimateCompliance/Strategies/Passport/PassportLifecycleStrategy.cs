@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 
@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Passport;
 /// </summary>
 public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, PassportRegistryEntry> _registry = new();
+    private readonly BoundedDictionary<string, PassportRegistryEntry> _registry = new BoundedDictionary<string, PassportRegistryEntry>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "passport-lifecycle";

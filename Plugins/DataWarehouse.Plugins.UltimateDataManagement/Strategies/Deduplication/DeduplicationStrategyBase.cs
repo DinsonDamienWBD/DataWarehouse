@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Deduplication;
 
@@ -266,12 +266,12 @@ public abstract class DeduplicationStrategyBase : DataManagementStrategyBase, ID
     /// <summary>
     /// Thread-safe hash index mapping hash to object references.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, HashEntry> HashIndex = new();
+    protected readonly BoundedDictionary<string, HashEntry> HashIndex = new BoundedDictionary<string, HashEntry>(1000);
 
     /// <summary>
     /// Thread-safe chunk index for sub-file deduplication.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, ChunkEntry> ChunkIndex = new();
+    protected readonly BoundedDictionary<string, ChunkEntry> ChunkIndex = new BoundedDictionary<string, ChunkEntry>(1000);
 
     /// <summary>
     /// Lock object for statistics updates.

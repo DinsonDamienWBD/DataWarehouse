@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.BatchStreaming;
 
@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Strategies.BatchStreamin
 /// </summary>
 public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, LambdaPipeline> _pipelines = new();
-    private readonly ConcurrentDictionary<string, BatchView> _batchViews = new();
-    private readonly ConcurrentDictionary<string, SpeedView> _speedViews = new();
+    private readonly BoundedDictionary<string, LambdaPipeline> _pipelines = new BoundedDictionary<string, LambdaPipeline>(1000);
+    private readonly BoundedDictionary<string, BatchView> _batchViews = new BoundedDictionary<string, BatchView>(1000);
+    private readonly BoundedDictionary<string, SpeedView> _speedViews = new BoundedDictionary<string, SpeedView>(1000);
 
     public override string StrategyId => "integration-lambda";
     public override string DisplayName => "Lambda Architecture";
@@ -194,8 +194,8 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class KappaArchitectureStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, KappaPipeline> _pipelines = new();
-    private readonly ConcurrentDictionary<string, StreamView> _views = new();
+    private readonly BoundedDictionary<string, KappaPipeline> _pipelines = new BoundedDictionary<string, KappaPipeline>(1000);
+    private readonly BoundedDictionary<string, StreamView> _views = new BoundedDictionary<string, StreamView>(1000);
 
     public override string StrategyId => "integration-kappa";
     public override string DisplayName => "Kappa Architecture";
@@ -314,7 +314,7 @@ public sealed class KappaArchitectureStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, UnifiedPipeline> _pipelines = new();
+    private readonly BoundedDictionary<string, UnifiedPipeline> _pipelines = new BoundedDictionary<string, UnifiedPipeline>(1000);
 
     public override string StrategyId => "integration-unified";
     public override string DisplayName => "Unified Batch-Streaming";
@@ -442,7 +442,7 @@ public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class HybridIntegrationStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, HybridPipeline> _pipelines = new();
+    private readonly BoundedDictionary<string, HybridPipeline> _pipelines = new BoundedDictionary<string, HybridPipeline>(1000);
 
     public override string StrategyId => "integration-hybrid";
     public override string DisplayName => "Hybrid Integration";
@@ -583,7 +583,7 @@ public sealed class HybridIntegrationStrategy : DataIntegrationStrategyBase
 /// </summary>
 public sealed class RealTimeMaterializedViewStrategy : DataIntegrationStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MaterializedView> _views = new();
+    private readonly BoundedDictionary<string, MaterializedView> _views = new BoundedDictionary<string, MaterializedView>(1000);
 
     public override string StrategyId => "integration-materialized-view";
     public override string DisplayName => "Real-time Materialized View";

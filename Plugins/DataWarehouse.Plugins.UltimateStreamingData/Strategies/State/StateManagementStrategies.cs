@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.State;
 
@@ -13,8 +13,8 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.State;
 /// </summary>
 public sealed class InMemoryStateBackendStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, StateEntry>> _stateStores = new();
-    private readonly ConcurrentDictionary<string, StateStoreConfig> _configs = new();
+    private readonly BoundedDictionary<string, BoundedDictionary<string, StateEntry>> _stateStores = new BoundedDictionary<string, BoundedDictionary<string, StateEntry>>(1000);
+    private readonly BoundedDictionary<string, StateStoreConfig> _configs = new BoundedDictionary<string, StateStoreConfig>(1000);
 
     public override string StrategyId => "state-inmemory";
     public override string DisplayName => "In-Memory State Backend";
@@ -48,7 +48,7 @@ public sealed class InMemoryStateBackendStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
 
         var storeId = $"store-{Guid.NewGuid():N}";
-        _stateStores[storeId] = new ConcurrentDictionary<string, StateEntry>();
+        _stateStores[storeId] = new BoundedDictionary<string, StateEntry>(1000);
         _configs[storeId] = config ?? new StateStoreConfig();
 
         return Task.FromResult(storeId);
@@ -177,7 +177,7 @@ public sealed class InMemoryStateBackendStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
 
         var entries = JsonSerializer.Deserialize<List<StateEntry>>(snapshot.Data) ?? new List<StateEntry>();
-        var store = new ConcurrentDictionary<string, StateEntry>();
+        var store = new BoundedDictionary<string, StateEntry>(1000);
 
         foreach (var entry in entries)
         {
@@ -235,7 +235,7 @@ public sealed record StateSnapshot
 /// </summary>
 public sealed class RocksDbStateBackendStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RocksDbStore> _stores = new();
+    private readonly BoundedDictionary<string, RocksDbStore> _stores = new BoundedDictionary<string, RocksDbStore>(1000);
 
     public override string StrategyId => "state-rocksdb";
     public override string DisplayName => "RocksDB State Backend";
@@ -274,7 +274,7 @@ public sealed class RocksDbStateBackendStrategy : StreamingDataStrategyBase
             StoreId = storeId,
             DbPath = dbPath,
             Config = config ?? new RocksDbConfig(),
-            Data = new ConcurrentDictionary<string, byte[]>(),
+            Data = new BoundedDictionary<string, byte[]>(1000),
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -424,7 +424,7 @@ internal sealed class RocksDbStore
     public required string StoreId { get; init; }
     public required string DbPath { get; init; }
     public required RocksDbConfig Config { get; init; }
-    public required ConcurrentDictionary<string, byte[]> Data { get; init; }
+    public required BoundedDictionary<string, byte[]> Data { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public long WriteCount { get; set; }
 }
@@ -465,7 +465,7 @@ public sealed record RocksDbStats
 /// </summary>
 public sealed class DistributedStateStoreStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DistributedStore> _stores = new();
+    private readonly BoundedDictionary<string, DistributedStore> _stores = new BoundedDictionary<string, DistributedStore>(1000);
 
     public override string StrategyId => "state-distributed";
     public override string DisplayName => "Distributed State Store";
@@ -499,14 +499,14 @@ public sealed class DistributedStateStoreStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
 
         var storeId = $"dist-{Guid.NewGuid():N}";
-        var partitions = new ConcurrentDictionary<int, PartitionState>();
+        var partitions = new BoundedDictionary<int, PartitionState>(1000);
 
         for (int i = 0; i < config.PartitionCount; i++)
         {
             partitions[i] = new PartitionState
             {
                 PartitionId = i,
-                Data = new ConcurrentDictionary<string, byte[]>(),
+                Data = new BoundedDictionary<string, byte[]>(1000),
                 Leader = config.Nodes[i % config.Nodes.Length]
             };
         }
@@ -620,7 +620,7 @@ public sealed class DistributedStateStoreStrategy : StreamingDataStrategyBase
         var partition = new PartitionState
         {
             PartitionId = partitionId,
-            Data = new ConcurrentDictionary<string, byte[]>(state),
+            Data = new BoundedDictionary<string, byte[]>(1000),
             Leader = store.Config.Nodes[partitionId % store.Config.Nodes.Length]
         };
 
@@ -652,14 +652,14 @@ internal sealed class DistributedStore
     public required string StoreId { get; init; }
     public required string Name { get; init; }
     public required DistributedStoreConfig Config { get; init; }
-    public required ConcurrentDictionary<int, PartitionState> Partitions { get; init; }
+    public required BoundedDictionary<int, PartitionState> Partitions { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }
 
 internal sealed class PartitionState
 {
     public int PartitionId { get; init; }
-    public required ConcurrentDictionary<string, byte[]> Data { get; init; }
+    public required BoundedDictionary<string, byte[]> Data { get; init; }
     public required string Leader { get; init; }
 }
 
@@ -673,7 +673,7 @@ internal sealed class PartitionState
 /// </summary>
 public sealed class ChangelogStateStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ChangelogStore> _stores = new();
+    private readonly BoundedDictionary<string, ChangelogStore> _stores = new BoundedDictionary<string, ChangelogStore>(1000);
 
     public override string StrategyId => "state-changelog";
     public override string DisplayName => "Changelog State Backend";
@@ -712,7 +712,7 @@ public sealed class ChangelogStateStrategy : StreamingDataStrategyBase
             StoreId = storeId,
             Name = storeName,
             Config = config ?? new ChangelogConfig(),
-            CurrentState = new ConcurrentDictionary<string, byte[]>(),
+            CurrentState = new BoundedDictionary<string, byte[]>(1000),
             Changelog = new List<ChangelogEntry>(),
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -734,7 +734,7 @@ public sealed class ChangelogStateStrategy : StreamingDataStrategyBase
         }
 
         store.CurrentState.TryGetValue(key, out var value);
-        return Task.FromResult(value);
+        return Task.FromResult<byte[]?>(value);
     }
 
     /// <summary>
@@ -928,7 +928,7 @@ internal sealed class ChangelogStore
     public required string StoreId { get; init; }
     public required string Name { get; init; }
     public required ChangelogConfig Config { get; init; }
-    public required ConcurrentDictionary<string, byte[]> CurrentState { get; init; }
+    public required BoundedDictionary<string, byte[]> CurrentState { get; init; }
     public required List<ChangelogEntry> Changelog { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public long SequenceNumber;

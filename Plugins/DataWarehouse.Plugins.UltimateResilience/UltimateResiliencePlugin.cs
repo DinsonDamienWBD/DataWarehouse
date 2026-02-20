@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -40,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateResilience;
 public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 {
     private readonly ResilienceStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
     // Statistics

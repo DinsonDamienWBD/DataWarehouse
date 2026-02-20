@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 
@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Retention;
 /// </remarks>
 public sealed class CascadingRetentionStrategy : RetentionStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RetentionTierInfo> _tierAssignments = new();
+    private readonly BoundedDictionary<string, RetentionTierInfo> _tierAssignments = new BoundedDictionary<string, RetentionTierInfo>(1000);
     private readonly int _dailyCount;
     private readonly int _weeklyCount;
     private readonly int _monthlyCount;

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 
@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Versioning;
 /// </remarks>
 public sealed class SemanticVersioningStrategy : VersioningStrategyBase
 {
-    private readonly ConcurrentDictionary<string, ObjectSemVerStore> _stores = new();
+    private readonly BoundedDictionary<string, ObjectSemVerStore> _stores = new BoundedDictionary<string, ObjectSemVerStore>(1000);
 
     /// <summary>
     /// Represents a semantic version.

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 {
@@ -33,9 +34,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// </remarks>
     public sealed class DataPseudonymizationStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PseudonymDomain> _domains = new();
-        private readonly ConcurrentDictionary<string, PseudonymMapping> _mappings = new();
-        private readonly ConcurrentDictionary<string, byte[]> _domainKeys = new();
+        private readonly BoundedDictionary<string, PseudonymDomain> _domains = new BoundedDictionary<string, PseudonymDomain>(1000);
+        private readonly BoundedDictionary<string, PseudonymMapping> _mappings = new BoundedDictionary<string, PseudonymMapping>(1000);
+        private readonly BoundedDictionary<string, byte[]> _domainKeys = new BoundedDictionary<string, byte[]>(1000);
         private readonly ConcurrentBag<PseudonymizationAuditEntry> _auditLog = new();
         private readonly SemaphoreSlim _keyLock = new(1, 1);
 

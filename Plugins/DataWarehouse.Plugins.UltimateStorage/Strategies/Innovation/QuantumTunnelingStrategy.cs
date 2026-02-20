@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _chunkSizeBytes = 1_048_576;
         private bool _enableCompression = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private readonly ConcurrentDictionary<string, TransferMetrics> _transferMetrics = new();
+        private readonly BoundedDictionary<string, TransferMetrics> _transferMetrics = new BoundedDictionary<string, TransferMetrics>(1000);
 
         public override string StrategyId => "quantum-tunneling";
         public override string Name => "Quantum Tunneling Storage";

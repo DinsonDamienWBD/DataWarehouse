@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -32,13 +31,13 @@ namespace DataWarehouse.Plugins.UltimateDataTransit.Audit;
 internal sealed class TransitAuditService
 {
     private readonly IMessageBus _messageBus;
-    private readonly ConcurrentDictionary<string, List<TransitAuditEntry>> _auditLog = new();
+    private readonly BoundedDictionary<string, List<TransitAuditEntry>> _auditLog = new BoundedDictionary<string, List<TransitAuditEntry>>(1000);
     private long _totalAuditEntries;
 
     /// <summary>
     /// Lock objects per transfer ID to synchronize list access within a single transfer.
     /// </summary>
-    private readonly ConcurrentDictionary<string, object> _transferLocks = new();
+    private readonly BoundedDictionary<string, object> _transferLocks = new BoundedDictionary<string, object>(1000);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransitAuditService"/> class.

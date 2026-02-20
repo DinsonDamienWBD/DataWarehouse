@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -23,10 +23,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class RegionRegistryStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, RegionDefinition> _regions = new();
-        private readonly ConcurrentDictionary<string, CountryInfo> _countries = new();
-        private readonly ConcurrentDictionary<string, List<string>> _countryToRegions = new();
-        private readonly ConcurrentDictionary<string, DataSharingAgreement> _agreements = new();
+        private readonly BoundedDictionary<string, RegionDefinition> _regions = new BoundedDictionary<string, RegionDefinition>(1000);
+        private readonly BoundedDictionary<string, CountryInfo> _countries = new BoundedDictionary<string, CountryInfo>(1000);
+        private readonly BoundedDictionary<string, List<string>> _countryToRegions = new BoundedDictionary<string, List<string>>(1000);
+        private readonly BoundedDictionary<string, DataSharingAgreement> _agreements = new BoundedDictionary<string, DataSharingAgreement>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "region-registry";

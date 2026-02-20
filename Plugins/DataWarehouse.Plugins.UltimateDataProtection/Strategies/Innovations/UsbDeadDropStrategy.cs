@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -24,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class UsbDeadDropStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, UsbBackupPackage> _packages = new();
-        private readonly ConcurrentDictionary<string, UsbDevice> _registeredDevices = new();
-        private readonly ConcurrentDictionary<string, CustodyRecord> _custodyChain = new();
+        private readonly BoundedDictionary<string, UsbBackupPackage> _packages = new BoundedDictionary<string, UsbBackupPackage>(1000);
+        private readonly BoundedDictionary<string, UsbDevice> _registeredDevices = new BoundedDictionary<string, UsbDevice>(1000);
+        private readonly BoundedDictionary<string, CustodyRecord> _custodyChain = new BoundedDictionary<string, CustodyRecord>(1000);
         private readonly List<TamperEvent> _tamperEvents = new();
         private readonly object _tamperLock = new();
 

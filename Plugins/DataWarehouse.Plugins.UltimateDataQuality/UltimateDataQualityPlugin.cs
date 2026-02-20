@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -35,8 +34,8 @@ namespace DataWarehouse.Plugins.UltimateDataQuality;
 public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataQualityStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
-    private readonly ConcurrentDictionary<string, QualityPolicy> _policies = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly BoundedDictionary<string, QualityPolicy> _policies = new BoundedDictionary<string, QualityPolicy>(1000);
     private bool _disposed;
 
     // Configuration

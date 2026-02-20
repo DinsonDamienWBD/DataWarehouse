@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.EventDriven;
 
@@ -12,9 +12,9 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.EventDriven;
 /// </summary>
 public sealed class EventSourcingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EventStream> _streams = new();
-    private readonly ConcurrentDictionary<string, List<StoredEvent>> _eventStore = new();
-    private readonly ConcurrentDictionary<string, Snapshot> _snapshots = new();
+    private readonly BoundedDictionary<string, EventStream> _streams = new BoundedDictionary<string, EventStream>(1000);
+    private readonly BoundedDictionary<string, List<StoredEvent>> _eventStore = new BoundedDictionary<string, List<StoredEvent>>(1000);
+    private readonly BoundedDictionary<string, Snapshot> _snapshots = new BoundedDictionary<string, Snapshot>(1000);
     private long _globalSequence;
 
     public override string StrategyId => "event-driven-sourcing";
@@ -251,10 +251,10 @@ public sealed class EventSourcingStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class CqrsStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CqrsAggregate> _aggregates = new();
-    private readonly ConcurrentDictionary<string, ICommandHandler> _commandHandlers = new();
-    private readonly ConcurrentDictionary<string, IQueryHandler> _queryHandlers = new();
-    private readonly ConcurrentDictionary<string, ReadModel> _readModels = new();
+    private readonly BoundedDictionary<string, CqrsAggregate> _aggregates = new BoundedDictionary<string, CqrsAggregate>(1000);
+    private readonly BoundedDictionary<string, ICommandHandler> _commandHandlers = new BoundedDictionary<string, ICommandHandler>(1000);
+    private readonly BoundedDictionary<string, IQueryHandler> _queryHandlers = new BoundedDictionary<string, IQueryHandler>(1000);
+    private readonly BoundedDictionary<string, ReadModel> _readModels = new BoundedDictionary<string, ReadModel>(1000);
 
     public override string StrategyId => "event-driven-cqrs";
     public override string DisplayName => "CQRS Pattern";
@@ -363,7 +363,7 @@ public sealed class CqrsStrategy : StreamingDataStrategyBase
         {
             ModelId = modelId,
             Config = config ?? new ReadModelConfig(),
-            Data = new ConcurrentDictionary<string, object>(),
+            Data = new BoundedDictionary<string, object>(1000),
             LastUpdated = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         };
@@ -425,9 +425,9 @@ public sealed class CqrsStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class SagaOrchestrationStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SagaDefinition> _definitions = new();
-    private readonly ConcurrentDictionary<string, SagaInstance> _instances = new();
-    private readonly ConcurrentDictionary<string, List<SagaEvent>> _sagaEvents = new();
+    private readonly BoundedDictionary<string, SagaDefinition> _definitions = new BoundedDictionary<string, SagaDefinition>(1000);
+    private readonly BoundedDictionary<string, SagaInstance> _instances = new BoundedDictionary<string, SagaInstance>(1000);
+    private readonly BoundedDictionary<string, List<SagaEvent>> _sagaEvents = new BoundedDictionary<string, List<SagaEvent>>(1000);
 
     public override string StrategyId => "event-driven-saga";
     public override string DisplayName => "Saga Orchestration";
@@ -742,9 +742,9 @@ public sealed class SagaOrchestrationStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class EventBusStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, EventTopic> _topics = new();
-    private readonly ConcurrentDictionary<string, List<Subscription>> _subscriptions = new();
-    private readonly ConcurrentDictionary<string, List<PublishedEvent>> _deadLetters = new();
+    private readonly BoundedDictionary<string, EventTopic> _topics = new BoundedDictionary<string, EventTopic>(1000);
+    private readonly BoundedDictionary<string, List<Subscription>> _subscriptions = new BoundedDictionary<string, List<Subscription>>(1000);
+    private readonly BoundedDictionary<string, List<PublishedEvent>> _deadLetters = new BoundedDictionary<string, List<PublishedEvent>>(1000);
     private long _totalEventsPublished;
 
     public override string StrategyId => "event-driven-bus";
@@ -967,9 +967,9 @@ public sealed class EventBusStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class DomainEventsStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, List<IDomainEventHandler>> _handlers = new();
-    private readonly ConcurrentDictionary<string, List<DomainEventRecord>> _eventLog = new();
-    private readonly ConcurrentDictionary<string, AggregateRoot> _aggregates = new();
+    private readonly BoundedDictionary<string, List<IDomainEventHandler>> _handlers = new BoundedDictionary<string, List<IDomainEventHandler>>(1000);
+    private readonly BoundedDictionary<string, List<DomainEventRecord>> _eventLog = new BoundedDictionary<string, List<DomainEventRecord>>(1000);
+    private readonly BoundedDictionary<string, AggregateRoot> _aggregates = new BoundedDictionary<string, AggregateRoot>(1000);
     private long _totalEventsDispatched;
 
     public override string StrategyId => "event-driven-domain-events";
@@ -1222,7 +1222,7 @@ public record ReadModel
 {
     public required string ModelId { get; init; }
     public required ReadModelConfig Config { get; init; }
-    public required ConcurrentDictionary<string, object> Data { get; init; }
+    public required BoundedDictionary<string, object> Data { get; init; }
     public DateTime LastUpdated { get; set; }
     public DateTime CreatedAt { get; init; }
 }

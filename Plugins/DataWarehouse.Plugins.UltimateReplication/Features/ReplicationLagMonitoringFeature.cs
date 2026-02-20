@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -33,8 +32,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, LagNodeStatus> _nodeStatus = new();
-        private readonly ConcurrentDictionary<string, List<LagSample>> _lagHistory = new();
+        private readonly BoundedDictionary<string, LagNodeStatus> _nodeStatus = new BoundedDictionary<string, LagNodeStatus>(1000);
+        private readonly BoundedDictionary<string, List<LagSample>> _lagHistory = new BoundedDictionary<string, List<LagSample>>(1000);
         private readonly int _maxHistorySamples;
         private bool _disposed;
         private IDisposable? _lagSubscription;

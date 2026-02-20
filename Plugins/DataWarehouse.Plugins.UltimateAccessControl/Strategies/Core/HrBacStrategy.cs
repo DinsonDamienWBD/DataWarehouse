@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -22,10 +22,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class HrBacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, HierarchicalRole> _roles = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _rolePermissions = new();
-        private readonly ConcurrentDictionary<string, HashSet<string>> _roleHierarchy = new(); // child -> parents
-        private readonly ConcurrentDictionary<string, HashSet<string>> _effectivePermissionsCache = new();
+        private readonly BoundedDictionary<string, HierarchicalRole> _roles = new BoundedDictionary<string, HierarchicalRole>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _rolePermissions = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _roleHierarchy = new BoundedDictionary<string, HashSet<string>>(1000); // child -> parents
+        private readonly BoundedDictionary<string, HashSet<string>> _effectivePermissionsCache = new BoundedDictionary<string, HashSet<string>>(1000);
         private readonly HashSet<(string, string)> _mutuallyExclusiveRoles = new();
 
         /// <inheritdoc/>

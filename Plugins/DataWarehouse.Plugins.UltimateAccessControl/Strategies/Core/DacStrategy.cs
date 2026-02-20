@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 {
@@ -22,8 +22,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </remarks>
     public sealed class DacStrategy : AccessControlStrategyBase
     {
-        private readonly ConcurrentDictionary<string, string> _resourceOwners = new();
-        private readonly ConcurrentDictionary<string, PermissionMatrix> _resourcePermissions = new();
+        private readonly BoundedDictionary<string, string> _resourceOwners = new BoundedDictionary<string, string>(1000);
+        private readonly BoundedDictionary<string, PermissionMatrix> _resourcePermissions = new BoundedDictionary<string, PermissionMatrix>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "dac";
@@ -281,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </summary>
     public sealed class PermissionMatrix
     {
-        private readonly ConcurrentDictionary<string, DacPermission> _permissions = new();
+        private readonly BoundedDictionary<string, DacPermission> _permissions = new BoundedDictionary<string, DacPermission>(1000);
 
         public void Grant(string subjectId, DacPermission permission)
         {

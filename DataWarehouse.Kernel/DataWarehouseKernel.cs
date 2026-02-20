@@ -10,7 +10,6 @@ using DataWarehouse.SDK.Services;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 // Use SDK's MessageTopics (not Kernel's removed duplicate)
 using static DataWarehouse.SDK.Contracts.MessageTopics;
 
@@ -38,7 +37,7 @@ namespace DataWarehouse.Kernel
         private readonly PluginCapabilityRegistry _capabilityRegistry;
         private readonly ILogger<DataWarehouseKernel>? _logger;
         private readonly CancellationTokenSource _shutdownCts = new();
-        private readonly ConcurrentDictionary<string, Task> _backgroundJobs = new();
+        private readonly BoundedDictionary<string, Task> _backgroundJobs = new BoundedDictionary<string, Task>(1000);
         private readonly SemaphoreSlim _initLock = new(1, 1);
 
         private readonly PluginLoader _pluginLoader;

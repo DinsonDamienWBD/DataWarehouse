@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 {
@@ -21,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </remarks>
     public sealed class ConnectionPoolManager : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<string, StrategyPool> _pools = new();
+        private readonly BoundedDictionary<string, StrategyPool> _pools = new BoundedDictionary<string, StrategyPool>(1000);
         private readonly Timer _evictionTimer;
         private volatile bool _disposed;
 

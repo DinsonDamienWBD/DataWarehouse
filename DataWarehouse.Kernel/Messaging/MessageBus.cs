@@ -134,15 +134,15 @@ namespace DataWarehouse.Kernel.Messaging
     /// </summary>
     public sealed class DefaultMessageBus(ILogger? logger = null) : IMessageBus
     {
-        private readonly ConcurrentDictionary<string, List<Subscription>> _subscriptions = new();
-        private readonly ConcurrentDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new();
-        private readonly ConcurrentDictionary<string, PatternSubscription> _patternSubscriptions = new();
+        private readonly BoundedDictionary<string, List<Subscription>> _subscriptions = new BoundedDictionary<string, List<Subscription>>(1000);
+        private readonly BoundedDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new BoundedDictionary<string, List<ResponseSubscription>>(1000);
+        private readonly BoundedDictionary<string, PatternSubscription> _patternSubscriptions = new BoundedDictionary<string, PatternSubscription>(1000);
         private readonly ILogger? _logger = logger;
         private readonly Lock _subscriptionLock = new();
         private long _subscriptionIdCounter;
 
         // BUS-03: Per-publisher rate limiting to prevent flooding DoS
-        private readonly ConcurrentDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new();
+        private readonly BoundedDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new BoundedDictionary<string, SlidingWindowRateLimiter>(1000);
 
         /// <summary>
         /// Maximum messages per second per publisher. Default: 1000.

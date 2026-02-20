@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -32,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateSDKPorts;
 public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
 {
     private readonly SDKPortStrategyRegistry _registry = new();
-    private readonly ConcurrentDictionary<string, SDKMethod> _globalMethods = new();
-    private readonly ConcurrentDictionary<string, TypeMapping> _globalTypeMappings = new();
+    private readonly BoundedDictionary<string, SDKMethod> _globalMethods = new BoundedDictionary<string, SDKMethod>(1000);
+    private readonly BoundedDictionary<string, TypeMapping> _globalTypeMappings = new BoundedDictionary<string, TypeMapping>(1000);
     private SDKPortStrategyBase? _activeStrategy;
     private CancellationTokenSource? _cts;
     private bool _disposed;

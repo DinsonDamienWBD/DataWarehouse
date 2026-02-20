@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.DataSemantic;
 
@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.DataSemantic;
 /// </remarks>
 internal sealed class SemanticMeaningExtractorStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemanticMeaning> _meanings = new();
+    private readonly BoundedDictionary<string, SemanticMeaning> _meanings = new BoundedDictionary<string, SemanticMeaning>(1000);
 
     private static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -276,8 +276,8 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ContextualRelevanceStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, Dictionary<string, int>> _documentTermFreqs = new();
-    private readonly ConcurrentDictionary<string, int> _documentFreqs = new();
+    private readonly BoundedDictionary<string, Dictionary<string, int>> _documentTermFreqs = new BoundedDictionary<string, Dictionary<string, int>>(1000);
+    private readonly BoundedDictionary<string, int> _documentFreqs = new BoundedDictionary<string, int>(1000);
     private int _totalDocuments;
 
     /// <inheritdoc/>
@@ -487,8 +487,8 @@ internal sealed record RelevanceResult(
 /// </remarks>
 internal sealed class DomainKnowledgeIntegratorStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, DomainGlossary> _glossaries = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, List<BusinessRule>> _rules = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, DomainGlossary> _glossaries = new BoundedDictionary<string, DomainGlossary>(1000);
+    private readonly BoundedDictionary<string, List<BusinessRule>> _rules = new BoundedDictionary<string, List<BusinessRule>>(1000);
 
     /// <inheritdoc/>
     public override string StrategyId => "data-semantic-domain-integrator";
@@ -520,7 +520,7 @@ internal sealed class DomainKnowledgeIntegratorStrategy : IntelligenceStrategyBa
     /// <param name="terms">Dictionary of term-to-definition mappings.</param>
     public void RegisterGlossary(string domain, Dictionary<string, string> terms)
     {
-        var glossaryTerms = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var glossaryTerms = new BoundedDictionary<string, string>(1000);
         foreach (var (term, definition) in terms)
         {
             glossaryTerms[term] = definition;
@@ -645,7 +645,7 @@ internal sealed class DomainKnowledgeIntegratorStrategy : IntelligenceStrategyBa
 /// </summary>
 internal sealed record DomainGlossary(
     string DomainName,
-    ConcurrentDictionary<string, string> Terms);
+    BoundedDictionary<string, string> Terms);
 
 /// <summary>
 /// A business rule associated with a domain, containing a condition and action.
@@ -697,7 +697,7 @@ internal sealed record GlossaryMatch(
 /// </remarks>
 internal sealed class CrossSystemSemanticMatchStrategy : IntelligenceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SystemSchema> _systems = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, SystemSchema> _systems = new BoundedDictionary<string, SystemSchema>(1000);
 
     private static readonly string[] CommonPrefixes = { "fk_", "pk_", "col_", "fld_" };
 
@@ -731,7 +731,7 @@ internal sealed class CrossSystemSemanticMatchStrategy : IntelligenceStrategyBas
     /// <param name="fields">Dictionary of field name to <see cref="FieldInfo"/> mappings.</param>
     public void RegisterSystem(string systemId, Dictionary<string, FieldInfo> fields)
     {
-        var fieldDict = new ConcurrentDictionary<string, FieldInfo>(StringComparer.OrdinalIgnoreCase);
+        var fieldDict = new BoundedDictionary<string, FieldInfo>(1000);
         foreach (var (name, info) in fields)
         {
             fieldDict[name] = info;
@@ -885,7 +885,7 @@ internal sealed class CrossSystemSemanticMatchStrategy : IntelligenceStrategyBas
 /// </summary>
 internal sealed record SystemSchema(
     string SystemId,
-    ConcurrentDictionary<string, FieldInfo> Fields);
+    BoundedDictionary<string, FieldInfo> Fields);
 
 /// <summary>
 /// Information about a field in a system schema, including its name, data type, optional description,

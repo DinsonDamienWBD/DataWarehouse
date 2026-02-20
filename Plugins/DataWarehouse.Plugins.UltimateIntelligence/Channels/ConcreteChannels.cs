@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Channels;
 
@@ -71,8 +72,8 @@ public static class ChannelTopics
 /// </remarks>
 public sealed class ChannelRegistry : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IIntelligenceChannel> _channels = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<ChannelType, List<string>> _channelsByType = new();
+    private readonly BoundedDictionary<string, IIntelligenceChannel> _channels = new BoundedDictionary<string, IIntelligenceChannel>(1000);
+    private readonly BoundedDictionary<ChannelType, List<string>> _channelsByType = new BoundedDictionary<ChannelType, List<string>>(1000);
     private readonly SemaphoreSlim _registrationLock = new(1, 1);
     private bool _disposed;
 
@@ -509,7 +510,7 @@ public sealed class RESTChannel : IntelligenceChannelBase
     private readonly HttpClient _httpClient;
     private readonly RESTChannelOptions _options;
     private readonly SemaphoreSlim _rateLimiter;
-    private readonly ConcurrentDictionary<string, PendingRequest> _pendingRequests = new();
+    private readonly BoundedDictionary<string, PendingRequest> _pendingRequests = new BoundedDictionary<string, PendingRequest>(1000);
     private bool _ownsHttpClient;
 
     /// <inheritdoc/>
@@ -805,7 +806,7 @@ public sealed class RESTChannelOptions
 public sealed class GRPCChannel : IntelligenceChannelBase
 {
     private readonly GRPCChannelOptions _options;
-    private readonly ConcurrentDictionary<string, GRPCCallState> _activeCalls = new();
+    private readonly BoundedDictionary<string, GRPCCallState> _activeCalls = new BoundedDictionary<string, GRPCCallState>(1000);
     private IGRPCClientAdapter? _clientAdapter;
     private Task? _streamingTask;
     private CancellationTokenSource? _streamingCts;
@@ -1449,7 +1450,7 @@ public sealed class PluginChannel : IntelligenceChannelBase
 {
     private readonly PluginChannelOptions _options;
     private readonly Channel<PrioritizedMessage> _priorityQueue;
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<IntelligenceResponse>> _pendingRequests = new();
+    private readonly BoundedDictionary<string, TaskCompletionSource<IntelligenceResponse>> _pendingRequests = new BoundedDictionary<string, TaskCompletionSource<IntelligenceResponse>>(1000);
     private readonly Func<IntelligenceRequest, CancellationToken, Task<IntelligenceResponse>>? _requestHandler;
     private Task? _processingTask;
     private CancellationTokenSource? _processingCts;

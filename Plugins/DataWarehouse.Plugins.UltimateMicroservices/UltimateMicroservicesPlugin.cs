@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -25,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateMicroservices;
 /// </summary>
 public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, MicroservicesStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ServiceInstance> _registeredServices = new();
-    private readonly ConcurrentDictionary<string, List<ServiceRequest>> _requestHistory = new();
+    private readonly BoundedDictionary<string, MicroservicesStrategyBase> _strategies = new BoundedDictionary<string, MicroservicesStrategyBase>(1000);
+    private readonly BoundedDictionary<string, ServiceInstance> _registeredServices = new BoundedDictionary<string, ServiceInstance>(1000);
+    private readonly BoundedDictionary<string, List<ServiceRequest>> _requestHistory = new BoundedDictionary<string, List<ServiceRequest>>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
 

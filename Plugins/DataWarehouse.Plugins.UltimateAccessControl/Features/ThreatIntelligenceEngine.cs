@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 {
@@ -13,8 +14,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// </summary>
     public sealed class ThreatIntelligenceEngine
     {
-        private readonly ConcurrentDictionary<string, ThreatFeed> _feeds = new();
-        private readonly ConcurrentDictionary<string, ThreatIndicator> _indicators = new();
+        private readonly BoundedDictionary<string, ThreatFeed> _feeds = new BoundedDictionary<string, ThreatFeed>(1000);
+        private readonly BoundedDictionary<string, ThreatIndicator> _indicators = new BoundedDictionary<string, ThreatIndicator>(1000);
         private readonly ConcurrentQueue<ThreatMatch> _recentMatches = new();
         private readonly int _maxMatchHistorySize = 1000;
 

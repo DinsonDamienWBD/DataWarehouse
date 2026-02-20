@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Features
 {
@@ -13,8 +13,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
     /// </summary>
     public sealed class AutomatedRemediationEngine
     {
-        private readonly ConcurrentDictionary<string, RemediationAction> _remediationActions = new();
-        private readonly ConcurrentDictionary<string, RemediationHistory> _history = new();
+        private readonly BoundedDictionary<string, RemediationAction> _remediationActions = new BoundedDictionary<string, RemediationAction>(1000);
+        private readonly BoundedDictionary<string, RemediationHistory> _history = new BoundedDictionary<string, RemediationHistory>(1000);
 
         /// <summary>
         /// Registers a remediation action for a specific violation code.

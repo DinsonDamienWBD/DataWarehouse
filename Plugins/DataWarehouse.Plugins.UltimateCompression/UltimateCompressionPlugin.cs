@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
@@ -55,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
     /// </remarks>
     public sealed class UltimateCompressionPlugin : HierarchyCompressionPluginBase
     {
-        private readonly ConcurrentDictionary<string, ICompressionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+        private readonly BoundedDictionary<string, ICompressionStrategy> _strategies = new BoundedDictionary<string, ICompressionStrategy>(1000);
         private ICompressionStrategy? _activeStrategy;
 
         // Statistics tracking

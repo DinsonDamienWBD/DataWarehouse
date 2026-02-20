@@ -1,5 +1,5 @@
 using DataWarehouse.SDK.Primitives;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 using DataWarehouse.SDK.Contracts.Hierarchy;
 
@@ -55,7 +55,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Additional context data added by interceptors.
         /// </summary>
-        public ConcurrentDictionary<string, object> Data { get; } = new();
+        public BoundedDictionary<string, object> Data { get; } = new BoundedDictionary<string, object>(1000);
 
         /// <summary>
         /// Access to the plugin registry for inter-plugin communication.
@@ -591,7 +591,7 @@ namespace DataWarehouse.SDK.Contracts
             var processingResults = await ProcessContentAsync(data, manifest, options, ct);
             var indexableContent = CreateIndexableContent(objectId, manifest, processingResults);
             if (data.CanSeek) data.Position = 0;
-            var destinationResults = new ConcurrentDictionary<WriteDestinationType, WriteDestinationResult>();
+            var destinationResults = new BoundedDictionary<WriteDestinationType, WriteDestinationResult>(1000);
 
             var requiredTasks = requiredDestinations.Select(async d => { var result = await WriteToDestinationAsync(d, objectId, indexableContent, ct); destinationResults[d.DestinationType] = result; return result; });
             var requiredResults = await Task.WhenAll(requiredTasks);

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies;
 
@@ -10,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies;
 /// </summary>
 public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
 {
-    private readonly ConcurrentDictionary<string, RenewableRegionData> _regionData = new();
-    private readonly ConcurrentDictionary<string, List<RoutingDecision>> _routingHistory = new();
+    private readonly BoundedDictionary<string, RenewableRegionData> _regionData = new BoundedDictionary<string, RenewableRegionData>(1000);
+    private readonly BoundedDictionary<string, List<RoutingDecision>> _routingHistory = new BoundedDictionary<string, List<RoutingDecision>>(1000);
     private readonly HttpClient _httpClient;
     private string _apiToken = "";
 

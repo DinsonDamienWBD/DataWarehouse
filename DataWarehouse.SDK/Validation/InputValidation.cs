@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Validation;
 
@@ -180,7 +180,7 @@ public sealed class ValidationException : Exception
 /// </summary>
 public sealed class InputValidator : IInputValidator
 {
-    private readonly ConcurrentDictionary<Type, object> _validators = new();
+    private readonly BoundedDictionary<Type, object> _validators = new BoundedDictionary<Type, object>(1000);
     private readonly InputValidatorConfig _config;
 
     public InputValidator(InputValidatorConfig? config = null)

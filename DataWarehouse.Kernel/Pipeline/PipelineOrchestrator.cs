@@ -4,7 +4,6 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 // Use SDK's MessageTopics
 using static DataWarehouse.SDK.Contracts.MessageTopics;
@@ -32,7 +31,7 @@ namespace DataWarehouse.Kernel.Pipeline
         private readonly DefaultMessageBus _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
         private readonly ILogger? _logger = logger;
         private readonly IDistributedTracing? _tracing = tracing;
-        private readonly ConcurrentDictionary<string, IDataTransformation> _stages = new();
+        private readonly BoundedDictionary<string, IDataTransformation> _stages = new BoundedDictionary<string, IDataTransformation>(1000);
         private readonly Lock _configLock = new();
 
         private PipelineConfiguration _currentConfig = PipelineConfiguration.CreateDefault();

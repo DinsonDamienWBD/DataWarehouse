@@ -3,6 +3,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot;
 
@@ -16,11 +17,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot;
 /// </remarks>
 public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDisposable
 {
-    private readonly ConcurrentDictionary<string, DeceptionEnvironment> _environments = new();
-    private readonly ConcurrentDictionary<string, MisdirectionPath> _misdirectionPaths = new();
-    private readonly ConcurrentDictionary<string, ThreatLure> _threatLures = new();
+    private readonly BoundedDictionary<string, DeceptionEnvironment> _environments = new BoundedDictionary<string, DeceptionEnvironment>(1000);
+    private readonly BoundedDictionary<string, MisdirectionPath> _misdirectionPaths = new BoundedDictionary<string, MisdirectionPath>(1000);
+    private readonly BoundedDictionary<string, ThreatLure> _threatLures = new BoundedDictionary<string, ThreatLure>(1000);
     private readonly ConcurrentQueue<DeceptionEvent> _eventQueue = new();
-    private readonly ConcurrentDictionary<string, AttackerProfile> _attackerProfiles = new();
+    private readonly BoundedDictionary<string, AttackerProfile> _attackerProfiles = new BoundedDictionary<string, AttackerProfile>(1000);
     private readonly List<IDeceptionEventHandler> _eventHandlers = new();
 
     private Timer? _environmentRotationTimer;

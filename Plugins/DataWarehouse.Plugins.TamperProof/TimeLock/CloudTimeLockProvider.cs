@@ -1,7 +1,6 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
@@ -42,7 +41,7 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
     /// Cloud lock metadata store tracking lock entries with references to cloud retention policies.
     /// The actual enforcement is performed by cloud infrastructure (S3 Object Lock, Azure Immutable Blob, GCS Retention).
     /// </summary>
-    private readonly ConcurrentDictionary<Guid, CloudTimeLockEntry> _cloudLocks = new();
+    private readonly BoundedDictionary<Guid, CloudTimeLockEntry> _cloudLocks = new BoundedDictionary<Guid, CloudTimeLockEntry>(1000);
 
     /// <summary>
     /// Supported cloud provider identifiers for retention API delegation.

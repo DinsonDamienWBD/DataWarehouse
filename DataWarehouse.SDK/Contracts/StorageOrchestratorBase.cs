@@ -1,5 +1,5 @@
-﻿using DataWarehouse.SDK.Primitives;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -11,14 +11,14 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public abstract class StoragePoolBase : Hierarchy.InfrastructurePluginBase, IStoragePool
     {
-        protected readonly ConcurrentDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new();
+        protected readonly BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)>(1000);
         protected IStorageStrategy _strategy;
 
         /// <summary>
         /// Per-URI locks to prevent concurrent writes to the same resource.
         /// Uses SemaphoreSlim for async-safe locking.
         /// </summary>
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _uriLocks = new();
+        private readonly BoundedDictionary<string, SemaphoreSlim> _uriLocks = new BoundedDictionary<string, SemaphoreSlim>(1000);
 
         /// <summary>
         /// Gets or creates a lock for the specified URI.

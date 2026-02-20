@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 {
@@ -15,8 +15,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// </summary>
     public sealed class ComplianceReportingStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, ComplianceReport> _reports = new();
-        private readonly ConcurrentDictionary<string, List<ComplianceEvent>> _events = new();
+        private readonly BoundedDictionary<string, ComplianceReport> _reports = new BoundedDictionary<string, ComplianceReport>(1000);
+        private readonly BoundedDictionary<string, List<ComplianceEvent>> _events = new BoundedDictionary<string, List<ComplianceEvent>>(1000);
         private Timer? _reportGenerationTimer;
 
         /// <inheritdoc/>

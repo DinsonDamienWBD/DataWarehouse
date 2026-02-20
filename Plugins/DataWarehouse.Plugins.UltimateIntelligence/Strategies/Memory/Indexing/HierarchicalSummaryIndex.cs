@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 
@@ -19,10 +19,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// </summary>
 public sealed class HierarchicalSummaryIndex : ContextIndexBase
 {
-    private readonly ConcurrentDictionary<string, SummaryNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, IndexedEntry> _entries = new();
-    private readonly ConcurrentDictionary<string, HashSet<string>> _childIndex = new();
-    private readonly ConcurrentDictionary<string, string> _entryToNode = new();
+    private readonly BoundedDictionary<string, SummaryNode> _nodes = new BoundedDictionary<string, SummaryNode>(1000);
+    private readonly BoundedDictionary<string, IndexedEntry> _entries = new BoundedDictionary<string, IndexedEntry>(1000);
+    private readonly BoundedDictionary<string, HashSet<string>> _childIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    private readonly BoundedDictionary<string, string> _entryToNode = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _treeLock = new();
 
     private const string RootNodeId = "root";

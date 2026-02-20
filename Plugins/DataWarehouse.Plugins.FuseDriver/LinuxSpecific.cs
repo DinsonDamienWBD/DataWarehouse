@@ -3,10 +3,10 @@
 // Licensed under the MIT License.
 // </copyright>
 
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.FuseDriver;
 
@@ -18,8 +18,8 @@ public sealed class LinuxSpecific : IDisposable
 {
     private readonly FuseConfig _config;
     private readonly IKernelContext? _kernelContext;
-    private readonly ConcurrentDictionary<string, int> _inotifyWatches = new();
-    private readonly ConcurrentDictionary<string, string> _selinuxLabels = new();
+    private readonly BoundedDictionary<string, int> _inotifyWatches = new BoundedDictionary<string, int>(1000);
+    private readonly BoundedDictionary<string, string> _selinuxLabels = new BoundedDictionary<string, string>(1000);
     private readonly object _inotifyLock = new();
     private int _inotifyFd = -1;
     private Thread? _inotifyThread;

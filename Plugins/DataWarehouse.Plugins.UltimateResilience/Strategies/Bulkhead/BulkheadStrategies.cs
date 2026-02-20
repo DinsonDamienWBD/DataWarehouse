@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Bulkhead;
 
@@ -299,8 +300,8 @@ public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposa
 /// </summary>
 public sealed class PartitionBulkheadStrategy : ResilienceStrategyBase
 {
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _partitions = new();
-    private readonly ConcurrentDictionary<string, int> _activeByPartition = new();
+    private readonly BoundedDictionary<string, SemaphoreSlim> _partitions = new BoundedDictionary<string, SemaphoreSlim>(1000);
+    private readonly BoundedDictionary<string, int> _activeByPartition = new BoundedDictionary<string, int>(1000);
     private readonly int _defaultPartitionSize;
     private readonly Dictionary<string, int> _partitionSizes;
 

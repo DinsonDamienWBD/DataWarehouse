@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 {
@@ -24,11 +24,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class SneakernetOrchestratorStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, SneakernetPackage> _packages = new();
-        private readonly ConcurrentDictionary<string, CourierAssignment> _courierAssignments = new();
-        private readonly ConcurrentDictionary<string, DeliveryRoute> _routes = new();
-        private readonly ConcurrentDictionary<string, HandoffRecord> _handoffs = new();
-        private readonly ConcurrentDictionary<string, CourierCredential> _couriers = new();
+        private readonly BoundedDictionary<string, SneakernetPackage> _packages = new BoundedDictionary<string, SneakernetPackage>(1000);
+        private readonly BoundedDictionary<string, CourierAssignment> _courierAssignments = new BoundedDictionary<string, CourierAssignment>(1000);
+        private readonly BoundedDictionary<string, DeliveryRoute> _routes = new BoundedDictionary<string, DeliveryRoute>(1000);
+        private readonly BoundedDictionary<string, HandoffRecord> _handoffs = new BoundedDictionary<string, HandoffRecord>(1000);
+        private readonly BoundedDictionary<string, CourierCredential> _couriers = new BoundedDictionary<string, CourierCredential>(1000);
 
         /// <summary>
         /// Interface for courier management system.

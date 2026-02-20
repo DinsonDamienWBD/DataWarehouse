@@ -1,7 +1,7 @@
 // 91.G: Performance Optimization - Parallel Parity, SIMD, Write Coalescing, Prefetch, Caching, I/O Scheduling, QoS
-using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -245,7 +245,7 @@ public sealed class RaidPerformanceOptimizer
 /// </summary>
 public sealed class WriteCoalescer
 {
-    private readonly ConcurrentDictionary<string, CoalesceBatch> _batches = new();
+    private readonly BoundedDictionary<string, CoalesceBatch> _batches = new BoundedDictionary<string, CoalesceBatch>(1000);
     private readonly WriteCoalescingConfig _config;
     private long _totalWrites;
     private long _coalescedWrites;
@@ -335,7 +335,7 @@ public sealed class WriteCoalescer
 /// </summary>
 public sealed class ReadAheadPrefetcher
 {
-    private readonly ConcurrentDictionary<string, PrefetchCache> _caches = new();
+    private readonly BoundedDictionary<string, PrefetchCache> _caches = new BoundedDictionary<string, PrefetchCache>(1000);
     private readonly PrefetchConfig _config;
     private long _cacheHits;
     private long _cacheMisses;
@@ -409,7 +409,7 @@ public sealed class ReadAheadPrefetcher
 /// </summary>
 public sealed class WriteBackCache
 {
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+    private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
     private readonly WriteCacheConfig _config;
     private long _totalBytes;
 
@@ -588,8 +588,8 @@ public sealed class IoScheduler
 /// </summary>
 public sealed class QosEnforcer
 {
-    private readonly ConcurrentDictionary<string, QosPolicy> _policies = new();
-    private readonly ConcurrentDictionary<string, QosStatistics> _statistics = new();
+    private readonly BoundedDictionary<string, QosPolicy> _policies = new BoundedDictionary<string, QosPolicy>(1000);
+    private readonly BoundedDictionary<string, QosStatistics> _statistics = new BoundedDictionary<string, QosStatistics>(1000);
     private readonly QosConfig _config;
 
     public QosEnforcer(QosConfig? config = null)
@@ -745,7 +745,7 @@ public sealed class CoalescedWriteResult
 
 public sealed class PrefetchCache
 {
-    private readonly ConcurrentDictionary<long, byte[]> _data = new();
+    private readonly BoundedDictionary<long, byte[]> _data = new BoundedDictionary<long, byte[]>(1000);
     public bool TryGet(long offset, int length, out byte[]? data) => _data.TryGetValue(offset, out data);
     public bool Contains(long offset) => _data.ContainsKey(offset);
     public void Add(long offset, byte[] data) => _data[offset] = data;

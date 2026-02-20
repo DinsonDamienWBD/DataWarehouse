@@ -29,8 +29,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     /// </remarks>
     public sealed class AiPredictiveBackupStrategy : DataProtectionStrategyBase
     {
-        private readonly ConcurrentDictionary<string, PredictiveBackupMetadata> _backups = new();
-        private readonly ConcurrentDictionary<string, FileActivityPattern> _activityPatterns = new();
+        private readonly BoundedDictionary<string, PredictiveBackupMetadata> _backups = new BoundedDictionary<string, PredictiveBackupMetadata>(1000);
+        private readonly BoundedDictionary<string, FileActivityPattern> _activityPatterns = new BoundedDictionary<string, FileActivityPattern>(1000);
         private readonly ConcurrentQueue<PredictedBackupTask> _stagedBackups = new();
         private readonly SemaphoreSlim _predictionLock = new(1, 1);
 

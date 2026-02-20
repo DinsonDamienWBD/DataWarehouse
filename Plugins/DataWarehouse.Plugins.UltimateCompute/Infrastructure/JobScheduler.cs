@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts.Compute;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Infrastructure;
 
@@ -21,8 +21,8 @@ namespace DataWarehouse.Plugins.UltimateCompute.Infrastructure;
 internal sealed class JobScheduler : IDisposable
 {
     private readonly PriorityQueue<ScheduledJob, int> _queue = new();
-    private readonly ConcurrentDictionary<string, ScheduledJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellations = new();
+    private readonly BoundedDictionary<string, ScheduledJob> _jobs = new BoundedDictionary<string, ScheduledJob>(1000);
+    private readonly BoundedDictionary<string, CancellationTokenSource> _cancellations = new BoundedDictionary<string, CancellationTokenSource>(1000);
     private readonly SemaphoreSlim _concurrencySemaphore;
     private readonly object _queueLock = new();
     private readonly int _maxConcurrency;

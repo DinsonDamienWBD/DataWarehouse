@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -73,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateReplication
     /// </summary>
     public sealed class EnhancedVectorClock
     {
-        private readonly ConcurrentDictionary<string, long> _clock = new();
+        private readonly BoundedDictionary<string, long> _clock = new BoundedDictionary<string, long>(1000);
         private readonly object _lock = new();
 
         /// <summary>
@@ -256,7 +255,7 @@ namespace DataWarehouse.Plugins.UltimateReplication
     /// </summary>
     public sealed class ReplicationLagTracker
     {
-        private readonly ConcurrentDictionary<string, LagEntry> _lagEntries = new();
+        private readonly BoundedDictionary<string, LagEntry> _lagEntries = new BoundedDictionary<string, LagEntry>(1000);
 
         private sealed class LagEntry
         {
@@ -330,8 +329,8 @@ namespace DataWarehouse.Plugins.UltimateReplication
     /// </summary>
     public sealed class AntiEntropyProtocol
     {
-        private readonly ConcurrentDictionary<string, EnhancedVectorClock> _nodeVersions = new();
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastSyncTimes = new();
+        private readonly BoundedDictionary<string, EnhancedVectorClock> _nodeVersions = new BoundedDictionary<string, EnhancedVectorClock>(1000);
+        private readonly BoundedDictionary<string, DateTimeOffset> _lastSyncTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
         private readonly TimeSpan _syncInterval;
         private readonly Random _random = new();
 

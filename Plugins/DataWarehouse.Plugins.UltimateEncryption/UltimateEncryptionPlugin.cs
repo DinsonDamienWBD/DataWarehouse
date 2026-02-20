@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
@@ -48,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption;
 public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, IDisposable
 {
     private readonly EncryptionStrategyRegistry _registry;
-    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
 

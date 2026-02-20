@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading;
 using DataWarehouse.SDK.AI;
@@ -28,8 +27,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence;
 [PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hierarchy.DataTransformationPluginBase
 {
-    private readonly ConcurrentDictionary<string, IIntelligenceStrategy> _allStrategies = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<IntelligenceStrategyCategory, ConcurrentDictionary<string, IIntelligenceStrategy>> _strategiesByCategory = new();
+    private readonly BoundedDictionary<string, IIntelligenceStrategy> _allStrategies = new BoundedDictionary<string, IIntelligenceStrategy>(1000);
+    private readonly BoundedDictionary<IntelligenceStrategyCategory, BoundedDictionary<string, IIntelligenceStrategy>> _strategiesByCategory = new BoundedDictionary<IntelligenceStrategyCategory, BoundedDictionary<string, IIntelligenceStrategy>>(1000);
 
     // Active strategies by category
     private IIntelligenceStrategy? _activeAIProvider;
@@ -71,7 +70,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         // Initialize category dictionaries
         foreach (IntelligenceStrategyCategory category in Enum.GetValues<IntelligenceStrategyCategory>())
         {
-            _strategiesByCategory[category] = new ConcurrentDictionary<string, IIntelligenceStrategy>(StringComparer.OrdinalIgnoreCase);
+            _strategiesByCategory[category] = new BoundedDictionary<string, IIntelligenceStrategy>(1000);
         }
 
         DiscoverAndRegisterStrategies();

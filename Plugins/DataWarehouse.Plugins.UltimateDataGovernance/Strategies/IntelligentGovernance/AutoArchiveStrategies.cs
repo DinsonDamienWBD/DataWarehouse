@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Consciousness;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.IntelligentGovernance;
 
@@ -376,7 +376,7 @@ public sealed class TieredAutoArchiveStrategy : ConsciousnessStrategyBase
 
     private static readonly string[] TierOrder = { "hot", "warm", "cold", "archive", "deep_archive" };
 
-    private readonly ConcurrentDictionary<string, List<TierTransition>> _transitionLog = new();
+    private readonly BoundedDictionary<string, List<TierTransition>> _transitionLog = new BoundedDictionary<string, List<TierTransition>>(1000);
 
     /// <inheritdoc />
     public override string StrategyId => "auto-archive-tiered";
@@ -523,7 +523,7 @@ public sealed class AutoArchiveOrchestrator : ConsciousnessStrategyBase
     private readonly ThresholdAutoArchiveStrategy _thresholdStrategy = new();
     private readonly AgeBasedAutoArchiveStrategy _ageBasedStrategy = new();
     private readonly TieredAutoArchiveStrategy _tieredStrategy = new();
-    private readonly ConcurrentDictionary<string, ArchiveDecision> _decisions = new();
+    private readonly BoundedDictionary<string, ArchiveDecision> _decisions = new BoundedDictionary<string, ArchiveDecision>(1000);
 
     /// <summary>
     /// The message bus topic this orchestrator subscribes to for archive recommendations.

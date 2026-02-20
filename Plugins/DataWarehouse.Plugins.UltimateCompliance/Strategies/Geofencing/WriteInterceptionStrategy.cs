@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -23,9 +24,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class WriteInterceptionStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, StorageNodeInfo> _storageNodes = new();
-        private readonly ConcurrentDictionary<string, WritePolicy> _writePolicies = new();
-        private readonly ConcurrentDictionary<string, WriteInterceptionStats> _stats = new();
+        private readonly BoundedDictionary<string, StorageNodeInfo> _storageNodes = new BoundedDictionary<string, StorageNodeInfo>(1000);
+        private readonly BoundedDictionary<string, WritePolicy> _writePolicies = new BoundedDictionary<string, WritePolicy>(1000);
+        private readonly BoundedDictionary<string, WriteInterceptionStats> _stats = new BoundedDictionary<string, WriteInterceptionStats>(1000);
         private readonly ConcurrentBag<WriteInterceptionEvent> _auditLog = new();
 
         private bool _enforceMode = true;

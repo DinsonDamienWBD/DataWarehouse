@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 
@@ -30,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RealTime;
 /// </remarks>
 internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    private readonly ConcurrentDictionary<string, WebSocketConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _rooms = new();
+    private readonly BoundedDictionary<string, WebSocketConnection> _connections = new BoundedDictionary<string, WebSocketConnection>(1000);
+    private readonly BoundedDictionary<string, ConcurrentBag<string>> _rooms = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
     private CancellationTokenSource? _heartbeatCts;
     private Task? _heartbeatTask;
 

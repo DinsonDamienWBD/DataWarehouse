@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 {
@@ -32,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// </remarks>
     public sealed class GeofencingStrategy : ComplianceStrategyBase
     {
-        private readonly ConcurrentDictionary<string, GeofenceZone> _zones = new();
-        private readonly ConcurrentDictionary<string, DataClassificationPolicy> _policies = new();
-        private readonly ConcurrentDictionary<string, List<string>> _dataResidencyRequirements = new();
+        private readonly BoundedDictionary<string, GeofenceZone> _zones = new BoundedDictionary<string, GeofenceZone>(1000);
+        private readonly BoundedDictionary<string, DataClassificationPolicy> _policies = new BoundedDictionary<string, DataClassificationPolicy>(1000);
+        private readonly BoundedDictionary<string, List<string>> _dataResidencyRequirements = new BoundedDictionary<string, List<string>>(1000);
 
         // Regulatory zone mappings
         private static readonly Dictionary<string, HashSet<string>> _regulatoryZones = new()

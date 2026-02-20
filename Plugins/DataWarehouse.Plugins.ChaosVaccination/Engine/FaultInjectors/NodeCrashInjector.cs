@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,7 +18,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination.Engine.FaultInjectors;
 public sealed class NodeCrashInjector : IFaultInjector
 {
     private readonly IMessageBus? _messageBus;
-    private readonly ConcurrentDictionary<string, NodeCrashState> _activeCrashes = new();
+    private readonly BoundedDictionary<string, NodeCrashState> _activeCrashes = new BoundedDictionary<string, NodeCrashState>(1000);
 
     /// <summary>
     /// Tracks the state of an active node crash simulation.

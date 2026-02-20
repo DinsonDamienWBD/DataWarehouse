@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Analytics;
 
@@ -11,8 +11,8 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Analytics;
 /// </summary>
 public sealed class RealTimeAggregationStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, AggregationJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, AggregationState> _states = new();
+    private readonly BoundedDictionary<string, AggregationJob> _jobs = new BoundedDictionary<string, AggregationJob>(1000);
+    private readonly BoundedDictionary<string, AggregationState> _states = new BoundedDictionary<string, AggregationState>(1000);
 
     public override string StrategyId => "analytics-aggregation";
     public override string DisplayName => "Real-time Aggregation";
@@ -59,7 +59,7 @@ public sealed class RealTimeAggregationStrategy : StreamingDataStrategyBase
         _states[jobId] = new AggregationState
         {
             JobId = jobId,
-            Aggregates = new ConcurrentDictionary<string, AggregateValue>()
+            Aggregates = new BoundedDictionary<string, AggregateValue>(1000)
         };
 
         RecordOperation("CreateAggregationJob");
@@ -213,9 +213,9 @@ public sealed class RealTimeAggregationStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class ComplexEventProcessingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, CepEngine> _engines = new();
-    private readonly ConcurrentDictionary<string, CepPattern> _patterns = new();
-    private readonly ConcurrentDictionary<string, List<PartialMatch>> _partialMatches = new();
+    private readonly BoundedDictionary<string, CepEngine> _engines = new BoundedDictionary<string, CepEngine>(1000);
+    private readonly BoundedDictionary<string, CepPattern> _patterns = new BoundedDictionary<string, CepPattern>(1000);
+    private readonly BoundedDictionary<string, List<PartialMatch>> _partialMatches = new BoundedDictionary<string, List<PartialMatch>>(1000);
 
     public override string StrategyId => "analytics-cep";
     public override string DisplayName => "Complex Event Processing";
@@ -461,9 +461,9 @@ public sealed class ComplexEventProcessingStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, MlModel> _models = new();
-    private readonly ConcurrentDictionary<string, InferenceJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, ModelMetrics> _metrics = new();
+    private readonly BoundedDictionary<string, MlModel> _models = new BoundedDictionary<string, MlModel>(1000);
+    private readonly BoundedDictionary<string, InferenceJob> _jobs = new BoundedDictionary<string, InferenceJob>(1000);
+    private readonly BoundedDictionary<string, ModelMetrics> _metrics = new BoundedDictionary<string, ModelMetrics>(1000);
 
     public override string StrategyId => "analytics-ml-inference";
     public override string DisplayName => "ML Inference Streaming";
@@ -724,8 +724,8 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, TimeSeriesAnalyzer> _analyzers = new();
-    private readonly ConcurrentDictionary<string, List<TimeSeriesPoint>> _buffers = new();
+    private readonly BoundedDictionary<string, TimeSeriesAnalyzer> _analyzers = new BoundedDictionary<string, TimeSeriesAnalyzer>(1000);
+    private readonly BoundedDictionary<string, List<TimeSeriesPoint>> _buffers = new BoundedDictionary<string, List<TimeSeriesPoint>>(1000);
 
     public override string StrategyId => "analytics-timeseries";
     public override string DisplayName => "Time Series Analytics";
@@ -888,8 +888,8 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 /// </summary>
 public sealed class StreamingSqlQueryStrategy : StreamingDataStrategyBase
 {
-    private readonly ConcurrentDictionary<string, StreamingQuery> _queries = new();
-    private readonly ConcurrentDictionary<string, StreamTable> _tables = new();
+    private readonly BoundedDictionary<string, StreamingQuery> _queries = new BoundedDictionary<string, StreamingQuery>(1000);
+    private readonly BoundedDictionary<string, StreamTable> _tables = new BoundedDictionary<string, StreamTable>(1000);
 
     public override string StrategyId => "analytics-streaming-sql";
     public override string DisplayName => "Streaming SQL Query";
@@ -1306,7 +1306,7 @@ public record AggregationJobConfig
 public record AggregationState
 {
     public required string JobId { get; init; }
-    public required ConcurrentDictionary<string, AggregateValue> Aggregates { get; init; }
+    public required BoundedDictionary<string, AggregateValue> Aggregates { get; init; }
 }
 
 public class AggregateValue

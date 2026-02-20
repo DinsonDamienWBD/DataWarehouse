@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Carbon;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.GreenPlacement;
 
@@ -13,8 +13,8 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.GreenPlacement
 /// </summary>
 public sealed class BackendGreenScoreRegistry
 {
-    private readonly ConcurrentDictionary<string, GreenScore> _scores = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _backendRegions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedDictionary<string, GreenScore> _scores = new BoundedDictionary<string, GreenScore>(1000);
+    private readonly BoundedDictionary<string, string> _backendRegions = new BoundedDictionary<string, string>(1000);
     private readonly string? _persistencePath;
 
     // Scoring weights

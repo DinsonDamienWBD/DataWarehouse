@@ -1,12 +1,12 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 {
@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class IoTStorageStrategy : UltimateStorageStrategyBase
     {
         private string _basePath = string.Empty;
-        private readonly ConcurrentDictionary<string, DeviceShard> _deviceShards = new();
-        private readonly ConcurrentDictionary<string, TimeSeriesBuffer> _timeSeriesBuffers = new();
+        private readonly BoundedDictionary<string, DeviceShard> _deviceShards = new BoundedDictionary<string, DeviceShard>(1000);
+        private readonly BoundedDictionary<string, TimeSeriesBuffer> _timeSeriesBuffers = new BoundedDictionary<string, TimeSeriesBuffer>(1000);
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private int _shardCount = 256;
 

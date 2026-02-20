@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -36,9 +35,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     {
         private readonly ReplicationStrategyRegistry _registry;
         private readonly IMessageBus _messageBus;
-        private readonly ConcurrentDictionary<string, ShardDistributionRecord> _shardRecords = new();
-        private readonly ConcurrentDictionary<string, GeoShardRegion> _regions = new();
-        private readonly ConcurrentDictionary<string, ShardHealthRecord> _shardHealth = new();
+        private readonly BoundedDictionary<string, ShardDistributionRecord> _shardRecords = new BoundedDictionary<string, ShardDistributionRecord>(1000);
+        private readonly BoundedDictionary<string, GeoShardRegion> _regions = new BoundedDictionary<string, GeoShardRegion>(1000);
+        private readonly BoundedDictionary<string, ShardHealthRecord> _shardHealth = new BoundedDictionary<string, ShardHealthRecord>(1000);
         private readonly int _defaultDataShards;
         private readonly int _defaultParityShards;
         private bool _disposed;

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -26,7 +25,7 @@ namespace DataWarehouse.SDK.Tags;
 [SdkCompatibility("5.0.0", Notes = "Phase 55: Default tag policy engine")]
 public sealed class DefaultTagPolicyEngine : ITagPolicyEngine
 {
-    private readonly ConcurrentDictionary<string, TagPolicy> _policies = new(StringComparer.Ordinal);
+    private readonly BoundedDictionary<string, TagPolicy> _policies = new BoundedDictionary<string, TagPolicy>(1000);
     private readonly IMessageBus? _messageBus;
 
     /// <summary>
@@ -69,7 +68,7 @@ public sealed class DefaultTagPolicyEngine : ITagPolicyEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(policyId);
         ct.ThrowIfCancellationRequested();
         _policies.TryGetValue(policyId, out var policy);
-        return Task.FromResult(policy);
+        return Task.FromResult<TagPolicy?>(policy);
     }
 
     /// <inheritdoc />
