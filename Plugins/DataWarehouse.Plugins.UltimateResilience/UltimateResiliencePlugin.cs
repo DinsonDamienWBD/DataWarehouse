@@ -640,6 +640,13 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     #region ResiliencePluginBase Implementation
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Looks up the named resilience strategy from the registry and delegates execution
+    /// to <see cref="IResilienceStrategy.ExecuteAsync{T}"/>, which applies the strategy's
+    /// full policy (circuit breaker, retry, timeout, bulkhead, etc.) around the action.
+    /// Throws <see cref="AggregateException"/> if the strategy-protected execution fails
+    /// after all retry attempts.
+    /// </remarks>
     public override async Task<T> ExecuteWithResilienceAsync<T>(
         Func<CancellationToken, Task<T>> action,
         string policyName,
@@ -656,17 +663,33 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
         Interlocked.Increment(ref _totalExecutions);
         IncrementUsageStats(policyName);
 
-        try
+        // Delegate to the strategy so its full policy (retry, circuit breaker, timeout,
+        // bulkhead, etc.) is applied — not a bare passthrough to action(ct).
+        var result = await strategy.ExecuteAsync(action, context: null, cancellationToken: ct)
+            .ConfigureAwait(false);
+
+        if (result.Success)
         {
-            var result = await action(ct).ConfigureAwait(false);
             Interlocked.Increment(ref _successfulExecutions);
-            return result;
+            return result.Value!;
         }
-        catch (Exception)
+
+        // Track failure and surface the exception to the caller.
+        Interlocked.Increment(ref _failedExecutions);
+
+        if (result.UsedFallback)
         {
-            Interlocked.Increment(ref _failedExecutions);
-            throw;
+            Interlocked.Increment(ref _fallbackInvocations);
         }
+
+        if (result.Exception != null)
+        {
+            // Preserve the original stack trace via ExceptionDispatchInfo when possible.
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.Exception).Throw();
+        }
+
+        throw new InvalidOperationException(
+            $"ExecuteWithResilienceAsync: policy '{policyName}' reported failure but provided no exception.");
     }
 
     /// <inheritdoc/>
