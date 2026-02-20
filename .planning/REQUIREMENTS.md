@@ -192,14 +192,17 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 - [ ] **INTG-07**: Tamper detection tests for all 5 response levels
 - [ ] **INTG-08**: Migration tests (v1.0 → v2.0)
 
-## v7.0+ Future Requirements
+### VDE Advanced Features (VADV)
 
-- **VFUT-01**: VDE-level index/metadata separation across VDEs
-- **VFUT-02**: Online defragmentation via region indirection
-- **VFUT-03**: VDE federation across geographic regions
-- **PFUT-01**: Policy marketplace (import/export templates)
-- **PFUT-02**: Policy simulation sandbox
-- **PFUT-03**: Policy compliance scoring
+- [ ] **VADV-01**: VDE-level index/metadata separation across VDEs (data on VDE1, index on VDE2, metadata on VDE3 — user-configurable)
+- [ ] **VADV-02**: Online defragmentation via region indirection (background block relocation, zero downtime)
+- [ ] **VADV-03**: VDE federation across geographic regions (cross-region namespace resolution, geo-aware routing)
+
+### Policy Advanced Features (PADV)
+
+- [ ] **PADV-01**: Policy marketplace (import/export policy templates, community-shared profiles)
+- [ ] **PADV-02**: Policy simulation sandbox (run full workload against hypothetical policy, report impact before apply)
+- [ ] **PADV-03**: Policy compliance scoring (score deployment against regulatory templates, gap analysis report)
 
 ## Out of Scope
 
@@ -355,10 +358,16 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 | INTG-06 | Phase 83 | Pending |
 | INTG-07 | Phase 83 | Pending |
 | INTG-08 | Phase 83 | Pending |
+| VADV-01 | Phase 73 | Pending |
+| VADV-02 | Phase 78 | Pending |
+| VADV-03 | Phase 73 | Pending |
+| PADV-01 | Phase 69 | Pending |
+| PADV-02 | Phase 76 | Pending |
+| PADV-03 | Phase 70 | Pending |
 
 **Coverage:**
-- v6.0 requirements: 140 total (SDKF:12, CASC:8, PERF:7, AIPI:11, AUTH:9, PERS:7, VDEF:18, VREG:18, VTMP:10, OMOD:7, FEXT:8, TIER:5, PLUG:6, MIGR:6, INTG:8)
-- Mapped to phases: 140
+- v6.0 requirements: 146 total (SDKF:12, CASC:8, PERF:7, AIPI:11, AUTH:9, PERS:7, VDEF:18, VREG:18, VTMP:10, OMOD:7, FEXT:8, TIER:5, PLUG:6, MIGR:6, INTG:8, VADV:3, PADV:3)
+- Mapped to phases: 146
 - Unmapped: 0
 
 ---

@@ -1492,7 +1492,7 @@ Wave 4 (Final gate — depends on all):
 
 ## Milestone: v6.0 Intelligent Policy Engine & Composable VDE
 
-> 16 phases (68-83) | 120 requirements across 15 categories | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing last
+> 16 phases (68-83) | 146 requirements across 17 categories | 73 plans | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing last
 > Design documents: .planning/v6.0-DESIGN-DISCUSSION.md (12 architectural decisions), .planning/v6.0-VDE-FORMAT-v2.0-SPEC.md, .planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md
 
 **Milestone Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.0 format with 18 named regions, runtime VDE composition, three-tier performance model, AI-driven policy intelligence, authority chain with 3-of-5 quorum, and full OS integration for the .dwvd extension.
@@ -1523,16 +1523,16 @@ Phase 68 (SDK Foundation)
 ### Phases
 
 - [ ] **Phase 68: SDK Foundation** -- PolicyEngine contracts, PluginBase extension, IntelligenceAwarePluginBase, all policy model types
-- [ ] **Phase 69: Policy Persistence** -- IPolicyPersistence + 5 implementations (InMemory, File, Database, TamperProof, Hybrid) + compliance validation
-- [ ] **Phase 70: Cascade Resolution Engine** -- Full cascade algorithm, strategy defaults by category, conflict resolution, snapshot versioning, circular reference detection
+- [ ] **Phase 69: Policy Persistence** -- IPolicyPersistence + 5 implementations (InMemory, File, Database, TamperProof, Hybrid) + compliance validation + policy marketplace
+- [ ] **Phase 70: Cascade Resolution Engine** -- Full cascade algorithm, strategy defaults by category, conflict resolution, snapshot versioning, circular reference detection, compliance scoring
 - [ ] **Phase 71: VDE Format v2.0** -- DWVD v2.0 superblock, region directory, block trailer, module manifest, inode layout, WAL, creation profiles
 - [ ] **Phase 72: VDE Regions -- Foundation** -- Policy Vault, Encryption Header, Integrity Tree, Tag Index, Replication State, RAID Metadata, WORM, Compliance Vault, Streaming Append
-- [ ] **Phase 73: VDE Regions -- Operations** -- Intelligence Cache, Cross-VDE Reference, Compute Code Cache, Snapshot Table, Audit Log, Consensus Log, Compression Dictionary, Metrics Log, Anonymization Table
+- [ ] **Phase 73: VDE Regions -- Operations** -- Intelligence Cache, Cross-VDE Reference, Compute Code Cache, Snapshot Table, Audit Log, Consensus Log, Compression Dictionary, Metrics Log, Anonymization Table, VDE index/metadata separation, VDE federation
 - [ ] **Phase 74: VDE Identity & Tamper Detection** -- dw:// namespace, format fingerprint, header seal, metadata chain hash, file size sentinel, tamper response levels, emergency recovery block, VDE nesting
 - [ ] **Phase 75: Authority Chain & Emergency Override** -- Emergency escalation, immutable records, 3-of-5 quorum, hardware token support, time-lock, dead man's switch
-- [ ] **Phase 76: Performance Optimization** -- MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate, three-tier fast path, check classification, Simulate()
+- [ ] **Phase 76: Performance Optimization** -- MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate, three-tier fast path, check classification, Simulate(), policy simulation sandbox
 - [ ] **Phase 77: AI Policy Intelligence** -- Observation pipeline, hardware/workload/threat/cost/sensitivity advisors, autonomy levels, hybrid config, overhead throttling, self-modification prevention
-- [ ] **Phase 78: Online Module Addition** -- Three addition options (online/inode-claim/migration), atomic manifest update, Tier 2 fallback, user comparison
+- [ ] **Phase 78: Online Module Addition** -- Three addition options (online/inode-claim/migration), atomic manifest update, Tier 2 fallback, user comparison, online defragmentation
 - [ ] **Phase 79: File Extension & OS Integration** -- .dwvd IANA MIME, Windows/Linux/macOS registration, content detection, import from VHD/VHDX/VMDK/QCOW2, secondary extensions
 - [ ] **Phase 80: Three-Tier Performance Verification** -- Tier 1/2/3 validation for all 19 modules, per-feature tier mapping, benchmarks
 - [ ] **Phase 81: Backward Compatibility & Migration** -- v1.0 format auto-detect, dw migrate command, v5.0 config migration, safe defaults (AI off, no multi-level without admin config)
@@ -1563,7 +1563,7 @@ Plans:
 #### Phase 69: Policy Persistence
 **Goal**: All five persistence implementations exist so policies can survive restarts, replicate across nodes, and satisfy compliance requirements.
 **Depends on**: Phase 68 (SDK Foundation)
-**Requirements**: PERS-01, PERS-02, PERS-03, PERS-04, PERS-05, PERS-06, PERS-07
+**Requirements**: PERS-01, PERS-02, PERS-03, PERS-04, PERS-05, PERS-06, PERS-07, PADV-01
 **Success Criteria** (what must be TRUE):
   1. IPolicyPersistence is the only contract -- all five implementations are swappable without code changes
   2. InMemoryPolicyPersistence passes all persistence tests (used in testing throughout v6.0)
@@ -1572,18 +1572,20 @@ Plans:
   5. TamperProofPolicyPersistence produces blockchain-backed immutable audit records on every policy write
   6. HybridPolicyPersistence delegates policy storage to DB and audit to TamperProof independently
   7. Compliance validator rejects HIPAA config that uses file-only audit store (produces actionable error)
-**Plans**: 4 plans
+  8. Policy marketplace enables import/export of policy templates and community-shared profiles via IPolicyPersistence
+**Plans**: 5 plans
 
 Plans:
 - [ ] 69-01-PLAN.md -- IPolicyPersistence interface, base persistence types, serialization contracts, test harness
 - [ ] 69-02-PLAN.md -- InMemoryPolicyPersistence + FilePolicyPersistence (VDE sidecar format)
 - [ ] 69-03-PLAN.md -- DatabasePolicyPersistence (multi-node replication) + TamperProofPolicyPersistence (blockchain-backed)
 - [ ] 69-04-PLAN.md -- HybridPolicyPersistence + compliance validator (HIPAA, GDPR, SOC2 store requirements)
+- [ ] 69-05-PLAN.md -- Policy marketplace: import/export policy templates, community-shared profiles, template versioning, compatibility validation
 
 #### Phase 70: Cascade Resolution Engine
 **Goal**: The cascade engine resolves the effective policy at any path in the hierarchy -- without this, policies are just stored data with no runtime meaning.
 **Depends on**: Phase 68 (SDK Foundation), Phase 69 (Policy Persistence)
-**Requirements**: CASC-01, CASC-02, CASC-03, CASC-04, CASC-05, CASC-06, CASC-07, CASC-08
+**Requirements**: CASC-01, CASC-02, CASC-03, CASC-04, CASC-05, CASC-06, CASC-07, CASC-08, PADV-03
 **Success Criteria** (what must be TRUE):
   1. PolicyEngine.Resolve(path) returns correct effective policy at VDE, Container, Object, Chunk, and Block levels
   2. Default cascade strategies match spec: Security=MostRestrictive, Performance=Override, Governance=Merge, Compliance=Enforce
@@ -1593,7 +1595,8 @@ Plans:
   6. In-flight operations complete with their start-time policy snapshot; new policy takes effect for next operation only
   7. Circular policy references are detected during store validation and rejected with a clear error
   8. Merge strategy conflict resolution is configurable per tag key (MostRestrictive / Closest / Union)
-**Plans**: 5 plans
+  9. Policy compliance scoring scores deployments against regulatory templates (HIPAA, GDPR, SOC2, FedRAMP) and produces a gap analysis report
+**Plans**: 6 plans
 
 Plans:
 - [ ] 70-01-PLAN.md -- PolicyResolutionEngine core: path resolution, level traversal, empty-level skip logic
@@ -1601,6 +1604,7 @@ Plans:
 - [ ] 70-03-PLAN.md -- User override support: per-feature per-level cascade strategy override, persistence integration
 - [ ] 70-04-PLAN.md -- Safety mechanisms: double-buffered versioned cache, circular reference detector, Merge conflict resolver
 - [ ] 70-05-PLAN.md -- Cascade engine unit tests: 60+ tests covering all strategies, edge cases, adversarial Enforce-vs-Override scenarios
+- [ ] 70-06-PLAN.md -- Policy compliance scoring: regulatory template scoring (HIPAA/GDPR/SOC2/FedRAMP), gap analysis report, remediation suggestions
 
 #### Phase 71: VDE Format v2.0
 **Goal**: The DWVD v2.0 binary format exists on disk -- superblock, region directory, block trailer, module manifest, and composable inode layout -- so all subsequent region and VDE work has a concrete format to target.
@@ -1651,7 +1655,7 @@ Plans:
 #### Phase 73: VDE Regions -- Operations
 **Goal**: The nine operational regions that power intelligence, compute, snapshots, audit, consensus, compression, metrics, and GDPR anonymization are implemented.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 72 (VDE Regions Foundation)
-**Requirements**: VREG-10, VREG-11, VREG-12, VREG-13, VREG-14, VREG-15, VREG-16, VREG-17, VREG-18
+**Requirements**: VREG-10, VREG-11, VREG-12, VREG-13, VREG-14, VREG-15, VREG-16, VREG-17, VREG-18, VADV-01, VADV-03
 **Success Criteria** (what must be TRUE):
   1. Intelligence Cache region stores AI classification results, confidence scores, heat scores, and tier assignments
   2. Cross-VDE Reference Table persists dw:// fabric links; broken links are detectable
@@ -1662,13 +1666,16 @@ Plans:
   7. Compression Dictionary Region manages up to 256 dictionaries with 2-byte DictId; lookup is O(1)
   8. Metrics Log Region records time-series data and auto-compacts when capacity threshold is reached
   9. Anonymization Table maps PII to anonymized identifiers for GDPR right-to-be-forgotten operations
-**Plans**: 4 plans
+  10. VDE-level index/metadata separation allows data on VDE1, index on VDE2, metadata on VDE3 -- user-configurable via Cross-VDE Reference Table
+  11. VDE federation across geographic regions resolves cross-region dw:// namespaces with geo-aware routing
+**Plans**: 5 plans
 
 Plans:
 - [ ] 73-01-PLAN.md -- Intelligence Cache region (classification, confidence, heat score, tier) + Cross-VDE Reference Table (dw:// links, broken link detection)
 - [ ] 73-02-PLAN.md -- Compute Code Cache (WASM module directory, hash lookup) + Snapshot Table (CoW registry, no-copy creation)
 - [ ] 73-03-PLAN.md -- Audit Log Region (append-only, hash-chained, truncation-proof) + Consensus Log Region (per-Raft-group, term/index)
 - [ ] 73-04-PLAN.md -- Compression Dictionary Region (256 dicts, 2-byte DictId) + Metrics Log Region (time-series, auto-compact) + Anonymization Table (GDPR mapping, right-to-be-forgotten)
+- [ ] 73-05-PLAN.md -- VDE index/metadata separation (cross-VDE data/index/metadata split, user-configurable routing) + VDE federation (geo-aware cross-region namespace resolution, geo-routing)
 
 #### Phase 74: VDE Identity & Tamper Detection
 **Goal**: Every DWVD file has cryptographic identity (Ed25519-signed dw:// authority), header integrity, and configurable tamper response -- so tampering is detected at open time and responded to appropriately.
@@ -1715,7 +1722,7 @@ Plans:
 #### Phase 76: Performance Optimization
 **Goal**: Policy checks have minimal overhead -- VDE-only deployments pay 0ns, container-level pays ~20ns, and full cascade pays ~200ns -- so the policy engine is invisible in the hot path.
 **Depends on**: Phase 70 (Cascade Engine)
-**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04, PERF-05, PERF-06, PERF-07
+**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04, PERF-05, PERF-06, PERF-07, PADV-02
 **Success Criteria** (what must be TRUE):
   1. MaterializedPolicyCache pre-computes effective policies at VDE open time; first policy check after open takes the same time as subsequent checks
   2. BloomFilterSkipIndex confirms "no override" for 99%+ of paths in O(1) with zero false negatives
@@ -1724,13 +1731,15 @@ Plans:
   5. Check classification (CONNECT_TIME, SESSION_CACHED, PER_OPERATION, DEFERRED, PERIODIC) correctly routes each of the 94 feature checks
   6. Policy recompilation is triggered by policy change events only -- not by every operation
   7. PolicyEngine.Simulate() returns what-if analysis results without applying any changes to the live engine
-**Plans**: 4 plans
+  8. Policy simulation sandbox runs full workloads against hypothetical policies and reports projected impact before apply (build on Simulate())
+**Plans**: 5 plans
 
 Plans:
 - [ ] 76-01-PLAN.md -- MaterializedPolicyCache: pre-computation at VDE open, double-buffered versioned swap, invalidation on policy change
 - [ ] 76-02-PLAN.md -- BloomFilterSkipIndex: per-VDE bloom filter, "has override?" O(1) check, false-positive handling
 - [ ] 76-03-PLAN.md -- CompiledPolicyDelegate: JIT compilation of hot-path policies, delegate cache, recompilation trigger
 - [ ] 76-04-PLAN.md -- Three-tier fast path wiring (VDE_ONLY/CONTAINER_STOP/FULL_CASCADE), check classification routing, PolicyEngine.Simulate()
+- [ ] 76-05-PLAN.md -- Policy simulation sandbox: full workload replay against hypothetical policies, impact report (latency/throughput/storage/compliance), before-apply comparison
 
 #### Phase 77: AI Policy Intelligence
 **Goal**: The AI observation pipeline runs asynchronously with zero hot-path impact, advisors produce recommendations for all 94 features across all 5 autonomy levels, and the AI cannot modify its own configuration.
@@ -1759,7 +1768,7 @@ Plans:
 #### Phase 78: Online Module Addition
 **Goal**: Users can add a new VDE module to a running VDE without downtime by choosing between three clearly-explained options -- and any option leaves the VDE in a valid state.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 72 (VDE Regions Foundation)
-**Requirements**: OMOD-01, OMOD-02, OMOD-03, OMOD-04, OMOD-05, OMOD-06, OMOD-07
+**Requirements**: OMOD-01, OMOD-02, OMOD-03, OMOD-04, OMOD-05, OMOD-06, OMOD-07, VADV-02
 **Success Criteria** (what must be TRUE):
   1. Option 1 (online region addition from free space) completes without dismounting the VDE and is WAL-journaled
   2. Option 2 (inode field via padding bytes) claims reserved padding bytes with lazy initialization -- no inode table rebuild needed
@@ -1768,13 +1777,15 @@ Plans:
   5. Tier 2 fallback is always available -- the feature works via the processing pipeline even before a module is added
   6. User is presented with all three primary options with a performance/downtime/risk comparison table before committing
   7. ModuleManifest and ModuleConfig update atomically within a WAL transaction -- no partial state is persisted
-**Plans**: 4 plans
+  8. Online defragmentation via region indirection relocates blocks in the background with zero downtime
+**Plans**: 5 plans
 
 Plans:
 - [ ] 78-01-PLAN.md -- Online region addition (Option 1): free space detection, WAL-journaled region creation, atomic commit
 - [ ] 78-02-PLAN.md -- Inode padding claim (Option 2): reserved byte allocation, lazy initialization, padding inventory
 - [ ] 78-03-PLAN.md -- Background inode migration (Option 3): crash-safe migration engine, progress checkpoints; extent-aware new-VDE copy (Option 4)
 - [ ] 78-04-PLAN.md -- User option comparison UI, Tier 2 fallback guarantee, atomic ModuleManifest+ModuleConfig update, online module addition tests
+- [ ] 78-05-PLAN.md -- Online defragmentation: region indirection layer, background block relocation, zero-downtime compaction, fragmentation metrics
 
 #### Phase 79: File Extension & OS Integration
 **Goal**: .dwvd files are recognized by Windows, Linux, and macOS natively -- users can open, inspect, and verify them with standard OS tools -- and non-DWVD files can be imported from common virtual disk formats.
@@ -1896,4 +1907,4 @@ Plans:
 | 82. Plugin Consolidation Audit | 0/3 | Not started | - |
 | 83. Integration Testing | 0/5 | Not started | - |
 
-**Total v6.0:** 0/68 plans complete
+**Total v6.0:** 0/73 plans complete

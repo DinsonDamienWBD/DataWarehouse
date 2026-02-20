@@ -92,7 +92,7 @@
 
 ## v6.0 Intelligent Policy Engine & Composable VDE (PLANNING)
 
-**Phases:** 68+ (TBD) | **Requirements:** TBD (defining)
+**Phases:** 68-83 (16 phases, 73 plans) | **Requirements:** 146 across 17 categories
 
 **Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins.
 
