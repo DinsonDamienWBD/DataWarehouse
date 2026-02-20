@@ -1,333 +1,227 @@
-# Requirements: DataWarehouse SDK v2.0
+# Requirements: DataWarehouse v6.0
 
-**Defined:** 2026-02-11
-**Core Value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
+**Defined:** 2026-02-20
+**Core Value:** Every feature has a multi-level, cascade-aware, AI-tunable policy with format-native VDE integration — no feature is "dumb" or "one-size-fits-all."
 
-> **CRITICAL: ZERO REGRESSION (AD-08)** — ALL refactoring work MUST preserve every piece of already-implemented logic. No plugin functionality lost, no strategy behavior changed, no feature removed. See AD-08 in ARCHITECTURE_DECISIONS.md.
+## v6.0 Requirements
 
-## v2.0 Requirements
+Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to roadmap phases.
 
-### Plugin Hierarchy
+### SDK Foundation (SDKF)
 
-- [ ] **HIER-01**: PluginBase implements IDisposable and IAsyncDisposable with proper Dispose(bool) pattern and GC.SuppressFinalize
-- [ ] **HIER-02**: PluginBase has complete lifecycle methods: Initialize(), Execute(), Shutdown() with CancellationToken on all async overloads
-- [ ] **HIER-03**: PluginBase capability registry allows plugins to register, query, and deregister capabilities at runtime
-- [ ] **HIER-04**: PluginBase knowledge registry enables plugins to register and query knowledge objects via ConcurrentDictionary cache
-- [ ] **HIER-05**: IntelligenceAwarePluginBase (IntelligentPluginBase) extends PluginBase with UltimateIntelligence socket, graceful degradation when unavailable — parent of both DataPipelinePluginBase and FeaturePluginBase (per AD-01)
-- [ ] **HIER-06**: All feature-specific plugin base classes (Encryption, Compression, Storage, Security, Observability, Interface, Format, Streaming, Media, Processing) inherit from IntelligenceAwarePluginBase
-- [ ] **HIER-07**: UltimateIntelligence plugin inherits from PluginBase directly (not IntelligenceAwarePluginBase -- it IS the intelligence provider)
-- [ ] **HIER-08**: Each feature-specific base class implements common functionality for its domain without code duplication across Ultimate plugins
-- [ ] **HIER-09**: All base classes compile and all 60 existing plugins still build without errors after hierarchy changes
+- [ ] **SDKF-01**: PolicyEngine SDK contracts defined (IPolicyEngine, IEffectivePolicy, IPolicyStore, IPolicyPersistence)
+- [ ] **SDKF-02**: FeaturePolicy model with intensity levels, cascade rules, and AI autonomy per feature
+- [ ] **SDKF-03**: PolicyLevel enum (Block, Chunk, Object, Container, VDE) with resolution context
+- [ ] **SDKF-04**: CascadeStrategy enum (MostRestrictive, Enforce, Inherit, Override, Merge) per feature
+- [ ] **SDKF-05**: AiAutonomyLevel enum (ManualOnly, Suggest, SuggestExplain, AutoNotify, AutoSilent)
+- [ ] **SDKF-06**: OperationalProfile model with named presets (Speed, Balanced, Standard, Strict, Paranoid) and custom profiles
+- [ ] **SDKF-07**: AuthorityChain model (Admin → AI Emergency → Super Admin Quorum)
+- [ ] **SDKF-08**: QuorumPolicy with configurable required approvals, approval window, and action list
+- [ ] **SDKF-09**: PolicyResolutionContext carrying path, user, hardware, and security context
+- [ ] **SDKF-10**: PluginBase extended with PolicyContext (every plugin is policy-aware)
+- [ ] **SDKF-11**: IntelligenceAwarePluginBase with IAiHook, ObservationEmitter, RecommendationReceiver
+- [ ] **SDKF-12**: UltimateIntelligencePlugin inherits PluginBase directly (NOT IntelligenceAwarePluginBase) to prevent AI-observing-AI loops
 
-### Strategy Hierarchy
+### Cascade Resolution Engine (CASC)
 
-- [ ] **STRAT-01**: Unified StrategyBase root class exists with common strategy lifecycle (Initialize, Shutdown), IDisposable/IAsyncDisposable, metadata (Name, Description, Characteristics), CancellationToken support — NO intelligence, NO capability registry, NO knowledge bank (per AD-05)
-- [ ] **STRAT-02**: Flat two-level hierarchy: StrategyBase → ~15 domain strategy bases (Encryption, Compression, Storage, Security, KeyManagement, Compliance, Interface, Connector, Compute, Observability, Replication, Media, Streaming, Format, Transit, DataManagement) — NO IntelligenceAwareStrategyBase (per AD-05)
-- [ ] **~~STRAT-03~~**: ~~IntelligenceAwareStrategyBase~~ — **REMOVED per AD-05**: Intelligence belongs at plugin level only. Strategies are workers, not orchestrators. Plugins pass AI-derived decisions as options to strategy methods.
-- [ ] **STRAT-04**: All 7 existing fragmented strategy bases are consolidated under the unified hierarchy via adapter wrappers for backward compatibility
-- [ ] **STRAT-05**: Domain strategy base classes implement domain-common contracts (e.g., EncryptionStrategyBase has Encrypt/Decrypt, StorageStrategyBase has Store/Retrieve/Delete/List)
-- [ ] **STRAT-06**: All ~1,500 existing plugin strategies migrated to new bases, duplicated boilerplate removed, behavioral equivalence verified
+- [ ] **CASC-01**: Cascade resolution algorithm resolves effective policy at any path (VDE/Container/Object/Chunk/Block)
+- [ ] **CASC-02**: Per-category default cascade strategy applied (Security=MostRestrictive, Performance=Override, Governance=Merge, etc.)
+- [ ] **CASC-03**: User can override cascade strategy per feature per level
+- [ ] **CASC-04**: Empty intermediate levels skipped in resolution (Object inherits from VDE if Container has no override)
+- [ ] **CASC-05**: Enforce at higher level ALWAYS wins over Override at lower level
+- [ ] **CASC-06**: In-flight operations use policy snapshot from start time (double-buffered versioned cache)
+- [ ] **CASC-07**: Circular reference detection during policy store validation
+- [ ] **CASC-08**: Per-tag-key conflict resolver for Merge strategy (configurable: MostRestrictive, Closest, Union)
 
-### Distributed Infrastructure
+### Performance Optimization (PERF)
 
-- [ ] **DIST-01**: SDK defines IClusterMembership contract for node join/leave/discovery with health monitoring
-- [ ] **DIST-02**: SDK defines ILoadBalancerStrategy contract with pluggable algorithms (round-robin, consistent hashing, weighted, resource-aware)
-- [ ] **DIST-03**: SDK defines IP2PNetwork and IGossipProtocol contracts for peer-to-peer data distribution
-- [ ] **DIST-04**: SDK defines IAutoScaler and IScalingPolicy contracts for elastic scaling based on storage/performance metrics
-- [ ] **DIST-05**: SDK defines IReplicationSync contract supporting online (real-time) and offline (air-gap) synchronization with conflict resolution
-- [ ] **DIST-06**: SDK defines IAutoTier contract for automatic data placement based on access patterns and cost optimization
-- [ ] **DIST-07**: SDK defines IAutoGovernance contract for policy enforcement at SDK level (retention, classification, compliance)
-- [ ] **DIST-08**: FederatedMessageBus wraps IMessageBus with transparent local/remote routing using consistent hashing
-- [ ] **DIST-09**: Multi-phase plugin initialization: construction (zero deps) -> initialization (MessageBus) -> activation (distributed coordination)
-- [ ] **DIST-10**: In-memory single-node implementations exist for all distributed contracts (backward compatible -- single laptop works without cluster)
-- [ ] **DIST-11**: Auto-scaling prompts user when nodes reach capacity limits, accepts new node information, deploys and integrates new nodes automatically
-- [ ] **DIST-12**: SWIM gossip protocol implementation for decentralized cluster membership and failure detection
-- [ ] **DIST-13**: Raft consensus implementation for leader election in multi-node clusters
-- [ ] **DIST-14**: Multi-master replication with CRDT conflict resolution for distributed writes
-- [ ] **DIST-15**: P2P gossip-based data replication across cluster nodes
-- [ ] **DIST-16**: Consistent hashing load balancer with virtual nodes for cache-friendly request distribution
-- [ ] **DIST-17**: Resource-aware load balancer monitoring CPU/memory for adaptive routing decisions
+- [ ] **PERF-01**: MaterializedPolicyCache pre-computes effective policies at VDE open time
+- [ ] **PERF-02**: BloomFilterSkipIndex for O(1) "has override?" checks per VDE (false positive ~1%, zero false negatives)
+- [ ] **PERF-03**: CompiledPolicyDelegate JIT-compiles hot-path policies into direct delegates
+- [ ] **PERF-04**: Three-tier fast path: VDE_ONLY (0ns), CONTAINER_STOP (~20ns), FULL_CASCADE (~200ns)
+- [ ] **PERF-05**: Check classification: CONNECT_TIME, SESSION_CACHED, PER_OPERATION, DEFERRED, PERIODIC
+- [ ] **PERF-06**: Policy recompilation triggered only on policy changes (not on every operation)
+- [ ] **PERF-07**: PolicyEngine.Simulate() returns what-if analysis without applying changes
 
-### Decoupling Verification
+### AI Policy Intelligence (AIPI)
 
-- [ ] **DECPL-01**: Zero plugins or kernel depend on any other plugin directly -- all depend only on SDK
-- [ ] **DECPL-02**: All inter-plugin and plugin-kernel communication uses Commands/Messages via message bus only
-- [ ] **DECPL-03**: Kernel leverages capability registry and knowledge bank for informed routing decisions
-- [ ] **DECPL-04**: All plugins can register capabilities and knowledge into system knowledge bank
-- [ ] **DECPL-05**: All plugins leverage auto-scaling, load balancing, P2P, auto-sync, auto-tier, auto-governance from SDK base classes
+- [ ] **AIPI-01**: AI observation pipeline with zero hot-path impact (async metrics via lock-free ring buffer)
+- [ ] **AIPI-02**: HardwareProbe awareness (CPU capabilities, RAM, storage speed, thermal throttling)
+- [ ] **AIPI-03**: WorkloadAnalyzer awareness (time-of-day patterns, seasonal, burst detection)
+- [ ] **AIPI-04**: ThreatDetector awareness feeds into policy tightening
+- [ ] **AIPI-05**: CostAnalyzer awareness (cloud billing, compute cost per algorithm)
+- [ ] **AIPI-06**: DataSensitivityAnalyzer (PII detection, classification patterns)
+- [ ] **AIPI-07**: PolicyAdvisor produces PolicyRecommendation with rationale chain
+- [ ] **AIPI-08**: AI autonomy level configurable per feature, per level (94 features x 5 levels = 470 config points)
+- [ ] **AIPI-09**: Hybrid configuration: different autonomy levels for different feature categories
+- [ ] **AIPI-10**: Configurable maxCpuOverhead for AI observation (default 1%, auto-throttle if exceeded)
+- [ ] **AIPI-11**: AI cannot modify its own configuration (allowSelfModification: false, modificationRequiresQuorum: true)
 
-### Plugin Updates
+### Authority Chain & Emergency Override (AUTH)
 
-- [ ] **UPLT-01**: All Ultimate plugins inherit from their respective feature-specific plugin base classes
-- [ ] **UPLT-02**: All Ultimate plugins leverage new distributed infrastructure features from SDK base classes
-- [ ] **UPLT-03**: All Ultimate plugin strategies inherit from appropriate strategy base in the unified hierarchy
-- [ ] **UPST-01**: All standalone plugins inherit from IntelligenceAwarePluginBase at minimum
-- [ ] **UPST-02**: All standalone plugin strategies leverage the unified strategy base class hierarchy
-- [ ] **UPST-03**: All standalone plugins leverage distributed infrastructure features from SDK
+- [ ] **AUTH-01**: Emergency escalation protocol with time-bounded AI override (default 15 min)
+- [ ] **AUTH-02**: Escalation countdown: admin confirms → permanent, admin reverts → restored, timeout → auto-revert
+- [ ] **AUTH-03**: Immutable EscalationRecord with tamper-proof hash per escalation
+- [ ] **AUTH-04**: Super Admin Quorum with configurable required approvals (e.g., 3-of-5)
+- [ ] **AUTH-05**: Quorum actions defined: override AI, change security policy, disable AI, modify quorum, delete VDE, export keys, disable audit
+- [ ] **AUTH-06**: Hardware token support for quorum approval (YubiKey, smart card)
+- [ ] **AUTH-07**: Time-lock on destructive quorum actions (24hr cooling-off, any super admin can veto)
+- [ ] **AUTH-08**: Dead man's switch: no super admin activity for N days → auto-lock to max security
+- [ ] **AUTH-09**: Authority resolution order: Quorum → AI Emergency → Admin → System defaults
 
-### Pre-Execution Cleanup
+### Policy Persistence (PERS)
 
-- [ ] **PRECLEAN-01**: `ConnectionType` enum consolidated into SDK (`DataWarehouse.SDK.Hosting`) as superset: Local, Remote, InProcess, Cluster — replaces 4 duplicate definitions across Shared, Launcher, CLI, and Metadata/Adapter
-- [ ] **PRECLEAN-02**: `ConnectionTarget` class consolidated into SDK with merged properties (Name, Type, Host, Port, LocalPath, AuthToken, UseTls, TimeoutSeconds, Metadata) — all projects reference the single SDK type
-- [ ] **PRECLEAN-03**: `OperatingMode`, `InstallConfiguration`, `EmbeddedConfiguration` consolidated into SDK (`DataWarehouse.SDK.Hosting`) — Launcher and CLI reference SDK types; Metadata/Adapter examples updated
-- [ ] **PRECLEAN-04**: `DataWarehouse.CLI/Integration/OperatingMode.cs` deleted (completely unused dead code); CLI Commands updated to import SDK types
-- [ ] **PRECLEAN-05**: All Newtonsoft.Json usage in DataWarehouse.Shared (and UniversalDashboards plugin) migrated to System.Text.Json; Newtonsoft.Json PackageReference removed
-- [ ] **PRECLEAN-06**: DataWarehouse.Plugins.AirGapBridge and DataWarehouse.Plugins.DataMarketplace added to DataWarehouse.slnx; all 69 projects listed in solution
+- [ ] **PERS-01**: IPolicyPersistence interface with pluggable implementations
+- [ ] **PERS-02**: InMemoryPolicyPersistence (testing, ephemeral)
+- [ ] **PERS-03**: FilePolicyPersistence (single-node, VDE sidecar)
+- [ ] **PERS-04**: DatabasePolicyPersistence (multi-node with replication)
+- [ ] **PERS-05**: TamperProofPolicyPersistence (blockchain-backed, immutable audit)
+- [ ] **PERS-06**: HybridPolicyPersistence (policies in DB, audit trail in TamperProof)
+- [ ] **PERS-07**: Compliance validation rejects incompatible persistence config (e.g., HIPAA + File audit store)
 
-### CLI & Unified Interface
+### Composable VDE Format (VDEF)
 
-- [ ] **CLI-01**: DataWarehouse.CLI uses current System.CommandLine API (not deprecated NamingConventionBinder) for all command parsing and binding
-- [ ] **CLI-02**: DataWarehouse.Shared subscribes to `capability.changed`, `plugin.loaded`, `plugin.unloaded` events via MessageBridge and maintains a `DynamicCommandRegistry` that auto-updates available commands/features at runtime
-- [ ] **CLI-03**: User NLP queries route through MessageBridge → UltimateInterfacePlugin → IntelligenceAwarePluginBase AI socket → Knowledge Bank, with graceful degradation to direct Capability Registry lookup (keyword matching) when Intelligence is unavailable
-- [ ] **CLI-04**: CommandExecutor generates available commands dynamically from `DynamicCommandRegistry` (no hardcoded command lists) — when a plugin loads/unloads, CLI/GUI commands appear/disappear without restart
-- [ ] **CLI-05**: CLI and GUI both read from the same Shared `DynamicCommandRegistry` ensuring 100% feature parity — anything possible in CLI is possible in GUI and vice versa
+- [ ] **VDEF-01**: DWVD v2.0 format with 16-byte magic signature ("DWVD" + version + "dw://" anchor)
+- [ ] **VDEF-02**: 4-block Superblock Group (primary superblock, region pointer table, extended metadata, integrity anchor) with mirror
+- [ ] **VDEF-03**: Region Directory with 127 indirectable region pointer slots (32 bytes each)
+- [ ] **VDEF-04**: Universal Block Trailer (16 bytes: BlockTypeTag, GenerationNumber, XxHash64) on every block
+- [ ] **VDEF-05**: 19 composable modules with 32-bit ModuleManifest in Superblock
+- [ ] **VDEF-06**: Nibble-encoded ModuleConfig (16 bytes for 32 modules at 16 levels each)
+- [ ] **VDEF-07**: Self-describing InodeLayoutDescriptor for variable inode layouts between VDEs
+- [ ] **VDEF-08**: Inode size calculated from selected modules (320B minimal to 576B maximum)
+- [ ] **VDEF-09**: Inode padding bytes reserved for future module additions without migration
+- [ ] **VDEF-10**: Extent-based inode addressing (8 extents x 24 bytes, replaces 12 direct block pointers)
+- [ ] **VDEF-11**: Inline tag area in inode (128 bytes for ~4 compact tags when Tags module active)
+- [ ] **VDEF-12**: Dual WAL (Metadata WAL + Data WAL) for reduced contention
+- [ ] **VDEF-13**: Seven VDE creation profiles (Minimal, Standard, Enterprise, MaxSecurity, Edge/IoT, Analytics, Custom)
+- [ ] **VDEF-14**: Runtime VDE composition based on user module selection
+- [ ] **VDEF-15**: Sub-4K block sizes supported (512B, 1K, 2K) for IoT/embedded
+- [ ] **VDEF-16**: Feature flags: IncompatibleFeatureFlags, ReadOnlyCompatibleFeatureFlags, CompatibleFeatureFlags
+- [ ] **VDEF-17**: MinReaderVersion and MinWriterVersion for forward compatibility
+- [ ] **VDEF-18**: Thin provisioning with sparse file semantics
 
-### Deployment Modes
+### VDE Regions (VREG)
 
-- [ ] **DEPLOY-01**: `dw connect` command fully operational — MessageBridge connects to real DW instance via HTTP/gRPC (not mock/placeholder), capability discovery returns live data
-- [ ] **DEPLOY-02**: Launcher exposes HTTP/gRPC listener endpoint compatible with Shared's `RemoteInstanceConnection` protocol (`/api/v1/info`, `/api/v1/capabilities`, `/api/v1/message`, `/api/v1/execute`)
-- [ ] **DEPLOY-03**: `dw live [--port] [--memory]` command starts embedded DW instance with `PersistData=false`, in-memory storage, HTTP endpoint for CLI/GUI connection — "Linux Live CD" style
-- [ ] **DEPLOY-04**: USB/portable media auto-detection — when CLI/GUI runs from removable media, adapts paths to avoid writes to host filesystem; auto-discovers local live instance on known ports
-- [ ] **DEPLOY-05**: `dw install --path <path> [--autostart] [--service] [--admin-password <pwd>]` command runs full installation pipeline with real implementations (not stubs): copy binaries, init config, init plugins, create admin user, register service
-- [ ] **DEPLOY-06**: `dw install --from-usb <source> --path <target>` clones a portable DW instance from USB to local disk: copies tree, remaps paths in configuration, copies data (optional), registers service, verifies installation
-- [ ] **DEPLOY-07**: Platform-specific service registration: Windows `sc create`, Linux systemd unit file, macOS launchd plist — production-ready, not placeholder
-- [ ] **DEPLOY-08**: Platform-specific autostart configuration: Windows Task Scheduler or `sc config start=auto`, Linux `systemctl enable`, macOS `launchctl load`
-- [ ] **DEPLOY-09**: `ServerStartCommand` and `ServerStopCommand` use real kernel startup/shutdown via DataWarehouseHost (not `Task.Delay` placeholder); `MessageBridge.SendInProcessAsync()` uses real in-memory message queue (not mock response)
+- [ ] **VREG-01**: Policy Vault region (2 blocks, crypto-bound, HMAC-sealed policy definitions)
+- [ ] **VREG-02**: Encryption Header region (2 blocks, 63 key slots, KDF params, key rotation)
+- [ ] **VREG-03**: Integrity Tree region (Merkle tree, O(log N) verification)
+- [ ] **VREG-04**: Tag Index Region (B+-tree with bloom filter)
+- [ ] **VREG-05**: Replication State Region (DVV, watermarks, dirty bitmap)
+- [ ] **VREG-06**: RAID Metadata Region (shard maps, parity layout, rebuild progress)
+- [ ] **VREG-07**: Streaming Append Region (ring buffer, 0% default allocation)
+- [ ] **VREG-08**: WORM Immutable Region (append-only, high-water mark)
+- [ ] **VREG-09**: Compliance Vault (CompliancePassport records with digital signatures)
+- [ ] **VREG-10**: Intelligence Cache (classification, confidence, heat score, tier)
+- [ ] **VREG-11**: Cross-VDE Reference Table (dw:// fabric links)
+- [ ] **VREG-12**: Compute Code Cache (WASM module directory)
+- [ ] **VREG-13**: Snapshot Table (CoW snapshot registry)
+- [ ] **VREG-14**: Audit Log Region (append-only, hash-chained, never-truncated)
+- [ ] **VREG-15**: Consensus Log Region (per-Raft-group, term/index metadata)
+- [ ] **VREG-16**: Compression Dictionary Region (256 dictionaries, 2-byte DictId)
+- [ ] **VREG-17**: Metrics Log Region (time-series, auto-compacted)
+- [ ] **VREG-18**: Anonymization Table (GDPR mapping, right-to-be-forgotten)
 
-### Memory Safety
+### VDE Identity & Tamper Detection (VTMP)
 
-- [ ] **MEM-01**: All key material, tokens, and passwords are wiped from memory using CryptographicOperations.ZeroMemory after use
-- [ ] **MEM-02**: Hot-path buffer allocations use ArrayPool<byte> or MemoryPool<byte> instead of raw new byte[]
-- [ ] **MEM-03**: All collections exposed in public APIs are bounded with configurable maximum sizes
-- [ ] **MEM-04**: PluginBase.Dispose() properly cleans up knowledge cache, capability subscriptions, and message bus subscriptions
-- [ ] **MEM-05**: All IAsyncDisposable implementations follow the async dispose pattern with DisposeAsyncCore()
+- [ ] **VTMP-01**: dw:// Namespace Registration Block with Ed25519-signed URI authority
+- [ ] **VTMP-02**: Format Fingerprint (BLAKE3 hash of spec revision)
+- [ ] **VTMP-03**: Header Integrity Seal (HMAC-BLAKE3, checked on every open)
+- [ ] **VTMP-04**: Metadata Chain Hash (rolling hash covering all metadata regions)
+- [ ] **VTMP-05**: File Size Sentinel (expected size, truncation detected on open)
+- [ ] **VTMP-06**: Last Writer Identity (session ID, timestamp, node ID)
+- [ ] **VTMP-07**: TamperResponse enum with 5 levels, configurable in Policy Vault
+- [ ] **VTMP-08**: Emergency Recovery Block at fixed block 9 (plaintext, accessible without keys)
+- [ ] **VTMP-09**: VDE Health metadata (creation, mount count, error count, state machine)
+- [ ] **VTMP-10**: VDE Nesting support (up to 3 levels)
 
-### Cryptographic Hygiene
+### Online Module Addition (OMOD)
 
-- [ ] **CRYPTO-01**: All secret/hash comparisons use CryptographicOperations.FixedTimeEquals (constant-time) to prevent timing attacks
-- [ ] **CRYPTO-02**: All cryptographic random generation uses RandomNumberGenerator, never System.Random
-- [ ] **CRYPTO-03**: Key rotation contracts defined in SDK (IKeyRotationPolicy) usable by any plugin
-- [ ] **CRYPTO-04**: Algorithm agility -- no hardcoded algorithm choices in SDK; all configurable via strategy
-- [ ] **CRYPTO-05**: FIPS 140-3 compliance verified -- all crypto uses .NET BCL implementations (no custom crypto)
-- [ ] **CRYPTO-06**: Distributed message authentication uses HMAC-SHA256 signatures with replay protection
+- [ ] **OMOD-01**: Online region addition from free space (zero downtime, WAL-journaled)
+- [ ] **OMOD-02**: Inode field addition via claiming reserved padding bytes (lazy init)
+- [ ] **OMOD-03**: Background inode table migration when no padding available (crash-safe)
+- [ ] **OMOD-04**: New VDE creation + bulk data migration (extent-aware copy)
+- [ ] **OMOD-05**: Tier 2 fallback always available (feature works via pipeline)
+- [ ] **OMOD-06**: User presented with all 3 options with performance/downtime/risk comparison
+- [ ] **OMOD-07**: ModuleManifest and ModuleConfig update atomically
 
-### Input Validation
+### File Extension & OS Integration (FEXT)
 
-- [ ] **VALID-01**: Every public SDK method validates inputs before processing (null checks, range checks, format validation)
-- [ ] **VALID-02**: All file/URI operations include path traversal protection
-- [ ] **VALID-03**: All incoming data has configurable size limits (messages, knowledge objects, capability payloads)
-- [ ] **VALID-04**: All regex operations use bounded timeouts (Regex.MatchTimeout) to prevent ReDoS attacks
-- [ ] **VALID-05**: Plugin identity verification via cryptographic keys for distributed message authentication
+- [ ] **FEXT-01**: .dwvd extension with IANA MIME type (application/vnd.datawarehouse.dwvd)
+- [ ] **FEXT-02**: Windows ProgID with shell handlers (open/inspect/verify via dw CLI)
+- [ ] **FEXT-03**: Linux freedesktop.org shared-mime-info + /etc/magic
+- [ ] **FEXT-04**: macOS UTI (com.datawarehouse.dwvd)
+- [ ] **FEXT-05**: Content detection priority (magic → version → namespace → flags → seal)
+- [ ] **FEXT-06**: Non-DWVD file handling with import suggestion
+- [ ] **FEXT-07**: Import from VHD, VHDX, VMDK, QCOW2, VDI, RAW, IMG
+- [ ] **FEXT-08**: Secondary extensions (.dwvd.snap, .dwvd.delta, .dwvd.meta, .dwvd.lock)
 
-### Resilience Contracts
+### Three-Tier Performance Model (TIER)
 
-- [ ] **RESIL-01**: SDK defines ICircuitBreaker contract with Open/Closed/HalfOpen states for cross-service calls
-- [ ] **RESIL-02**: SDK defines IBulkheadIsolation contract for per-plugin resource limits (memory, CPU, connections)
-- [ ] **RESIL-03**: All async operations have configurable timeout policies with sensible defaults
-- [ ] **RESIL-04**: Graceful shutdown propagates CancellationToken from kernel through all plugins to strategy level
-- [ ] **RESIL-05**: Dead letter queue contract for failed message bus messages with retry policies
+- [ ] **TIER-01**: Tier 1 (VDE-Integrated) implemented for all 19 modules
+- [ ] **TIER-02**: Tier 2 (Pipeline-Optimized) verified for all features without module integration
+- [ ] **TIER-03**: Tier 3 (Basic) verified as fallback for all features
+- [ ] **TIER-04**: Per-feature tier mapping documented
+- [ ] **TIER-05**: Performance benchmarks comparing Tier 1 vs Tier 2 vs Tier 3
 
-### Observability Contracts
+### Plugin Consolidation Audit (PLUG)
 
-- [ ] **OBS-01**: SDK provides ActivitySource for distributed tracing at plugin, strategy, kernel, and registry boundaries
-- [ ] **OBS-02**: All SDK operations include structured logging with mandatory correlation IDs
-- [ ] **OBS-03**: IHealthCheck interface required by all plugins -- kernel aggregates health status
-- [ ] **OBS-04**: Resource usage metering per plugin (memory, CPU, I/O) available via SDK contracts
-- [ ] **OBS-05**: Audit trail interface for security-sensitive operations (immutable, append-only)
+- [ ] **PLUG-01**: Review all 17 non-Ultimate plugins for standalone justification
+- [ ] **PLUG-02**: Standalone plugins documented with rationale
+- [ ] **PLUG-03**: Merge candidates identified with target plugin and migration plan
+- [ ] **PLUG-04**: Merge execution (refactor into target as strategy, delete standalone)
+- [ ] **PLUG-05**: Build verification after each merge (0 errors, 0 warnings)
+- [ ] **PLUG-06**: Test verification after all merges
 
-### API Contract Safety
+### Backward Compatibility & Migration (MIGR)
 
-- [ ] **API-01**: All public SDK data transfer types use C# records or init-only setters (immutable by default)
-- [ ] **API-02**: Public APIs use strongly-typed contracts instead of Dictionary<string, object> where possible
-- [ ] **API-03**: SdkCompatibility attributes on all public types for versioning and backward compatibility tracking
-- [ ] **API-04**: Null-object pattern for optional dependencies (no scattered null checks)
+- [ ] **MIGR-01**: v1.0 format VDEs auto-detected and opened in compatibility mode
+- [ ] **MIGR-02**: `dw migrate` converts v1.0 to v2.0 format with user-selected modules
+- [ ] **MIGR-03**: v5.0 configs auto-migrated to VDE-level policies
+- [ ] **MIGR-04**: No multi-level behavior unless admin explicitly configures
+- [ ] **MIGR-05**: PolicyEngine transparent for existing deployments
+- [ ] **MIGR-06**: AI is OFF by default (ManualOnly for all features)
 
-### Build Safety
+### Integration Testing (INTG)
 
-- [ ] **BUILD-01**: TreatWarningsAsErrors enabled incrementally across all projects (SDK + 60 plugins) via category-based rollout
-- [ ] **BUILD-02**: Roslyn analyzers added: Microsoft.CodeAnalysis.NetAnalyzers, SecurityCodeScan, SonarAnalyzer, Roslynator, BannedApiAnalyzers
-- [ ] **BUILD-03**: EnforceCodeStyleInBuild enabled in Directory.Build.props
-- [ ] **BUILD-04**: XML documentation completeness enforced on all public APIs in SDK
-- [ ] **BUILD-05**: Zero compiler warnings in final build (excluding NuGet-sourced warnings)
+- [ ] **INTG-01**: PolicyEngine unit tests (~200)
+- [ ] **INTG-02**: Per-feature multi-level tests (~280)
+- [ ] **INTG-03**: Cross-feature interaction tests (~50)
+- [ ] **INTG-04**: AI behavior tests (~100)
+- [ ] **INTG-05**: Performance tests (~30)
+- [ ] **INTG-06**: VDE format tests for all modules
+- [ ] **INTG-07**: Tamper detection tests for all 5 response levels
+- [ ] **INTG-08**: Migration tests (v1.0 → v2.0)
 
-### Supply Chain Security
+## v7.0+ Future Requirements
 
-- [ ] **SUPPLY-01**: NuGet vulnerability audit passes with zero known vulnerabilities (dotnet list package --vulnerable)
-- [ ] **SUPPLY-02**: All package versions pinned to exact versions (no floating ranges)
-- [ ] **SUPPLY-03**: SBOM generated for SDK and all plugins (CycloneDX or SPDX format)
-- [ ] **SUPPLY-04**: Minimal dependency surface -- SDK maintains <=6 direct PackageReferences
-
-### Dead Code Cleanup
-
-- [ ] **CLEAN-01**: All classes/files with zero references (no inheritance, no instantiation, no import) that are NOT future-ready interfaces are removed
-- [ ] **CLEAN-02**: Superseded implementations whose logic exists elsewhere (extracted to composable services per AD-03) are removed
-- [ ] **CLEAN-03**: Future-ready interfaces for unreleased technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing, hardware-specific bases) are preserved with "FUTURE:" documentation comments
-
-### Regression Prevention (AD-08)
-
-- [ ] **REGR-01**: All 60 plugins compile and retain their FULL strategy catalogs after every phase — zero plugins lose functionality during refactoring
-- [ ] **REGR-02**: All ~1,500 strategies produce IDENTICAL results for identical inputs after base class migration — behavioral equivalence verified by tests
-- [ ] **REGR-03**: All 1,039+ existing tests pass at every phase boundary — test suite is the regression gate, NO phase is complete until tests pass
-- [ ] **REGR-04**: All v1.0 features remain fully operational: encryption (30+ algorithms), compression (40+ algorithms), storage (130+ backends), RAID (50+ strategies), security (142+ access control strategies), compliance (145+ strategies), interfaces (80+ strategies), compute (83+ strategies), formats (28+ strategies), media codecs, governance intelligence, AEDS, marketplace, app platform, WASM ecosystem, data transit — NOTHING is lost
-- [ ] **REGR-05**: When extracting logic from specialized bases to composable services (AD-03), the logic MUST be extracted to the new location FIRST, verified to compile and work, ONLY THEN can the old location be removed
-- [ ] **REGR-06**: Dead code cleanup (Phase 28) ONLY happens AFTER plugin migration (Phase 27) verifies everything works — never delete during restructuring
-
-### Testing
-
-- [ ] **TEST-01**: Full solution builds with zero errors after all refactoring
-- [ ] **TEST-02**: New unit tests cover all new/modified base classes (plugin hierarchy, strategy hierarchy)
-- [ ] **TEST-03**: Behavioral verification tests confirm existing strategies produce identical results after hierarchy migration
-- [ ] **TEST-04**: All existing 1,039+ tests continue to pass
-- [ ] **TEST-05**: Distributed infrastructure contracts have integration tests with in-memory implementations
-- [ ] **TEST-06**: Security hardening verified via Roslyn analyzer clean pass (zero suppressed warnings without justification)
-
-## v3.0 Requirements (Deferred)
-
-- **PERF-01**: Source generator-based plugin discovery (replace reflection for AOT compatibility)
-- **PERF-02**: Span<T>/Memory<T> zero-allocation hot paths throughout SDK
-- **CLOUD-01**: Azure Key Vault integration for algorithm agility crypto migration
-- **CLOUD-02**: Kubernetes-native auto-scaling with HPA integration
+- **VFUT-01**: VDE-level index/metadata separation across VDEs
+- **VFUT-02**: Online defragmentation via region indirection
+- **VFUT-03**: VDE federation across geographic regions
+- **PFUT-01**: Policy marketplace (import/export templates)
+- **PFUT-02**: Policy simulation sandbox
+- **PFUT-03**: Policy compliance scoring
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Orleans/Aspire as SDK dependencies | Vendor lock-in, violates dependency-lean principle -- use SDK contracts instead |
-| SecureString usage | Deprecated in .NET -- use CryptographicOperations.ZeroMemory |
-| Global TreatWarningsAsErrors day-one | Would break 1.1M LOC build -- use incremental category rollout |
-| Real-time sync everywhere | Complexity without value -- use eventual consistency with configurable intervals |
-| Dashboard UI redesign | Phase 31 covers CLI/GUI dynamic reflection and deployment modes, but NOT Dashboard visual redesign |
-| Synchronous blocking APIs | Causes deadlocks -- all APIs must be async with CancellationToken |
+| New plugin creation | v6.0 consolidates, doesn't add new plugins |
+| UI/Dashboard changes | PolicyEngine via existing REST/gRPC/CLI |
+| Deployment/CI/CD | Infrastructure concern |
+| VDE hypervisor integration | DWVD is not a VM disk format |
+| Real-time AI inference | AI observation is async/background only |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUILD-01 | Phase 22 | Pending |
-| BUILD-02 | Phase 22 | Pending |
-| BUILD-03 | Phase 22 | Pending |
-| BUILD-04 | Phase 22 | Pending |
-| BUILD-05 | Phase 22 | Pending |
-| SUPPLY-01 | Phase 22 | Pending |
-| SUPPLY-02 | Phase 22 | Pending |
-| SUPPLY-03 | Phase 22 | Pending |
-| SUPPLY-04 | Phase 22 | Pending |
-| PRECLEAN-01 | Phase 21.5 | Pending |
-| PRECLEAN-02 | Phase 21.5 | Pending |
-| PRECLEAN-03 | Phase 21.5 | Pending |
-| PRECLEAN-04 | Phase 21.5 | Pending |
-| PRECLEAN-05 | Phase 21.5 | Pending |
-| PRECLEAN-06 | Phase 21.5 | Pending |
-| CLI-01 | Phase 22 | Pending |
-| CLI-02 | Phase 31 | Pending |
-| CLI-03 | Phase 31 | Pending |
-| CLI-04 | Phase 31 | Pending |
-| CLI-05 | Phase 31 | Pending |
-| DEPLOY-01 | Phase 31 | Pending |
-| DEPLOY-02 | Phase 31 | Pending |
-| DEPLOY-03 | Phase 31 | Pending |
-| DEPLOY-04 | Phase 31 | Pending |
-| DEPLOY-05 | Phase 31 | Pending |
-| DEPLOY-06 | Phase 31 | Pending |
-| DEPLOY-07 | Phase 31 | Pending |
-| DEPLOY-08 | Phase 31 | Pending |
-| DEPLOY-09 | Phase 31 | Pending |
-| MEM-01 | Phase 23 | Pending |
-| MEM-02 | Phase 23 | Pending |
-| MEM-03 | Phase 23 | Pending |
-| MEM-04 | Phase 23 | Pending |
-| MEM-05 | Phase 23 | Pending |
-| CRYPTO-01 | Phase 23 | Pending |
-| CRYPTO-02 | Phase 23 | Pending |
-| CRYPTO-03 | Phase 23 | Pending |
-| CRYPTO-04 | Phase 23 | Pending |
-| CRYPTO-05 | Phase 23 | Pending |
-| CRYPTO-06 | Phase 23 | Pending |
-| HIER-01 | Phase 24 | Pending |
-| HIER-02 | Phase 24 | Pending |
-| HIER-03 | Phase 24 | Pending |
-| HIER-04 | Phase 24 | Pending |
-| HIER-05 | Phase 24 | Pending |
-| HIER-06 | Phase 24 | Pending |
-| HIER-07 | Phase 24 | Pending |
-| HIER-08 | Phase 24 | Pending |
-| HIER-09 | Phase 24 | Pending |
-| VALID-01 | Phase 24 | Pending |
-| VALID-02 | Phase 24 | Pending |
-| VALID-03 | Phase 24 | Pending |
-| VALID-04 | Phase 24 | Pending |
-| VALID-05 | Phase 24 | Pending |
-| STRAT-01 | Phase 25a | Pending |
-| STRAT-02 | Phase 25a | Pending |
-| STRAT-03 | — | REMOVED (AD-05) |
-| STRAT-04 | Phase 25a | Pending |
-| STRAT-05 | Phase 25a | Pending |
-| STRAT-06 | Phase 25b | Pending |
-| API-01 | Phase 25a | Pending |
-| API-02 | Phase 25a | Pending |
-| API-03 | Phase 25a | Pending |
-| API-04 | Phase 25a | Pending |
-| DIST-01 | Phase 26 | Pending |
-| DIST-02 | Phase 26 | Pending |
-| DIST-03 | Phase 26 | Pending |
-| DIST-04 | Phase 26 | Pending |
-| DIST-05 | Phase 26 | Pending |
-| DIST-06 | Phase 26 | Pending |
-| DIST-07 | Phase 26 | Pending |
-| DIST-08 | Phase 26 | Pending |
-| DIST-09 | Phase 26 | Pending |
-| DIST-10 | Phase 26 | Pending |
-| DIST-11 | Phase 26 | Pending |
-| RESIL-01 | Phase 26 | Pending |
-| RESIL-02 | Phase 26 | Pending |
-| RESIL-03 | Phase 26 | Pending |
-| RESIL-04 | Phase 26 | Pending |
-| RESIL-05 | Phase 26 | Pending |
-| OBS-01 | Phase 26 | Pending |
-| OBS-02 | Phase 26 | Pending |
-| OBS-03 | Phase 26 | Pending |
-| OBS-04 | Phase 26 | Pending |
-| OBS-05 | Phase 26 | Pending |
-| UPLT-01 | Phase 27 | Pending |
-| UPLT-02 | Phase 27 | Pending |
-| UPLT-03 | Phase 27 | Pending |
-| UPST-01 | Phase 27 | Pending |
-| UPST-02 | Phase 27 | Pending |
-| UPST-03 | Phase 27 | Pending |
-| DECPL-01 | Phase 27 | Pending |
-| DECPL-02 | Phase 27 | Pending |
-| DECPL-03 | Phase 27 | Pending |
-| DECPL-04 | Phase 27 | Pending |
-| DECPL-05 | Phase 27 | Pending |
-| DIST-12 | Phase 29 | Pending |
-| DIST-13 | Phase 29 | Pending |
-| DIST-14 | Phase 29 | Pending |
-| DIST-15 | Phase 29 | Pending |
-| DIST-16 | Phase 29 | Pending |
-| DIST-17 | Phase 29 | Pending |
-| CLEAN-01 | Phase 28 | Pending |
-| CLEAN-02 | Phase 28 | Pending |
-| CLEAN-03 | Phase 28 | Pending |
-| REGR-01 | ALL phases (22-30) | Pending |
-| REGR-02 | Phase 25b, 27, 30 | Pending |
-| REGR-03 | ALL phases (22-30) | Pending |
-| REGR-04 | Phase 27, 30 | Pending |
-| REGR-05 | Phase 24, 25a | Pending |
-| REGR-06 | Phase 28 | Pending |
-| TEST-01 | Phase 30 | Pending |
-| TEST-02 | Phase 30 | Pending |
-| TEST-03 | Phase 30 | Pending |
-| TEST-04 | Phase 30 | Pending |
-| TEST-05 | Phase 30 | Pending |
-| TEST-06 | Phase 30 | Pending |
+| (populated by roadmapper) | | |
 
 **Coverage:**
-- v2.0 requirements: 118 total (22 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added, 4 CLI-* added, 9 DEPLOY-* added, 6 PRECLEAN-* added)
-- Mapped to phases: 117 (1 removed)
-- Unmapped: 0
-- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-10)
-- SDK_REFACTOR_PLAN.md phases: All 6 main phases + subphases (3.5, 4A, 4B, 5A, 5B, 5C) fully covered
+- v6.0 requirements: 120 total
+- Mapped to phases: TBD
+- Unmapped: TBD
 
 ---
-*Requirements defined: 2026-02-11*
-*Last updated: 2026-02-12 -- architecture decisions applied, phases renumbered, STRAT-03 removed, CLEAN-* added*
+*Requirements defined: 2026-02-20*
+*Last updated: 2026-02-20 after design discussion*
