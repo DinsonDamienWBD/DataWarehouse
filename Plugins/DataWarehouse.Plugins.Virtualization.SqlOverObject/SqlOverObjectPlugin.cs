@@ -1,8 +1,11 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Query;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -67,6 +70,11 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
     private long _cacheHits;
     private long _cacheMisses;
 
+    // New query engine infrastructure (Plans 01-04)
+    private QueryExecutionEngine? _queryEngine;
+    private ISqlParser? _sqlParser;
+    private bool _useNewEngine = true;
+
     /// <summary>
     /// Initializes a new instance of the SqlOverObjectPlugin.
     /// </summary>
@@ -93,6 +101,9 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
             _fileReader = reader;
         }
 
+        // Initialize the new query engine infrastructure
+        InitializeQueryEngine(request);
+
         return new HandshakeResponse
         {
             PluginId = Id,
@@ -104,6 +115,35 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
             Capabilities = GetCapabilities(),
             Metadata = GetMetadata()
         };
+    }
+
+    /// <summary>
+    /// Initializes the query execution engine with the SQL parser, cost-based planner,
+    /// and columnar engine from Plans 01-04.
+    /// </summary>
+    private void InitializeQueryEngine(HandshakeRequest request)
+    {
+        try
+        {
+            _sqlParser = new SqlParserEngine();
+            var planner = new CostBasedQueryPlanner();
+            var dataSource = new PluginDataSourceProvider(this);
+
+            // Wire ITagProvider to DW tag system via MessageBus if available
+            ITagProvider? tagProvider = null;
+            if (MessageBus != null)
+            {
+                tagProvider = new MessageBusTagProvider(MessageBus);
+            }
+
+            _queryEngine = new QueryExecutionEngine(_sqlParser, planner, dataSource, tagProvider);
+        }
+        catch (Exception)
+        {
+            // If initialization fails, fall back to legacy parser
+            _useNewEngine = false;
+            _queryEngine = null;
+        }
     }
 
     /// <inheritdoc />
@@ -170,6 +210,24 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
                 Name = "jdbc_odbc_bridge",
                 DisplayName = "JDBC/ODBC Bridge",
                 Description = "Expose metadata for standard connectivity"
+            },
+            new()
+            {
+                Name = "cost_based_planner",
+                DisplayName = "Cost-Based Query Planner",
+                Description = "Cost-based query optimization with cardinality estimation and join reordering"
+            },
+            new()
+            {
+                Name = "columnar_execution",
+                DisplayName = "Columnar Execution Engine",
+                Description = "Vectorized columnar batch processing with efficient aggregation"
+            },
+            new()
+            {
+                Name = "tag_queries",
+                DisplayName = "Tag-Aware Queries",
+                Description = "SQL queries with tag(), has_tag(), tag_count() functions for DW metadata"
             }
         };
     }
@@ -536,6 +594,100 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
         }
         Interlocked.Increment(ref _cacheMisses);
 
+        // Try the new query engine first (Plans 01-04 infrastructure)
+        if (_useNewEngine && _queryEngine != null)
+        {
+            try
+            {
+                var engineResult = await ExecuteViaNewEngineAsync(sql, parameters, maxRows, ct);
+                _queryCache.Set(cacheKey, engineResult);
+                return engineResult;
+            }
+            catch (SqlParseException)
+            {
+                // New parser cannot handle this query (DW-specific syntax);
+                // fall back to legacy regex parser with warning
+            }
+            catch (NotSupportedException)
+            {
+                // Query type not supported by new engine; fall back
+            }
+        }
+
+        // Legacy path: regex-based parser
+        return await ExecuteViaLegacyEngineAsync(sql, parameters, maxRows, cacheKey, ct);
+    }
+
+    /// <summary>
+    /// Executes a query using the new QueryExecutionEngine infrastructure.
+    /// Converts QueryExecutionResult (columnar batches) to SqlQueryResult format.
+    /// </summary>
+    private async Task<SqlQueryResult> ExecuteViaNewEngineAsync(
+        string sql,
+        IReadOnlyDictionary<string, object>? parameters,
+        int maxRows,
+        CancellationToken ct)
+    {
+        // Apply parameter substitution to SQL string
+        var resolvedSql = parameters != null ? SubstituteSqlParameters(sql, parameters) : sql;
+
+        var result = await _queryEngine!.ExecuteQueryAsync(resolvedSql, ct);
+
+        // Convert IAsyncEnumerable<ColumnarBatch> to SqlQueryResult format
+        var allRows = new List<object?[]>();
+        var columns = new List<VirtualTableColumn>();
+        bool schemaBuilt = false;
+
+        await foreach (var batch in result.Batches.WithCancellation(ct))
+        {
+            // Build schema from first batch
+            if (!schemaBuilt)
+            {
+                for (int c = 0; c < batch.ColumnCount; c++)
+                {
+                    var col = batch.Columns[c];
+                    columns.Add(new VirtualTableColumn
+                    {
+                        Name = col.Name,
+                        DataType = MapColumnDataTypeToSql(col.DataType),
+                        Ordinal = c
+                    });
+                }
+                schemaBuilt = true;
+            }
+
+            // Extract rows from columnar batch
+            for (int r = 0; r < batch.RowCount && allRows.Count < maxRows; r++)
+            {
+                var row = new object?[batch.ColumnCount];
+                for (int c = 0; c < batch.ColumnCount; c++)
+                    row[c] = batch.Columns[c].GetValue(r);
+                allRows.Add(row);
+            }
+
+            if (allRows.Count >= maxRows) break;
+        }
+
+        return new SqlQueryResult
+        {
+            Columns = columns,
+            Rows = allRows,
+            RowCount = allRows.Count,
+            HasMoreRows = allRows.Count >= maxRows,
+            BytesScanned = Interlocked.Read(ref _totalBytesScanned)
+        };
+    }
+
+    /// <summary>
+    /// Executes a query using the legacy regex-based parser (backward compatibility).
+    /// </summary>
+    private async Task<SqlQueryResult> ExecuteViaLegacyEngineAsync(
+        string sql,
+        IReadOnlyDictionary<string, object>? parameters,
+        int maxRows,
+        string cacheKey,
+        CancellationToken ct)
+    {
         // Parse the SQL query
         var parsedQuery = ParseSqlQuery(sql);
 
@@ -558,6 +710,37 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
         return result;
     }
+
+    private static string SubstituteSqlParameters(string sql, IReadOnlyDictionary<string, object> parameters)
+    {
+        var result = sql;
+        foreach (var param in parameters)
+        {
+            var placeholder = $"@{param.Key}";
+            var value = param.Value switch
+            {
+                string s => $"'{s.Replace("'", "''")}'",
+                DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
+                null => "NULL",
+                _ => param.Value.ToString()
+            };
+            result = result.Replace(placeholder, value);
+        }
+        return result;
+    }
+
+    private static SqlDataType MapColumnDataTypeToSql(ColumnDataType dt) => dt switch
+    {
+        ColumnDataType.Int32 => SqlDataType.Integer,
+        ColumnDataType.Int64 => SqlDataType.BigInt,
+        ColumnDataType.Float64 => SqlDataType.Double,
+        ColumnDataType.String => SqlDataType.VarChar,
+        ColumnDataType.Bool => SqlDataType.Boolean,
+        ColumnDataType.Binary => SqlDataType.Binary,
+        ColumnDataType.Decimal => SqlDataType.Decimal,
+        ColumnDataType.DateTime => SqlDataType.Timestamp,
+        _ => SqlDataType.VarChar
+    };
 
     private async Task<SqlQueryResult> ExecuteSelectAsync(ParsedQuery query, int maxRows, CancellationToken ct)
     {
@@ -1934,6 +2117,349 @@ public sealed class SqlOverObjectPlugin : DataVirtualizationPluginBase
 
     #endregion
 }
+
+#region Query Engine Integration Types
+
+/// <summary>
+/// Bridges the plugin's table registry and file reader to the IDataSourceProvider contract
+/// required by QueryExecutionEngine. Converts file data into ColumnarBatch format.
+/// </summary>
+internal sealed class PluginDataSourceProvider : IDataSourceProvider
+{
+    private readonly SqlOverObjectPlugin _plugin;
+
+    public PluginDataSourceProvider(SqlOverObjectPlugin plugin) =>
+        _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
+
+    public async IAsyncEnumerable<ColumnarBatch> GetTableData(
+        string tableName,
+        List<string>? columns,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        if (!_plugin._tableRegistry.TryGetValue(tableName, out var schema))
+            throw new InvalidOperationException($"Table '{tableName}' not found. Error code: SQL_42P01");
+
+        // Check cached data first
+        if (_plugin._tableDataCache.TryGetValue(tableName, out var cached) &&
+            (DateTime.UtcNow - cached.CachedAt) < TimeSpan.FromMinutes(5))
+        {
+            yield return ConvertRowsToBatch(cached.Rows, schema, columns);
+            yield break;
+        }
+
+        // Read from source
+        if (_plugin._fileReader == null)
+            throw new InvalidOperationException("File reader not configured");
+
+        using var stream = await _plugin._fileReader(schema.SourcePath, ct);
+        if (stream == null)
+            throw new FileNotFoundException($"Source file not found: {schema.SourcePath}");
+
+        var data = await ReadAllDataInternalAsync(schema, stream, ct);
+
+        // Cache for future use
+        _plugin._tableDataCache[tableName] = new CachedTableData
+        {
+            TableName = tableName,
+            Rows = data,
+            CachedAt = DateTime.UtcNow,
+            RowCount = data.Count
+        };
+
+        yield return ConvertRowsToBatch(data, schema, columns);
+    }
+
+    public TableStatistics? GetTableStatistics(string tableName)
+    {
+        if (_plugin._tableDataCache.TryGetValue(tableName, out var cached))
+        {
+            var colStats = ImmutableDictionary<string, ColumnStatistics>.Empty;
+            if (_plugin._tableRegistry.TryGetValue(tableName, out var schema))
+            {
+                var builder = ImmutableDictionary.CreateBuilder<string, ColumnStatistics>();
+                foreach (var col in schema.Columns)
+                {
+                    builder[col.Name] = new ColumnStatistics(
+                        DistinctCount: Math.Min(cached.RowCount, 100),
+                        NullCount: 0,
+                        MinValue: null,
+                        MaxValue: null,
+                        AvgSize: 32
+                    );
+                }
+                colStats = builder.ToImmutable();
+            }
+
+            return new TableStatistics(
+                TableName: tableName,
+                RowCount: cached.RowCount,
+                SizeBytes: cached.RowCount * 256, // rough estimate
+                Columns: colStats
+            );
+        }
+
+        // Return basic stats if table is registered but not cached
+        if (_plugin._tableRegistry.ContainsKey(tableName))
+        {
+            return new TableStatistics(
+                TableName: tableName,
+                RowCount: 1000, // default estimate
+                SizeBytes: 256_000,
+                Columns: ImmutableDictionary<string, ColumnStatistics>.Empty
+            );
+        }
+
+        return null;
+    }
+
+    private static ColumnarBatch ConvertRowsToBatch(
+        List<Dictionary<string, object?>> rows,
+        VirtualTableSchema schema,
+        List<string>? requestedColumns)
+    {
+        if (rows.Count == 0)
+            return new ColumnarBatch(0, Array.Empty<ColumnVector>());
+
+        var columnsToUse = requestedColumns != null
+            ? schema.Columns.Where(c => requestedColumns.Contains(c.Name, StringComparer.OrdinalIgnoreCase)).ToList()
+            : schema.Columns.ToList();
+
+        // If no schema columns match, try using keys from data
+        if (columnsToUse.Count == 0 && rows.Count > 0)
+        {
+            var allKeys = rows.SelectMany(r => r.Keys).Distinct().ToList();
+            var colsToProject = requestedColumns != null
+                ? allKeys.Where(k => requestedColumns.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList()
+                : allKeys;
+
+            columnsToUse = colsToProject.Select((k, i) => new VirtualTableColumn
+            {
+                Name = k,
+                DataType = SqlDataType.VarChar,
+                Ordinal = i
+            }).ToList();
+        }
+
+        var builder = new ColumnarBatchBuilder(rows.Count);
+
+        foreach (var col in columnsToUse)
+        {
+            var dataType = MapSqlDataTypeToColumnar(col.DataType);
+            builder.AddColumn(col.Name, dataType);
+        }
+
+        for (int r = 0; r < rows.Count; r++)
+        {
+            for (int c = 0; c < columnsToUse.Count; c++)
+            {
+                var colName = columnsToUse[c].Name;
+                rows[r].TryGetValue(colName, out var value);
+                if (value != null)
+                {
+                    try
+                    {
+                        builder.SetValue(c, r, ConvertForColumnar(value, columnsToUse[c].DataType));
+                    }
+                    catch
+                    {
+                        // Type conversion failure; leave as null
+                    }
+                }
+            }
+        }
+
+        return builder.Build();
+    }
+
+    private static ColumnDataType MapSqlDataTypeToColumnar(SqlDataType dt) => dt switch
+    {
+        SqlDataType.Boolean => ColumnDataType.Bool,
+        SqlDataType.Integer => ColumnDataType.Int32,
+        SqlDataType.BigInt => ColumnDataType.Int64,
+        SqlDataType.Float or SqlDataType.Double => ColumnDataType.Float64,
+        SqlDataType.Decimal => ColumnDataType.Decimal,
+        SqlDataType.Date or SqlDataType.Time or SqlDataType.Timestamp => ColumnDataType.DateTime,
+        SqlDataType.Binary => ColumnDataType.Binary,
+        _ => ColumnDataType.String
+    };
+
+    private static object? ConvertForColumnar(object? value, SqlDataType targetType)
+    {
+        if (value == null) return null;
+
+        return targetType switch
+        {
+            SqlDataType.Integer => Convert.ToInt32(value),
+            SqlDataType.BigInt => Convert.ToInt64(value),
+            SqlDataType.Float or SqlDataType.Double => Convert.ToDouble(value),
+            SqlDataType.Decimal => Convert.ToDecimal(value),
+            SqlDataType.Boolean => Convert.ToBoolean(value),
+            SqlDataType.Timestamp or SqlDataType.Date or SqlDataType.Time =>
+                value is DateTime dt ? dt : DateTime.TryParse(value.ToString(), out var parsed) ? parsed : value,
+            _ => value.ToString() ?? ""
+        };
+    }
+
+    private static async Task<List<Dictionary<string, object?>>> ReadAllDataInternalAsync(
+        VirtualTableSchema schema, Stream stream, CancellationToken ct)
+    {
+        var data = new List<Dictionary<string, object?>>();
+
+        switch (schema.SourceFormat)
+        {
+            case VirtualTableFormat.Csv:
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    var headerLine = await reader.ReadLineAsync(ct);
+                    if (headerLine == null) return data;
+
+                    var headers = headerLine.Split(',').Select(h => h.Trim().Trim('"')).ToList();
+
+                    while (!reader.EndOfStream)
+                    {
+                        var line = await reader.ReadLineAsync(ct);
+                        if (string.IsNullOrEmpty(line)) continue;
+
+                        var values = line.Split(',');
+                        var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                        for (int i = 0; i < headers.Count && i < values.Length; i++)
+                            row[headers[i]] = values[i].Trim().Trim('"');
+
+                        data.Add(row);
+                    }
+                }
+                break;
+
+            case VirtualTableFormat.Json:
+                using (var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct))
+                {
+                    foreach (var element in doc.RootElement.EnumerateArray())
+                    {
+                        if (element.ValueKind != JsonValueKind.Object) continue;
+                        var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var property in element.EnumerateObject())
+                            row[property.Name] = JsonElementToValue(property.Value);
+                        data.Add(row);
+                    }
+                }
+                break;
+
+            case VirtualTableFormat.NdJson:
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    while (!reader.EndOfStream)
+                    {
+                        var line = await reader.ReadLineAsync(ct);
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        using var doc = JsonDocument.Parse(line);
+                        if (doc.RootElement.ValueKind != JsonValueKind.Object) continue;
+
+                        var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var property in doc.RootElement.EnumerateObject())
+                            row[property.Name] = JsonElementToValue(property.Value);
+                        data.Add(row);
+                    }
+                }
+                break;
+        }
+
+        return data;
+    }
+
+    private static object? JsonElementToValue(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Null => null,
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number when element.TryGetInt32(out var i) => i,
+        JsonValueKind.Number when element.TryGetInt64(out var l) => l,
+        JsonValueKind.Number when element.TryGetDouble(out var d) => d,
+        JsonValueKind.String => element.GetString(),
+        _ => element.GetRawText()
+    };
+}
+
+/// <summary>
+/// Bridges the DW MessageBus tag system to the ITagProvider contract.
+/// Resolves tag(), has_tag(), and tag_count() SQL function calls against the
+/// message bus topics "tags.get", "tags.has", and "tags.count".
+/// </summary>
+internal sealed class MessageBusTagProvider : ITagProvider
+{
+    private readonly IMessageBus _bus;
+
+    public MessageBusTagProvider(IMessageBus bus) =>
+        _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+
+    public string? GetTag(string objectKey, string tagName)
+    {
+        try
+        {
+            var message = new PluginMessage
+            {
+                Type = "tags.get",
+                Payload = new Dictionary<string, object>
+                {
+                    ["objectKey"] = objectKey,
+                    ["tagName"] = tagName
+                }
+            };
+            var response = _bus.SendAsync("tags.get", message).GetAwaiter().GetResult();
+            return response.Success ? response.Payload?.ToString() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public bool HasTag(string objectKey, string tagName)
+    {
+        try
+        {
+            var message = new PluginMessage
+            {
+                Type = "tags.has",
+                Payload = new Dictionary<string, object>
+                {
+                    ["objectKey"] = objectKey,
+                    ["tagName"] = tagName
+                }
+            };
+            var response = _bus.SendAsync("tags.has", message).GetAwaiter().GetResult();
+            return response.Success && response.Payload is true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public int GetTagCount(string objectKey)
+    {
+        try
+        {
+            var message = new PluginMessage
+            {
+                Type = "tags.count",
+                Payload = new Dictionary<string, object>
+                {
+                    ["objectKey"] = objectKey
+                }
+            };
+            var response = _bus.SendAsync("tags.count", message).GetAwaiter().GetResult();
+            return response.Success && response.Payload is int count ? count : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+}
+
+#endregion
 
 #region Supporting Types
 
