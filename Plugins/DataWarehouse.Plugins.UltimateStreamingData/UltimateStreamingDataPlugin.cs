@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Threading.Channels;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -229,12 +230,106 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     }
 
     #region Hierarchy StreamingPluginBase Abstract Methods
+
     /// <inheritdoc/>
-    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default)
-        => Task.CompletedTask;
+    /// <remarks>
+    /// Reads the data stream into memory, wraps it in a PluginMessage, and publishes
+    /// it to the message bus under the topic <c>dw.streaming.{topic}</c>.
+    /// </remarks>
+    public override async Task PublishAsync(string topic, Stream data, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (MessageBus == null)
+            throw new InvalidOperationException(
+                "MessageBus not initialized. Ensure InitializeAsync has been called before publishing.");
+
+        if (string.IsNullOrWhiteSpace(topic))
+            throw new ArgumentException("Topic must not be null or empty.", nameof(topic));
+
+        if (data == null)
+            throw new ArgumentNullException(nameof(data));
+
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct).ConfigureAwait(false);
+        var payload = ms.ToArray();
+
+        var busTopic = $"dw.streaming.{topic}";
+        var message = new PluginMessage
+        {
+            SourcePluginId = Id,
+            Type = "streaming.publish",
+            Source = Id,
+            Timestamp = DateTime.UtcNow,
+            Payload = new Dictionary<string, object>
+            {
+                ["streamTopic"] = topic,
+                ["payload"] = Convert.ToBase64String(payload),
+                ["payloadLength"] = payload.Length
+            }
+        };
+
+        await MessageBus.PublishAsync(busTopic, message, ct).ConfigureAwait(false);
+        Interlocked.Increment(ref _totalOperations);
+    }
+
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    { await Task.CompletedTask; yield break; }
+    /// <remarks>
+    /// Subscribes to the message bus topic <c>dw.streaming.{topic}</c> via a bounded
+    /// channel, then yields each message's Data dictionary as it arrives.
+    /// The subscription is disposed when the caller cancels or the iterator is discarded.
+    /// </remarks>
+    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(
+        string topic,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (MessageBus == null)
+            throw new InvalidOperationException(
+                "MessageBus not initialized. Ensure InitializeAsync has been called before subscribing.");
+
+        if (string.IsNullOrWhiteSpace(topic))
+            throw new ArgumentException("Topic must not be null or empty.", nameof(topic));
+
+        var channel = Channel.CreateBounded<Dictionary<string, object>>(
+            new BoundedChannelOptions(1000)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleWriter = false,
+                SingleReader = true
+            });
+
+        var busTopic = $"dw.streaming.{topic}";
+
+        // Subscribe to the message bus; write each incoming message's payload into the channel.
+        var subscription = MessageBus.Subscribe(busTopic, async msg =>
+        {
+            if (msg.Payload != null && !channel.Reader.Completion.IsCompleted)
+            {
+                try
+                {
+                    await channel.Writer.WriteAsync(msg.Payload).ConfigureAwait(false);
+                }
+                catch (ChannelClosedException)
+                {
+                    // Channel closed — subscriber gone; ignore.
+                }
+            }
+        });
+
+        try
+        {
+            await foreach (var item in channel.Reader.ReadAllAsync(ct).ConfigureAwait(false))
+            {
+                yield return item;
+            }
+        }
+        finally
+        {
+            channel.Writer.TryComplete();
+            subscription?.Dispose();
+        }
+    }
+
     #endregion
 
     protected override void Dispose(bool disposing)
