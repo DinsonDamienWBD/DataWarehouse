@@ -100,12 +100,17 @@ public sealed class UniversalDashboardsPlugin : DataWarehouse.SDK.Contracts.Hier
 
     /// <summary>
     /// Registers a dashboard strategy with the plugin.
+    /// Registers in both the local typed dictionary and the inherited
+    /// <see cref="SDK.Contracts.PluginBase.StrategyRegistry"/> (IStrategy) for unified dispatch.
     /// </summary>
     /// <param name="strategy">The strategy to register.</param>
     public void RegisterStrategy(DashboardStrategyBase strategy)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         _strategies[strategy.StrategyId] = strategy;
+        // DashboardStrategyBase : StrategyBase : IStrategy — register with inherited IStrategy registry.
+        // Explicit cast to IStrategy routes to PluginBase.RegisterStrategy(IStrategy), not this overload.
+        RegisterStrategy((DataWarehouse.SDK.Contracts.IStrategy)strategy);
     }
 
     /// <summary>
@@ -760,7 +765,9 @@ public sealed class UniversalDashboardsPlugin : DataWarehouse.SDK.Contracts.Hier
             {
                 if (Activator.CreateInstance(strategyType) is DashboardStrategyBase strategy)
                 {
-                    _strategies[strategy.StrategyId] = strategy;
+                    // RegisterStrategy(DashboardStrategyBase) registers in both the local typed
+                    // dictionary and the inherited PluginBase.StrategyRegistry (IStrategy).
+                    RegisterStrategy(strategy);
                 }
             }
             catch

@@ -69,6 +69,8 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
 
     /// <summary>
     /// Registers an observability strategy with the plugin.
+    /// Registers in both the local typed dictionary and the inherited
+    /// <see cref="ObservabilityPluginBase.ObservabilityStrategyRegistry"/> for unified dispatch.
     /// </summary>
     /// <param name="strategy">The strategy to register.</param>
     public void RegisterStrategy(IObservabilityStrategy strategy)
@@ -77,6 +79,8 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
         if (strategy is ObservabilityStrategyBase baseStrategy)
         {
             _strategies[baseStrategy.StrategyId] = strategy;
+            // Also register with inherited ObservabilityStrategyRegistry for unified dispatch
+            RegisterObservabilityStrategy(strategy);
         }
     }
 
@@ -230,6 +234,8 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
 
     /// <summary>
     /// Discovers and registers all observability strategies via reflection.
+    /// Strategies are registered in both the local typed dictionary and the inherited
+    /// <see cref="ObservabilityPluginBase.ObservabilityStrategyRegistry"/> for unified dispatch.
     /// </summary>
     private void DiscoverAndRegisterStrategies()
     {
@@ -244,6 +250,8 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
                 if (Activator.CreateInstance(strategyType) is ObservabilityStrategyBase strategy)
                 {
                     _strategies[strategy.StrategyId] = strategy;
+                    // Also register with inherited ObservabilityStrategyRegistry for unified dispatch
+                    RegisterObservabilityStrategy(strategy);
                 }
             }
             catch
