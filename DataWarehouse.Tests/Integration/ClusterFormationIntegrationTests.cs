@@ -1,14 +1,14 @@
-using DataWarehouse.Plugins.Raft;
+using DataWarehouse.SDK.Infrastructure.Distributed;
 using FluentAssertions;
 using Xunit;
 
 namespace DataWarehouse.Tests.Integration;
 
 /// <summary>
-/// Integration tests for cluster formation and consensus using Raft.
-/// Tests configuration and initialization patterns.
-/// Note: RaftConsensusPlugin is marked obsolete (replaced by UltimateConsensus),
-/// but still functional for testing distributed consensus patterns.
+/// Integration tests for cluster formation and consensus configuration using the SDK's Raft types.
+/// Tests SDK RaftConfiguration defaults and initialization patterns.
+/// The old RaftConsensusPlugin (BasePort/PortRange/ClusterEndpoints) has been deleted;
+/// these tests now use the SDK-native RaftConfiguration (ElectionTimeoutMinMs/Max/Heartbeat/MaxLogEntries).
 /// </summary>
 [Trait("Category", "Integration")]
 public class ClusterFormationIntegrationTests
@@ -19,43 +19,38 @@ public class ClusterFormationIntegrationTests
         // Arrange & Act
         var config = new RaftConfiguration
         {
-            BasePort = 0, // OS-assigned port
-            ClusterEndpoints = new List<string>()
+            ElectionTimeoutMinMs = 150,
+            ElectionTimeoutMaxMs = 300,
+            HeartbeatIntervalMs = 50
         };
 
         // Assert - Configuration is valid
-        config.BasePort.Should().Be(0);
-        config.ClusterEndpoints.Should().NotBeNull();
-        config.ClusterEndpoints.Should().BeEmpty();
+        config.ElectionTimeoutMinMs.Should().Be(150);
+        config.ElectionTimeoutMaxMs.Should().Be(300);
+        config.HeartbeatIntervalMs.Should().Be(50);
     }
 
     [Fact]
     public void RaftCluster_ThreeNodes_ConfigurationsShouldBeValid()
     {
-        // Arrange - Create 3-node cluster configuration
-        var node1Config = new RaftConfiguration
+        // Arrange - Create 3-node cluster configurations (each node uses same consensus settings)
+        var sharedConfig = new RaftConfiguration
         {
-            BasePort = 5001,
-            ClusterEndpoints = new List<string> { "127.0.0.1:5002", "127.0.0.1:5003" }
+            ElectionTimeoutMinMs = 150,
+            ElectionTimeoutMaxMs = 300,
+            HeartbeatIntervalMs = 50,
+            MaxLogEntries = 10_000
         };
 
-        var node2Config = new RaftConfiguration
-        {
-            BasePort = 5002,
-            ClusterEndpoints = new List<string> { "127.0.0.1:5001", "127.0.0.1:5003" }
-        };
-
-        var node3Config = new RaftConfiguration
-        {
-            BasePort = 5003,
-            ClusterEndpoints = new List<string> { "127.0.0.1:5001", "127.0.0.1:5002" }
-        };
+        var node1Config = sharedConfig;
+        var node2Config = sharedConfig;
+        var node3Config = sharedConfig;
 
         // Assert - All configurations should be valid
         var configs = new[] { node1Config, node2Config, node3Config };
         configs.Should().HaveCount(3);
-        configs.Should().AllSatisfy(c => c.ClusterEndpoints.Should().HaveCount(2));
-        configs.Should().AllSatisfy(c => c.BasePort.Should().BeGreaterThan(0));
+        configs.Should().AllSatisfy(c => c.ElectionTimeoutMaxMs.Should().BeGreaterThan(c.ElectionTimeoutMinMs));
+        configs.Should().AllSatisfy(c => c.HeartbeatIntervalMs.Should().BeGreaterThan(0));
 
         // Quorum = (3 / 2) + 1 = 2 nodes required
         var quorumSize = (3 / 2) + 1;
@@ -68,17 +63,17 @@ public class ClusterFormationIntegrationTests
         // Arrange & Act
         var config = new RaftConfiguration
         {
-            BasePort = 6000,
-            PortRange = 50,
-            ClusterEndpoints = new List<string> { "peer1:6001", "peer2:6002" }
+            ElectionTimeoutMinMs = 200,
+            ElectionTimeoutMaxMs = 500,
+            HeartbeatIntervalMs = 75,
+            MaxLogEntries = 50_000
         };
 
         // Assert
-        config.BasePort.Should().Be(6000);
-        config.PortRange.Should().Be(50);
-        config.ClusterEndpoints.Should().HaveCount(2);
-        config.ClusterEndpoints.Should().Contain("peer1:6001");
-        config.ClusterEndpoints.Should().Contain("peer2:6002");
+        config.ElectionTimeoutMinMs.Should().Be(200);
+        config.ElectionTimeoutMaxMs.Should().Be(500);
+        config.HeartbeatIntervalMs.Should().Be(75);
+        config.MaxLogEntries.Should().Be(50_000);
     }
 
     [Fact]
@@ -87,50 +82,28 @@ public class ClusterFormationIntegrationTests
         // Arrange & Act
         var config = new RaftConfiguration();
 
-        // Assert
-        config.BasePort.Should().Be(0, "default should be OS-assigned");
-        config.PortRange.Should().Be(100);
-        config.ClusterEndpoints.Should().NotBeNull();
+        // Assert - SDK defaults: 150ms/300ms/50ms/10000
+        config.ElectionTimeoutMinMs.Should().Be(150, "election timeout min should be 150ms per Raft paper recommendation");
+        config.ElectionTimeoutMaxMs.Should().Be(300, "election timeout max should be 300ms per Raft paper recommendation");
+        config.HeartbeatIntervalMs.Should().Be(50, "heartbeat interval should be 50ms");
+        config.MaxLogEntries.Should().Be(10_000, "max log entries default should be 10000");
     }
 
     [Fact]
     public void RaftCluster_SingleNode_ConfigurationIsValid()
     {
-        // Arrange - Single node cluster configuration
+        // Arrange - Single node cluster configuration uses same SDK settings
         var config = new RaftConfiguration
         {
-            BasePort = 0,
-            ClusterEndpoints = new List<string>() // No peers
+            ElectionTimeoutMinMs = 150,
+            ElectionTimeoutMaxMs = 300,
+            HeartbeatIntervalMs = 50
         };
 
-        // Assert - Configuration is valid even with no peers
-        config.ClusterEndpoints.Should().BeEmpty();
-        config.BasePort.Should().Be(0);
-
-        // Note: RaftConsensusPlugin requires handshake to initialize NodeId,
-        // so we just verify configuration validity here
-    }
-
-    [Fact]
-    public void RaftPlugin_Metadata_ShouldIndicateObsoleteStatus()
-    {
-        // Arrange & Act
-        var config = new RaftConfiguration { BasePort = 0 };
-
-#pragma warning disable CS0618 // RaftConsensusPlugin is obsolete; this test intentionally tests the legacy plugin and verifies its obsolete status
-        using var plugin = new RaftConsensusPlugin(config);
-
-        // Assert
-        plugin.Id.Should().Be("datawarehouse.raft");
-        plugin.Name.Should().Be("Raft Consensus");
-
-        // Verify the type has Obsolete attribute
-        var obsoleteAttr = typeof(RaftConsensusPlugin)
-            .GetCustomAttributes(typeof(ObsoleteAttribute), false)
-            .FirstOrDefault();
-#pragma warning restore CS0618
-
-        obsoleteAttr.Should().NotBeNull("RaftConsensusPlugin should be marked obsolete");
+        // Assert - Configuration is valid for single-node deployment
+        config.ElectionTimeoutMinMs.Should().BeGreaterThan(0);
+        config.ElectionTimeoutMaxMs.Should().BeGreaterThan(config.ElectionTimeoutMinMs);
+        config.HeartbeatIntervalMs.Should().BeLessThan(config.ElectionTimeoutMinMs);
     }
 
     [Fact]
@@ -139,35 +112,31 @@ public class ClusterFormationIntegrationTests
         // Arrange & Act
         var config = new RaftConfiguration();
 
-        // Assert - Default configuration should have sensible values
-        config.BasePort.Should().Be(0, "default should use OS-assigned port");
-        config.PortRange.Should().BeGreaterThan(0);
-        config.ClusterEndpoints.Should().NotBeNull();
+        // Assert - Default configuration should have sensible timing ratios
+        config.ElectionTimeoutMinMs.Should().BeGreaterThan(0, "election timeout should be positive");
+        config.ElectionTimeoutMaxMs.Should().BeGreaterThan(config.ElectionTimeoutMinMs, "max should exceed min for randomization");
+        config.HeartbeatIntervalMs.Should().BeLessThan(config.ElectionTimeoutMinMs, "heartbeat must be much shorter than election timeout");
+        config.MaxLogEntries.Should().BeGreaterThan(0, "max log entries should be positive");
     }
 
     [Fact]
     public void RaftCluster_FiveNodes_ShouldSurviveTwoFailures()
     {
-        // Arrange - 5-node cluster configuration
-        var nodes = new List<RaftConfiguration>();
-
-        for (int i = 1; i <= 5; i++)
+        // Arrange - 5-node cluster shares one SDK RaftConfiguration
+        var config = new RaftConfiguration
         {
-            var peers = Enumerable.Range(1, 5)
-                .Where(p => p != i)
-                .Select(p => $"127.0.0.1:600{p}")
-                .ToList();
+            ElectionTimeoutMinMs = 150,
+            ElectionTimeoutMaxMs = 300,
+            HeartbeatIntervalMs = 50,
+            MaxLogEntries = 10_000
+        };
 
-            nodes.Add(new RaftConfiguration
-            {
-                BasePort = 6000 + i,
-                ClusterEndpoints = peers
-            });
-        }
+        // Create 5 node configurations (all use same consensus engine settings)
+        var nodeConfigs = Enumerable.Range(1, 5).Select(_ => config).ToList();
 
         // Assert
-        nodes.Should().HaveCount(5);
-        nodes.Should().AllSatisfy(n => n.ClusterEndpoints.Should().HaveCount(4));
+        nodeConfigs.Should().HaveCount(5);
+        nodeConfigs.Should().AllSatisfy(n => n.ElectionTimeoutMaxMs.Should().BeGreaterThan(n.ElectionTimeoutMinMs));
 
         // Quorum = (5 / 2) + 1 = 3 nodes
         // Can tolerate 2 failures and still maintain quorum
