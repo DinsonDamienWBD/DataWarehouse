@@ -40,7 +40,6 @@
     <ProjectReference Include="..\DataWarehouse.Shared\DataWarehouse.Shared.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompliance\DataWarehouse.Plugins.UltimateCompliance.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Raft\DataWarehouse.Plugins.Raft.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateEncryption\DataWarehouse.Plugins.UltimateEncryption.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompression\DataWarehouse.Plugins.UltimateCompression.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorage\DataWarehouse.Plugins.UltimateStorage.csproj" />

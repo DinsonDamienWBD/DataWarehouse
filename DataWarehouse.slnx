@@ -29,7 +29,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.KubernetesCsi/DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PluginMarketplace/DataWarehouse.Plugins.PluginMarketplace.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.Raft/DataWarehouse.Plugins.Raft.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfEmulatingObjects/DataWarehouse.Plugins.SelfEmulatingObjects.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SemanticSync/DataWarehouse.Plugins.SemanticSync.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
