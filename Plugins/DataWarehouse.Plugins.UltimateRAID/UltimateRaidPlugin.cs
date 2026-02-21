@@ -7,6 +7,7 @@ using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using CapabilityCategory = DataWarehouse.SDK.Contracts.CapabilityCategory;
+using RaidRegistry = DataWarehouse.SDK.Contracts.StrategyRegistry<DataWarehouse.Plugins.UltimateRAID.IRaidStrategy>;
 
 namespace DataWarehouse.Plugins.UltimateRAID;
 
@@ -41,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 [PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase, IDisposable
 {
-    private readonly RaidStrategyRegistry _registry;
+    private readonly RaidRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, RaidHealthStatus> _healthStatus = new BoundedDictionary<string, RaidHealthStatus>(1000);
     private bool _disposed;
@@ -89,9 +90,9 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
     ];
 
     /// <summary>
-    /// Gets the RAID strategy registry.
+    /// Gets the typed RAID strategy registry (StrategyRegistry&lt;IRaidStrategy&gt;).
     /// </summary>
-    public RaidStrategyRegistry Registry => _registry;
+    public RaidRegistry Registry => _registry;
 
     /// <summary>
     /// Gets or sets whether audit logging is enabled.
@@ -125,7 +126,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
     /// </summary>
     public UltimateRaidPlugin()
     {
-        _registry = new RaidStrategyRegistry();
+        _registry = new RaidRegistry(s => s.StrategyId);
 
         // Auto-discover and register strategies
         DiscoverAndRegisterStrategies();
@@ -136,7 +137,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
     {
         var response = await base.OnHandshakeAsync(request);
 
-        response.Metadata["RegisteredStrategies"] = _registry.GetAllStrategies().Count.ToString();
+        response.Metadata["RegisteredStrategies"] = _registry.Count.ToString();
         response.Metadata["DefaultStrategy"] = _defaultStrategyId;
         response.Metadata["AuditEnabled"] = _auditEnabled.ToString();
         response.Metadata["AutoRebuildEnabled"] = _autoRebuildEnabled.ToString();
@@ -268,7 +269,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             }
 
             // Strategy-specific capabilities
-            foreach (var strategy in _registry.GetAllStrategies())
+            foreach (var strategy in _registry.GetAll())
             {
                 capabilities.Add(new RegisteredCapability
                 {
@@ -327,7 +328,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             Payload = new Dictionary<string, object>
             {
                 ["type"] = "raid-plugin-overview",
-                ["totalStrategies"] = _registry.GetAllStrategies().Count,
+                ["totalStrategies"] = _registry.Count,
                 ["categories"] = new[]
                 {
                     "standard",
@@ -363,7 +364,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
         });
 
         // Individual strategy knowledge
-        foreach (var strategy in _registry.GetAllStrategies())
+        foreach (var strategy in _registry.GetAll())
         {
             knowledge.Add(new KnowledgeObject
             {
@@ -450,7 +451,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        metadata["TotalStrategies"] = _registry.GetAllStrategies().Count;
+        metadata["TotalStrategies"] = _registry.Count;
         metadata["StandardStrategies"] = GetStrategiesByCategory("standard").Count;
         metadata["NestedStrategies"] = GetStrategiesByCategory("nested").Count;
         metadata["AdvancedStrategies"] = GetStrategiesByCategory("advanced").Count;
@@ -484,7 +485,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing or invalid 'config' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.InitializeAsync(config);
@@ -515,7 +516,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing or invalid 'data' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.WriteAsync(lba, data);
@@ -542,7 +543,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'length' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var data = await strategy.ReadAsync(lba, length);
@@ -564,7 +565,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'diskIndex' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.RebuildAsync(diskIndex);
@@ -580,7 +581,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var result = await strategy.VerifyAsync();
@@ -596,7 +597,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var result = await strategy.ScrubAsync();
@@ -612,7 +613,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var health = await strategy.GetHealthStatusAsync();
@@ -628,7 +629,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var stats = await strategy.GetStatisticsAsync();
@@ -648,7 +649,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing or invalid 'disk' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.AddDiskAsync(disk);
@@ -668,7 +669,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'diskIndex' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.RemoveDiskAsync(diskIndex);
@@ -693,7 +694,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing or invalid 'replacementDisk' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         await strategy.ReplaceDiskAsync(diskIndex, replacementDisk);
@@ -703,7 +704,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
 
     private Task HandleListStrategiesAsync(PluginMessage message)
     {
-        var strategies = _registry.GetAllStrategies();
+        var strategies = _registry.GetAll();
 
         var strategyList = strategies.Select(s => new Dictionary<string, object>
         {
@@ -733,7 +734,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"Strategy '{strategyId}' not found");
 
         _defaultStrategyId = strategyId;
@@ -765,7 +766,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'diskIndex' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var health = await strategy.GetHealthStatusAsync();
@@ -826,7 +827,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
         var priorityGoal = message.Payload.TryGetValue("priorityGoal", out var pgObj) && pgObj is string goal ? goal : "balanced";
 
         // Build classification request for Intelligence
-        var categories = _registry.GetAllStrategies()
+        var categories = _registry.GetAll()
             .Where(s => s.MinimumDisks <= availableDisks)
             .Select(s => s.StrategyId)
             .ToArray();
@@ -870,7 +871,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
 
         var stats = await strategy.GetStatisticsAsync();
@@ -912,7 +913,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
 
     private List<IRaidStrategy> GetStrategiesByCategory(string category)
     {
-        return _registry.GetStrategiesByCategory(category).ToList();
+        return _registry.GetByPredicate(s => s.Category.Equals(category, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     private void IncrementUsageStats(string strategyId)
@@ -922,8 +923,8 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
 
     private void DiscoverAndRegisterStrategies()
     {
-        // Auto-discover strategies in this assembly
-        _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+        // Auto-discover strategies in this assembly using typed StrategyRegistry<IRaidStrategy>
+        _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
     }
 
     private static string[] GetUseCasesForRaidLevel(int level)
@@ -991,7 +992,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
             _disposed = true;
 
             // Dispose all registered strategies
-            foreach (var strategy in _registry.GetAllStrategies())
+            foreach (var strategy in _registry.GetAll())
             {
             strategy.Dispose();
             }

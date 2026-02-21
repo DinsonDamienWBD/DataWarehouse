@@ -9,6 +9,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 /// Interface for database storage strategy registry.
 /// Provides auto-discovery and lookup of database storage strategies.
 /// </summary>
+[Obsolete("Use StoragePluginBase.StorageStrategyRegistry (StrategyRegistry<IStorageStrategy>) for dispatch. This interface will be removed in v6.0.")]
 public interface IDatabaseStorageStrategyRegistry
 {
     /// <summary>Registers a database storage strategy.</summary>
@@ -43,6 +44,7 @@ public interface IDatabaseStorageStrategyRegistry
 /// Default implementation of database storage strategy registry.
 /// Provides thread-safe registration and lookup of strategies.
 /// </summary>
+[Obsolete("Use StoragePluginBase.StorageStrategyRegistry (StrategyRegistry<IStorageStrategy>) for dispatch. This class will be removed in v6.0.")]
 public sealed class DatabaseStorageStrategyRegistry : IDatabaseStorageStrategyRegistry
 {
     private readonly BoundedDictionary<string, DatabaseStorageStrategyBase> _strategies = new BoundedDictionary<string, DatabaseStorageStrategyBase>(1000);

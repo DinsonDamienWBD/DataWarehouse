@@ -78,7 +78,6 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 [PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IAsyncDisposable
 {
-    private readonly DatabaseStorageStrategyRegistry _strategyRegistry;
     private bool _disposed;
 
     /// <inheritdoc/>
@@ -94,24 +93,31 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     public override PluginCategory Category => PluginCategory.StorageProvider;
 
     /// <summary>
-    /// Gets the strategy registry for accessing database storage strategies.
-    /// Shadows the base <see cref="PluginBase.StrategyRegistry"/> which operates on <see cref="IStrategy"/>;
-    /// this property exposes the domain-specific <see cref="IDatabaseStorageStrategyRegistry"/> interface.
-    /// </summary>
-    public new IDatabaseStorageStrategyRegistry StrategyRegistry => _strategyRegistry;
-
-    /// <summary>
     /// Gets the number of registered strategies.
     /// </summary>
-    public int StrategyCount => _strategyRegistry.Count;
+    public int StrategyCount => StorageStrategyRegistry.Count;
 
     /// <summary>
     /// Creates a new instance of the UltimateDatabaseStoragePlugin.
     /// </summary>
     public UltimateDatabaseStoragePlugin()
     {
-        _strategyRegistry = new DatabaseStorageStrategyRegistry();
     }
+
+    /// <summary>
+    /// Gets a database storage strategy by ID, cast to the domain base type.
+    /// </summary>
+    private DatabaseStorageStrategyBase? GetDatabaseStrategy(string strategyId)
+        => StorageStrategyRegistry.Get(strategyId) as DatabaseStorageStrategyBase;
+
+    /// <summary>
+    /// Gets all registered database storage strategies.
+    /// </summary>
+    private IReadOnlyCollection<DatabaseStorageStrategyBase> GetAllDatabaseStrategies()
+        => StorageStrategyRegistry.GetAll()
+            .OfType<DatabaseStorageStrategyBase>()
+            .ToList()
+            .AsReadOnly();
 
     /// <inheritdoc/>
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
@@ -138,12 +144,12 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     }
 
     /// <summary>
-    /// Registers all database storage strategies.
+    /// Registers all database storage strategies using inherited StoragePluginBase typed dispatch.
     /// </summary>
     private void RegisterAllStrategies()
     {
-        // Auto-discover strategies from this assembly
-        _strategyRegistry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+        // Auto-discover strategies from this assembly using inherited StorageStrategyRegistry
+        StorageStrategyRegistry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
     }
 
     /// <inheritdoc/>
@@ -199,7 +205,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
 
     private Task HandleListStrategiesAsync(PluginMessage message)
     {
-        var strategies = _strategyRegistry.GetAllStrategies()
+        var strategies = GetAllDatabaseStrategies()
             .Select(s => new
             {
                 s.StrategyId,
@@ -221,7 +227,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     {
         if (message.Payload.TryGetValue("strategyId", out var idObj) && idObj is string strategyId)
         {
-            var strategy = _strategyRegistry.GetStrategy(strategyId);
+            var strategy = GetDatabaseStrategy(strategyId);
             if (strategy != null)
             {
                 var stats = strategy.GetDatabaseStatistics();
@@ -233,7 +239,8 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
 
     private Task HandleGetStatisticsAsync(PluginMessage message)
     {
-        var stats = _strategyRegistry.GetAllStatistics();
+        var stats = GetAllDatabaseStrategies()
+            .ToDictionary(s => s.StrategyId, s => s.GetDatabaseStatistics());
         // Response would be sent via message context
         return Task.CompletedTask;
     }
@@ -245,7 +252,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             return;
         }
 
-        var strategy = _strategyRegistry.GetStrategy(strategyId);
+        var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
             return;
@@ -278,7 +285,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             return;
         }
 
-        var strategy = _strategyRegistry.GetStrategy(strategyId);
+        var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
             return;
@@ -304,7 +311,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             return;
         }
 
-        var strategy = _strategyRegistry.GetStrategy(strategyId);
+        var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
             return;
@@ -325,7 +332,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             return;
         }
 
-        var strategy = _strategyRegistry.GetStrategy(strategyId);
+        var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
             return;
@@ -358,7 +365,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
         {
             // Check health of all strategies
             var healthResults = new Dictionary<string, object>();
-            foreach (var strategy in _strategyRegistry.GetAllStrategies())
+            foreach (var strategy in GetAllDatabaseStrategies())
             {
                 var health = await strategy.GetHealthAsync();
                 healthResults[strategy.StrategyId] = new
@@ -372,7 +379,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
         }
         else
         {
-            var strategy = _strategyRegistry.GetStrategy(strategyId);
+            var strategy = GetDatabaseStrategy(strategyId);
             if (strategy != null)
             {
                 var health = await strategy.GetHealthAsync();
@@ -385,8 +392,8 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        metadata["StrategyCount"] = _strategyRegistry.Count;
-        metadata["RegisteredStrategies"] = _strategyRegistry.StrategyIds.ToArray();
+        metadata["StrategyCount"] = StorageStrategyRegistry.Count;
+        metadata["RegisteredStrategies"] = StorageStrategyRegistry.GetAll().Select(s => s.StrategyId).ToArray();
         metadata["SupportedCategories"] = Enum.GetNames<DatabaseCategory>();
         metadata["DefaultStrategy"] = "postgresql";
         return metadata;
@@ -418,7 +425,7 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             return;
         }
 
-        foreach (var strategy in _strategyRegistry.GetAllStrategies())
+        foreach (var strategy in GetAllDatabaseStrategies())
         {
             try
             {
@@ -430,7 +437,6 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             }
         }
 
-        _strategyRegistry.Clear();
         _disposed = true;
 
         await base.DisposeAsyncCore();

@@ -7,6 +7,7 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// Interface for RAID strategy registry.
 /// Provides auto-discovery and lookup of RAID strategies.
 /// </summary>
+[Obsolete("Use StrategyRegistry<IRaidStrategy> instead. This interface will be removed in v6.0.")]
 public interface IRaidStrategyRegistry
 {
     /// <summary>Registers a RAID strategy.</summary>
@@ -38,6 +39,7 @@ public interface IRaidStrategyRegistry
 /// Default implementation of RAID strategy registry.
 /// Provides thread-safe registration and lookup of strategies.
 /// </summary>
+[Obsolete("Use StrategyRegistry<IRaidStrategy> instead. This class will be removed in v6.0.")]
 public sealed class RaidStrategyRegistry : IRaidStrategyRegistry
 {
     private readonly BoundedDictionary<string, IRaidStrategy> _strategies = new BoundedDictionary<string, IRaidStrategy>(1000);
