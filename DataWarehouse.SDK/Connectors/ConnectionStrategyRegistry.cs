@@ -2,18 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Connectors
 {
     /// <summary>
     /// Thread-safe registry for <see cref="IConnectionStrategy"/> instances.
+    /// Delegates to the generic <see cref="StrategyRegistry{TStrategy}"/> internally.
     /// Supports registration, lookup by ID or category, and auto-discovery from assemblies.
     /// </summary>
     public sealed class ConnectionStrategyRegistry
     {
-        private readonly BoundedDictionary<string, IConnectionStrategy> _strategies =
-            new BoundedDictionary<string, IConnectionStrategy>(200);
+        private readonly StrategyRegistry<IConnectionStrategy> _inner =
+            new(s => s.StrategyId);
 
         /// <summary>
         /// Registers a connection strategy. Overwrites any existing registration with the same ID.
@@ -22,8 +24,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <exception cref="ArgumentNullException">If strategy is null.</exception>
         public void Register(IConnectionStrategy strategy)
         {
-            ArgumentNullException.ThrowIfNull(strategy);
-            _strategies[strategy.StrategyId] = strategy;
+            _inner.Register(strategy);
         }
 
         /// <summary>
@@ -33,19 +34,18 @@ namespace DataWarehouse.SDK.Connectors
         /// <returns>True if the strategy was removed, false if it was not found.</returns>
         public bool Unregister(string strategyId)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
-            return _strategies.TryRemove(strategyId, out _);
+            return _inner.Unregister(strategyId);
         }
 
         /// <summary>
         /// Gets a strategy by its unique identifier.
         /// </summary>
-        /// <param name="strategyId">The strategy identifier (case-insensitive).</param>
+        /// <param name="strategyId">The strategy identifier.</param>
         /// <returns>The strategy, or null if not found.</returns>
         public IConnectionStrategy? Get(string strategyId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
-            return _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
+            return _inner.Get(strategyId);
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <returns>Read-only collection of all registered strategies.</returns>
         public IReadOnlyCollection<IConnectionStrategy> GetAll()
         {
-            return _strategies.Values.ToList().AsReadOnly();
+            return _inner.GetAll();
         }
 
         /// <summary>
@@ -64,8 +64,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <returns>Read-only collection of matching strategies.</returns>
         public IReadOnlyCollection<IConnectionStrategy> GetByCategory(ConnectorCategory category)
         {
-            return _strategies.Values
-                .Where(s => s.Category == category)
+            return _inner.GetByPredicate(s => s.Category == category)
                 .OrderBy(s => s.DisplayName)
                 .ToList()
                 .AsReadOnly();
@@ -74,7 +73,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <summary>
         /// Gets the total number of registered strategies.
         /// </summary>
-        public int Count => _strategies.Count;
+        public int Count => _inner.Count;
 
         /// <summary>
         /// Auto-discovers and registers all concrete <see cref="IConnectionStrategy"/> implementations
@@ -84,39 +83,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <returns>The number of newly discovered and registered strategies.</returns>
         public int AutoDiscover(params Assembly[] assemblies)
         {
-            var strategyType = typeof(IConnectionStrategy);
-            int discovered = 0;
-
-            foreach (var assembly in assemblies)
-            {
-                try
-                {
-                    var types = assembly.GetTypes()
-                        .Where(t => !t.IsAbstract && !t.IsInterface && strategyType.IsAssignableFrom(t));
-
-                    foreach (var type in types)
-                    {
-                        try
-                        {
-                            if (Activator.CreateInstance(type) is IConnectionStrategy strategy)
-                            {
-                                Register(strategy);
-                                discovered++;
-                            }
-                        }
-                        catch
-                        {
-                            // Skip types that cannot be instantiated with a parameterless constructor
-                        }
-                    }
-                }
-                catch
-                {
-                    // Skip assemblies that cannot be scanned (e.g., dynamic or unloadable assemblies)
-                }
-            }
-
-            return discovered;
+            return _inner.DiscoverFromAssembly(assemblies);
         }
     }
 }

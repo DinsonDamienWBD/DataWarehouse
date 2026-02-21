@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1030,38 +1031,38 @@ namespace DataWarehouse.SDK.Contracts.Encryption
 
     /// <summary>
     /// Default implementation of encryption strategy registry.
-    /// Provides thread-safe registration and lookup of strategies.
+    /// Delegates to the generic <see cref="DataWarehouse.SDK.Contracts.StrategyRegistry{TStrategy}"/> internally.
+    /// All public APIs are unchanged for backward compatibility.
     /// </summary>
     public sealed class EncryptionStrategyRegistry : IEncryptionStrategyRegistry
     {
-        private readonly BoundedDictionary<string, IEncryptionStrategy> _strategies = new BoundedDictionary<string, IEncryptionStrategy>(1000);
+        private readonly DataWarehouse.SDK.Contracts.StrategyRegistry<IEncryptionStrategy> _inner =
+            new(s => s.StrategyId);
         private volatile string _defaultStrategyId = "aes-256-gcm";
 
         /// <inheritdoc/>
         public void Register(IEncryptionStrategy strategy)
         {
-            ArgumentNullException.ThrowIfNull(strategy);
-            _strategies[strategy.StrategyId] = strategy;
+            _inner.Register(strategy);
         }
 
         /// <inheritdoc/>
         public IEncryptionStrategy? GetStrategy(string strategyId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
-            return _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
+            return _inner.Get(strategyId);
         }
 
         /// <inheritdoc/>
         public IReadOnlyCollection<IEncryptionStrategy> GetAllStrategies()
         {
-            return _strategies.Values.ToList().AsReadOnly();
+            return _inner.GetAll();
         }
 
         /// <inheritdoc/>
         public IReadOnlyCollection<IEncryptionStrategy> GetStrategiesBySecurityLevel(SecurityLevel minLevel)
         {
-            return _strategies.Values
-                .Where(s => s.CipherInfo.SecurityLevel >= minLevel)
+            return _inner.GetByPredicate(s => s.CipherInfo.SecurityLevel >= minLevel)
                 .OrderByDescending(s => s.CipherInfo.SecurityLevel)
                 .ToList()
                 .AsReadOnly();
@@ -1070,10 +1071,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// <inheritdoc/>
         public IReadOnlyCollection<IEncryptionStrategy> GetFipsCompliantStrategies()
         {
-            return _strategies.Values
-                .Where(s => IsFipsCompliant(s.StrategyId))
-                .ToList()
-                .AsReadOnly();
+            return _inner.GetByPredicate(s => IsFipsCompliant(s.StrategyId));
         }
 
         /// <inheritdoc/>
@@ -1087,7 +1085,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         public void SetDefaultStrategy(string strategyId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
-            if (!_strategies.ContainsKey(strategyId))
+            if (!_inner.ContainsStrategy(strategyId))
             {
                 throw new ArgumentException($"Strategy '{strategyId}' not registered", nameof(strategyId));
             }
@@ -1097,35 +1095,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// <inheritdoc/>
         public void DiscoverStrategies(params System.Reflection.Assembly[] assemblies)
         {
-            var strategyType = typeof(IEncryptionStrategy);
-
-            foreach (var assembly in assemblies)
-            {
-                try
-                {
-                    var types = assembly.GetTypes()
-                        .Where(t => !t.IsAbstract && !t.IsInterface && strategyType.IsAssignableFrom(t));
-
-                    foreach (var type in types)
-                    {
-                        try
-                        {
-                            if (Activator.CreateInstance(type) is IEncryptionStrategy strategy)
-                            {
-                                Register(strategy);
-                            }
-                        }
-                        catch
-                        {
-                            // Skip types that can't be instantiated
-                        }
-                    }
-                }
-                catch
-                {
-                    // Skip assemblies that can't be scanned
-                }
-            }
+            _inner.DiscoverFromAssembly(assemblies);
         }
 
         /// <summary>
