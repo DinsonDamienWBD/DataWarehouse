@@ -2198,3 +2198,17 @@ Plans:
 - [ ] 65.2-02-PLAN.md -- Triage 3,142 PERSIST findings from in-memory analysis
 - [ ] 65.2-03-PLAN.md -- Rewire UltimateConsensus to SDK RaftConsensusEngine
 - [ ] 65.2-04-PLAN.md -- Delete obsolete Raft plugin + update tests
+
+### Phase 65.3: Strategy-Aware Plugin Base Infrastructure with CommandIdentity ACL (INSERTED)
+
+**Goal:** Add generic strategy registry + dispatch to PluginBase with CommandIdentity ACL. Implement domain operations in plugin bases (Encrypt/Decrypt, Compress/Decompress, etc.) so Ultimate plugins get them for free. Migrate all strategy bases to extend SDK StrategyBase. Wire SelectOptimalAlgorithmAsync into dispatch chain.
+**Depends on:** Phase 65.2
+**Plans:** 6 plans in 3 waves
+
+Plans:
+- [ ] 65.3-01-PLAN.md -- Generic StrategyRegistry + PluginBase strategy dispatch with CommandIdentity ACL
+- [ ] 65.3-02-PLAN.md -- Retire 3 bespoke registries + migrate ConsciousnessStrategyBase to StrategyBase
+- [ ] 65.3-03-PLAN.md -- Wire SelectOptimalAlgorithmAsync + domain operations in EncryptionPluginBase/CompressionPluginBase
+- [ ] 65.3-04-PLAN.md -- Migrate Tier 2 plugin strategy bases batch 1 (RAID, Governance, Resilience, Privacy, Quality, Catalog, Deployment, Dashboard)
+- [ ] 65.3-05-PLAN.md -- Migrate Tier 2 plugin strategy bases batch 2 (IoT, Intelligence, DatabaseProtocol, DomainModel, Regeneration, FanOut)
+- [ ] 65.3-06-PLAN.md -- Migrate Ultimate plugins to use inherited dispatch infrastructure
