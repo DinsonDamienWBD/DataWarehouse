@@ -2187,7 +2187,7 @@ Plans:
 - [ ] 65.1-07-PLAN.md -- Migrate ConcurrentDictionary, delete obsolete code, fix remaining findings
 - [ ] 65.1-08-PLAN.md -- Verification sweep (re-audit, build, tests)
 
-### Phase 65.2: Raft Migration, Persistence Verification & Obsolete Code Removal (INSERTED)
+### Phase 65.2: Raft Migration, Persistence Verification & Obsolete Code Removal (COMPLETE)
 
 **Goal:** Migrate FileRaftLogStore to SDK, wire UltimateConsensus to use SDK's RaftConsensusEngine, add distributed locking, verify 3,142 PERSIST findings from in-memory analysis, delete obsolete Raft plugin
 **Depends on:** Phase 65.1
