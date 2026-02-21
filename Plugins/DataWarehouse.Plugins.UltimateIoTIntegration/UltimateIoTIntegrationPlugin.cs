@@ -35,7 +35,12 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 /// </remarks>
 public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposable
 {
+    // NOTE(65.4-07): _registry is retained as a typed lookup layer for domain-specific strategy interfaces
+    // (IDeviceManagementStrategy, ISensorIngestionStrategy, etc.). Strategies also registered via base-class
+    // RegisterStrategy() for unified lifecycle management via PluginBase.StrategyRegistry.
+#pragma warning disable CS0618 // IoTStrategyRegistry obsolete -- retained as typed lookup thin wrapper
     private readonly IoTStrategyRegistry _registry = new();
+#pragma warning restore CS0618
     private readonly BoundedDictionary<string, DeviceState> _deviceStates = new BoundedDictionary<string, DeviceState>(1000);
     private readonly BoundedDictionary<string, TelemetryBuffer> _telemetryBuffers = new BoundedDictionary<string, TelemetryBuffer>(1000);
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
@@ -78,8 +83,9 @@ public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposa
     };
 
     /// <summary>
-    /// Gets the IoT strategy registry.
+    /// Gets the IoT strategy registry (typed lookup thin wrapper).
     /// </summary>
+    [System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. Registry is retained as typed lookup.")]
     public IoTStrategyRegistry Registry => _registry;
 
     /// <summary>
@@ -1023,7 +1029,12 @@ public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposa
             {
                 if (Activator.CreateInstance(strategyType) is IIoTStrategyBase strategy)
                 {
+                    // Register in domain registry for typed dispatch (IDeviceManagementStrategy, ISensorIngestionStrategy, etc.)
                     _registry.Register(strategy);
+
+                    // Also register via PluginBase base-class registry for unified strategy lifecycle (AD-65.4)
+                    if (strategy is DataWarehouse.SDK.Contracts.IStrategy baseStrategy)
+                        RegisterStrategy(baseStrategy);
                 }
             }
             catch

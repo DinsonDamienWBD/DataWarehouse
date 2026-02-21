@@ -10,6 +10,17 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 /// <summary>
 /// Registry for IoT strategies.
 /// </summary>
+/// <remarks>
+/// <b>Migration note (65.4-07):</b> <see cref="UltimateIoTIntegrationPlugin"/> inherits
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.StreamingPluginBase"/> which exposes
+/// <c>RegisterStrategy</c> and <c>StrategyRegistry</c> from PluginBase for unified lifecycle.
+/// Strategies are now also registered via the base-class registry. This custom registry is
+/// retained as a typed lookup layer for domain interfaces (IDeviceManagementStrategy,
+/// ISensorIngestionStrategy, IProtocolStrategy, etc.) that are not expressible via
+/// the generic IStreamingStrategy contract.
+/// New plugins should prefer the base-class strategy registry over this class.
+/// </remarks>
+[System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
 public sealed class IoTStrategyRegistry
 {
     private readonly BoundedDictionary<string, IIoTStrategyBase> _strategies = new BoundedDictionary<string, IIoTStrategyBase>(1000);
