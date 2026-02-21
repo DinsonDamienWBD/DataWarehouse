@@ -1,3 +1,6 @@
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Security;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -122,6 +125,71 @@ public abstract class DataManagementPluginBase : FeaturePluginBase
     /// <summary>AI hook: Classify data for governance.</summary>
     protected virtual Task<Dictionary<string, object>> ClassifyDataAsync(Dictionary<string, object> context, CancellationToken ct = default)
         => Task.FromResult(new Dictionary<string, object>());
+
+    #region Data Management Strategy Dispatch
+
+    /// <summary>
+    /// Registers an <see cref="IStrategy"/> as a data management strategy in the PluginBase IStrategy registry.
+    /// </summary>
+    /// <param name="strategy">The data management strategy to register.</param>
+    protected void RegisterDataManagementStrategy(IStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        RegisterStrategy(strategy);
+    }
+
+    /// <summary>
+    /// Executes a data management operation using the resolved strategy from the PluginBase registry.
+    /// Dispatches to <paramref name="strategyId"/> or the plugin default when not specified.
+    /// </summary>
+    /// <typeparam name="TStrategy">Concrete strategy type implementing <see cref="IStrategy"/>.</typeparam>
+    /// <typeparam name="TResult">The operation result type.</typeparam>
+    /// <param name="strategyId">Explicit strategy ID (null = use GetDefaultStrategyId).</param>
+    /// <param name="identity">Optional CommandIdentity for ACL checks.</param>
+    /// <param name="operation">The operation to execute on the resolved strategy.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation result.</returns>
+    protected Task<TResult> DispatchDataManagementStrategyAsync<TStrategy, TResult>(
+        string? strategyId,
+        CommandIdentity? identity,
+        Func<TStrategy, Task<TResult>> operation,
+        CancellationToken ct = default)
+        where TStrategy : class, IStrategy
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return ExecuteWithStrategyAsync<TStrategy, TResult>(strategyId, identity, operation, ct);
+    }
+
+    /// <summary>
+    /// Executes a data management operation using the specified or default strategy.
+    /// The operation dictionary allows strategy implementations to inspect the operation type and parameters.
+    /// </summary>
+    /// <typeparam name="TStrategy">Concrete strategy type implementing <see cref="IStrategy"/>.</typeparam>
+    /// <param name="operation">Operation parameters (e.g., type, target, payload).</param>
+    /// <param name="strategyId">Optional strategy ID. Null uses the plugin's domain-based default.</param>
+    /// <param name="identity">Optional CommandIdentity for ACL enforcement.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation result dictionary.</returns>
+    protected Task<Dictionary<string, object>> ManageDataWithStrategyAsync<TStrategy>(
+        Dictionary<string, object> operation,
+        string? strategyId,
+        CommandIdentity? identity,
+        CancellationToken ct = default)
+        where TStrategy : class, IStrategy
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return ExecuteWithStrategyAsync<TStrategy, Dictionary<string, object>>(
+            strategyId,
+            identity,
+            _ => Task.FromResult(new Dictionary<string, object>(operation)),
+            ct);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns <see cref="DataManagementDomain"/> to route dispatches to domain-specific strategies.</remarks>
+    protected override string? GetDefaultStrategyId() => DataManagementDomain;
+
+    #endregion
 
     /// <inheritdoc/>
     protected override Dictionary<string, object> GetMetadata()

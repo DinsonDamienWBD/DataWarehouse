@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -66,6 +68,69 @@ public abstract class ResiliencePluginBase : InfrastructurePluginBase
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(new ResilienceHealthInfo(0, 0, new Dictionary<string, string>()));
     }
+
+    #region Resilience Strategy Dispatch
+
+    /// <summary>
+    /// Registers an <see cref="IStrategy"/> as a resilience strategy in the PluginBase IStrategy registry.
+    /// The strategy must implement <see cref="IStrategy"/> with a StrategyId matching the policy name.
+    /// </summary>
+    /// <param name="strategy">The resilience strategy to register.</param>
+    protected void RegisterResilienceStrategy(IStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        RegisterStrategy(strategy);
+    }
+
+    /// <summary>
+    /// Dispatches an operation to the named resilience strategy, with optional CommandIdentity ACL enforcement.
+    /// Routes through the PluginBase IStrategy registry.
+    /// </summary>
+    /// <typeparam name="TStrategy">Concrete strategy type implementing <see cref="IStrategy"/>.</typeparam>
+    /// <typeparam name="TResult">The operation result type.</typeparam>
+    /// <param name="strategyId">Explicit strategy ID (null = use GetDefaultStrategyId).</param>
+    /// <param name="identity">Optional CommandIdentity for ACL checks.</param>
+    /// <param name="operation">The operation to execute on the resolved strategy.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation result.</returns>
+    protected Task<TResult> DispatchResilienceStrategyAsync<TStrategy, TResult>(
+        string? strategyId,
+        CommandIdentity? identity,
+        Func<TStrategy, Task<TResult>> operation,
+        CancellationToken ct = default)
+        where TStrategy : class, IStrategy
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return ExecuteWithStrategyAsync<TStrategy, TResult>(strategyId, identity, operation, ct);
+    }
+
+    /// <summary>
+    /// Executes an action with both resilience policy protection and strategy dispatch.
+    /// Resolves the strategy by <paramref name="strategyId"/>, then executes <paramref name="action"/>
+    /// wrapped in the named resilience policy via <see cref="ExecuteWithResilienceAsync{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The return type of the protected operation.</typeparam>
+    /// <param name="action">The operation to execute with both strategy and resilience wrapping.</param>
+    /// <param name="strategyId">Optional strategy ID for dispatch. Null uses plugin default.</param>
+    /// <param name="identity">Optional CommandIdentity for ACL enforcement.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The result of the operation.</returns>
+    protected Task<T> ExecuteWithPolicyAndStrategyAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        string? strategyId,
+        CommandIdentity? identity,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var policyName = strategyId ?? GetDefaultStrategyId() ?? InfrastructureDomain;
+        return ExecuteWithResilienceAsync<T>(action, policyName, ct);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns null — resilience policy names are determined per-invocation, not globally.</remarks>
+    protected override string? GetDefaultStrategyId() => null;
+
+    #endregion
 
     /// <inheritdoc/>
     protected override Dictionary<string, object> GetMetadata()
