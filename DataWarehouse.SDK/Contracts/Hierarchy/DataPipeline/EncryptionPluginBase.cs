@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Security;
 using System;
@@ -52,6 +53,187 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
     /// <summary>AI hook: Detect encryption anomalies.</summary>
     protected virtual Task<bool> DetectEncryptionAnomalyAsync(Dictionary<string, object> operationContext, CancellationToken ct = default)
         => Task.FromResult(false);
+
+    #endregion
+
+    #region Typed Encryption Strategy Registry
+
+    /// <summary>
+    /// Lazy-initialized typed registry for <see cref="IEncryptionStrategy"/> instances.
+    /// IEncryptionStrategy does not inherit IStrategy, so it uses its own dedicated registry
+    /// rather than the PluginBase IStrategy registry.
+    /// </summary>
+    private StrategyRegistry<IEncryptionStrategy>? _encryptionStrategyRegistry;
+
+    /// <summary>Lock protecting lazy initialization of <see cref="_encryptionStrategyRegistry"/>.</summary>
+    private readonly object _encryptionRegistryLock = new();
+
+    /// <summary>
+    /// Gets the typed encryption strategy registry. Lazily initialized on first access.
+    /// </summary>
+    protected StrategyRegistry<IEncryptionStrategy> EncryptionStrategyRegistry
+    {
+        get
+        {
+            if (_encryptionStrategyRegistry is not null) return _encryptionStrategyRegistry;
+            lock (_encryptionRegistryLock)
+            {
+                _encryptionStrategyRegistry ??= new StrategyRegistry<IEncryptionStrategy>(s => s.StrategyId);
+            }
+            return _encryptionStrategyRegistry;
+        }
+    }
+
+    /// <summary>
+    /// Registers an encryption strategy with the typed registry.
+    /// </summary>
+    /// <param name="strategy">The encryption strategy to register.</param>
+    protected void RegisterEncryptionStrategy(IEncryptionStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        EncryptionStrategyRegistry.Register(strategy);
+    }
+
+    /// <summary>
+    /// Dispatches an operation to the optimal encryption strategy, using AI-driven algorithm
+    /// selection when no explicit strategy is specified. Routes through the typed
+    /// <see cref="EncryptionStrategyRegistry"/> with CommandIdentity ACL enforcement.
+    /// </summary>
+    /// <typeparam name="TResult">The operation result type.</typeparam>
+    /// <param name="explicitStrategyId">Explicit strategy ID (null = use AI selection via SelectOptimalAlgorithmAsync).</param>
+    /// <param name="identity">Optional CommandIdentity for ACL checks. When null, ACL is skipped.</param>
+    /// <param name="dataContext">Context about the data for AI algorithm selection.</param>
+    /// <param name="operation">The operation to execute on the resolved encryption strategy.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation result.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when no strategy is found for the given ID.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the identity is denied by the ACL provider.</exception>
+    protected async Task<TResult> DispatchEncryptionStrategyAsync<TResult>(
+        string? explicitStrategyId,
+        CommandIdentity? identity,
+        Dictionary<string, object>? dataContext,
+        Func<IEncryptionStrategy, Task<TResult>> operation,
+        CancellationToken ct = default)
+    {
+        string strategyId;
+        if (!string.IsNullOrEmpty(explicitStrategyId))
+        {
+            strategyId = explicitStrategyId;
+        }
+        else
+        {
+            // Delegate to AI hook -- SelectOptimalAlgorithmAsync is active code here
+            strategyId = await SelectOptimalAlgorithmAsync(
+                dataContext ?? new Dictionary<string, object>(), ct).ConfigureAwait(false);
+        }
+
+        // ACL check if provider is configured
+        if (identity != null && StrategyAclProvider != null)
+        {
+            if (!StrategyAclProvider.IsStrategyAllowed(strategyId, identity))
+                throw new UnauthorizedAccessException(
+                    $"Principal '{identity.EffectivePrincipalId}' is not authorized to use encryption strategy '{strategyId}'.");
+        }
+
+        var strategy = EncryptionStrategyRegistry.Get(strategyId)
+            ?? throw new InvalidOperationException(
+                $"Encryption strategy '{strategyId}' is not registered. " +
+                $"Call RegisterEncryptionStrategy before dispatching.");
+
+        return await operation(strategy).ConfigureAwait(false);
+    }
+
+    #endregion
+
+    #region Domain Operations (Strategy-Dispatched)
+
+    /// <summary>
+    /// Encrypts data using the specified or default encryption strategy.
+    /// Resolves the strategy from the typed <see cref="EncryptionStrategyRegistry"/> with
+    /// optional CommandIdentity ACL, falls back to <see cref="SelectOptimalAlgorithmAsync"/>
+    /// for AI-driven algorithm selection when no strategy is specified.
+    /// </summary>
+    /// <param name="plaintext">The data to encrypt.</param>
+    /// <param name="key">The encryption key.</param>
+    /// <param name="strategyId">Optional strategy ID. When null, AI selection applies.</param>
+    /// <param name="identity">Optional identity for ACL enforcement.</param>
+    /// <param name="associatedData">Optional associated data for AEAD ciphers.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Encrypted ciphertext.</returns>
+    protected async Task<byte[]> EncryptAsync(
+        byte[] plaintext,
+        byte[] key,
+        string? strategyId = null,
+        CommandIdentity? identity = null,
+        byte[]? associatedData = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        return await DispatchEncryptionStrategyAsync<byte[]>(
+            strategyId,
+            identity,
+            new Dictionary<string, object>
+            {
+                ["operation"] = "encrypt",
+                ["dataSize"] = plaintext.Length,
+                ["hasAssociatedData"] = associatedData != null
+            },
+            async strategy =>
+            {
+                var result = await strategy.EncryptAsync(plaintext, key, associatedData, ct)
+                    .ConfigureAwait(false);
+                UpdateEncryptionStats(plaintext.Length);
+                return result;
+            },
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Decrypts data using the specified or default encryption strategy.
+    /// Resolves the strategy from the typed <see cref="EncryptionStrategyRegistry"/> with
+    /// optional CommandIdentity ACL.
+    /// </summary>
+    /// <param name="ciphertext">The encrypted data to decrypt.</param>
+    /// <param name="key">The decryption key.</param>
+    /// <param name="strategyId">Optional strategy ID. When null, AI selection applies.</param>
+    /// <param name="identity">Optional identity for ACL enforcement.</param>
+    /// <param name="associatedData">Optional associated data for AEAD verification.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Decrypted plaintext.</returns>
+    protected async Task<byte[]> DecryptAsync(
+        byte[] ciphertext,
+        byte[] key,
+        string? strategyId = null,
+        CommandIdentity? identity = null,
+        byte[]? associatedData = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(key);
+
+        return await DispatchEncryptionStrategyAsync<byte[]>(
+            strategyId,
+            identity,
+            new Dictionary<string, object>
+            {
+                ["operation"] = "decrypt",
+                ["dataSize"] = ciphertext.Length
+            },
+            async strategy =>
+            {
+                var result = await strategy.DecryptAsync(ciphertext, key, associatedData, ct)
+                    .ConfigureAwait(false);
+                UpdateDecryptionStats(result.Length);
+                return result;
+            },
+            ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns <see cref="AlgorithmId"/> to route encryption-specific dispatches to the correct algorithm.</remarks>
+    protected override string? GetDefaultStrategyId() => AlgorithmId;
 
     #endregion
 
