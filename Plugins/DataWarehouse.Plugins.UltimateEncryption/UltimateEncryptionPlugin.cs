@@ -48,7 +48,6 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 {
     private readonly EncryptionStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
-    private readonly object _statsLock = new();
     private bool _disposed;
 
     // Hardware acceleration flags
@@ -63,11 +62,10 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     private volatile bool _fipsMode;
     private volatile bool _auditEnabled = true;
 
-    // Statistics
-    private long _totalEncryptions;
-    private long _totalDecryptions;
-    private long _totalBytesEncrypted;
-    private long _totalBytesDecrypted;
+    // NOTE(65.3): Per-operation stats (_totalEncryptions etc.) removed.
+    // Inherited EncryptionPluginBase counters are used instead:
+    //   EncryptionCount, DecryptionCount, TotalBytesEncrypted, TotalBytesDecrypted.
+    // Use UpdateEncryptionStats(bytes) / UpdateDecryptionStats(bytes) to update them.
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.encryption.ultimate";
@@ -389,9 +387,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
             KeyId = keyId
         };
 
-        // Update stats
-        Interlocked.Increment(ref _totalEncryptions);
-        Interlocked.Add(ref _totalBytesEncrypted, plaintext.Length);
+        // Update stats using inherited counters
+        UpdateEncryptionStats(plaintext.Length);
         IncrementUsageStats(strategyId);
 
         if (_auditEnabled)
@@ -442,9 +439,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
         var plaintext = await strategy.DecryptAsync(payload.Ciphertext, key, aad);
 
-        // Update stats
-        Interlocked.Increment(ref _totalDecryptions);
-        Interlocked.Add(ref _totalBytesDecrypted, plaintext.Length);
+        // Update stats using inherited counters
+        UpdateDecryptionStats(plaintext.Length);
 
         if (_auditEnabled)
         {
@@ -487,8 +483,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         message.Payload["result"] = ciphertext;
         message.Payload["strategyId"] = strategyId;
 
-        Interlocked.Increment(ref _totalEncryptions);
-        Interlocked.Add(ref _totalBytesEncrypted, data.Length);
+        // Update stats using inherited counters
+        UpdateEncryptionStats(data.Length);
         IncrementUsageStats(strategyId);
     }
 
@@ -516,8 +512,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
         message.Payload["result"] = plaintext;
 
-        Interlocked.Increment(ref _totalDecryptions);
-        Interlocked.Add(ref _totalBytesDecrypted, plaintext.Length);
+        // Update stats using inherited counters
+        UpdateDecryptionStats(plaintext.Length);
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)
@@ -604,10 +600,14 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
     private Task HandleStatsAsync(PluginMessage message)
     {
-        message.Payload["totalEncryptions"] = Interlocked.Read(ref _totalEncryptions);
-        message.Payload["totalDecryptions"] = Interlocked.Read(ref _totalDecryptions);
-        message.Payload["totalBytesEncrypted"] = Interlocked.Read(ref _totalBytesEncrypted);
-        message.Payload["totalBytesDecrypted"] = Interlocked.Read(ref _totalBytesDecrypted);
+        // Use inherited counters from EncryptionPluginBase (thread-safe via StatsLock)
+        lock (StatsLock)
+        {
+            message.Payload["totalEncryptions"] = EncryptionCount;
+            message.Payload["totalDecryptions"] = DecryptionCount;
+            message.Payload["totalBytesEncrypted"] = TotalBytesEncrypted;
+            message.Payload["totalBytesDecrypted"] = TotalBytesDecrypted;
+        }
         message.Payload["registeredStrategies"] = _registry.GetAllStrategies().Count;
         message.Payload["fipsMode"] = _fipsMode;
         message.Payload["aesNiAvailable"] = _aesNiAvailable;
@@ -668,7 +668,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
             currentData = await strategy.EncryptAsync(currentData, key);
 
-            Interlocked.Increment(ref _totalEncryptions);
+            // Per-encryption count via inherited infrastructure; byte tracking done after loop
             IncrementUsageStats(strategyId);
         }
 
@@ -676,7 +676,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         message.Payload["keys"] = keys;
         message.Payload["strategyIds"] = ids;
 
-        Interlocked.Add(ref _totalBytesEncrypted, data.Length);
+        // Update inherited stats for full cascade (count each strategy pass)
+        for (int i = 0; i < ids.Count; i++) UpdateEncryptionStats(i == 0 ? data.Length : 0);
     }
 
     private async Task HandleReencryptAsync(PluginMessage message)
@@ -717,8 +718,9 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         message.Payload["newKey"] = newKey;
         message.Payload["newStrategyId"] = newStrategyId;
 
-        Interlocked.Increment(ref _totalDecryptions);
-        Interlocked.Increment(ref _totalEncryptions);
+        // Update inherited stats: one decrypt + one encrypt pass
+        UpdateDecryptionStats(data.Length);
+        UpdateEncryptionStats(plaintext.Length);
     }
 
     private Task HandleGenerateKeyAsync(PluginMessage message)
@@ -853,6 +855,16 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     /// <inheritdoc/>
     protected override KnowledgeObject? BuildStatisticsKnowledge()
     {
+        // Read inherited counters under StatsLock for consistency
+        long encryptionCount, decryptionCount, bytesEncrypted, bytesDecrypted;
+        lock (StatsLock)
+        {
+            encryptionCount = EncryptionCount;
+            decryptionCount = DecryptionCount;
+            bytesEncrypted = TotalBytesEncrypted;
+            bytesDecrypted = TotalBytesDecrypted;
+        }
+
         return new KnowledgeObject
         {
             Id = $"{Id}.statistics.{Guid.NewGuid():N}",
@@ -863,10 +875,10 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
             Description = $"Usage statistics for {Name}",
             Payload = new Dictionary<string, object>
             {
-                ["totalEncryptions"] = Interlocked.Read(ref _totalEncryptions),
-                ["totalDecryptions"] = Interlocked.Read(ref _totalDecryptions),
-                ["totalBytesEncrypted"] = Interlocked.Read(ref _totalBytesEncrypted),
-                ["totalBytesDecrypted"] = Interlocked.Read(ref _totalBytesDecrypted),
+                ["totalEncryptions"] = encryptionCount,
+                ["totalDecryptions"] = decryptionCount,
+                ["totalBytesEncrypted"] = bytesEncrypted,
+                ["totalBytesDecrypted"] = bytesDecrypted,
                 ["registeredStrategies"] = _registry.GetAllStrategies().Count,
                 ["fipsCompliantStrategies"] = _registry.GetFipsCompliantStrategies().Count,
                 ["usageByStrategy"] = new Dictionary<string, long>(_usageStats)
