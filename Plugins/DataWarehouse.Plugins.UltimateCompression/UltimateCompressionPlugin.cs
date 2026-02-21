@@ -57,7 +57,8 @@ namespace DataWarehouse.Plugins.UltimateCompression
         private readonly BoundedDictionary<string, ICompressionStrategy> _strategies = new BoundedDictionary<string, ICompressionStrategy>(1000);
         private ICompressionStrategy? _activeStrategy;
 
-        // Statistics tracking
+        // NOTE(65.3): Statistics tracking delegated to CompressionPluginBase (no duplication).
+        // Use UpdateCompressionStats/UpdateDecompressionStats if added to base class in future phases.
 
         /// <inheritdoc/>
         public override string Id => "com.datawarehouse.compression.ultimate";
@@ -86,12 +87,18 @@ namespace DataWarehouse.Plugins.UltimateCompression
 
         /// <summary>
         /// Registers a compression strategy with the plugin.
+        /// Stores in the local content-aware dictionary and in the inherited
+        /// <see cref="CompressionPluginBase.CompressionStrategyRegistry"/> so the base-class
+        /// dispatch path (DispatchCompressionStrategyAsync / CompressAsync / DecompressAsync)
+        /// also resolves this strategy.
         /// </summary>
         /// <param name="strategy">The strategy to register.</param>
         public void RegisterStrategy(ICompressionStrategy strategy)
         {
             ArgumentNullException.ThrowIfNull(strategy);
             _strategies[strategy.Characteristics.AlgorithmName] = strategy;
+            // Also register in inherited typed registry for base-class dispatch
+            RegisterCompressionStrategy(strategy);
         }
 
         /// <summary>
@@ -209,6 +216,9 @@ namespace DataWarehouse.Plugins.UltimateCompression
 
         /// <summary>
         /// Discovers and registers all compression strategies via reflection.
+        /// Populates both the local content-aware <see cref="_strategies"/> dictionary
+        /// and the inherited <see cref="CompressionPluginBase.CompressionStrategyRegistry"/>
+        /// so the base-class dispatch path also works.
         /// </summary>
         private void DiscoverAndRegisterStrategies()
         {
@@ -223,6 +233,8 @@ namespace DataWarehouse.Plugins.UltimateCompression
                     if (Activator.CreateInstance(strategyType) is CompressionStrategyBase strategy)
                     {
                         _strategies[strategy.Characteristics.AlgorithmName] = strategy;
+                        // Also register in inherited typed registry for base-class dispatch
+                        RegisterCompressionStrategy(strategy);
                     }
                 }
                 catch (Exception ex)
