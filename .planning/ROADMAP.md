@@ -2212,3 +2212,21 @@ Plans:
 - [ ] 65.3-04-PLAN.md -- Migrate Tier 2 plugin strategy bases batch 1 (RAID, Governance, Resilience, Privacy, Quality, Catalog, Deployment, Dashboard)
 - [ ] 65.3-05-PLAN.md -- Migrate Tier 2 plugin strategy bases batch 2 (IoT, Intelligence, DatabaseProtocol, DomainModel, Regeneration, FanOut)
 - [ ] 65.3-06-PLAN.md -- Migrate Ultimate plugins to use inherited dispatch infrastructure
+
+### Phase 65.4: Comprehensive Strategy Dispatch Migration — All Plugin Bases and All 65 Plugins (INSERTED)
+
+**Goal:** Update ALL remaining typed plugin bases (Storage, Security, RAID, Replication, Compliance, Connector, Interface, Observability, etc.) with domain operations using inherited strategy dispatch. Migrate ALL 65 plugins to use inherited infrastructure. Use Python script to programmatically detect and remove custom registry implementations that duplicate base class functionality. Only retain custom code where genuinely unique.
+**Depends on:** Phase 65.3
+**Plans:** 10 plans in 5 waves
+
+Plans:
+- [ ] 65.4-01-PLAN.md -- Python audit script for custom registry detection and classification
+- [ ] 65.4-02-PLAN.md -- Add strategy dispatch to DataPipeline bases (Storage, Replication, Transit, Integrity)
+- [ ] 65.4-03-PLAN.md -- Add strategy dispatch to Feature bases batch 1 (Security, Observability, Streaming, Compute, Media)
+- [ ] 65.4-04-PLAN.md -- Add strategy dispatch to Feature bases batch 2 (Resilience, DataManagement, Format, Interface, Orchestration, Platform)
+- [ ] 65.4-05-PLAN.md -- Migrate UltimateStorage, UltimateRAID, UltimateDatabaseStorage (Pattern A standalone)
+- [ ] 65.4-06-PLAN.md -- Migrate UltimateDataTransit, UltimateResilience, UltimateDataMesh, UltimateWorkflow (Pattern A standalone)
+- [ ] 65.4-07-PLAN.md -- Migrate UltimateSDKPorts, UltimateIoTIntegration, UltimateDataProtection, UltimateDatabaseProtocol
+- [ ] 65.4-08-PLAN.md -- Migrate Pattern B inline + Pattern C inline class plugins (9 plugins)
+- [ ] 65.4-09-PLAN.md -- Hybrid-migrate UNIQUE plugins (Replication, Compute, StorageProcessing, SemanticSync)
+- [ ] 65.4-10-PLAN.md -- Full solution build verification and cleanup
