@@ -37,7 +37,7 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public void Dispose()
+    public new void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
@@ -190,7 +190,7 @@ public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposa
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public void Dispose()
+    public new void Dispose()
     {
         if (_disposed) return;
         _disposed = true;

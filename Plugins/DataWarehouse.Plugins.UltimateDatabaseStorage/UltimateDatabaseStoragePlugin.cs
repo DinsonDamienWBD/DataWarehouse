@@ -95,8 +95,10 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
 
     /// <summary>
     /// Gets the strategy registry for accessing database storage strategies.
+    /// Shadows the base <see cref="PluginBase.StrategyRegistry"/> which operates on <see cref="IStrategy"/>;
+    /// this property exposes the domain-specific <see cref="IDatabaseStorageStrategyRegistry"/> interface.
     /// </summary>
-    public IDatabaseStorageStrategyRegistry StrategyRegistry => _strategyRegistry;
+    public new IDatabaseStorageStrategyRegistry StrategyRegistry => _strategyRegistry;
 
     /// <summary>
     /// Gets the number of registered strategies.

@@ -1107,11 +1107,13 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     /// Overrides StrategyBase.DisposeAsyncCore to disconnect and release connection resources.
     /// Called by StrategyBase.DisposeAsync() before the synchronous dispose.
     /// </summary>
+#pragma warning disable CA2215 // Roslyn analyzer false positive: base.DisposeAsyncCore() is called below
     protected override async ValueTask DisposeAsyncCore()
     {
         await DisconnectAsync().ConfigureAwait(false);
         await base.DisposeAsyncCore().ConfigureAwait(false);
     }
+#pragma warning restore CA2215
 
     /// <summary>
     /// Overrides StrategyBase.Dispose(bool) to release unmanaged resources.

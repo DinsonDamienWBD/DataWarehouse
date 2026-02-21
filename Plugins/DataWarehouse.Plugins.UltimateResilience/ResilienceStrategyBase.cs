@@ -227,7 +227,7 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     public abstract string Category { get; }
 
     /// <inheritdoc/>
-    public abstract ResilienceCharacteristics Characteristics { get; }
+    public new abstract ResilienceCharacteristics Characteristics { get; }
 
     /// <inheritdoc/>
     public virtual async Task<ResilienceResult<T>> ExecuteAsync<T>(

@@ -503,8 +503,12 @@ public abstract class DataQualityStrategyBase : StrategyBase, IDataQualityStrate
         IncrementCounter("initialized");
     }
 
-    /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    /// <summary>
+    /// Disposes the data quality strategy asynchronously, calling domain-specific cleanup.
+    /// Note: this returns Task rather than ValueTask to match domain base patterns.
+    /// Use the IAsyncDisposable.DisposeAsync() path from StrategyBase for ValueTask disposal.
+    /// </summary>
+    public virtual new async Task DisposeAsync()
     {
         if (!IsInitialized) return;
         await DisposeCoreAsync();

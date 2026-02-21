@@ -286,7 +286,7 @@ public sealed class LeakyBucketRateLimitingStrategy : ResilienceStrategyBase
 
     protected override string? GetCurrentState() => $"Queue: {_queue.Count}/{_bucketCapacity}";
 
-    public void Dispose()
+    public new void Dispose()
     {
         if (_disposed) return;
         _disposed = true;

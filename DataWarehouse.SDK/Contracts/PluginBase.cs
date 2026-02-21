@@ -7,7 +7,11 @@ using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts
@@ -441,13 +445,38 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Gets strategy-specific knowledge for strategy-based plugins.
-        /// Override in strategy-based plugins to expose available strategies.
+        /// When <see cref="_strategyRegistry"/> is initialized and has registered strategies,
+        /// returns a dictionary describing all available strategies automatically.
+        /// Override in strategy-based plugins to supplement or replace this default.
         /// </summary>
         /// <returns>Dictionary with strategy information, or null if not a strategy-based plugin.</returns>
         protected virtual Dictionary<string, object>? GetStrategyKnowledge()
         {
-            // Default: no strategy knowledge
-            // Override in strategy-based plugins (encryption, compression, etc.)
+            // Auto-populate from registry when strategies have been registered
+            if (_strategyRegistry is not null && _strategyRegistry.Count > 0)
+            {
+                var strategies = _strategyRegistry.GetAll()
+                    .Select(s => new Dictionary<string, object>
+                    {
+                        ["strategyId"] = s.StrategyId,
+                        ["name"] = s.Name,
+                        ["description"] = s.Description
+                    })
+                    .ToList<object>();
+
+                var info = new Dictionary<string, object>
+                {
+                    ["strategies"] = strategies,
+                    ["count"] = _strategyRegistry.Count
+                };
+
+                if (_strategyRegistry.DefaultStrategyId is not null)
+                    info["defaultStrategyId"] = _strategyRegistry.DefaultStrategyId;
+
+                return info;
+            }
+
+            // Default: no strategy knowledge (registry not used or empty)
             return null;
         }
 
@@ -1264,6 +1293,164 @@ namespace DataWarehouse.SDK.Contracts
 
         #endregion
 
+        #region Strategy Registry and Dispatch
+
+        /// <summary>
+        /// Lazy-initialized backing store for the strategy registry.
+        /// Null until first accessed via <see cref="StrategyRegistry"/>.
+        /// Non-strategy plugins incur zero overhead.
+        /// </summary>
+        private StrategyRegistry<IStrategy>? _strategyRegistry;
+
+        /// <summary>Lock protecting lazy initialization of <see cref="_strategyRegistry"/>.</summary>
+        private readonly object _strategyRegistryLock = new();
+
+        /// <summary>
+        /// Gets the strategy registry for this plugin. Lazily initialized on first access.
+        /// Non-strategy plugins that never call this property pay no overhead.
+        /// </summary>
+        protected StrategyRegistry<IStrategy> StrategyRegistry
+        {
+            get
+            {
+                if (_strategyRegistry is not null) return _strategyRegistry;
+                lock (_strategyRegistryLock)
+                {
+                    _strategyRegistry ??= new StrategyRegistry<IStrategy>(s => s.StrategyId);
+                }
+                return _strategyRegistry;
+            }
+        }
+
+        /// <summary>
+        /// Optional ACL provider for strategy access control.
+        /// When null, all strategies are accessible (allow-all default).
+        /// Inject an <see cref="IStrategyAclProvider"/> to restrict strategy access by principal.
+        /// </summary>
+        protected IStrategyAclProvider? StrategyAclProvider { get; set; }
+
+        /// <summary>
+        /// Registers a strategy with this plugin's registry.
+        /// If the plugin is already initialized, calls <see cref="IStrategy.InitializeAsync"/> on the strategy.
+        /// </summary>
+        /// <param name="strategy">The strategy to register.</param>
+        protected void RegisterStrategy(IStrategy strategy)
+        {
+            ArgumentNullException.ThrowIfNull(strategy);
+            StrategyRegistry.Register(strategy);
+        }
+
+        /// <summary>
+        /// Resolves a strategy by ID, optionally enforcing ACL via <see cref="StrategyAclProvider"/>.
+        /// Returns null if the strategy is not found (caller decides how to handle absence).
+        /// </summary>
+        /// <typeparam name="TStrategy">Concrete strategy type. Must implement <see cref="IStrategy"/>.</typeparam>
+        /// <param name="strategyId">The strategy ID to resolve.</param>
+        /// <param name="identity">
+        /// Optional command identity. When provided and <see cref="StrategyAclProvider"/> is set,
+        /// ACL is checked before returning the strategy.
+        /// </param>
+        /// <returns>The resolved strategy cast to <typeparamref name="TStrategy"/>, or null if not found.</returns>
+        /// <exception cref="UnauthorizedAccessException">
+        /// Thrown when the identity is denied access by <see cref="StrategyAclProvider"/>.
+        /// </exception>
+        protected TStrategy? ResolveStrategy<TStrategy>(string strategyId, CommandIdentity? identity = null)
+            where TStrategy : class, IStrategy
+        {
+            var strategy = StrategyRegistry.Get(strategyId);
+            if (strategy is null) return null;
+
+            if (identity is not null && StrategyAclProvider is not null)
+            {
+                if (!StrategyAclProvider.IsStrategyAllowed(strategyId, identity))
+                {
+                    throw new UnauthorizedAccessException(
+                        $"Principal '{identity.EffectivePrincipalId}' is not allowed to use strategy '{strategyId}'.");
+                }
+            }
+
+            return strategy as TStrategy;
+        }
+
+        /// <summary>
+        /// Resolves a strategy by ID (or falls back to the default), throwing if none is found.
+        /// Falls back to <see cref="GetDefaultStrategyId"/> then the registry's DefaultStrategyId
+        /// when <paramref name="strategyId"/> is null or empty.
+        /// </summary>
+        /// <typeparam name="TStrategy">Concrete strategy type. Must implement <see cref="IStrategy"/>.</typeparam>
+        /// <param name="strategyId">The strategy ID, or null/empty to use the default.</param>
+        /// <param name="identity">Optional command identity for ACL enforcement.</param>
+        /// <returns>The resolved strategy cast to <typeparamref name="TStrategy"/>.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no strategy is found.</exception>
+        /// <exception cref="UnauthorizedAccessException">
+        /// Thrown when the identity is denied access by <see cref="StrategyAclProvider"/>.
+        /// </exception>
+        protected TStrategy ResolveStrategyOrDefault<TStrategy>(string? strategyId, CommandIdentity? identity = null)
+            where TStrategy : class, IStrategy
+        {
+            var effectiveId = string.IsNullOrWhiteSpace(strategyId)
+                ? (GetDefaultStrategyId() ?? StrategyRegistry.DefaultStrategyId)
+                : strategyId;
+
+            if (string.IsNullOrWhiteSpace(effectiveId))
+                throw new InvalidOperationException(
+                    $"No strategy ID provided and no default strategy is configured for plugin '{Id}'.");
+
+            var resolved = ResolveStrategy<TStrategy>(effectiveId, identity);
+            if (resolved is null)
+                throw new InvalidOperationException(
+                    $"Strategy '{effectiveId}' is not registered in plugin '{Id}'.");
+
+            return resolved;
+        }
+
+        /// <summary>
+        /// Returns the domain-specific default strategy ID for this plugin.
+        /// Override in domain base classes to provide domain-specific defaults
+        /// (e.g., EncryptionPluginBase might return "aes-256-gcm").
+        /// Returns null by default, deferring to the registry's DefaultStrategyId.
+        /// </summary>
+        protected virtual string? GetDefaultStrategyId() => null;
+
+        /// <summary>
+        /// Resolves a strategy and executes an async operation against it.
+        /// This is the primary dispatch pattern for strategy-based plugins.
+        /// </summary>
+        /// <typeparam name="TStrategy">Concrete strategy type.</typeparam>
+        /// <typeparam name="TResult">Return type of the operation.</typeparam>
+        /// <param name="strategyId">Strategy ID, or null to use the default.</param>
+        /// <param name="identity">Optional command identity for ACL enforcement.</param>
+        /// <param name="operation">Async operation to execute against the resolved strategy.</param>
+        /// <param name="ct">Cancellation token passed to the operation.</param>
+        /// <returns>The result of the operation.</returns>
+        protected async Task<TResult> ExecuteWithStrategyAsync<TStrategy, TResult>(
+            string? strategyId,
+            CommandIdentity? identity,
+            Func<TStrategy, Task<TResult>> operation,
+            CancellationToken ct = default)
+            where TStrategy : class, IStrategy
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+            ct.ThrowIfCancellationRequested();
+
+            var strategy = ResolveStrategyOrDefault<TStrategy>(strategyId, identity);
+            return await operation(strategy).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Scans the given assemblies for non-abstract concrete types implementing
+        /// <see cref="IStrategy"/>, instantiates them, and registers each one.
+        /// Types that cannot be instantiated are silently skipped.
+        /// </summary>
+        /// <param name="assemblies">Assemblies to scan.</param>
+        /// <returns>Number of strategies successfully discovered and registered.</returns>
+        protected int DiscoverStrategiesFromAssembly(params Assembly[] assemblies)
+        {
+            return StrategyRegistry.DiscoverFromAssembly(assemblies);
+        }
+
+        #endregion
+
         #region IDisposable / IAsyncDisposable
 
         /// <summary>
@@ -1297,6 +1484,15 @@ namespace DataWarehouse.SDK.Contracts
                 }
                 _knowledgeSubscriptions.Clear();
 
+                // Dispose all registered strategies (sync path -- prefer DisposeAsync for async shutdown)
+                if (_strategyRegistry is not null)
+                {
+                    foreach (var strategy in _strategyRegistry.GetAll())
+                    {
+                        try { strategy.Dispose(); } catch { /* Swallow during cleanup */ }
+                    }
+                }
+
                 // Dispose all tracked bounded collections (includes _knowledgeCache)
                 foreach (var collection in _trackedCollections)
                 {
@@ -1325,6 +1521,16 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         protected virtual async ValueTask DisposeAsyncCore()
         {
+            // Async cleanup: shutdown and dispose all registered strategies
+            if (_strategyRegistry is not null)
+            {
+                foreach (var strategy in _strategyRegistry.GetAll())
+                {
+                    try { await strategy.ShutdownAsync().ConfigureAwait(false); } catch { /* Best-effort */ }
+                    try { await strategy.DisposeAsync().ConfigureAwait(false); } catch { /* Best-effort */ }
+                }
+            }
+
             // Async cleanup: unregister from system if message bus is available
             if (MessageBus != null)
             {
