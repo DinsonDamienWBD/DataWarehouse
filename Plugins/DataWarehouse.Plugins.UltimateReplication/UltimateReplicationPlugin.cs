@@ -269,95 +269,109 @@ namespace DataWarehouse.Plugins.UltimateReplication
 
         #region Strategy Discovery
 
+        /// <summary>
+        /// Registers a strategy in both the local registry (for dual-index lookups) and the
+        /// inherited base class registry (for standard StrategyId dispatch). This hybrid approach
+        /// preserves the secondary ConsistencyModel and capability indexes while delegating primary
+        /// dispatch to <see cref="ReplicationPluginBase.ReplicationStrategyRegistry"/>.
+        /// </summary>
+        private void RegisterBothRegistries(EnhancedReplicationStrategyBase strategy)
+        {
+            // Primary: register in inherited base class registry (IReplicationStrategy typed, standard dispatch)
+            RegisterReplicationStrategy(strategy);
+            // Secondary indexes: register in local registry (ConsistencyModel + capability dual-index)
+            _registry.Register(strategy);
+        }
+
         private void DiscoverAndRegisterStrategies()
         {
             // Register core strategies (4)
-            _registry.Register(new CrdtReplicationStrategy());
-            _registry.Register(new MultiMasterStrategy());
-            _registry.Register(new RealTimeSyncStrategy());
-            _registry.Register(new DeltaSyncStrategy());
+            RegisterBothRegistries(new CrdtReplicationStrategy());
+            RegisterBothRegistries(new MultiMasterStrategy());
+            RegisterBothRegistries(new RealTimeSyncStrategy());
+            RegisterBothRegistries(new DeltaSyncStrategy());
 
             // Register geo strategies (2)
-            _registry.Register(new GeoReplicationStrategy());
-            _registry.Register(new CrossRegionStrategy());
+            RegisterBothRegistries(new GeoReplicationStrategy());
+            RegisterBothRegistries(new CrossRegionStrategy());
 
             // Register federation strategies (2)
-            _registry.Register(new FederationStrategy());
-            _registry.Register(new FederatedQueryStrategy());
+            RegisterBothRegistries(new FederationStrategy());
+            RegisterBothRegistries(new FederatedQueryStrategy());
 
             // Register sync mode strategies (2)
-            _registry.Register(new SynchronousReplicationStrategy());
-            _registry.Register(new AsynchronousReplicationStrategy());
+            RegisterBothRegistries(new SynchronousReplicationStrategy());
+            RegisterBothRegistries(new AsynchronousReplicationStrategy());
 
             // Register geo-replication strategies (1)
-            _registry.Register(new PrimarySecondaryReplicationStrategy());
+            RegisterBothRegistries(new PrimarySecondaryReplicationStrategy());
 
             // Register cloud strategies (6)
-            _registry.Register(new AwsReplicationStrategy());
-            _registry.Register(new AzureReplicationStrategy());
-            _registry.Register(new GcpReplicationStrategy());
-            _registry.Register(new HybridCloudStrategy());
-            _registry.Register(new KubernetesReplicationStrategy());
-            _registry.Register(new EdgeReplicationStrategy());
+            RegisterBothRegistries(new AwsReplicationStrategy());
+            RegisterBothRegistries(new AzureReplicationStrategy());
+            RegisterBothRegistries(new GcpReplicationStrategy());
+            RegisterBothRegistries(new HybridCloudStrategy());
+            RegisterBothRegistries(new KubernetesReplicationStrategy());
+            RegisterBothRegistries(new EdgeReplicationStrategy());
 
             // Register active-active strategies (3)
-            _registry.Register(new HotHotStrategy());
-            _registry.Register(new NWayActiveStrategy());
-            _registry.Register(new GlobalActiveStrategy());
+            RegisterBothRegistries(new HotHotStrategy());
+            RegisterBothRegistries(new NWayActiveStrategy());
+            RegisterBothRegistries(new GlobalActiveStrategy());
 
             // Register CDC strategies (4)
-            _registry.Register(new KafkaConnectCdcStrategy());
-            _registry.Register(new DebeziumCdcStrategy());
-            _registry.Register(new MaxwellCdcStrategy());
-            _registry.Register(new CanalCdcStrategy());
+            RegisterBothRegistries(new KafkaConnectCdcStrategy());
+            RegisterBothRegistries(new DebeziumCdcStrategy());
+            RegisterBothRegistries(new MaxwellCdcStrategy());
+            RegisterBothRegistries(new CanalCdcStrategy());
 
             // Register AI-enhanced strategies (5)
-            _registry.Register(new PredictiveReplicationStrategy());
-            _registry.Register(new SemanticReplicationStrategy());
-            _registry.Register(new AdaptiveReplicationStrategy());
-            _registry.Register(new IntelligentReplicationStrategy());
-            _registry.Register(new AutoTuneReplicationStrategy());
+            RegisterBothRegistries(new PredictiveReplicationStrategy());
+            RegisterBothRegistries(new SemanticReplicationStrategy());
+            RegisterBothRegistries(new AdaptiveReplicationStrategy());
+            RegisterBothRegistries(new IntelligentReplicationStrategy());
+            RegisterBothRegistries(new AutoTuneReplicationStrategy());
 
             // Register conflict resolution strategies (7)
-            _registry.Register(new LastWriteWinsStrategy());
-            _registry.Register(new VectorClockStrategy());
-            _registry.Register(new MergeConflictStrategy());
-            _registry.Register(new CustomConflictStrategy());
-            _registry.Register(new CrdtConflictStrategy());
-            _registry.Register(new VersionConflictStrategy());
-            _registry.Register(new ThreeWayMergeStrategy());
+            RegisterBothRegistries(new LastWriteWinsStrategy());
+            RegisterBothRegistries(new VectorClockStrategy());
+            RegisterBothRegistries(new MergeConflictStrategy());
+            RegisterBothRegistries(new CustomConflictStrategy());
+            RegisterBothRegistries(new CrdtConflictStrategy());
+            RegisterBothRegistries(new VersionConflictStrategy());
+            RegisterBothRegistries(new ThreeWayMergeStrategy());
 
             // Register topology strategies (6)
-            _registry.Register(new StarTopologyStrategy());
-            _registry.Register(new MeshTopologyStrategy());
-            _registry.Register(new ChainTopologyStrategy());
-            _registry.Register(new TreeTopologyStrategy());
-            _registry.Register(new RingTopologyStrategy());
-            _registry.Register(new HierarchicalTopologyStrategy());
+            RegisterBothRegistries(new StarTopologyStrategy());
+            RegisterBothRegistries(new MeshTopologyStrategy());
+            RegisterBothRegistries(new ChainTopologyStrategy());
+            RegisterBothRegistries(new TreeTopologyStrategy());
+            RegisterBothRegistries(new RingTopologyStrategy());
+            RegisterBothRegistries(new HierarchicalTopologyStrategy());
 
             // Register specialized strategies (6)
-            _registry.Register(new SelectiveReplicationStrategy());
-            _registry.Register(new FilteredReplicationStrategy());
-            _registry.Register(new CompressionReplicationStrategy());
-            _registry.Register(new EncryptionReplicationStrategy());
-            _registry.Register(new ThrottleReplicationStrategy());
-            _registry.Register(new PriorityReplicationStrategy());
+            RegisterBothRegistries(new SelectiveReplicationStrategy());
+            RegisterBothRegistries(new FilteredReplicationStrategy());
+            RegisterBothRegistries(new CompressionReplicationStrategy());
+            RegisterBothRegistries(new EncryptionReplicationStrategy());
+            RegisterBothRegistries(new ThrottleReplicationStrategy());
+            RegisterBothRegistries(new PriorityReplicationStrategy());
 
             // Register disaster recovery strategies (5)
-            _registry.Register(new AsyncDRStrategy());
-            _registry.Register(new SyncDRStrategy());
-            _registry.Register(new ZeroRPOStrategy());
-            _registry.Register(new ActivePassiveStrategy());
-            _registry.Register(new FailoverDRStrategy());
+            RegisterBothRegistries(new AsyncDRStrategy());
+            RegisterBothRegistries(new SyncDRStrategy());
+            RegisterBothRegistries(new ZeroRPOStrategy());
+            RegisterBothRegistries(new ActivePassiveStrategy());
+            RegisterBothRegistries(new FailoverDRStrategy());
 
             // Register air-gap strategies (7)
-            _registry.Register(new BidirectionalMergeStrategy());
-            _registry.Register(new ConflictAvoidanceStrategy());
-            _registry.Register(new SchemaEvolutionStrategy());
-            _registry.Register(new ZeroDataLossStrategy());
-            _registry.Register(new ResumableMergeStrategy());
-            _registry.Register(new IncrementalSyncStrategy());
-            _registry.Register(new ProvenanceTrackingStrategy());
+            RegisterBothRegistries(new BidirectionalMergeStrategy());
+            RegisterBothRegistries(new ConflictAvoidanceStrategy());
+            RegisterBothRegistries(new SchemaEvolutionStrategy());
+            RegisterBothRegistries(new ZeroDataLossStrategy());
+            RegisterBothRegistries(new ResumableMergeStrategy());
+            RegisterBothRegistries(new IncrementalSyncStrategy());
+            RegisterBothRegistries(new ProvenanceTrackingStrategy());
         }
 
         #endregion

@@ -140,16 +140,24 @@ public sealed class UltimateComputePlugin : ComputePluginBase, IDisposable
     {
         if (_initialized) return;
 
-        // Auto-discover all strategies in this assembly
+        // Auto-discover all strategies in this assembly into the local registry (secondary index by ComputeRuntime)
         _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
 
-        // Configure Intelligence on each strategy and publish registration events
+        // Dual-register: also register each strategy with the inherited base class ComputeStrategyRegistry
+        // so primary dispatch (by StrategyId) routes through the standard base class path.
+        // The local _registry keeps the secondary ComputeRuntime enum index for runtime-based lookups.
         var strategies = _registry.GetAllStrategies();
         foreach (var strategy in strategies)
         {
-            if (strategy is ComputeRuntimeStrategyBase baseStrategy && MessageBus != null)
+            // Primary: register in inherited ComputePluginBase.ComputeStrategyRegistry
+            if (strategy is ComputeRuntimeStrategyBase baseStrategy)
             {
-                baseStrategy.ConfigureIntelligence(MessageBus);
+                RegisterComputeStrategy(baseStrategy);
+
+                if (MessageBus != null)
+                {
+                    baseStrategy.ConfigureIntelligence(MessageBus);
+                }
             }
 
             await PublishStrategyRegisteredAsync(strategy);
