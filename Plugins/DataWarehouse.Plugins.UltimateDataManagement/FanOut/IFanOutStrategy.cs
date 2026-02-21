@@ -129,14 +129,20 @@ public sealed class StrategyValidationResult
 
 /// <summary>
 /// Base class for fan out strategies providing common functionality.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// </summary>
-public abstract class FanOutStrategyBase : IFanOutStrategy
+public abstract class FanOutStrategyBase : StrategyBase, IFanOutStrategy
 {
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific DisplayName.
+    /// </summary>
+    public override string Name => DisplayName;
 
     /// <inheritdoc/>
     public abstract string SemanticDescription { get; }

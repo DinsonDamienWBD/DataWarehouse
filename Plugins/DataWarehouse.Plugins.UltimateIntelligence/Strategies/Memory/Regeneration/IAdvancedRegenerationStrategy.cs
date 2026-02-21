@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
@@ -198,8 +199,9 @@ public record RegenerationOptions
 
 /// <summary>
 /// Base class for regeneration strategies providing common functionality.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// </summary>
-public abstract class RegenerationStrategyBase : IAdvancedRegenerationStrategy
+public abstract class RegenerationStrategyBase : StrategyBase, IAdvancedRegenerationStrategy
 {
     private readonly BoundedDictionary<string, RegenerationStatistics> _statisticsByFormat = new BoundedDictionary<string, RegenerationStatistics>(1000);
     private long _totalRegenerations;
@@ -207,10 +209,15 @@ public abstract class RegenerationStrategyBase : IAdvancedRegenerationStrategy
     private double _cumulativeAccuracy;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific DisplayName.
+    /// </summary>
+    public override string Name => DisplayName;
 
     /// <inheritdoc/>
     public abstract string[] SupportedFormats { get; }

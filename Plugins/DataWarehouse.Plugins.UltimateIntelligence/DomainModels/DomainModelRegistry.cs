@@ -565,16 +565,28 @@ public sealed class DiscoveredCapabilities
 
 /// <summary>
 /// Base class for domain model strategies, providing common functionality.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// </summary>
-public abstract class DomainModelStrategyBase : IDomainModelStrategy
+public abstract class DomainModelStrategyBase : StrategyBase, IDomainModelStrategy
 {
-    protected readonly IMessageBus? _messageBus;
+    /// <summary>Message bus for external model communication. Set via constructor or ConfigureIntelligence.</summary>
+    protected IMessageBus? _messageBus;
 
     /// <inheritdoc/>
     public abstract string Domain { get; }
 
     /// <inheritdoc/>
     public abstract string ModelId { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.StrategyId to domain-specific ModelId.
+    /// </summary>
+    public override string StrategyId => ModelId;
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific Domain name.
+    /// </summary>
+    public override string Name => Domain;
 
     /// <inheritdoc/>
     public abstract IReadOnlyList<string> SupportedTasks { get; }
@@ -586,6 +598,16 @@ public abstract class DomainModelStrategyBase : IDomainModelStrategy
     protected DomainModelStrategyBase(IMessageBus? messageBus = null)
     {
         _messageBus = messageBus;
+    }
+
+    /// <summary>
+    /// Configures the message bus for this domain model strategy.
+    /// Updates both the StrategyBase MessageBus and the local _messageBus field.
+    /// </summary>
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
+    {
+        _messageBus = messageBus;
+        base.ConfigureIntelligence(messageBus);
     }
 
     /// <inheritdoc/>
@@ -709,7 +731,7 @@ public sealed class MathematicsModelStrategy : DomainModelStrategyBase
 
     private async Task<DomainInferenceResult> PerformSymbolicComputationAsync(DomainInferenceInput input, CancellationToken ct)
     {
-        if (_messageBus != null)
+        if (MessageBus != null)
         {
             var message = new PluginMessage
             {
@@ -717,7 +739,7 @@ public sealed class MathematicsModelStrategy : DomainModelStrategyBase
                 Payload = new Dictionary<string, object> { ["Expression"] = input.Data }
             };
 
-            var response = await _messageBus.SendAsync("math.symbolic", message, ct);
+            var response = await MessageBus.SendAsync("math.symbolic", message, ct);
             if (response.Success)
             {
                 return Success(response.Payload!, 0.95, "Symbolic computation completed via external engine");
