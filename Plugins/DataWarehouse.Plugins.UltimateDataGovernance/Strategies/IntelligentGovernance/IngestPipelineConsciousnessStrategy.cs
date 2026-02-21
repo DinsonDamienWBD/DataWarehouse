@@ -216,8 +216,13 @@ public sealed class IngestPipelineConsciousnessStrategy : ConsciousnessStrategyB
     /// <summary>
     /// Message bus instance for publishing consciousness events.
     /// Nullable for unit test contexts where the bus is not wired.
+    /// Shadows <see cref="StrategyBase.MessageBus"/> (protected) to expose it publicly for injection.
     /// </summary>
-    public IMessageBus? MessageBus { get; set; }
+    public new IMessageBus? MessageBus
+    {
+        get => base.MessageBus;
+        set => base.ConfigureIntelligence(value);
+    }
 
     /// <inheritdoc />
     public override string StrategyId => "consciousness-ingest-pipeline";

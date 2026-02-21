@@ -73,22 +73,27 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     }
 
     /// <summary>
-    /// Base class for consciousness strategies. Provides production infrastructure:
-    /// lifecycle management, health checks, counters, and graceful shutdown.
-    /// Follows the DataGovernanceStrategyBase pattern (standalone base, does NOT inherit StrategyBase).
+    /// Base class for consciousness strategies. Extends <see cref="StrategyBase"/> for shared
+    /// lifecycle management, health checks, counters, and graceful shutdown. Implements
+    /// <see cref="IConsciousnessStrategy"/> for domain-specific consciousness members.
     /// </summary>
-    public abstract class ConsciousnessStrategyBase : IConsciousnessStrategy
+    public abstract class ConsciousnessStrategyBase : StrategyBase, IConsciousnessStrategy
     {
-        private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
-        private bool _initialized;
-        private DateTime? _healthCacheExpiry;
-        private ConsciousnessHealthStatus? _cachedHealth;
+        // StrategyBase provides: _initialized, _counters, _healthCacheLock,
+        // InitializeAsync, ShutdownAsync, Dispose, IncrementCounter, GetCounter, GetAllCounters,
+        // GetCachedHealthAsync, EnsureNotDisposed, ThrowIfNotInitialized.
 
         /// <inheritdoc />
-        public abstract string StrategyId { get; }
+        public abstract override string StrategyId { get; }
 
-        /// <inheritdoc />
+        /// <inheritdoc cref="IConsciousnessStrategy.DisplayName" />
         public abstract string DisplayName { get; }
+
+        /// <summary>
+        /// Maps <see cref="StrategyBase.Name"/> to <see cref="DisplayName"/> so the
+        /// generic strategy infrastructure can read a human-readable label.
+        /// </summary>
+        public override string Name => DisplayName;
 
         /// <inheritdoc />
         public abstract ConsciousnessCategory Category { get; }
@@ -103,58 +108,24 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         public abstract string[] Tags { get; }
 
         /// <summary>Gets whether this strategy has been initialized.</summary>
-        public bool IsInitialized => _initialized;
+        public new bool IsInitialized => _initialized;
 
         /// <summary>
-        /// Initializes the strategy. Idempotent -- calling multiple times has no additional effect.
-        /// </summary>
-        /// <param name="cancellationToken">Token to cancel the initialization.</param>
-        public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
-        {
-            if (_initialized) return Task.CompletedTask;
-            _initialized = true;
-            IncrementCounter("initialized");
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Shuts down the strategy gracefully, releasing any acquired resources.
-        /// </summary>
-        /// <param name="cancellationToken">Token to cancel the shutdown.</param>
-        public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
-        {
-            if (!_initialized) return Task.CompletedTask;
-            _initialized = false;
-            IncrementCounter("shutdown");
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Gets a cached health status, refreshing every 60 seconds.
+        /// Gets a cached health status for this consciousness strategy, reflecting
+        /// whether the strategy has been initialized.
         /// </summary>
         public ConsciousnessHealthStatus GetHealth()
         {
-            if (_cachedHealth.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
-                return _cachedHealth.Value;
-
-            _cachedHealth = _initialized ? ConsciousnessHealthStatus.Healthy : ConsciousnessHealthStatus.NotInitialized;
-            _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-            return _cachedHealth.Value;
-        }
-
-        /// <summary>
-        /// Increments a named counter. Thread-safe.
-        /// </summary>
-        /// <param name="name">The counter name.</param>
-        protected void IncrementCounter(string name)
-        {
-            _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+            return _initialized
+                ? ConsciousnessHealthStatus.Healthy
+                : ConsciousnessHealthStatus.NotInitialized;
         }
 
         /// <summary>
         /// Gets all counter values as a read-only snapshot.
+        /// Delegates to the inherited counter infrastructure from <see cref="StrategyBase"/>.
         /// </summary>
-        public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
+        public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();
     }
 
     /// <summary>
@@ -173,15 +144,17 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     }
 
     /// <summary>
-    /// Registry for consciousness strategies. Supports auto-discovery from assemblies,
-    /// manual registration, and lookup by ID or category.
+    /// Registry for consciousness strategies. Delegates to the generic
+    /// <see cref="StrategyRegistry{TStrategy}"/> internally. Supports auto-discovery
+    /// from assemblies, manual registration, and lookup by ID or category.
     /// </summary>
     public sealed class ConsciousnessStrategyRegistry
     {
-        private readonly BoundedDictionary<string, IConsciousnessStrategy> _strategies = new BoundedDictionary<string, IConsciousnessStrategy>(1000);
+        private readonly StrategyRegistry<IConsciousnessStrategy> _inner =
+            new(s => s.StrategyId);
 
         /// <summary>Gets the number of registered strategies.</summary>
-        public int Count => _strategies.Count;
+        public int Count => _inner.Count;
 
         /// <summary>
         /// Auto-discovers and registers all concrete <see cref="IConsciousnessStrategy"/> implementations
@@ -191,26 +164,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         /// <returns>The number of strategies discovered and registered.</returns>
         public int AutoDiscover(Assembly assembly)
         {
-            var strategyType = typeof(IConsciousnessStrategy);
-            var count = 0;
-
-            foreach (var type in assembly.GetTypes())
-            {
-                if (type.IsAbstract || !strategyType.IsAssignableFrom(type))
-                    continue;
-
-                try
-                {
-                    if (Activator.CreateInstance(type) is IConsciousnessStrategy strategy)
-                    {
-                        _strategies[strategy.StrategyId] = strategy;
-                        count++;
-                    }
-                }
-                catch { /* Non-critical: skip types that require constructor args */ }
-            }
-
-            return count;
+            return _inner.DiscoverFromAssembly(assembly);
         }
 
         /// <summary>
@@ -219,7 +173,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         /// <param name="strategy">The strategy to register.</param>
         public void Register(IConsciousnessStrategy strategy)
         {
-            _strategies[strategy.StrategyId] = strategy ?? throw new ArgumentNullException(nameof(strategy));
+            _inner.Register(strategy);
         }
 
         /// <summary>
@@ -228,7 +182,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         /// <param name="strategyId">The strategy ID to look up.</param>
         /// <returns>The strategy, or null if not found.</returns>
         public IConsciousnessStrategy? GetById(string strategyId) =>
-            _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
+            _inner.Get(strategyId);
 
         /// <summary>
         /// Gets all registered strategies in a specific category.
@@ -236,13 +190,13 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         /// <param name="category">The category to filter by.</param>
         /// <returns>A read-only list of matching strategies.</returns>
         public IReadOnlyList<IConsciousnessStrategy> GetByCategory(ConsciousnessCategory category) =>
-            _strategies.Values.Where(s => s.Category == category).ToList().AsReadOnly();
+            _inner.GetByPredicate(s => s.Category == category).ToList().AsReadOnly();
 
         /// <summary>
         /// Gets all registered strategies.
         /// </summary>
         /// <returns>A read-only list of all strategies.</returns>
         public IReadOnlyList<IConsciousnessStrategy> GetAll() =>
-            _strategies.Values.ToList().AsReadOnly();
+            _inner.GetAll().ToList().AsReadOnly();
     }
 }
