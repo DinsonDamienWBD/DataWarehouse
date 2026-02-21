@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // DataProtectionStrategyRegistry obsolete -- retained as typed lookup thin wrapper
 namespace DataWarehouse.Plugins.UltimateDataProtection.Validation
 {
     /// <summary>

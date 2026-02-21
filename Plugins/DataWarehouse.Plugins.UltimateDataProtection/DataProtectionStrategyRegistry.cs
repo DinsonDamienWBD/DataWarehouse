@@ -18,7 +18,18 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     ///   <item>Intelligence integration for AI-driven strategy selection</item>
     ///   <item>Automatic capability aggregation</item>
     /// </list>
+    /// <para>
+    /// <b>Migration note (65.4-07):</b> <see cref="UltimateDataProtectionPlugin"/> inherits
+    /// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.SecurityPluginBase"/> which exposes
+    /// <c>RegisterStrategy</c> and <c>StrategyRegistry</c> from PluginBase for unified lifecycle.
+    /// Strategies are now also registered via the base-class registry. This custom registry is
+    /// retained as a typed lookup layer for domain interfaces (<see cref="IDataProtectionStrategy"/>,
+    /// <see cref="DataProtectionCapabilities"/>, category filtering, statistics aggregation)
+    /// that are not expressible via the generic <c>ISecurityStrategy</c> contract.
+    /// New plugins should prefer the base-class strategy registry over this class.
+    /// </para>
     /// </remarks>
+    [System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
     public sealed class DataProtectionStrategyRegistry
     {
         private readonly BoundedDictionary<string, IDataProtectionStrategy> _strategies = new BoundedDictionary<string, IDataProtectionStrategy>(1000);

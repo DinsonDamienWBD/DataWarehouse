@@ -37,7 +37,12 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol;
 /// </summary>
 public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
+    // NOTE(65.4-07): _registry is retained as a typed lookup layer for domain-specific interfaces
+    // (IDatabaseProtocolStrategy, ProtocolFamily, etc.). Strategies also registered via base-class
+    // DiscoverStrategiesFromAssembly() for unified lifecycle management via PluginBase.StrategyRegistry.
+#pragma warning disable CS0618 // DatabaseProtocolStrategyRegistry obsolete -- retained as typed lookup thin wrapper
     private readonly DatabaseProtocolStrategyRegistry _registry;
+#pragma warning restore CS0618
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
     private bool _disposed;
@@ -145,7 +150,9 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
     /// </summary>
     public UltimateDatabaseProtocolPlugin()
     {
+#pragma warning disable CS0618 // DatabaseProtocolStrategyRegistry obsolete -- retained as typed lookup thin wrapper
         _registry = new DatabaseProtocolStrategyRegistry();
+#pragma warning restore CS0618
     }
 
     /// <inheritdoc/>
@@ -153,8 +160,12 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
     {
         if (_initialized) return;
 
-        // Auto-discover all strategies in this assembly
+        // Auto-discover all strategies in this assembly via domain registry for typed dispatch
         _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+
+        // Also register discovered strategies via base-class PluginBase.StrategyRegistry for unified lifecycle (AD-65.4)
+        // DatabaseProtocolStrategyBase extends StrategyBase (IStrategy), so base registration is valid
+        DiscoverStrategiesFromAssembly(Assembly.GetExecutingAssembly());
 
         // Publish registration events for each strategy
         var strategies = _registry.GetAllStrategies();

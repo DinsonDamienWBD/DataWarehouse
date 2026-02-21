@@ -1156,6 +1156,16 @@ public interface IDatabaseProtocolStrategyRegistry
 /// <summary>
 /// Default implementation of protocol strategy registry.
 /// </summary>
+/// <remarks>
+/// <b>Migration note (65.4-07):</b> <see cref="UltimateDatabaseProtocolPlugin"/> inherits
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase"/> which exposes
+/// <c>DiscoverStrategiesFromAssembly</c> and <c>StrategyRegistry</c> from PluginBase for unified lifecycle.
+/// Strategies are now also registered via the base-class registry. This custom registry is
+/// retained as a typed lookup layer for domain interfaces (<see cref="IDatabaseProtocolStrategy"/>,
+/// <see cref="ProtocolFamily"/> filtering) that differ from the generic IStorageStrategy contract.
+/// New plugins should prefer the base-class strategy registry over this class.
+/// </remarks>
+[System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
 public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDatabaseProtocolStrategy> _strategies = new BoundedDictionary<string, IDatabaseProtocolStrategy>(1000);
