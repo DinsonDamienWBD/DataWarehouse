@@ -15,7 +15,7 @@ public abstract class HardwareBusStrategyBase : IoTStrategyBase, IHardwareBusStr
     public abstract string BusType { get; }
 
     public abstract Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
-    public abstract Task ShutdownAsync(CancellationToken ct = default);
+    public abstract new Task ShutdownAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -24,7 +24,7 @@ public abstract class HardwareBusStrategyBase : IoTStrategyBase, IHardwareBusStr
 public class GpioControllerStrategy : HardwareBusStrategyBase
 {
     private readonly BoundedDictionary<int, GpioPinState> _pinStates = new BoundedDictionary<int, GpioPinState>(1000);
-    private bool _initialized;
+    private bool _busInitialized;
 
     public override string StrategyId => "gpio-controller";
     public override string StrategyName => "GPIO Controller";
@@ -34,7 +34,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
 
     public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default)
     {
-        _initialized = true;
+        _busInitialized = true;
         return Task.FromResult(true);
     }
 
@@ -45,7 +45,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
         {
             _pinStates.TryRemove(pin, out _);
         }
-        _initialized = false;
+        _busInitialized = false;
         return Task.CompletedTask;
     }
 
@@ -54,7 +54,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public Task<GpioPinResult> ConfigurePinAsync(int pinNumber, PinMode mode, PullMode pull = PullMode.None, CancellationToken ct = default)
     {
-        if (!_initialized)
+        if (!_busInitialized)
             return Task.FromResult(new GpioPinResult { Success = false, ErrorMessage = "GPIO not initialized" });
 
         if (pinNumber < 0 || pinNumber > 255)
@@ -138,7 +138,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
 /// </summary>
 public class I2cControllerStrategy : HardwareBusStrategyBase
 {
-    private bool _initialized;
+    private bool _busInitialized;
     private int _busFrequency = 100000; // 100 kHz standard mode
 
     public override string StrategyId => "i2c-controller";
@@ -156,14 +156,14 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
         // - Set SCL/SDA pins
         // - Configure clock divider for desired frequency
         // - Enable I2C controller
-        _initialized = true;
+        _busInitialized = true;
         return Task.FromResult(true);
     }
 
     public override Task ShutdownAsync(CancellationToken ct = default)
     {
         // Disable I2C controller
-        _initialized = false;
+        _busInitialized = false;
         return Task.CompletedTask;
     }
 
@@ -172,7 +172,7 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public async Task<byte[]> ScanBusAsync(CancellationToken ct = default)
     {
-        if (!_initialized)
+        if (!_busInitialized)
             throw new InvalidOperationException("I2C not initialized");
 
         var activeAddresses = new List<byte>();
@@ -197,7 +197,7 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public async Task<byte[]> ReadRegisterAsync(byte deviceAddress, byte registerAddress, int byteCount, CancellationToken ct = default)
     {
-        if (!_initialized)
+        if (!_busInitialized)
             throw new InvalidOperationException("I2C not initialized");
 
         if (byteCount <= 0 || byteCount > 256)
@@ -226,7 +226,7 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public async Task WriteRegisterAsync(byte deviceAddress, byte registerAddress, byte[] data, CancellationToken ct = default)
     {
-        if (!_initialized)
+        if (!_busInitialized)
             throw new InvalidOperationException("I2C not initialized");
 
         if (data == null || data.Length == 0 || data.Length > 256)
@@ -259,7 +259,7 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
 /// </summary>
 public class SpiControllerStrategy : HardwareBusStrategyBase
 {
-    private bool _initialized;
+    private bool _busInitialized;
     private SpiMode _mode = SpiMode.Mode0;
     private int _clockFrequency = 1000000; // 1 MHz
     private int _chipSelectPin = -1;
@@ -286,14 +286,14 @@ public class SpiControllerStrategy : HardwareBusStrategyBase
         // - Configure clock divider for desired frequency
         // - Set CPOL/CPHA based on mode
         // - Enable SPI controller
-        _initialized = true;
+        _busInitialized = true;
         return Task.FromResult(true);
     }
 
     public override Task ShutdownAsync(CancellationToken ct = default)
     {
         // Disable SPI controller
-        _initialized = false;
+        _busInitialized = false;
         return Task.CompletedTask;
     }
 
@@ -302,7 +302,7 @@ public class SpiControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public async Task<byte[]> TransferAsync(byte[] writeData, int readLength = -1, CancellationToken ct = default)
     {
-        if (!_initialized)
+        if (!_busInitialized)
             throw new InvalidOperationException("SPI not initialized");
 
         if (writeData == null || writeData.Length == 0)

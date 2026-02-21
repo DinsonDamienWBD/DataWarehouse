@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataQuality;
@@ -430,22 +431,21 @@ public interface IDataQualityStrategy
 
 /// <summary>
 /// Abstract base class for data quality strategies.
-/// Provides common functionality including statistics tracking and validation.
+/// Provides common functionality including statistics tracking and validation via StrategyBase.
 /// </summary>
-public abstract class DataQualityStrategyBase : IDataQualityStrategy
+public abstract class DataQualityStrategyBase : StrategyBase, IDataQualityStrategy
 {
     private readonly DataQualityStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
-    private bool _initialized;
-    private DateTime? _healthCacheExpiry;
-    private bool? _cachedHealthy;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
 
     /// <inheritdoc/>
     public abstract DataQualityCategory Category { get; }
@@ -458,11 +458,6 @@ public abstract class DataQualityStrategyBase : IDataQualityStrategy
 
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
-
-    /// <summary>
-    /// Gets whether the strategy has been initialized.
-    /// </summary>
-    protected bool IsInitialized => _initialized;
 
     /// <inheritdoc/>
     public DataQualityStatistics GetStatistics()
@@ -502,20 +497,18 @@ public abstract class DataQualityStrategyBase : IDataQualityStrategy
     }
 
     /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    protected override async Task InitializeAsyncCore(CancellationToken ct)
     {
-        if (_initialized) return;
         await InitializeCoreAsync(ct);
-        _initialized = true;
         IncrementCounter("initialized");
     }
 
     /// <inheritdoc/>
     public virtual async Task DisposeAsync()
     {
-        if (!_initialized) return;
+        if (!IsInitialized) return;
         await DisposeCoreAsync();
-        _initialized = false;
+        await ShutdownAsync();
     }
 
     /// <summary>
@@ -612,30 +605,14 @@ public abstract class DataQualityStrategyBase : IDataQualityStrategy
     /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
     public bool IsHealthy()
     {
-        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
-            return _cachedHealthy.Value;
-        _cachedHealthy = _initialized;
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealthy.Value;
-    }
-
-    /// <summary>Increments a named counter. Thread-safe.</summary>
-    protected void IncrementCounter(string name)
-    {
-        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+        var result = GetCachedHealthAsync(ct =>
+            Task.FromResult(new StrategyHealthCheckResult(IsInitialized)),
+            TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
+        return result.IsHealthy;
     }
 
     /// <summary>Gets all counter values.</summary>
-    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
-
-    /// <summary>
-    /// Throws if the strategy has not been initialized.
-    /// </summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
+    public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();
 }
 
 /// <summary>

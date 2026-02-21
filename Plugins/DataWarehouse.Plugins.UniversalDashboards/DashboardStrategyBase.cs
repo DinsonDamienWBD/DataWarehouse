@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Dashboards;
 using DataWarehouse.SDK.Utilities;
 
@@ -158,15 +159,15 @@ public sealed class DashboardStrategyStatistics
 /// <summary>
 /// Abstract base class for dashboard strategy implementations.
 /// Provides common functionality for authentication, HTTP requests, connection pooling, and statistics.
+/// Inherits lifecycle, dispose, and health caching from StrategyBase.
 /// </summary>
-public abstract class DashboardStrategyBase : IDashboardStrategy
+public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
 {
     private readonly BoundedDictionary<string, Dashboard> _dashboardCache = new BoundedDictionary<string, Dashboard>(1000);
     private readonly BoundedDictionary<string, HttpClient> _httpClientPool = new BoundedDictionary<string, HttpClient>(1000);
     private readonly DashboardStrategyStatistics _statistics = new();
     private readonly SemaphoreSlim _rateLimiter;
     private readonly object _statsLock = new();
-    private volatile bool _disposed;
     private string? _cachedAccessToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
 
@@ -175,12 +176,15 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     /// <summary>
     /// Gets the unique identifier for this strategy.
     /// </summary>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <summary>
     /// Gets the display name of this strategy.
     /// </summary>
     public abstract string StrategyName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => StrategyName;
 
     /// <summary>
     /// Gets the vendor or platform name.
@@ -624,7 +628,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     /// </summary>
     protected void EnsureConfigured()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
         if (Config == null)
             throw new InvalidOperationException($"{StrategyName} has not been configured. Call Configure() first.");
     }
@@ -841,7 +845,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     {
         _ = Task.Run(async () =>
         {
-            while (!_disposed)
+            while (true)
             {
                 await Task.Delay(1000);
                 try
@@ -862,25 +866,11 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
 
     #endregion
 
-    #region IDisposable
+    #region Dispose
 
-    /// <summary>
-    /// Disposes resources.
-    /// </summary>
-    public void Dispose()
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Disposes resources.
-    /// </summary>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-        _disposed = true;
-
         if (disposing)
         {
             foreach (var client in _httpClientPool.Values)
@@ -891,6 +881,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
             _dashboardCache.Clear();
             _rateLimiter.Dispose();
         }
+        base.Dispose(disposing);
     }
 
     #endregion

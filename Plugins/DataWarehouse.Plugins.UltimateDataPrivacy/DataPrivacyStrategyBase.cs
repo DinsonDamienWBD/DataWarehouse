@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataPrivacy;
@@ -45,62 +46,43 @@ public interface IDataPrivacyStrategy
 
 /// <summary>
 /// Base class for data privacy strategies.
-/// Provides production infrastructure: lifecycle management, health checks, counters, graceful shutdown.
+/// Provides production infrastructure via StrategyBase: lifecycle management, health checks, counters, graceful shutdown.
 /// </summary>
-public abstract class DataPrivacyStrategyBase : IDataPrivacyStrategy
+public abstract class DataPrivacyStrategyBase : StrategyBase, IDataPrivacyStrategy
 {
-    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
-    private bool _initialized;
-    private DateTime? _healthCacheExpiry;
-    private bool? _cachedHealthy;
-
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     public abstract string DisplayName { get; }
+    public override string Name => DisplayName;
     public abstract PrivacyCategory Category { get; }
     public abstract DataPrivacyCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
 
-    /// <summary>Gets whether this strategy has been initialized.</summary>
-    public bool IsInitialized => _initialized;
-
     /// <summary>Initializes the strategy. Idempotent.</summary>
-    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (_initialized) return Task.CompletedTask;
-        _initialized = true;
         IncrementCounter("initialized");
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>Shuts down the strategy gracefully.</summary>
-    public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        if (!_initialized) return Task.CompletedTask;
-        _initialized = false;
         IncrementCounter("shutdown");
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
     public bool IsHealthy()
     {
-        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
-            return _cachedHealthy.Value;
-
-        _cachedHealthy = _initialized;
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealthy.Value;
-    }
-
-    /// <summary>Increments a named counter. Thread-safe.</summary>
-    protected void IncrementCounter(string name)
-    {
-        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+        var result = GetCachedHealthAsync(ct =>
+            Task.FromResult(new StrategyHealthCheckResult(IsInitialized)),
+            TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
+        return result.IsHealthy;
     }
 
     /// <summary>Gets all counter values.</summary>
-    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
+    public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();
 }
 
 /// <summary>Registry for data privacy strategies.</summary>

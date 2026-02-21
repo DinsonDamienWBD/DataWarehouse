@@ -16,8 +16,9 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// - XOR parity utilities
 /// - Galois Field operations for erasure coding
 /// - Disk I/O simulation infrastructure
+/// Inherits lifecycle, dispose, counters, and health caching from StrategyBase.
 /// </summary>
-public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
+public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
 {
     #region Protected Fields
 
@@ -26,7 +27,6 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     protected List<VirtualDisk> _hotSpares = new();
     protected volatile RaidState _state = RaidState.Optimal;
     protected readonly object _stateLock = new();
-    protected volatile bool _disposed;
 
     // Statistics tracking
     protected long _totalReads;
@@ -49,18 +49,18 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     protected DateTime _rebuildStartTime;
     protected readonly object _rebuildLock = new();
 
-    // Intelligence integration
-    protected IMessageBus? _messageBus;
-
     #endregion
 
     #region Abstract Properties
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract int RaidLevel { get; }
@@ -106,10 +106,12 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
 
     #region Initialization
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Domain-specific initialization with RAID configuration.
+    /// </summary>
     public virtual async Task InitializeAsync(RaidConfiguration config, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
         ArgumentNullException.ThrowIfNull(config);
 
         if (config.Disks.Count < MinimumDisks)
@@ -150,7 +152,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual async Task<RaidVerificationResult> VerifyAsync(IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         var result = new RaidVerificationResult
         {
@@ -205,7 +207,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual async Task<RaidScrubResult> ScrubAsync(IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         var result = new RaidScrubResult
         {
@@ -296,7 +298,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual async Task<RaidHealthStatus> GetHealthStatusAsync(CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         var status = new RaidHealthStatus
         {
@@ -394,7 +396,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual Task<RaidStatistics> GetStatisticsAsync(CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         var stats = new RaidStatistics
         {
@@ -452,7 +454,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual Task AddDiskAsync(VirtualDisk disk, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         if (!SupportsOnlineExpansion)
         {
@@ -470,7 +472,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <inheritdoc/>
     public virtual Task RemoveDiskAsync(int diskIndex, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         if (diskIndex < 0 || diskIndex >= _disks.Count)
         {
@@ -495,7 +497,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     public virtual async Task ReplaceDiskAsync(int failedDiskIndex, VirtualDisk replacementDisk,
         IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotDisposed();
 
         if (failedDiskIndex < 0 || failedDiskIndex >= _disks.Count)
         {
@@ -675,11 +677,12 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
 
     /// <summary>
     /// Sets the message bus for Intelligence integration.
+    /// Delegates to the inherited ConfigureIntelligence method.
     /// </summary>
     /// <param name="messageBus">The message bus instance.</param>
     public void SetMessageBus(IMessageBus? messageBus)
     {
-        _messageBus = messageBus;
+        ConfigureIntelligence(messageBus);
     }
 
     /// <summary>
@@ -690,7 +693,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <returns>Failure prediction result, or null if Intelligence unavailable.</returns>
     protected async Task<DiskFailurePrediction?> RequestFailurePredictionAsync(int diskIndex, CancellationToken ct = default)
     {
-        if (_messageBus == null || diskIndex < 0 || diskIndex >= _disks.Count)
+        if (!IsIntelligenceAvailable || diskIndex < 0 || diskIndex >= _disks.Count)
             return null;
 
         var disk = _disks[diskIndex];
@@ -701,7 +704,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
         var tcs = new TaskCompletionSource<DiskFailurePrediction?>();
 
         // Subscribe to response
-        using var subscription = _messageBus.Subscribe(RaidTopics.PredictFailureResponse, msg =>
+        using var subscription = MessageBus!.Subscribe(RaidTopics.PredictFailureResponse, msg =>
         {
             if (msg.CorrelationId == correlationId)
             {
@@ -740,7 +743,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
             }
         };
 
-        await _messageBus.PublishAsync(RaidTopics.PredictFailure, request, ct);
+        await MessageBus!.PublishAsync(RaidTopics.PredictFailure, request, ct);
 
         // Wait for response with timeout
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -768,14 +771,14 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
         string priorityGoal = "balanced",
         CancellationToken ct = default)
     {
-        if (_messageBus == null)
+        if (!IsIntelligenceAvailable)
             return null;
 
         var correlationId = Guid.NewGuid().ToString("N");
         var tcs = new TaskCompletionSource<RaidLevelRecommendation?>();
 
         // Subscribe to response
-        using var subscription = _messageBus.Subscribe(RaidTopics.OptimizeLevelResponse, msg =>
+        using var subscription = MessageBus!.Subscribe(RaidTopics.OptimizeLevelResponse, msg =>
         {
             if (msg.CorrelationId == correlationId)
             {
@@ -810,7 +813,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
             }
         };
 
-        await _messageBus.PublishAsync(RaidTopics.OptimizeLevel, request, ct);
+        await MessageBus!.PublishAsync(RaidTopics.OptimizeLevel, request, ct);
 
         // Wait for response with timeout
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -833,7 +836,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     /// <returns>True if report was sent successfully.</returns>
     protected async Task<bool> ReportHealthToIntelligenceAsync(CancellationToken ct = default)
     {
-        if (_messageBus == null)
+        if (!IsIntelligenceAvailable)
             return false;
 
         try
@@ -862,7 +865,7 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
                 }
             };
 
-            await _messageBus.PublishAsync(RaidTopics.ReportHealth, report, ct);
+            await MessageBus!.PublishAsync(RaidTopics.ReportHealth, report, ct);
             return true;
         }
         catch
@@ -873,17 +876,16 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
 
     #endregion
 
-    #region IDisposable
+    #region Dispose
 
     /// <inheritdoc/>
-    public virtual void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-
-        _disposed = true;
-        _uptime.Stop();
-
-        GC.SuppressFinalize(this);
+        if (disposing)
+        {
+            _uptime.Stop();
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

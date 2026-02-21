@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataGovernance;
@@ -52,62 +53,48 @@ public interface IDataGovernanceStrategy
 
 /// <summary>
 /// Base class for data governance strategies.
-/// Provides production infrastructure: lifecycle management, health checks, counters, graceful shutdown.
+/// Provides production infrastructure via StrategyBase: lifecycle management, health checks, counters, graceful shutdown.
 /// </summary>
-public abstract class DataGovernanceStrategyBase : IDataGovernanceStrategy
+public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernanceStrategy
 {
-    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
-    private bool _initialized;
-    private DateTime? _healthCacheExpiry;
-    private HealthStatus? _cachedHealth;
-
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     public abstract string DisplayName { get; }
+    public override string Name => DisplayName;
     public abstract GovernanceCategory Category { get; }
     public abstract DataGovernanceCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
 
-    /// <summary>Gets whether this strategy has been initialized.</summary>
-    public bool IsInitialized => _initialized;
-
     /// <summary>Initializes the strategy. Idempotent.</summary>
-    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (_initialized) return Task.CompletedTask;
-        _initialized = true;
         IncrementCounter("initialized");
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>Shuts down the strategy gracefully.</summary>
-    public virtual Task ShutdownAsync(CancellationToken cancellationToken = default)
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        if (!_initialized) return Task.CompletedTask;
-        _initialized = false;
         IncrementCounter("shutdown");
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>Gets a cached health status, refreshing every 60 seconds.</summary>
     public HealthStatus GetHealth()
     {
-        if (_cachedHealth.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
-            return _cachedHealth.Value;
+        var result = GetCachedHealthAsync(ct =>
+        {
+            var status = IsInitialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
+            return Task.FromResult(new StrategyHealthCheckResult(
+                status == HealthStatus.Healthy,
+                status.ToString()));
+        }, TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
 
-        _cachedHealth = _initialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealth.Value;
-    }
-
-    /// <summary>Increments a named counter. Thread-safe.</summary>
-    protected void IncrementCounter(string name)
-    {
-        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+        return result.IsHealthy ? HealthStatus.Healthy : HealthStatus.NotInitialized;
     }
 
     /// <summary>Gets all counter values.</summary>
-    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
+    public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();
 }
 
 /// <summary>Health status for governance strategies.</summary>

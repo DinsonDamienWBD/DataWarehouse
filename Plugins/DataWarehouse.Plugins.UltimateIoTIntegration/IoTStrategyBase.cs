@@ -42,16 +42,21 @@ public sealed class IoTStrategyHealthReport
 
 /// <summary>
 /// Base class for all IoT strategies with production-ready health tracking and metrics.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// </summary>
-public abstract class IoTStrategyBase : IIoTStrategyBase
+public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
 {
-    protected IMessageBus? MessageBus { get; private set; }
     private long _totalOperations;
     private long _failedOperations;
     private DateTimeOffset? _lastActivity;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific StrategyName.
+    /// </summary>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
@@ -60,7 +65,7 @@ public abstract class IoTStrategyBase : IIoTStrategyBase
     public abstract IoTStrategyCategory Category { get; }
 
     /// <inheritdoc/>
-    public abstract string Description { get; }
+    public abstract override string Description { get; }
 
     /// <inheritdoc/>
     public virtual string[] Tags => Array.Empty<string>();
@@ -108,10 +113,12 @@ public abstract class IoTStrategyBase : IIoTStrategyBase
         _lastActivity = DateTimeOffset.UtcNow;
     }
 
-    /// <inheritdoc/>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    /// <summary>
+    /// Override of StrategyBase.ConfigureIntelligence to hook OnIntelligenceConfigured.
+    /// </summary>
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
-        MessageBus = messageBus;
+        base.ConfigureIntelligence(messageBus);
         OnIntelligenceConfigured();
     }
 

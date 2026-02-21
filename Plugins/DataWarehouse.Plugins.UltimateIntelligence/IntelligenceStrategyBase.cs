@@ -1,14 +1,16 @@
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
 /// <summary>
 /// Abstract base class for intelligence strategies.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// Provides common functionality for configuration, statistics tracking, and validation.
 /// </summary>
-public abstract class IntelligenceStrategyBase : IIntelligenceStrategy
+public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStrategy
 {
     private long _totalOperations;
     private long _successfulOperations;
@@ -29,10 +31,15 @@ public abstract class IntelligenceStrategyBase : IIntelligenceStrategy
     protected readonly BoundedDictionary<string, string> Configuration = new BoundedDictionary<string, string>(1000);
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific StrategyName.
+    /// </summary>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract IntelligenceStrategyCategory Category { get; }

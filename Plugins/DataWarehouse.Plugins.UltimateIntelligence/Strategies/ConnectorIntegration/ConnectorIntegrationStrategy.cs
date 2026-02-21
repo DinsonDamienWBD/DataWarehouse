@@ -183,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         /// <summary>
         /// Shuts down the connector integration strategy.
         /// </summary>
-        public async Task ShutdownAsync(CancellationToken cancellationToken = default)
+        public new async Task ShutdownAsync(CancellationToken cancellationToken = default)
         {
             _logger?.LogInformation("Shutting down connector integration strategy");
 
@@ -201,15 +201,25 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             _httpClients.Clear();
 
             // Unsubscribe from topics
-            Dispose();
+            DisposeSubscriptions();
 
             await Task.CompletedTask;
         }
 
         /// <summary>
         /// Disposes resources and unsubscribes from message bus.
+        /// Routes through StrategyBase dispose pattern.
         /// </summary>
-        public void Dispose()
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeSubscriptions();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void DisposeSubscriptions()
         {
             _logger?.LogInformation("Disposing connector integration strategy - unsubscribing from {Count} topics", _subscriptions.Count);
 

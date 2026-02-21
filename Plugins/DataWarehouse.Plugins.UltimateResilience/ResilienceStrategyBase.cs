@@ -199,12 +199,11 @@ public sealed class ResilienceStatistics
 
 /// <summary>
 /// Abstract base class for resilience strategies providing common infrastructure.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class ResilienceStrategyBase : IResilienceStrategy
+public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
 {
-    private readonly BoundedDictionary<string, long> _metrics = new BoundedDictionary<string, long>(1000);
     private readonly ConcurrentQueue<TimeSpan> _executionTimes = new();
-    private readonly object _statsLock = new();
     private long _totalExecutions;
     private long _successfulExecutions;
     private long _failedExecutions;
@@ -216,34 +215,19 @@ public abstract class ResilienceStrategyBase : IResilienceStrategy
     private DateTimeOffset? _lastSuccess;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract string Category { get; }
 
     /// <inheritdoc/>
     public abstract ResilienceCharacteristics Characteristics { get; }
-
-    /// <summary>
-    /// Message bus for Intelligence integration.
-    /// </summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
-    /// <summary>
-    /// Whether Intelligence is available.
-    /// </summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
-    /// <summary>
-    /// Configures Intelligence integration.
-    /// </summary>
-    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
 
     /// <inheritdoc/>
     public virtual async Task<ResilienceResult<T>> ExecuteAsync<T>(

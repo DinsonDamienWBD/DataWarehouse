@@ -457,10 +457,11 @@ public interface IDatabaseProtocolStrategy
 
 /// <summary>
 /// Abstract base class for database wire protocol strategies.
+/// Extends StrategyBase for unified lifecycle, counters, retry, and health infrastructure.
 /// Provides common functionality for connection management, statistics tracking,
 /// protocol encoding/decoding, and intelligence integration.
 /// </summary>
-public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, IDisposable, IAsyncDisposable
+public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProtocolStrategy
 {
     // Statistics tracking
     private long _connectionsEstablished;
@@ -491,14 +492,16 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
     protected static byte[] RentBuffer(int size) => ArrayPool<byte>.Shared.Rent(size);
     protected static void ReturnBuffer(byte[] buffer) => ArrayPool<byte>.Shared.Return(buffer);
 
-    /// <summary>Message bus reference for Intelligence communication.</summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to domain-specific StrategyName.
+    /// </summary>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract ProtocolInfo ProtocolInfo { get; }
@@ -1024,15 +1027,6 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
 
     #region Intelligence Integration
 
-    /// <summary>Configures Intelligence integration.</summary>
-    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
-
-    /// <summary>Whether Intelligence is available.</summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
     /// <summary>Gets knowledge about this strategy for AI discovery.</summary>
     public virtual KnowledgeObject GetStrategyKnowledge()
     {
@@ -1107,42 +1101,30 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
 
     #endregion
 
-    #region IDisposable
+    #region Dispose Pattern (StrategyBase)
 
-    private bool _disposed;
-
-    /// <summary>Disposes resources.</summary>
-    public void Dispose()
+    /// <summary>
+    /// Overrides StrategyBase.DisposeAsyncCore to disconnect and release connection resources.
+    /// Called by StrategyBase.DisposeAsync() before the synchronous dispose.
+    /// </summary>
+    protected override async ValueTask DisposeAsyncCore()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        await DisconnectAsync().ConfigureAwait(false);
+        await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 
-    /// <summary>Disposes resources.</summary>
-    protected virtual void Dispose(bool disposing)
+    /// <summary>
+    /// Overrides StrategyBase.Dispose(bool) to release unmanaged resources.
+    /// </summary>
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed)
-        {
-            return;
-        }
-
         if (disposing)
         {
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
+            TcpClient?.Dispose();
+            TcpClient = null;
+            ActiveStream = null;
         }
-
-        _disposed = true;
-    }
-
-    /// <inheritdoc/>
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed) return;
-
-        await DisconnectAsync().ConfigureAwait(false);
-        _disposed = true;
-        GC.SuppressFinalize(this);
+        base.Dispose(disposing);
     }
 
     #endregion

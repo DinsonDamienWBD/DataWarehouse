@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.Contracts;
+
 namespace DataWarehouse.Plugins.UltimateDataCatalog;
 
 /// <summary>
@@ -65,13 +67,16 @@ public interface IDataCatalogStrategy
 
 /// <summary>
 /// Abstract base class for data catalog strategies.
+/// Inherits lifecycle management, counters, health checks, and dispose from StrategyBase.
 /// </summary>
-public abstract class DataCatalogStrategyBase : IDataCatalogStrategy
+public abstract class DataCatalogStrategyBase : StrategyBase, IDataCatalogStrategy
 {
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract DataCatalogCategory Category { get; }
     /// <inheritdoc/>
