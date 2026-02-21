@@ -40,6 +40,15 @@ public interface IResilienceStrategyRegistry
 /// <summary>
 /// Default implementation of the resilience strategy registry.
 /// </summary>
+/// <remarks>
+/// This typed registry is superseded by the inherited strategy dispatch provided by
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.ResiliencePluginBase"/>.
+/// New plugins should use <c>RegisterResilienceStrategy</c> and <c>DispatchResilienceStrategyAsync</c>
+/// from the base class instead. This class is retained for the typed <see cref="IResilienceStrategy"/>
+/// category-query operations not available on the generic base dispatch.
+/// </remarks>
+[Obsolete("Use the inherited RegisterResilienceStrategy() and DispatchResilienceStrategyAsync() " +
+          "from ResiliencePluginBase for new dispatch. This class remains for typed IResilienceStrategy lookups.")]
 public sealed class ResilienceStrategyRegistry : IResilienceStrategyRegistry
 {
     private readonly BoundedDictionary<string, IResilienceStrategy> _strategies = new BoundedDictionary<string, IResilienceStrategy>(1000);

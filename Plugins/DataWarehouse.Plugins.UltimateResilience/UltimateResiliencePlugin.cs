@@ -38,7 +38,9 @@ namespace DataWarehouse.Plugins.UltimateResilience;
 /// </summary>
 public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 {
+#pragma warning disable CS0618 // ResilienceStrategyRegistry is obsolete; retained for typed IResilienceStrategy category-query operations
     private readonly ResilienceStrategyRegistry _registry;
+#pragma warning restore CS0618
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
@@ -87,7 +89,9 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     /// </summary>
     public UltimateResiliencePlugin()
     {
+#pragma warning disable CS0618 // ResilienceStrategyRegistry is obsolete; retained for typed IResilienceStrategy category-query operations
         _registry = new ResilienceStrategyRegistry();
+#pragma warning restore CS0618
         DiscoverAndRegisterStrategies();
     }
 

@@ -8,6 +8,14 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 /// Thread-safe registry for data transit strategies.
 /// Provides registration, lookup by ID/protocol/capability, and reflection-based auto-discovery.
 /// </summary>
+/// <remarks>
+/// This standalone registry is superseded by the inherited
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.DataTransitPluginBase.TransitStrategyRegistry"/>
+/// (a <see cref="DataWarehouse.SDK.Contracts.StrategyRegistry{TStrategy}"/>) provided by the base class.
+/// Use <c>RegisterTransitStrategy</c> and <c>TransitStrategyRegistry</c> from the base class instead.
+/// </remarks>
+[Obsolete("Use the inherited TransitStrategyRegistry property from DataTransitPluginBase instead. " +
+          "Call RegisterTransitStrategy() and TransitStrategyRegistry.DiscoverFromAssembly() on the base class.")]
 internal sealed class TransitStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataTransitStrategy> _strategies = new BoundedDictionary<string, IDataTransitStrategy>(1000);

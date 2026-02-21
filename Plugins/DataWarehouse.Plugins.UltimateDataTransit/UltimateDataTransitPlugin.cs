@@ -42,7 +42,6 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 /// </remarks>
 internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitOrchestrator, IDisposable
 {
-    private readonly TransitStrategyRegistry _registry;
     private readonly BoundedDictionary<string, ActiveTransfer> _activeTransfers = new BoundedDictionary<string, ActiveTransfer>(1000);
     private TransitAuditService? _auditService;
     private QoSThrottlingManager? _qosManager;
@@ -64,12 +63,12 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UltimateDataTransitPlugin"/> class.
-    /// Creates the strategy registry and discovers all strategies in the current assembly.
+    /// Discovers all transit strategies in the current assembly via the inherited
+    /// <see cref="DataTransitPluginBase.TransitStrategyRegistry"/>.
     /// </summary>
     public UltimateDataTransitPlugin()
     {
-        _registry = new TransitStrategyRegistry();
-        _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+        TransitStrategyRegistry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
     }
 
     /// <inheritdoc/>
@@ -122,7 +121,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
         RegisterDefaultCostProfiles();
 
         // Configure Intelligence integration on all discovered strategies
-        foreach (var strategy in _registry.GetAll())
+        foreach (var strategy in TransitStrategyRegistry.GetAll())
         {
             if (strategy is DataTransitStrategyBase baseStrategy)
             {
@@ -138,7 +137,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
                 HandleTransferRequestAsync);
 
             // Publish registration events for each strategy
-            foreach (var strategy in _registry.GetAll())
+            foreach (var strategy in TransitStrategyRegistry.GetAll())
             {
                 var message = new PluginMessage
                 {
@@ -164,7 +163,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
     {
         if (_costRouter == null) return;
 
-        foreach (var strategy in _registry.GetAll())
+        foreach (var strategy in TransitStrategyRegistry.GetAll())
         {
             var profile = strategy.StrategyId switch
             {
@@ -308,7 +307,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
         var destinationProtocol = request.Destination.Protocol
             ?? request.Destination.Uri.Scheme;
 
-        var candidates = _registry.GetAll();
+        var candidates = TransitStrategyRegistry.GetAll();
 
         // Build list of available, protocol-matching strategies
         var availableStrategies = new List<IDataTransitStrategy>();
@@ -654,7 +653,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
     /// <inheritdoc/>
     public IReadOnlyCollection<IDataTransitStrategy> GetRegisteredStrategies()
     {
-        return _registry.GetAll();
+        return TransitStrategyRegistry.GetAll();
     }
 
     /// <inheritdoc/>
@@ -662,7 +661,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
     {
         var results = new List<TransitHealthStatus>();
 
-        foreach (var strategy in _registry.GetAll())
+        foreach (var strategy in TransitStrategyRegistry.GetAll())
         {
             ct.ThrowIfCancellationRequested();
             try
