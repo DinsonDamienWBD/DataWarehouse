@@ -1,3 +1,6 @@
+// Owner file suppresses Obsolete warning for DataGovernanceStrategyRegistry: this file owns the
+// registry and retains it for category-typed lookups while base registry provides unified dispatch.
+#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -455,6 +458,14 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data governance strategies discovered");
+
+        // Also register with inherited DataManagementPluginBase/PluginBase.StrategyRegistry (IStrategy)
+        // for unified dispatch. DataGovernanceStrategyBase : StrategyBase : IStrategy.
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (strategy is DataWarehouse.SDK.Contracts.IStrategy iStrategy)
+                RegisterDataManagementStrategy(iStrategy);
+        }
     }
 
     #endregion

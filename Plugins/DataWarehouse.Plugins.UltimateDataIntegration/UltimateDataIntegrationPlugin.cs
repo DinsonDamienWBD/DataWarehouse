@@ -1,3 +1,6 @@
+// Owner file suppresses Obsolete warning for DataIntegrationStrategyRegistry: this file owns
+// the registry and retains it for category-typed lookups while base registry provides unified dispatch.
+#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -137,6 +140,10 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
                 if (Activator.CreateInstance(type) is IDataIntegrationStrategy strategy)
                 {
                     _registry.Register(strategy);
+                    // Also register with inherited OrchestrationPluginBase/PluginBase.StrategyRegistry
+                    // for unified dispatch. DataIntegrationStrategyBase : StrategyBase : IStrategy.
+                    if (strategy is DataWarehouse.SDK.Contracts.IStrategy iStrategy)
+                        RegisterOrchestrationStrategy(iStrategy);
                 }
             }
             catch
@@ -299,9 +306,15 @@ public sealed record IntegrationStatistics
 
 #region Strategy Registry
 
-/// <summary>
-/// Registry for data integration strategies.
-/// </summary>
+/// <summary>Registry for data integration strategies.</summary>
+/// <remarks>
+/// <b>Migration note:</b> This inline registry is superseded by the inherited
+/// OrchestrationPluginBase.RegisterOrchestrationStrategy / PluginBase.StrategyRegistry
+/// for unified dispatch. Strategies are dual-registered: this typed registry is retained
+/// for category-filtered lookups; the base IStrategy registry is used for cross-plugin dispatch.
+/// DataIntegrationStrategyBase : StrategyBase : IStrategy enables the migration.
+/// </remarks>
+[Obsolete("Superseded by OrchestrationPluginBase.RegisterOrchestrationStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
 public sealed class DataIntegrationStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataIntegrationStrategy> _strategies = new BoundedDictionary<string, IDataIntegrationStrategy>(1000);

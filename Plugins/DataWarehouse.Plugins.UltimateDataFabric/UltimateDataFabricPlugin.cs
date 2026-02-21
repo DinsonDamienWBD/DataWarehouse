@@ -1,3 +1,6 @@
+// Owner file suppresses Obsolete warning for FabricStrategyRegistry: this file owns the registry
+// and FabricStrategyBase does not implement IStrategy, preventing full migration to inherited dispatch.
+#pragma warning disable CS0618
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -49,6 +52,14 @@ public sealed class FabricResult
     public TimeSpan Duration { get; init; }
 }
 
+/// <summary>Registry for data fabric strategies.</summary>
+/// <remarks>
+/// <b>Migration note:</b> FabricStrategyBase does not extend StrategyBase/IStrategy, so unified
+/// IStrategy dispatch via PluginBase.StrategyRegistry is not available for this domain type.
+/// This registry is retained as the canonical store. Extend FabricStrategyBase : StrategyBase
+/// in a future release to enable full migration to inherited dispatch.
+/// </remarks>
+[Obsolete("Retained because FabricStrategyBase does not implement IStrategy. Future work: extend FabricStrategyBase : StrategyBase to enable full migration to inherited dispatch.")]
 public sealed class FabricStrategyRegistry
 {
     private readonly BoundedDictionary<string, FabricStrategyBase> _strategies = new BoundedDictionary<string, FabricStrategyBase>(1000);

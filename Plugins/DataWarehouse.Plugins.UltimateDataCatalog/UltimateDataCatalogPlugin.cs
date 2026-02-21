@@ -1,3 +1,6 @@
+// Owner class suppresses Obsolete warning for DataCatalogStrategyRegistry: this file is the
+// canonical owner that retains domain-typed lookups while base registry provides unified dispatch.
+#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -464,6 +467,14 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data catalog strategies discovered");
+
+        // Also register with inherited DataManagementPluginBase/PluginBase.StrategyRegistry (IStrategy)
+        // for unified dispatch. DataCatalogStrategyBase : StrategyBase : IStrategy.
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (strategy is DataWarehouse.SDK.Contracts.IStrategy iStrategy)
+                RegisterDataManagementStrategy(iStrategy);
+        }
     }
 
     #endregion
@@ -490,6 +501,14 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
 /// <summary>
 /// Registry for data catalog strategies with auto-discovery support.
 /// </summary>
+/// <remarks>
+/// <b>Migration note:</b> This inline registry is superseded by the inherited
+/// <see cref="DataManagementPluginBase.RegisterDataManagementStrategy"/> / PluginBase.StrategyRegistry
+/// which provides unified strategy dispatch. Strategies are now dual-registered: the domain-typed
+/// registry is retained for category-filtered lookups; the base IStrategy registry is used for
+/// cross-plugin dispatch. Do not use this class directly in new code.
+/// </remarks>
+[Obsolete("Superseded by DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
 public sealed class DataCatalogStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataCatalogStrategy> _strategies = new BoundedDictionary<string, IDataCatalogStrategy>(1000);

@@ -3,9 +3,15 @@ using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLake;
 
-/// <summary>
-/// Thread-safe registry for data lake strategies.
-/// </summary>
+/// <summary>Thread-safe registry for data lake strategies.</summary>
+/// <remarks>
+/// <b>Migration note:</b> This inline registry is superseded by the inherited
+/// DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry
+/// for unified dispatch. Strategies are dual-registered: this typed registry is retained
+/// for category-filtered lookups; the base IStrategy registry is used for cross-plugin dispatch.
+/// DataLakeStrategyBase : StrategyBase : IStrategy enables the migration.
+/// </remarks>
+[Obsolete("Superseded by DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
 public sealed class DataLakeStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataLakeStrategy> _strategies =

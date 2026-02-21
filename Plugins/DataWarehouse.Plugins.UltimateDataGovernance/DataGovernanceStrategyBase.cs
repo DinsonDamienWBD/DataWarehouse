@@ -110,9 +110,15 @@ public enum HealthStatus
     Unhealthy
 }
 
-/// <summary>
-/// Registry for data governance strategies.
-/// </summary>
+/// <summary>Registry for data governance strategies.</summary>
+/// <remarks>
+/// <b>Migration note:</b> This inline registry is superseded by the inherited
+/// DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry
+/// for unified dispatch. Strategies are dual-registered: this typed registry is retained
+/// for category-filtered lookups; the base IStrategy registry is used for cross-plugin dispatch.
+/// DataGovernanceStrategyBase : StrategyBase : IStrategy enables the migration.
+/// </remarks>
+[Obsolete("Superseded by DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
 public sealed class DataGovernanceStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataGovernanceStrategy> _strategies = new BoundedDictionary<string, IDataGovernanceStrategy>(1000);
