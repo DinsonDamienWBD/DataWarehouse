@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateRTOSBridge;
 
@@ -199,14 +200,18 @@ public record RtosAuditEntry
 
 /// <summary>
 /// Base class for RTOS strategies.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class RtosStrategyBase : IRtosStrategy
+public abstract class RtosStrategyBase : StrategyBase, IRtosStrategy
 {
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string StrategyName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract RtosCapabilities Capabilities { get; }
@@ -216,7 +221,10 @@ public abstract class RtosStrategyBase : IRtosStrategy
     /// </summary>
     protected Dictionary<string, object> Configuration { get; private set; } = new();
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Domain-specific initialization with configuration dictionary.
+    /// This overload is distinct from the standard StrategyBase.InitializeAsync(CancellationToken).
+    /// </summary>
     public virtual Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken ct = default)
     {
         Configuration = configuration ?? new Dictionary<string, object>();

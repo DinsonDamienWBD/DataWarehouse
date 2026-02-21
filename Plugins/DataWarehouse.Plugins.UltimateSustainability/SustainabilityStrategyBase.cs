@@ -382,29 +382,22 @@ public interface ISustainabilityStrategy
 /// Abstract base class for sustainability strategies.
 /// Provides common functionality including statistics tracking, Intelligence integration,
 /// and standardized operation management.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
+public abstract class SustainabilityStrategyBase : StrategyBase, ISustainabilityStrategy
 {
     private readonly SustainabilityStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private bool _initialized;
     private readonly BoundedDictionary<string, SustainabilityRecommendation> _activeRecommendations = new BoundedDictionary<string, SustainabilityRecommendation>(1000);
 
-    /// <summary>
-    /// Message bus for Intelligence communication.
-    /// </summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
-    /// <summary>
-    /// Whether Intelligence integration is available.
-    /// </summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
 
     /// <inheritdoc/>
     public abstract SustainabilityCategory Category { get; }
@@ -418,10 +411,20 @@ public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
 
-    /// <summary>
-    /// Gets whether the strategy has been initialized.
-    /// </summary>
-    protected bool IsInitialized => _initialized;
+    /// <inheritdoc/>
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+    {
+        await InitializeCoreAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
+        await DisposeCoreAsync();
+    }
+
+    /// <summary>Explicit implementation for ISustainabilityStrategy.DisposeAsync() (Task vs ValueTask).</summary>
+    Task ISustainabilityStrategy.DisposeAsync() => ShutdownAsync();
 
     /// <inheritdoc/>
     public SustainabilityStatistics GetStatistics()
@@ -464,22 +467,6 @@ public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
             _statistics.ThermalThrottlingEvents = 0;
             _statistics.AverageCarbonIntensity = 0;
         }
-    }
-
-    /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
-    {
-        if (_initialized) return;
-        await InitializeCoreAsync(ct);
-        _initialized = true;
-    }
-
-    /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
-    {
-        if (!_initialized) return;
-        await DisposeCoreAsync();
-        _initialized = false;
     }
 
     /// <inheritdoc/>
@@ -617,24 +604,7 @@ public abstract class SustainabilityStrategyBase : ISustainabilityStrategy
         }
     }
 
-    /// <summary>
-    /// Throws if the strategy has not been initialized.
-    /// </summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
-
     #region Intelligence Integration
-
-    /// <summary>
-    /// Configures Intelligence integration for this strategy.
-    /// </summary>
-    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
 
     /// <summary>
     /// Gets static knowledge about this strategy for AI discovery.

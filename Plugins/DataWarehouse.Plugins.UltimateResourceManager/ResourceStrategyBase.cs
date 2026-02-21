@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateResourceManager;
@@ -179,17 +180,19 @@ public interface IResourceStrategy
 
 /// <summary>
 /// Abstract base class for resource management strategies.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class ResourceStrategyBase : IResourceStrategy
+public abstract class ResourceStrategyBase : StrategyBase, IResourceStrategy
 {
     private readonly BoundedDictionary<string, ResourceAllocation> _allocations = new BoundedDictionary<string, ResourceAllocation>(1000);
     private readonly BoundedDictionary<string, ResourceQuota> _quotas = new BoundedDictionary<string, ResourceQuota>(1000);
-    private bool _initialized;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract ResourceCategory Category { get; }
     /// <inheritdoc/>
@@ -199,29 +202,32 @@ public abstract class ResourceStrategyBase : IResourceStrategy
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
 
-    /// <summary>Gets whether the strategy is initialized.</summary>
-    protected bool IsInitialized => _initialized;
     /// <summary>Gets active allocations.</summary>
     protected IReadOnlyDictionary<string, ResourceAllocation> ActiveAllocations => _allocations;
     /// <summary>Gets active quotas.</summary>
     protected IReadOnlyDictionary<string, ResourceQuota> ActiveQuotas => _quotas;
 
-    /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Explicit implementation of IResourceStrategy.DisposeAsync() which bridges
+    /// IResourceStrategy's Task return type to StrategyBase's ValueTask DisposeAsync().
+    /// </summary>
+    async Task IResourceStrategy.DisposeAsync()
     {
-        if (_initialized) return;
-        await InitializeCoreAsync(ct);
-        _initialized = true;
+        await DisposeAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (!_initialized) return;
+        await InitializeCoreAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    {
         await DisposeCoreAsync();
         _allocations.Clear();
         _quotas.Clear();
-        _initialized = false;
     }
 
     /// <summary>Core initialization logic.</summary>
@@ -267,13 +273,6 @@ public abstract class ResourceStrategyBase : IResourceStrategy
     protected virtual Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct) => Task.FromResult(true);
     /// <summary>Core quota application logic.</summary>
     protected virtual Task<bool> ApplyQuotaCoreAsync(ResourceQuota quota, CancellationToken ct) => Task.FromResult(true);
-
-    /// <summary>Throws if not initialized.</summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
 }
 
 /// <summary>

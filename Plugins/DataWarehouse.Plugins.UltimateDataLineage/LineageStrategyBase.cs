@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataLineage;
@@ -198,21 +199,20 @@ public interface ILineageStrategy
 
 /// <summary>
 /// Abstract base class for lineage strategies.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class LineageStrategyBase : ILineageStrategy
+public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
 {
     protected readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
     protected readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
     protected readonly BoundedDictionary<string, List<ProvenanceRecord>> _provenance = new BoundedDictionary<string, List<ProvenanceRecord>>(1000);
-    private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
-    private bool _initialized;
-    private DateTime? _healthCacheExpiry;
-    private bool? _cachedHealthy;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract LineageCategory Category { get; }
     /// <inheritdoc/>
@@ -222,28 +222,24 @@ public abstract class LineageStrategyBase : ILineageStrategy
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
 
-    /// <summary>Gets whether the strategy is initialized.</summary>
-    protected bool IsInitialized => _initialized;
-
     /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (_initialized) return;
-        await InitializeCoreAsync(ct);
-        _initialized = true;
+        await InitializeCoreAsync(cancellationToken);
         IncrementCounter("initialized");
     }
 
     /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        if (!_initialized) return;
         await DisposeCoreAsync();
         _nodes.Clear();
         _edges.Clear();
         _provenance.Clear();
-        _initialized = false;
     }
+
+    /// <summary>Explicit implementation for ILineageStrategy.DisposeAsync() (Task vs ValueTask).</summary>
+    Task ILineageStrategy.DisposeAsync() => ShutdownAsync();
 
     /// <summary>Core initialization logic.</summary>
     protected virtual Task InitializeCoreAsync(CancellationToken ct) => Task.CompletedTask;
@@ -361,36 +357,13 @@ public abstract class LineageStrategyBase : ILineageStrategy
         });
     }
 
-    /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
-    public bool IsHealthy()
-    {
-        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
-            return _cachedHealthy.Value;
-        _cachedHealthy = _initialized;
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealthy.Value;
-    }
-
-    /// <summary>Increments a named counter. Thread-safe.</summary>
-    protected void IncrementCounter(string name)
-    {
-        _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
-    }
-
     /// <summary>Gets all counter values.</summary>
-    public IReadOnlyDictionary<string, long> GetCounters() => new Dictionary<string, long>(_counters);
+    public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();
 
     /// <summary>Adds a node to the lineage graph.</summary>
     protected void AddNode(LineageNode node) => _nodes[node.NodeId] = node;
     /// <summary>Adds an edge to the lineage graph.</summary>
     protected void AddEdge(LineageEdge edge) => _edges[edge.EdgeId] = edge;
-
-    /// <summary>Throws if not initialized.</summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
 }
 
 /// <summary>

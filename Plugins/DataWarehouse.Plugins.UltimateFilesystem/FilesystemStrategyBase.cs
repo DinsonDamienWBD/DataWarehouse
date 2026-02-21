@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateFilesystem;
@@ -135,15 +136,16 @@ public interface IFilesystemStrategy
 
 /// <summary>
 /// Abstract base class for filesystem strategies.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class FilesystemStrategyBase : IFilesystemStrategy
+public abstract class FilesystemStrategyBase : StrategyBase, IFilesystemStrategy
 {
-    private bool _initialized;
-
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <inheritdoc/>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract FilesystemStrategyCategory Category { get; }
     /// <inheritdoc/>
@@ -153,24 +155,20 @@ public abstract class FilesystemStrategyBase : IFilesystemStrategy
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
 
-    /// <summary>Gets whether the strategy is initialized.</summary>
-    protected bool IsInitialized => _initialized;
-
     /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (_initialized) return;
-        await InitializeCoreAsync(ct);
-        _initialized = true;
+        await InitializeCoreAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        if (!_initialized) return;
         await DisposeCoreAsync();
-        _initialized = false;
     }
+
+    /// <summary>Explicit implementation for IFilesystemStrategy.DisposeAsync() (Task vs ValueTask).</summary>
+    Task IFilesystemStrategy.DisposeAsync() => ShutdownAsync();
 
     /// <summary>Core initialization logic.</summary>
     protected virtual Task InitializeCoreAsync(CancellationToken ct) => Task.CompletedTask;
@@ -185,13 +183,6 @@ public abstract class FilesystemStrategyBase : IFilesystemStrategy
     public abstract Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
     /// <inheritdoc/>
     public abstract Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-
-    /// <summary>Throws if not initialized.</summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
 }
 
 /// <summary>

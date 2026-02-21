@@ -328,16 +328,18 @@ public sealed class DataIntegrationStrategyRegistry
 
 /// <summary>
 /// Base class for data integration strategies.
+/// Inherits lifecycle, counters, health caching, and dispose from StrategyBase.
 /// </summary>
-public abstract class DataIntegrationStrategyBase : IDataIntegrationStrategy
+public abstract class DataIntegrationStrategyBase : StrategyBase, IDataIntegrationStrategy
 {
-    // Metrics - accessed via GetMetrics()
+    // Domain-specific metrics (distinct from StrategyBase counters)
     private long _totalReads = 0;
     private long _totalWrites = 0;
     private long _totalFailures = 0;
 
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     public abstract string DisplayName { get; }
+    public override string Name => DisplayName;
     public abstract IntegrationCategory Category { get; }
     public abstract DataIntegrationCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
