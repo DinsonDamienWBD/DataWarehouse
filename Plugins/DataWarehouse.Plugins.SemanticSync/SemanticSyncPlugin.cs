@@ -85,6 +85,20 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
     /// Registers a strategy with the specified name.
     /// Thread-safe; overwrites any previously registered strategy with the same name.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SemanticSync uses name-based keying (e.g., "classifier-hybrid", "router-summary") as a domain
+    /// requirement — names are meaningful identifiers used throughout the sync pipeline. This is
+    /// UNIQUE and distinct from the standard <see cref="IStrategy.StrategyId"/> dispatch pattern.
+    /// </para>
+    /// <para>
+    /// Hybrid migration: each strategy is ALSO registered with the inherited
+    /// <see cref="OrchestrationPluginBase.RegisterOrchestrationStrategy"/> so that standard
+    /// <see cref="IStrategy.StrategyId"/>-based dispatch (via <see cref="DispatchOrchestrationStrategyAsync{TStrategy,TResult}"/>)
+    /// works for callers that do not know the name-based key. The name-based registry remains
+    /// the primary lookup path for all internal pipeline operations.
+    /// </para>
+    /// </remarks>
     /// <param name="name">The unique name for the strategy.</param>
     /// <param name="strategy">The strategy instance to register.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> or <paramref name="strategy"/> is null.</exception>
@@ -94,7 +108,11 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(strategy);
 
+        // Primary: name-based keying (unique domain requirement — names are pipeline identifiers)
         _strategies[name] = strategy;
+
+        // Dual-register with base class IStrategy registry for standard StrategyId-based dispatch
+        RegisterOrchestrationStrategy(strategy);
     }
 
     /// <summary>

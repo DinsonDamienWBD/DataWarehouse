@@ -140,16 +140,28 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
     {
         if (_initialized) return;
 
-        // Auto-discover all strategies in this assembly
+        // Auto-discover all strategies in this assembly into the local registry (secondary index by category)
         _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
 
-        // Configure Intelligence on each strategy and publish registration events
+        // Dual-register: also register each strategy with the inherited PluginBase IStrategy registry
+        // so primary dispatch (by StrategyId) routes through the standard base class path.
+        // Note: IStorageProcessingStrategy is a distinct domain type from IStorageStrategy; the
+        // StoragePluginBase.StorageStrategyRegistry handles IStorageStrategy (read/write ops) while
+        // the local registry handles IStorageProcessingStrategy (compute-on-storage ops). Dual-registration
+        // uses PluginBase.RegisterStrategy(IStrategy) which accepts any IStrategy (StrategyBase implements IStrategy).
+        // The local _registry keeps the secondary category index for category-based lookups.
         var strategies = _registry.GetAllStrategies();
         foreach (var strategy in strategies)
         {
-            if (strategy is StorageProcessingStrategyBase baseStrategy && MessageBus != null)
+            if (strategy is StorageProcessingStrategyBase baseStrategy)
             {
-                baseStrategy.ConfigureIntelligence(MessageBus);
+                // Primary: register in inherited PluginBase IStrategy registry for standard StrategyId dispatch
+                RegisterStrategy(baseStrategy);
+
+                if (MessageBus != null)
+                {
+                    baseStrategy.ConfigureIntelligence(MessageBus);
+                }
             }
 
             await PublishStrategyRegisteredAsync(strategy);
