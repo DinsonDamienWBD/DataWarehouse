@@ -5,6 +5,18 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 /// <summary>
 /// Registry for workflow strategies.
 /// </summary>
+/// <remarks>
+/// This typed registry is superseded by the inherited strategy dispatch provided by
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.OrchestrationPluginBase"/>.
+/// New plugins should use <c>RegisterOrchestrationStrategy</c> and
+/// <c>DispatchOrchestrationStrategyAsync</c> from the base class instead.
+/// This class is retained because <see cref="WorkflowStrategyBase"/> does not implement
+/// <see cref="DataWarehouse.SDK.Contracts.IStrategy"/>; typed methods such as
+/// <c>SelectBest</c>, <c>GetByCategory</c>, and <c>GetSummary</c> are unique to this registry.
+/// </remarks>
+[Obsolete("Use the inherited RegisterOrchestrationStrategy() and DispatchOrchestrationStrategyAsync() " +
+          "from OrchestrationPluginBase for new dispatch. This class remains for typed WorkflowStrategyBase " +
+          "operations (SelectBest, GetByCategory, GetSummary) not available on the generic base dispatch.")]
 public sealed class WorkflowStrategyRegistry
 {
     private readonly BoundedDictionary<string, WorkflowStrategyBase> _strategies = new BoundedDictionary<string, WorkflowStrategyBase>(1000);

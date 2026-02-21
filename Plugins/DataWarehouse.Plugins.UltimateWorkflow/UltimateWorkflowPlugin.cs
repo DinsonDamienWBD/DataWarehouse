@@ -36,7 +36,9 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 /// </summary>
 public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposable
 {
+#pragma warning disable CS0618 // WorkflowStrategyRegistry is obsolete; retained for typed WorkflowStrategyBase operations (SelectBest, GetByCategory, GetSummary)
     private readonly WorkflowStrategyRegistry _registry = new();
+#pragma warning restore CS0618
     private readonly BoundedDictionary<string, WorkflowDefinition> _workflows = new BoundedDictionary<string, WorkflowDefinition>(1000);
     private readonly BoundedDictionary<string, WorkflowResult> _executions = new BoundedDictionary<string, WorkflowResult>(1000);
     private WorkflowStrategyBase? _activeStrategy;
@@ -79,7 +81,9 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
     };
 
     /// <summary>Gets the workflow strategy registry.</summary>
+#pragma warning disable CS0618 // WorkflowStrategyRegistry is obsolete; retained for typed WorkflowStrategyBase operations
     public WorkflowStrategyRegistry Registry => _registry;
+#pragma warning restore CS0618
 
     /// <summary>Initializes a new instance of the Ultimate Workflow plugin.</summary>
     public UltimateWorkflowPlugin()

@@ -6,6 +6,17 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 /// <summary>
 /// Thread-safe registry for data mesh strategies.
 /// </summary>
+/// <remarks>
+/// This typed registry is superseded by the inherited strategy dispatch provided by
+/// <see cref="DataWarehouse.SDK.Contracts.Hierarchy.DataManagementPluginBase"/>.
+/// New plugins should use <c>RegisterDataManagementStrategy</c> and
+/// <c>DispatchDataManagementStrategyAsync</c> from the base class instead.
+/// This class is retained for the typed <see cref="DataWarehouse.SDK.Contracts.DataMesh.IDataMeshStrategy"/>
+/// category-query and discovery operations not directly available on the generic base dispatch.
+/// </remarks>
+[Obsolete("Use the inherited RegisterDataManagementStrategy() and DispatchDataManagementStrategyAsync() " +
+          "from DataManagementPluginBase for new dispatch. This class remains for typed IDataMeshStrategy " +
+          "category-query operations (GetByCategory, AutoDiscover) not available on the generic base dispatch.")]
 public sealed class DataMeshStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDataMeshStrategy> _strategies =

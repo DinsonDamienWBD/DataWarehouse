@@ -33,7 +33,9 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 /// </summary>
 public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposable
 {
+#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
     private readonly DataMeshStrategyRegistry _registry;
+#pragma warning restore CS0618
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataDomain> _domains = new BoundedDictionary<string, DataDomain>(1000);
     private readonly BoundedDictionary<string, DataProduct> _products = new BoundedDictionary<string, DataProduct>(1000);
@@ -72,7 +74,9 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
     ];
 
     /// <summary>Gets the data mesh strategy registry.</summary>
+#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
     public DataMeshStrategyRegistry Registry => _registry;
+#pragma warning restore CS0618
 
     /// <summary>Gets or sets whether audit logging is enabled.</summary>
     public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
@@ -80,7 +84,9 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
     /// <summary>Initializes a new instance of the Ultimate Data Mesh plugin.</summary>
     public UltimateDataMeshPlugin()
     {
+#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
         _registry = new DataMeshStrategyRegistry();
+#pragma warning restore CS0618
         DiscoverAndRegisterStrategies();
     }
 
