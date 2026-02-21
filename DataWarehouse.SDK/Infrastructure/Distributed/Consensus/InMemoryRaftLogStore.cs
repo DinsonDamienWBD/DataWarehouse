@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// </list>
     /// </para>
     /// <para>
-    /// For production multi-node clusters, use FileRaftLogStore in the Raft plugin
+    /// For production multi-node clusters, use <see cref="FileRaftLogStore"/>
     /// which provides fsync-backed durability.
     /// </para>
     /// </remarks>
@@ -30,6 +30,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     {
         private readonly List<RaftLogEntry> _log = new();
         private readonly object _lock = new();
+        private long _currentTerm;
+        private string? _votedFor;
 
         /// <inheritdoc/>
         public long Count
@@ -131,6 +133,47 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
+        /// <inheritdoc/>
+        public Task<(long term, string? votedFor)> GetPersistentStateAsync()
+        {
+            lock (_lock)
+            {
+                return Task.FromResult((_currentTerm, _votedFor));
+            }
+        }
+
+        /// <inheritdoc/>
+        public Task SavePersistentStateAsync(long term, string? votedFor)
+        {
+            lock (_lock)
+            {
+                _currentTerm = term;
+                _votedFor = votedFor;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task CompactAsync(long upToIndex)
+        {
+            lock (_lock)
+            {
+                if (upToIndex <= 0 || upToIndex > _log.Count)
+                    return Task.CompletedTask;
+
+                _log.RemoveRange(0, (int)upToIndex);
+
+                // Re-index remaining entries starting from 1
+                for (int i = 0; i < _log.Count; i++)
+                {
+                    _log[i].Index = i + 1;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
         /// <summary>
         /// Gets the internal log list for direct access (used by RaftConsensusEngine for backward compatibility).
         /// </summary>
@@ -139,7 +182,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <summary>
         /// Removes entries from the beginning of the log (used for compaction).
         /// </summary>
-        /// <param name="count">Number of entries to remove from the start.</param>
+        /// <param name="start">Zero-based start index of entries to remove.</param>
+        /// <param name="count">Number of entries to remove.</param>
         internal void RemoveRange(int start, int count)
         {
             lock (_lock)

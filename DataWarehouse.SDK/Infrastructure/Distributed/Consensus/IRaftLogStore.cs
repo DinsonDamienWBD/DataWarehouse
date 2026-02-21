@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// Two implementations are provided:
     /// <list type="bullet">
     /// <item><description><see cref="InMemoryRaftLogStore"/>: In-memory storage for testing and single-node deployments.</description></item>
-    /// <item><description>File-based store in the Raft plugin for production multi-node clusters.</description></item>
+    /// <item><description><see cref="FileRaftLogStore"/>: File-based durable store for production multi-node clusters with fsync guarantees.</description></item>
     /// </list>
     /// </para>
     /// <para>
@@ -23,7 +23,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// to maintain Raft's safety guarantees under crash-recovery.
     /// </para>
     /// </remarks>
-    [SdkCompatibility("5.0.0", Notes = "Phase 65: Raft log persistence abstraction")]
+    [SdkCompatibility("5.0.0", Notes = "Phase 65: Raft log persistence abstraction. Phase 65.2: Added persistent state and compaction")]
     public interface IRaftLogStore
     {
         /// <summary>
@@ -73,5 +73,28 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Gets the total count of log entries.
         /// </summary>
         long Count { get; }
+
+        /// <summary>
+        /// Gets the persisted Raft state (currentTerm and votedFor).
+        /// These values must survive process restarts to maintain Raft safety invariants.
+        /// </summary>
+        /// <returns>A tuple of (term, votedFor) where votedFor may be null if the node has not voted in the current term.</returns>
+        Task<(long term, string? votedFor)> GetPersistentStateAsync();
+
+        /// <summary>
+        /// Persists the Raft state (currentTerm and votedFor) durably.
+        /// Must fsync before returning to ensure the state survives crashes.
+        /// </summary>
+        /// <param name="term">The current term to persist.</param>
+        /// <param name="votedFor">The node voted for in this term, or null if no vote cast.</param>
+        Task SavePersistentStateAsync(long term, string? votedFor);
+
+        /// <summary>
+        /// Compacts the log by removing all entries up to and including <paramref name="upToIndex"/>.
+        /// Used after a snapshot has been taken to reclaim disk space.
+        /// Remaining entries are re-indexed starting from 1.
+        /// </summary>
+        /// <param name="upToIndex">The last log index to remove (inclusive, 1-based).</param>
+        Task CompactAsync(long upToIndex);
     }
 }
