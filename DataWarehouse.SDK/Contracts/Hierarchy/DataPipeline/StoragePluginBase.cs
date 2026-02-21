@@ -1,5 +1,7 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Storage;
 using System;
 using System.Collections.Generic;
@@ -468,6 +470,188 @@ public abstract class StoragePluginBase : DataPipelinePluginBase
     /// <summary>AI hook: Predict access pattern for tiering.</summary>
     protected virtual Task<string> PredictAccessPatternAsync(string key, CancellationToken ct = default)
         => Task.FromResult("unknown");
+
+    /// <summary>
+    /// AI hook: Select optimal storage strategy based on data characteristics and context.
+    /// Override in derived classes to provide storage-specific selection logic.
+    /// Default returns null (no AI selection — falls back to registered default).
+    /// </summary>
+    /// <param name="context">Context information for strategy selection (key, data size, tier hints).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The selected storage strategy identifier, or null to use the registry default.</returns>
+    protected virtual Task<string?> SelectOptimalStorageStrategyAsync(Dictionary<string, object> context, CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
+
+    #endregion
+
+    #region Typed Storage Strategy Registry
+
+    /// <summary>
+    /// Lazy-initialized typed registry for <see cref="DataWarehouse.SDK.Contracts.Storage.IStorageStrategy"/> instances.
+    /// Uses its own dedicated registry to support typed dispatch beyond the PluginBase IStrategy registry.
+    /// </summary>
+    private StrategyRegistry<DataWarehouse.SDK.Contracts.Storage.IStorageStrategy>? _storageStrategyRegistry;
+
+    /// <summary>Lock protecting lazy initialization of <see cref="_storageStrategyRegistry"/>.</summary>
+    private readonly object _storageRegistryLock = new();
+
+    /// <summary>
+    /// Gets the typed storage strategy registry. Lazily initialized on first access.
+    /// </summary>
+    protected StrategyRegistry<DataWarehouse.SDK.Contracts.Storage.IStorageStrategy> StorageStrategyRegistry
+    {
+        get
+        {
+            if (_storageStrategyRegistry is not null) return _storageStrategyRegistry;
+            lock (_storageRegistryLock)
+            {
+                _storageStrategyRegistry ??= new StrategyRegistry<DataWarehouse.SDK.Contracts.Storage.IStorageStrategy>(s => s.StrategyId);
+            }
+            return _storageStrategyRegistry;
+        }
+    }
+
+    /// <summary>
+    /// Registers a storage strategy with the typed registry.
+    /// </summary>
+    /// <param name="strategy">The storage strategy to register.</param>
+    protected void RegisterStorageStrategy(DataWarehouse.SDK.Contracts.Storage.IStorageStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        StorageStrategyRegistry.Register(strategy);
+    }
+
+    /// <summary>
+    /// Dispatches an operation to the optimal storage strategy, using AI-driven strategy
+    /// selection when no explicit strategy is specified. Routes through the typed
+    /// <see cref="StorageStrategyRegistry"/> with CommandIdentity ACL enforcement.
+    /// </summary>
+    /// <typeparam name="TResult">The operation result type.</typeparam>
+    /// <param name="explicitStrategyId">Explicit strategy ID (null = use AI selection via SelectOptimalStorageStrategyAsync).</param>
+    /// <param name="identity">Optional CommandIdentity for ACL checks. When null, ACL is skipped.</param>
+    /// <param name="dataContext">Context about the data for AI strategy selection.</param>
+    /// <param name="operation">The operation to execute on the resolved storage strategy.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation result.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when no strategy is found for the given ID.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the identity is denied by the ACL provider.</exception>
+    protected async Task<TResult> DispatchStorageStrategyAsync<TResult>(
+        string? explicitStrategyId,
+        CommandIdentity? identity,
+        Dictionary<string, object>? dataContext,
+        Func<DataWarehouse.SDK.Contracts.Storage.IStorageStrategy, Task<TResult>> operation,
+        CancellationToken ct = default)
+    {
+        string? strategyId;
+        if (!string.IsNullOrEmpty(explicitStrategyId))
+        {
+            strategyId = explicitStrategyId;
+        }
+        else
+        {
+            // Delegate to AI hook -- SelectOptimalStorageStrategyAsync
+            strategyId = await SelectOptimalStorageStrategyAsync(
+                dataContext ?? new Dictionary<string, object>(), ct).ConfigureAwait(false);
+        }
+
+        // Fall back to registry default if still null
+        if (string.IsNullOrEmpty(strategyId))
+            strategyId = StorageStrategyRegistry.DefaultStrategyId;
+
+        if (string.IsNullOrEmpty(strategyId))
+            throw new InvalidOperationException(
+                $"No storage strategy ID provided and no default strategy is configured for plugin '{Id}'.");
+
+        // ACL check if provider is configured
+        if (identity != null && StrategyAclProvider != null)
+        {
+            if (!StrategyAclProvider.IsStrategyAllowed(strategyId, identity))
+                throw new UnauthorizedAccessException(
+                    $"Principal '{identity.EffectivePrincipalId}' is not authorized to use storage strategy '{strategyId}'.");
+        }
+
+        var strategy = StorageStrategyRegistry.Get(strategyId)
+            ?? throw new InvalidOperationException(
+                $"Storage strategy '{strategyId}' is not registered. " +
+                $"Call RegisterStorageStrategy before dispatching.");
+
+        return await operation(strategy).ConfigureAwait(false);
+    }
+
+    #endregion
+
+    #region Domain Operations (Strategy-Dispatched)
+
+    /// <summary>
+    /// Stores data using the specified or default storage strategy.
+    /// Resolves the strategy from the typed <see cref="StorageStrategyRegistry"/> with
+    /// optional CommandIdentity ACL, falls back to <see cref="SelectOptimalStorageStrategyAsync"/>
+    /// for AI-driven strategy selection when no strategy is specified.
+    /// </summary>
+    /// <param name="key">The unique key/path for the object.</param>
+    /// <param name="data">The data stream to store.</param>
+    /// <param name="strategyId">Optional strategy ID. When null, AI selection applies.</param>
+    /// <param name="identity">Optional identity for ACL enforcement.</param>
+    /// <param name="metadata">Optional metadata to associate with the stored object.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Metadata of the stored object.</returns>
+    protected virtual Task<StorageObjectMetadata> StoreWithStrategyAsync(
+        string key,
+        Stream data,
+        string? strategyId = null,
+        CommandIdentity? identity = null,
+        IDictionary<string, string>? metadata = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(data);
+
+        return DispatchStorageStrategyAsync<StorageObjectMetadata>(
+            strategyId,
+            identity,
+            new Dictionary<string, object>
+            {
+                ["operation"] = "store",
+                ["key"] = key,
+                ["hasMetadata"] = metadata != null
+            },
+            (DataWarehouse.SDK.Contracts.Storage.IStorageStrategy s) => s.StoreAsync(key, data, metadata, ct),
+            ct);
+    }
+
+    /// <summary>
+    /// Retrieves data using the specified or default storage strategy.
+    /// Resolves the strategy from the typed <see cref="StorageStrategyRegistry"/> with
+    /// optional CommandIdentity ACL.
+    /// </summary>
+    /// <param name="key">The unique key/path of the object.</param>
+    /// <param name="strategyId">Optional strategy ID. When null, AI selection applies.</param>
+    /// <param name="identity">Optional identity for ACL enforcement.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The data stream.</returns>
+    protected virtual Task<Stream> RetrieveWithStrategyAsync(
+        string key,
+        string? strategyId = null,
+        CommandIdentity? identity = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        return DispatchStorageStrategyAsync<Stream>(
+            strategyId,
+            identity,
+            new Dictionary<string, object>
+            {
+                ["operation"] = "retrieve",
+                ["key"] = key
+            },
+            (DataWarehouse.SDK.Contracts.Storage.IStorageStrategy s) => s.RetrieveAsync(key, ct),
+            ct);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns null — storage plugins set their own default strategy.</remarks>
+    protected override string? GetDefaultStrategyId() => null;
 
     #endregion
 
