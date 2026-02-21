@@ -1,13 +1,14 @@
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class MultiBackendFanOutFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, BackendHealth> _backendHealth = new BoundedDictionary<string, BackendHealth>(1000);
         private readonly BoundedDictionary<string, int> _roundRobinCounters = new BoundedDictionary<string, int>(1000);
         private bool _disposed;
@@ -40,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the MultiBackendFanOutFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public MultiBackendFanOutFeature(StorageStrategyRegistry registry)
+        public MultiBackendFanOutFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
@@ -189,7 +190,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         using var ms = new MemoryStream(data);
@@ -251,7 +252,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         using var ms = new MemoryStream(data);
@@ -318,7 +319,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             try
             {
-                var primaryStrategy = _registry.GetStrategy(primaryId);
+                var primaryStrategy = _registry.Get(primaryId);
                 if (primaryStrategy != null)
                 {
                     using var ms = new MemoryStream(data);
@@ -355,7 +356,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         var backendId = backendIds[i];
                         try
                         {
-                            var strategy = _registry.GetStrategy(backendId);
+                            var strategy = _registry.Get(backendId);
                             if (strategy != null)
                             {
                                 using var ms = new MemoryStream(data);
@@ -388,7 +389,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         var stream = await strategy.RetrieveAsync(key, ct);
@@ -425,7 +426,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         var stream = await strategy.RetrieveAsync(key, ct);
@@ -478,7 +479,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         var stream = await strategy.RetrieveAsync(key, ct);
@@ -516,7 +517,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var strategy = _registry.GetStrategy(backendId);
+                    var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
                         await strategy.DeleteAsync(key, ct);

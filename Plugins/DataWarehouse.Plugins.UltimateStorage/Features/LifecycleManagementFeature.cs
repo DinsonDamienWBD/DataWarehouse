@@ -1,12 +1,14 @@
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class LifecycleManagementFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, LifecyclePolicy> _policies = new BoundedDictionary<string, LifecyclePolicy>(1000);
         private readonly BoundedDictionary<string, ObjectLifecycleState> _objectStates = new BoundedDictionary<string, ObjectLifecycleState>(1000);
         private readonly BoundedDictionary<string, LegalHold> _legalHolds = new BoundedDictionary<string, LegalHold>(1000);
@@ -48,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the LifecycleManagementFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public LifecycleManagementFeature(StorageStrategyRegistry registry)
+        public LifecycleManagementFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
@@ -483,7 +485,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         private async Task<bool> DeleteObjectAsync(ObjectLifecycleState state, CancellationToken ct)
         {
-            var backend = _registry.GetStrategy(state.BackendId);
+            var backend = _registry.Get(state.BackendId);
             if (backend == null)
             {
                 return false;
@@ -518,13 +520,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             StorageTier targetTier,
             CancellationToken ct)
         {
-            var sourceBackend = _registry.GetStrategy(state.BackendId);
+            var sourceBackend = _registry.Get(state.BackendId);
             if (sourceBackend == null)
             {
                 return false;
             }
 
-            var targetBackend = _registry.GetStrategiesByTier(targetTier).FirstOrDefault();
+            var targetBackend = _registry.GetByPredicate(s => s.Tier == targetTier).FirstOrDefault();
             if (targetBackend == null)
             {
                 return false;

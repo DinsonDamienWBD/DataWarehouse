@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
@@ -6,7 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class ReplicationIntegrationFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, ReplicationGroup> _replicationGroups = new BoundedDictionary<string, ReplicationGroup>(1000);
         private readonly BoundedDictionary<string, string> _objectToGroupMapping = new BoundedDictionary<string, string>(1000); // object key -> group ID
@@ -52,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
         /// <param name="messageBus">Message bus for inter-plugin communication.</param>
-        public ReplicationIntegrationFeature(StorageStrategyRegistry registry, IMessageBus messageBus)
+        public ReplicationIntegrationFeature(StrategyRegistry<IStorageStrategy> registry, IMessageBus messageBus)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
@@ -124,14 +125,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
 
             // Validate backends exist
-            if (_registry.GetStrategy(primaryBackendId) == null)
+            if (_registry.Get(primaryBackendId) == null)
             {
                 throw new ArgumentException($"Primary backend '{primaryBackendId}' not found in registry");
             }
 
             foreach (var replicaId in replicas)
             {
-                if (_registry.GetStrategy(replicaId) == null)
+                if (_registry.Get(replicaId) == null)
                 {
                     throw new ArgumentException($"Replica backend '{replicaId}' not found in registry");
                 }
@@ -212,7 +213,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             };
 
             // Write to primary
-            var primaryBackend = _registry.GetStrategy(group.PrimaryBackendId);
+            var primaryBackend = _registry.Get(group.PrimaryBackendId);
             if (primaryBackend == null)
             {
                 throw new InvalidOperationException($"Primary backend '{group.PrimaryBackendId}' not available");
@@ -284,7 +285,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var backend = _registry.GetStrategy(backendId);
+                    var backend = _registry.Get(backendId);
                     if (backend != null)
                     {
                         using var stream = await backend.RetrieveAsync(objectKey, ct);
@@ -336,7 +337,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             group.ReplicaBackendIds.Remove(newPrimaryBackendId);
 
             // Demote old primary to replica (if still available)
-            var oldPrimaryBackend = _registry.GetStrategy(oldPrimary);
+            var oldPrimaryBackend = _registry.Get(oldPrimary);
             if (oldPrimaryBackend != null)
             {
                 group.ReplicaBackendIds.Add(oldPrimary);
@@ -398,7 +399,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     var lagKey = $"{group.GroupId}:{replicaId}";
                     var startTime = DateTime.UtcNow;
 
-                    var replicaBackend = _registry.GetStrategy(replicaId);
+                    var replicaBackend = _registry.Get(replicaId);
                     if (replicaBackend != null)
                     {
                         await replicaBackend.StoreAsync(objectKey, new System.IO.MemoryStream(data), metadata, ct);

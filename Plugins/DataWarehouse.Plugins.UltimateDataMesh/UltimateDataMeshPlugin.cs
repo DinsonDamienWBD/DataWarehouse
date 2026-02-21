@@ -33,9 +33,7 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 /// </summary>
 public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposable
 {
-#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
-    private readonly DataMeshStrategyRegistry _registry;
-#pragma warning restore CS0618
+    private readonly StrategyRegistry<IDataMeshStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataDomain> _domains = new BoundedDictionary<string, DataDomain>(1000);
     private readonly BoundedDictionary<string, DataProduct> _products = new BoundedDictionary<string, DataProduct>(1000);
@@ -74,9 +72,7 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
     ];
 
     /// <summary>Gets the data mesh strategy registry.</summary>
-#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
-    public DataMeshStrategyRegistry Registry => _registry;
-#pragma warning restore CS0618
+    public StrategyRegistry<IDataMeshStrategy> Registry => _registry;
 
     /// <summary>Gets or sets whether audit logging is enabled.</summary>
     public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
@@ -84,9 +80,7 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
     /// <summary>Initializes a new instance of the Ultimate Data Mesh plugin.</summary>
     public UltimateDataMeshPlugin()
     {
-#pragma warning disable CS0618 // DataMeshStrategyRegistry is obsolete; retained for typed IDataMeshStrategy category-query/discovery operations
-        _registry = new DataMeshStrategyRegistry();
-#pragma warning restore CS0618
+        _registry = new StrategyRegistry<IDataMeshStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -410,7 +404,7 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
             && Enum.TryParse<DataMeshCategory>(catStr, true, out var cat) ? cat : (DataMeshCategory?)null;
 
-        var strategies = categoryFilter.HasValue ? _registry.GetByCategory(categoryFilter.Value) : _registry.GetAll();
+        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category ==categoryFilter.Value) : _registry.GetAll();
 
         message.Payload["strategies"] = strategies.Select(s => new Dictionary<string, object>
         {
@@ -455,14 +449,14 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         _registry.Get(strategyId) ?? throw new ArgumentException($"Data mesh strategy '{strategyId}' not found");
 
     private List<IDataMeshStrategy> GetStrategiesByCategory(DataMeshCategory category) =>
-        _registry.GetByCategory(category).ToList();
+        _registry.GetByPredicate(s => s.Category ==category).ToList();
 
     private void IncrementUsageStats(string strategyId) =>
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
 
     private void DiscoverAndRegisterStrategies()
     {
-        var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+        var discovered = _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data mesh strategies discovered");
     }

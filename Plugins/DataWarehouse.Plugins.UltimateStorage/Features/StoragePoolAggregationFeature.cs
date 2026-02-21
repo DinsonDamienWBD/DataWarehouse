@@ -1,4 +1,6 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -7,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -25,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class StoragePoolAggregationFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, StoragePool> _pools = new BoundedDictionary<string, StoragePool>(1000);
         private readonly BoundedDictionary<string, string> _objectToPoolMapping = new BoundedDictionary<string, string>(1000); // object key -> pool ID
         private bool _disposed;
@@ -38,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the StoragePoolAggregationFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public StoragePoolAggregationFeature(StorageStrategyRegistry registry)
+        public StoragePoolAggregationFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
@@ -81,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // Validate backends exist
             var backends = backendIds.Select(id =>
             {
-                var strategy = _registry.GetStrategy(id);
+                var strategy = _registry.Get(id);
                 if (strategy == null)
                 {
                     throw new ArgumentException($"Backend '{id}' not found in registry");
@@ -156,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Pool '{poolId}' not found");
             }
 
-            var strategy = _registry.GetStrategy(backendId);
+            var strategy = _registry.Get(backendId);
             if (strategy == null)
             {
                 throw new ArgumentException($"Backend '{backendId}' not found in registry");

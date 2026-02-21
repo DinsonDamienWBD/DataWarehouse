@@ -28,14 +28,11 @@ public class UltimateDataMeshTests
     }
 
     [Fact]
-    public void DataMeshStrategyRegistry_ShouldRegisterAndLookup()
+    public void Plugin_ShouldRegisterAndLookupStrategies()
     {
-        var registry = new DataMeshStrategyRegistry();
-        registry.Count.Should().Be(0);
-
-        var discovered = registry.AutoDiscover(typeof(UltimateDataMeshPlugin).Assembly);
-        discovered.Should().BeGreaterThanOrEqualTo(0);
-        registry.GetAll().Should().NotBeNull();
+        var plugin = new UltimateDataMeshPlugin();
+        plugin.Registry.Count.Should().BeGreaterThanOrEqualTo(0);
+        plugin.Registry.GetAll().Should().NotBeNull();
     }
 
     [Fact]
@@ -50,18 +47,17 @@ public class UltimateDataMeshTests
     }
 
     [Fact]
-    public void DataMeshStrategyRegistry_UnregisterShouldWork()
+    public void Plugin_UnregisterShouldWork()
     {
-        var registry = new DataMeshStrategyRegistry();
-        registry.AutoDiscover(typeof(UltimateDataMeshPlugin).Assembly);
+        var plugin = new UltimateDataMeshPlugin();
 
-        var all = registry.GetAll();
+        var all = plugin.Registry.GetAll();
         if (all.Count > 0)
         {
             var firstId = all.First().StrategyId;
-            var result = registry.Unregister(firstId);
+            var result = plugin.Registry.Unregister(firstId);
             result.Should().BeTrue();
-            registry.Get(firstId).Should().BeNull();
+            plugin.Registry.Get(firstId).Should().BeNull();
         }
     }
 }

@@ -80,14 +80,13 @@ public class UltimateDataLakeTests
     }
 
     [Fact]
-    public void DataLakeStrategyRegistry_ShouldAutoDiscover()
+    public void Plugin_Registry_ShouldAutoDiscover()
     {
-        var registry = new DataLakeStrategyRegistry();
-        var discovered = registry.AutoDiscover(typeof(UltimateDataLakePlugin).Assembly);
-        discovered.Should().BeGreaterThanOrEqualTo(0);
+        var plugin = new UltimateDataLakePlugin();
+        plugin.Registry.Count.Should().BeGreaterThanOrEqualTo(0);
 
-        var all = registry.GetAll();
+        var all = plugin.Registry.GetAll();
         all.Should().NotBeNull();
-        all.Count.Should().Be(registry.Count);
+        all.Count.Should().Be(plugin.Registry.Count);
     }
 }

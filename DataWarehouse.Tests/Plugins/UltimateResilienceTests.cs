@@ -23,7 +23,7 @@ public class UltimateResilienceTests
     {
         using var plugin = new UltimateResiliencePlugin();
 
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
         Assert.NotEmpty(strategies);
         Assert.True(strategies.Count > 10, "Should discover many resilience strategies");
     }
@@ -33,8 +33,8 @@ public class UltimateResilienceTests
     {
         using var plugin = new UltimateResiliencePlugin();
 
-        var circuitBreakers = plugin.Registry.GetStrategiesByCategory("CircuitBreaker");
-        var retries = plugin.Registry.GetStrategiesByCategory("Retry");
+        var circuitBreakers = plugin.Registry.GetByPredicate(s => s.Category.Equals("CircuitBreaker", StringComparison.OrdinalIgnoreCase));
+        var retries = plugin.Registry.GetByPredicate(s => s.Category.Equals("Retry", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotEmpty(circuitBreakers);
         Assert.NotEmpty(retries);
@@ -45,7 +45,7 @@ public class UltimateResilienceTests
     {
         using var plugin = new UltimateResiliencePlugin();
 
-        var strategy = plugin.Registry.GetStrategy("non-existent");
+        var strategy = plugin.Registry.Get("non-existent");
         Assert.Null(strategy);
     }
 

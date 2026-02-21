@@ -1,12 +1,14 @@
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class AutoTieringFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, ObjectAccessMetrics> _accessMetrics = new BoundedDictionary<string, ObjectAccessMetrics>(1000);
         private readonly BoundedDictionary<string, ObjectTieringInfo> _tieringInfo = new BoundedDictionary<string, ObjectTieringInfo>(1000);
         private readonly BoundedDictionary<string, TieringPolicy> _policies = new BoundedDictionary<string, TieringPolicy>(1000);
@@ -46,7 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the AutoTieringFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public AutoTieringFeature(StorageStrategyRegistry registry)
+        public AutoTieringFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
@@ -151,7 +153,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            var sourceBackend = _registry.GetStrategy(sourceBackendId);
+            var sourceBackend = _registry.Get(sourceBackendId);
             if (sourceBackend == null)
             {
                 return new TieringResult
@@ -163,7 +165,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
 
             // Find target backend in the desired tier
-            var targetBackend = _registry.GetStrategiesByTier(targetTier).FirstOrDefault();
+            var targetBackend = _registry.GetByPredicate(s => s.Tier == targetTier).FirstOrDefault();
             if (targetBackend == null)
             {
                 return new TieringResult

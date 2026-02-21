@@ -46,19 +46,14 @@ public class UltimateDataFabricTests
     }
 
     [Fact]
-    public void FabricStrategyRegistry_ShouldRegisterAndRetrieve()
+    public void Plugin_Registry_ShouldRegisterAndRetrieve()
     {
-        var registry = new FabricStrategyRegistry();
-        var star = new StarTopologyStrategy();
-        var mesh = new MeshTopologyStrategy();
+        var plugin = new UltimateDataFabricPlugin();
 
-        registry.Register(star);
-        registry.Register(mesh);
-
-        registry.Count.Should().Be(2);
-        registry.Get("StarTopology").Should().NotBeNull();
-        registry.Get("MeshTopology").Should().NotBeNull();
-        registry.Get("NonExistent").Should().BeNull();
+        plugin.Registry.Count.Should().BeGreaterThan(0);
+        plugin.Registry.Get("StarTopology").Should().NotBeNull();
+        plugin.Registry.Get("MeshTopology").Should().NotBeNull();
+        plugin.Registry.Get("NonExistent").Should().BeNull();
     }
 
     [Fact]

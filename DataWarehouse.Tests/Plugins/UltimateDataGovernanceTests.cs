@@ -47,21 +47,18 @@ public class UltimateDataGovernanceTests
     }
 
     [Fact]
-    public void DataGovernanceStrategyRegistry_ShouldAutoDiscover()
+    public void Plugin_Registry_ShouldAutoDiscover()
     {
-        var registry = new DataGovernanceStrategyRegistry();
-        var discovered = registry.AutoDiscover(typeof(UltimateDataGovernancePlugin).Assembly);
-        discovered.Should().BeGreaterThanOrEqualTo(0);
-        registry.Count.Should().Be(discovered);
+        var plugin = new UltimateDataGovernancePlugin();
+        plugin.Registry.Count.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
-    public void DataGovernanceStrategyRegistry_ShouldFilterByCategory()
+    public void Plugin_Registry_ShouldFilterByCategory()
     {
-        var registry = new DataGovernanceStrategyRegistry();
-        registry.AutoDiscover(typeof(UltimateDataGovernancePlugin).Assembly);
+        var plugin = new UltimateDataGovernancePlugin();
 
-        var policies = registry.GetByCategory(GovernanceCategory.PolicyManagement);
+        var policies = plugin.Registry.GetByPredicate(s => s.Category == GovernanceCategory.PolicyManagement);
         policies.Should().NotBeNull();
         foreach (var s in policies)
         {

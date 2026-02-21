@@ -38,9 +38,7 @@ namespace DataWarehouse.Plugins.UltimateResilience;
 /// </summary>
 public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 {
-#pragma warning disable CS0618 // ResilienceStrategyRegistry is obsolete; retained for typed IResilienceStrategy category-query operations
-    private readonly ResilienceStrategyRegistry _registry;
-#pragma warning restore CS0618
+    private readonly StrategyRegistry<IResilienceStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
 
@@ -82,16 +80,14 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     /// <summary>
     /// Gets the resilience strategy registry.
     /// </summary>
-    public IResilienceStrategyRegistry Registry => _registry;
+    public StrategyRegistry<IResilienceStrategy> Registry => _registry;
 
     /// <summary>
     /// Initializes a new instance of the Ultimate Resilience plugin.
     /// </summary>
     public UltimateResiliencePlugin()
     {
-#pragma warning disable CS0618 // ResilienceStrategyRegistry is obsolete; retained for typed IResilienceStrategy category-query operations
-        _registry = new ResilienceStrategyRegistry();
-#pragma warning restore CS0618
+        _registry = new StrategyRegistry<IResilienceStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -102,7 +98,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
         await RegisterAllKnowledgeAsync();
 
-        response.Metadata["RegisteredStrategies"] = _registry.GetAllStrategies().Count.ToString();
+        response.Metadata["RegisteredStrategies"] = _registry.GetAll().Count.ToString();
         response.Metadata["Categories"] = string.Join(", ", GetStrategyCategories());
 
         return response;
@@ -145,7 +141,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
             };
 
             // Auto-generate capabilities from strategy registry
-            foreach (var strategy in _registry.GetAllStrategies())
+            foreach (var strategy in _registry.GetAll())
             {
                 var tags = new List<string> { "resilience", "strategy", strategy.Category.ToLowerInvariant() };
                 if (strategy.Characteristics.ProvidesFaultTolerance) tags.Add("fault-tolerance");
@@ -184,7 +180,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     {
         var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
 
-        var strategies = _registry.GetAllStrategies();
+        var strategies = _registry.GetAll();
         var categories = GetStrategyCategories();
 
         knowledge.Add(new KnowledgeObject
@@ -201,7 +197,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
                 ["categories"] = categories,
                 ["byCategory"] = categories.ToDictionary(
                     c => c,
-                    c => _registry.GetStrategiesByCategory(c).Count),
+                    c => _registry.GetByPredicate(s => s.Category.Equals(c, StringComparison.OrdinalIgnoreCase)).Count),
                 ["faultTolerant"] = strategies.Count(s => s.Characteristics.ProvidesFaultTolerance),
                 ["loadManagement"] = strategies.Count(s => s.Characteristics.ProvidesLoadManagement),
                 ["adaptive"] = strategies.Count(s => s.Characteristics.SupportsAdaptiveBehavior),
@@ -217,20 +213,20 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        var strategies = _registry.GetAllStrategies();
+        var strategies = _registry.GetAll();
 
         metadata["TotalStrategies"] = strategies.Count;
-        metadata["CircuitBreakerStrategies"] = _registry.GetStrategiesByCategory("CircuitBreaker").Count;
-        metadata["RetryStrategies"] = _registry.GetStrategiesByCategory("Retry").Count;
-        metadata["LoadBalancingStrategies"] = _registry.GetStrategiesByCategory("LoadBalancing").Count;
-        metadata["RateLimitingStrategies"] = _registry.GetStrategiesByCategory("RateLimiting").Count;
-        metadata["BulkheadStrategies"] = _registry.GetStrategiesByCategory("Bulkhead").Count;
-        metadata["TimeoutStrategies"] = _registry.GetStrategiesByCategory("Timeout").Count;
-        metadata["FallbackStrategies"] = _registry.GetStrategiesByCategory("Fallback").Count;
-        metadata["ConsensusStrategies"] = _registry.GetStrategiesByCategory("Consensus").Count;
-        metadata["HealthCheckStrategies"] = _registry.GetStrategiesByCategory("HealthCheck").Count;
-        metadata["ChaosStrategies"] = _registry.GetStrategiesByCategory("ChaosEngineering").Count;
-        metadata["DisasterRecoveryStrategies"] = _registry.GetStrategiesByCategory("DisasterRecovery").Count;
+        metadata["CircuitBreakerStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("CircuitBreaker", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["RetryStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("Retry", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["LoadBalancingStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("LoadBalancing", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["RateLimitingStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("RateLimiting", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["BulkheadStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("Bulkhead", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["TimeoutStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("Timeout", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["FallbackStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("Fallback", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["ConsensusStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("Consensus", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["HealthCheckStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("HealthCheck", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["ChaosStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("ChaosEngineering", StringComparison.OrdinalIgnoreCase)).Count;
+        metadata["DisasterRecoveryStrategies"] = _registry.GetByPredicate(s => s.Category.Equals("DisasterRecovery", StringComparison.OrdinalIgnoreCase)).Count;
 
         return metadata;
     }
@@ -268,8 +264,8 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
             ? cat : null;
 
         var strategies = category != null
-            ? _registry.GetStrategiesByCategory(category)
-            : _registry.GetAllStrategies();
+            ? _registry.GetByPredicate(s => s.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
+            : _registry.GetAll();
 
         var strategyList = strategies.Select(s => new Dictionary<string, object>
         {
@@ -298,7 +294,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId);
+        var strategy = _registry.Get(strategyId);
         if (strategy == null)
         {
             throw new ArgumentException($"Strategy '{strategyId}' not found");
@@ -336,7 +332,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
         message.Payload["successfulExecutions"] = Interlocked.Read(ref _successfulExecutions);
         message.Payload["failedExecutions"] = Interlocked.Read(ref _failedExecutions);
         message.Payload["fallbackInvocations"] = Interlocked.Read(ref _fallbackInvocations);
-        message.Payload["registeredStrategies"] = _registry.GetAllStrategies().Count;
+        message.Payload["registeredStrategies"] = _registry.GetAll().Count;
         message.Payload["categories"] = GetStrategyCategories();
 
         var usageByStrategy = new Dictionary<string, long>(_usageStats);
@@ -369,7 +365,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
     private Task HandleHealthCheckAsync(PluginMessage message)
     {
-        var healthChecks = _registry.GetStrategiesByCategory("HealthCheck");
+        var healthChecks = _registry.GetByPredicate(s => s.Category.Equals("HealthCheck", StringComparison.OrdinalIgnoreCase));
         var results = new Dictionary<string, object>();
 
         foreach (var check in healthChecks)
@@ -392,7 +388,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
     private Task HandleCircuitStatusAsync(PluginMessage message)
     {
-        var circuitBreakers = _registry.GetStrategiesByCategory("CircuitBreaker");
+        var circuitBreakers = _registry.GetByPredicate(s => s.Category.Equals("CircuitBreaker", StringComparison.OrdinalIgnoreCase));
         var results = new Dictionary<string, object>();
 
         foreach (var cb in circuitBreakers)
@@ -419,7 +415,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     {
         if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId)
         {
-            var strategy = _registry.GetStrategy(strategyId);
+            var strategy = _registry.Get(strategyId);
             if (strategy == null)
             {
                 throw new ArgumentException($"Strategy '{strategyId}' not found");
@@ -432,7 +428,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
         else
         {
             // Reset all strategies
-            foreach (var strategy in _registry.GetAllStrategies())
+            foreach (var strategy in _registry.GetAll())
             {
                 strategy.Reset();
             }
@@ -449,12 +445,12 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
     private void DiscoverAndRegisterStrategies()
     {
-        _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+        _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
     }
 
     private IEnumerable<string> GetStrategyCategories()
     {
-        return _registry.GetAllStrategies()
+        return _registry.GetAll()
             .Select(s => s.Category)
             .Distinct()
             .OrderBy(c => c);
@@ -526,7 +522,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
         if (MessageBus != null)
         {
-            var strategies = _registry.GetAllStrategies();
+            var strategies = _registry.GetAll();
             var categories = GetStrategyCategories().ToArray();
 
             await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
@@ -609,7 +605,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     {
         return new Dictionary<string, object>
         {
-            ["registeredStrategies"] = _registry.GetAllStrategies().Count,
+            ["registeredStrategies"] = _registry.GetAll().Count,
             ["categories"] = GetStrategyCategories().ToArray()
         };
     }
@@ -631,7 +627,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
                 ["successfulExecutions"] = Interlocked.Read(ref _successfulExecutions),
                 ["failedExecutions"] = Interlocked.Read(ref _failedExecutions),
                 ["fallbackInvocations"] = Interlocked.Read(ref _fallbackInvocations),
-                ["registeredStrategies"] = _registry.GetAllStrategies().Count,
+                ["registeredStrategies"] = _registry.GetAll().Count,
                 ["usageByStrategy"] = new Dictionary<string, long>(_usageStats)
             },
             Tags = new[] { "statistics", "resilience", "usage" }
@@ -657,7 +653,7 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     {
         ct.ThrowIfCancellationRequested();
 
-        var strategy = _registry.GetStrategy(policyName);
+        var strategy = _registry.Get(policyName);
         if (strategy == null)
         {
             throw new ArgumentException($"Resilience policy '{policyName}' not found in registry.", nameof(policyName));
@@ -700,8 +696,8 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
     {
         ct.ThrowIfCancellationRequested();
 
-        var circuitBreakers = _registry.GetStrategiesByCategory("CircuitBreaker");
-        var allStrategies = _registry.GetAllStrategies();
+        var circuitBreakers = _registry.GetByPredicate(s => s.Category.Equals("CircuitBreaker", StringComparison.OrdinalIgnoreCase));
+        var allStrategies = _registry.GetAll();
         var policyStates = new Dictionary<string, string>();
 
         int activeBreakers = 0;

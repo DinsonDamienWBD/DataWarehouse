@@ -1,6 +1,3 @@
-// Owner file suppresses Obsolete warning for DataIntegrationStrategyRegistry: this file owns
-// the registry and retains it for category-typed lookups while base registry provides unified dispatch.
-#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -35,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration;
 /// </summary>
 public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDisposable
 {
-    private readonly DataIntegrationStrategyRegistry _registry;
+    private readonly StrategyRegistry<IDataIntegrationStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, IntegrationPolicy> _policies = new BoundedDictionary<string, IntegrationPolicy>(1000);
     private bool _disposed;
@@ -101,7 +98,7 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
     /// <summary>
     /// Gets the data integration strategy registry.
     /// </summary>
-    public DataIntegrationStrategyRegistry Registry => _registry;
+    public StrategyRegistry<IDataIntegrationStrategy> Registry => _registry;
 
     /// <summary>
     /// Gets or sets whether audit logging is enabled.
@@ -123,7 +120,7 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
 
     public UltimateDataIntegrationPlugin()
     {
-        _registry = new DataIntegrationStrategyRegistry();
+        _registry = new StrategyRegistry<IDataIntegrationStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -157,13 +154,13 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
     /// Gets a data integration strategy by ID.
     /// </summary>
     public IDataIntegrationStrategy? GetStrategy(string strategyId) =>
-        _registry.GetStrategy(strategyId);
+        _registry.Get(strategyId);
 
     /// <summary>
     /// Gets all strategies of a specific category.
     /// </summary>
     public IEnumerable<IDataIntegrationStrategy> GetStrategiesByCategory(IntegrationCategory category) =>
-        _registry.GetByCategory(category);
+        _registry.GetByPredicate(s => s.Category == category);
 
     /// <summary>
     /// Gets plugin statistics.
@@ -190,7 +187,7 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
             if (_disposed) return;
             _disposed = true;
 
-            foreach (var strategy in _registry.GetAllStrategies())
+            foreach (var strategy in _registry.GetAll())
             {
             if (strategy is IDisposable disposable)
             {
@@ -304,37 +301,7 @@ public sealed record IntegrationStatistics
 
 #endregion
 
-#region Strategy Registry
-
-/// <summary>Registry for data integration strategies.</summary>
-/// <remarks>
-/// <b>Migration note:</b> This inline registry is superseded by the inherited
-/// OrchestrationPluginBase.RegisterOrchestrationStrategy / PluginBase.StrategyRegistry
-/// for unified dispatch. Strategies are dual-registered: this typed registry is retained
-/// for category-filtered lookups; the base IStrategy registry is used for cross-plugin dispatch.
-/// DataIntegrationStrategyBase : StrategyBase : IStrategy enables the migration.
-/// </remarks>
-[Obsolete("Superseded by OrchestrationPluginBase.RegisterOrchestrationStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
-public sealed class DataIntegrationStrategyRegistry
-{
-    private readonly BoundedDictionary<string, IDataIntegrationStrategy> _strategies = new BoundedDictionary<string, IDataIntegrationStrategy>(1000);
-
-    public int Count => _strategies.Count;
-
-    public void Register(IDataIntegrationStrategy strategy)
-    {
-        _strategies[strategy.StrategyId] = strategy;
-    }
-
-    public IDataIntegrationStrategy? GetStrategy(string strategyId) =>
-        _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
-
-    public IEnumerable<IDataIntegrationStrategy> GetByCategory(IntegrationCategory category) =>
-        _strategies.Values.Where(s => s.Category == category);
-
-    public IEnumerable<IDataIntegrationStrategy> GetAllStrategies() => _strategies.Values;
-}
-
+#region Strategy Registry (removed - now uses StrategyRegistry<IDataIntegrationStrategy>)
 #endregion
 
 #region Base Strategy Class

@@ -1,6 +1,3 @@
-// Owner class suppresses Obsolete warning for DataCatalogStrategyRegistry: this file is the
-// canonical owner that retains domain-typed lookups while base registry provides unified dispatch.
-#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -34,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateDataCatalog;
 /// </summary>
 public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDisposable
 {
-    private readonly DataCatalogStrategyRegistry _registry;
+    private readonly StrategyRegistry<IDataCatalogStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, CatalogAsset> _assets = new BoundedDictionary<string, CatalogAsset>(1000);
     private readonly BoundedDictionary<string, CatalogRelationship> _relationships = new BoundedDictionary<string, CatalogRelationship>(1000);
@@ -74,7 +71,7 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     ];
 
     /// <summary>Gets the data catalog strategy registry.</summary>
-    public DataCatalogStrategyRegistry Registry => _registry;
+    public StrategyRegistry<IDataCatalogStrategy> Registry => _registry;
 
     /// <summary>Gets or sets whether audit logging is enabled.</summary>
     public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
@@ -82,7 +79,7 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     /// <summary>Initializes a new instance of the Ultimate Data Catalog plugin.</summary>
     public UltimateDataCatalogPlugin()
     {
-        _registry = new DataCatalogStrategyRegistry();
+        _registry = new StrategyRegistry<IDataCatalogStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -415,7 +412,7 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
             && Enum.TryParse<DataCatalogCategory>(catStr, true, out var cat) ? cat : (DataCatalogCategory?)null;
 
-        var strategies = categoryFilter.HasValue ? _registry.GetByCategory(categoryFilter.Value) : _registry.GetAll();
+        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category ==categoryFilter.Value) : _registry.GetAll();
 
         message.Payload["strategies"] = strategies.Select(s => new Dictionary<string, object>
         {
@@ -457,14 +454,14 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         _registry.Get(strategyId) ?? throw new ArgumentException($"Data catalog strategy '{strategyId}' not found");
 
     private List<IDataCatalogStrategy> GetStrategiesByCategory(DataCatalogCategory category) =>
-        _registry.GetByCategory(category).ToList();
+        _registry.GetByPredicate(s => s.Category ==category).ToList();
 
     private void IncrementUsageStats(string strategyId) =>
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
 
     private void DiscoverAndRegisterStrategies()
     {
-        var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+        var discovered = _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data catalog strategies discovered");
 
@@ -496,70 +493,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         }
         base.Dispose(disposing);
     }
-}
-
-/// <summary>
-/// Registry for data catalog strategies with auto-discovery support.
-/// </summary>
-/// <remarks>
-/// <b>Migration note:</b> This inline registry is superseded by the inherited
-/// <see cref="DataManagementPluginBase.RegisterDataManagementStrategy"/> / PluginBase.StrategyRegistry
-/// which provides unified strategy dispatch. Strategies are now dual-registered: the domain-typed
-/// registry is retained for category-filtered lookups; the base IStrategy registry is used for
-/// cross-plugin dispatch. Do not use this class directly in new code.
-/// </remarks>
-[Obsolete("Superseded by DataManagementPluginBase.RegisterDataManagementStrategy / PluginBase.StrategyRegistry. Retained for category-typed lookups only.")]
-public sealed class DataCatalogStrategyRegistry
-{
-    private readonly BoundedDictionary<string, IDataCatalogStrategy> _strategies = new BoundedDictionary<string, IDataCatalogStrategy>(1000);
-
-    /// <summary>Gets the count of registered strategies.</summary>
-    public int Count => _strategies.Count;
-
-    /// <summary>Auto-discovers and registers strategies from an assembly.</summary>
-    public int AutoDiscover(Assembly assembly)
-    {
-        var strategyType = typeof(IDataCatalogStrategy);
-        var baseType = typeof(DataCatalogStrategyBase);
-        var count = 0;
-
-        foreach (var type in assembly.GetTypes())
-        {
-            if (type.IsAbstract || !strategyType.IsAssignableFrom(type) || type == baseType)
-                continue;
-
-            try
-            {
-                if (Activator.CreateInstance(type) is IDataCatalogStrategy strategy)
-                {
-                    _strategies[strategy.StrategyId] = strategy;
-                    count++;
-                }
-            }
-            catch
-            {
-                // Skip strategies that fail to instantiate
-            }
-        }
-
-        return count;
-    }
-
-    /// <summary>Gets a strategy by ID.</summary>
-    public IDataCatalogStrategy? Get(string strategyId) =>
-        _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
-
-    /// <summary>Gets all registered strategies.</summary>
-    public IReadOnlyList<IDataCatalogStrategy> GetAll() =>
-        _strategies.Values.ToList().AsReadOnly();
-
-    /// <summary>Gets strategies by category.</summary>
-    public IReadOnlyList<IDataCatalogStrategy> GetByCategory(DataCatalogCategory category) =>
-        _strategies.Values.Where(s => s.Category == category).ToList().AsReadOnly();
-
-    /// <summary>Registers a strategy.</summary>
-    public void Register(IDataCatalogStrategy strategy) =>
-        _strategies[strategy.StrategyId] = strategy;
 }
 
 /// <summary>

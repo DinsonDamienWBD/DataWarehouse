@@ -1,13 +1,14 @@
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -25,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class LatencyBasedSelectionFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, BackendLatencyProfile> _latencyProfiles = new BoundedDictionary<string, BackendLatencyProfile>(1000);
         private readonly Timer _healthCheckTimer;
         private bool _disposed;
@@ -46,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the LatencyBasedSelectionFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public LatencyBasedSelectionFeature(StorageStrategyRegistry registry)
+        public LatencyBasedSelectionFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
@@ -124,8 +125,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             // Get all available strategies
             var strategies = string.IsNullOrWhiteSpace(category)
-                ? _registry.GetAllStrategies()
-                : _registry.GetStrategiesByCategory(category);
+                ? _registry.GetAll()
+                : _registry.GetAll().Where(s => s.StrategyId.Contains(category, StringComparison.OrdinalIgnoreCase)).ToList().AsReadOnly();
 
             if (!strategies.Any())
             {
@@ -211,8 +212,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
 
             var strategies = string.IsNullOrWhiteSpace(category)
-                ? _registry.GetAllStrategies()
-                : _registry.GetStrategiesByCategory(category);
+                ? _registry.GetAll()
+                : _registry.GetAll().Where(s => s.StrategyId.Contains(category, StringComparison.OrdinalIgnoreCase)).ToList().AsReadOnly();
 
             var slaThreshold = slaLatencyMs ?? _maxAcceptableLatencyMs;
 
@@ -302,7 +303,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             try
             {
-                var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>();
+                var strategies = _registry.GetAll().OfType<IStorageStrategyExtended>();
 
                 foreach (var strategy in strategies)
                 {

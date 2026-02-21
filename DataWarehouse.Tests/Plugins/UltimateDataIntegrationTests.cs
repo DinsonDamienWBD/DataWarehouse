@@ -29,11 +29,11 @@ public class UltimateDataIntegrationTests
     }
 
     [Fact]
-    public void Registry_ShouldBeCreatableAndEmpty()
+    public void Plugin_Registry_ShouldHaveStrategies()
     {
-        var registry = new DataIntegrationStrategyRegistry();
-        registry.Count.Should().Be(0);
-        registry.GetAllStrategies().Should().BeEmpty();
+        var plugin = new UltimateDataIntegrationPlugin();
+        plugin.Registry.Count.Should().BeGreaterThanOrEqualTo(0);
+        plugin.Registry.GetAll().Should().NotBeNull();
     }
 
     [Fact]

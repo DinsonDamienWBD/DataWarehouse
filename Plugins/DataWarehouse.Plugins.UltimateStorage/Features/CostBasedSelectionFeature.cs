@@ -1,12 +1,14 @@
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class CostBasedSelectionFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly BoundedDictionary<string, BackendCostConfig> _costConfigs = new BoundedDictionary<string, BackendCostConfig>(1000);
         private readonly BoundedDictionary<string, BackendUsageMetrics> _usageMetrics = new BoundedDictionary<string, BackendUsageMetrics>(1000);
         private readonly List<CostEntry> _costHistory = new();
@@ -47,7 +49,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Initializes a new instance of the CostBasedSelectionFeature.
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
-        public CostBasedSelectionFeature(StorageStrategyRegistry registry)
+        public CostBasedSelectionFeature(StrategyRegistry<IStorageStrategy> registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
@@ -133,8 +135,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             Interlocked.Increment(ref _totalOperations);
 
             var candidates = tier.HasValue
-                ? _registry.GetStrategiesByTier(tier.Value).ToList()
-                : _registry.GetAllStrategies().ToList();
+                ? _registry.GetByPredicate(s => s.Tier == tier.Value).ToList()
+                : _registry.GetAll().ToList();
 
             if (candidates.Count == 0)
             {

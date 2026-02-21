@@ -1,6 +1,3 @@
-// Owner file suppresses Obsolete warning for DataGovernanceStrategyRegistry: this file owns the
-// registry and retains it for category-typed lookups while base registry provides unified dispatch.
-#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -34,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance;
 /// </summary>
 public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDisposable
 {
-    private readonly DataGovernanceStrategyRegistry _registry;
+    private readonly StrategyRegistry<IDataGovernanceStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, GovernancePolicy> _policies = new BoundedDictionary<string, GovernancePolicy>(1000);
     private readonly BoundedDictionary<string, DataOwnership> _ownerships = new BoundedDictionary<string, DataOwnership>(1000);
@@ -74,7 +71,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     ];
 
     /// <summary>Gets the data governance strategy registry.</summary>
-    public DataGovernanceStrategyRegistry Registry => _registry;
+    public StrategyRegistry<IDataGovernanceStrategy> Registry => _registry;
 
     /// <summary>Gets or sets whether audit logging is enabled.</summary>
     public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
@@ -85,7 +82,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     /// <summary>Initializes a new instance of the Ultimate Data Governance plugin.</summary>
     public UltimateDataGovernancePlugin()
     {
-        _registry = new DataGovernanceStrategyRegistry();
+        _registry = new StrategyRegistry<IDataGovernanceStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -403,7 +400,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
             && Enum.TryParse<GovernanceCategory>(catStr, true, out var cat) ? cat : (GovernanceCategory?)null;
 
-        var strategies = categoryFilter.HasValue ? _registry.GetByCategory(categoryFilter.Value) : _registry.GetAll();
+        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category ==categoryFilter.Value) : _registry.GetAll();
 
         message.Payload["strategies"] = strategies.Select(s => new Dictionary<string, object>
         {
@@ -448,14 +445,14 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         _registry.Get(strategyId) ?? throw new ArgumentException($"Data governance strategy '{strategyId}' not found");
 
     private List<IDataGovernanceStrategy> GetStrategiesByCategory(GovernanceCategory category) =>
-        _registry.GetByCategory(category).ToList();
+        _registry.GetByPredicate(s => s.Category ==category).ToList();
 
     private void IncrementUsageStats(string strategyId) =>
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
 
     private void DiscoverAndRegisterStrategies()
     {
-        var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+        var discovered = _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data governance strategies discovered");
 

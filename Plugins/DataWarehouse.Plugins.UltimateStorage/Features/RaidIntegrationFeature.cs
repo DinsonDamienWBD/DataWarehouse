@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
@@ -6,7 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
@@ -24,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class RaidIntegrationFeature : IDisposable
     {
-        private readonly StorageStrategyRegistry _registry;
+        private readonly StrategyRegistry<IStorageStrategy> _registry;
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, RaidArray> _raidArrays = new BoundedDictionary<string, RaidArray>(1000);
         private readonly BoundedDictionary<string, string> _objectToArrayMapping = new BoundedDictionary<string, string>(1000); // object key -> array ID
@@ -47,7 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// </summary>
         /// <param name="registry">The storage strategy registry.</param>
         /// <param name="messageBus">Message bus for inter-plugin communication.</param>
-        public RaidIntegrationFeature(StorageStrategyRegistry registry, IMessageBus messageBus)
+        public RaidIntegrationFeature(StrategyRegistry<IStorageStrategy> registry, IMessageBus messageBus)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
@@ -102,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // Validate backends exist
             foreach (var backendId in backends)
             {
-                if (_registry.GetStrategy(backendId) == null)
+                if (_registry.Get(backendId) == null)
                 {
                     throw new ArgumentException($"Backend '{backendId}' not found in registry");
                 }
@@ -371,7 +372,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 var backendId = array.BackendIds[backendIndex];
                 var stripeKey = $"{objectKey}.stripe{i}";
 
-                var backend = _registry.GetStrategy(backendId);
+                var backend = _registry.Get(backendId);
                 if (backend != null)
                 {
                     await backend.StoreAsync(stripeKey, new System.IO.MemoryStream(stripe), null, ct);
@@ -384,7 +385,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // RAID 1: Mirror data to all backends
             var tasks = array.BackendIds.Select(async backendId =>
             {
-                var backend = _registry.GetStrategy(backendId);
+                var backend = _registry.Get(backendId);
                 if (backend != null)
                 {
                     await backend.StoreAsync(objectKey, new System.IO.MemoryStream(data), null, ct);
@@ -413,7 +414,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 // Write data stripe
                 var dataBackendId = array.BackendIds[dataBackendIndex];
-                var backend = _registry.GetStrategy(dataBackendId);
+                var backend = _registry.Get(dataBackendId);
                 if (backend != null)
                 {
                     await backend.StoreAsync($"{objectKey}.stripe{i}", new System.IO.MemoryStream(stripe), null, ct);
@@ -421,7 +422,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 // Write parity stripe (simplified - would be XOR of all data stripes)
                 var parityBackendId = array.BackendIds[parityBackendIndex];
-                var parityBackend = _registry.GetStrategy(parityBackendId);
+                var parityBackend = _registry.Get(parityBackendId);
                 if (parityBackend != null)
                 {
                     await parityBackend.StoreAsync($"{objectKey}.parity{i}", new System.IO.MemoryStream(stripe), null, ct);
@@ -449,7 +450,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             var tasks = mirrorPairs.SelectMany(pair =>
                 pair.Select(backendId =>
                 {
-                    var backend = _registry.GetStrategy(backendId);
+                    var backend = _registry.Get(backendId);
                     return backend != null
                         ? backend.StoreAsync(objectKey, new System.IO.MemoryStream(data), null, ct)
                         : Task.CompletedTask;
@@ -472,7 +473,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 var backendId = array.BackendIds[backendIndex];
                 var stripeKey = $"{objectKey}.stripe{stripeIndex}";
 
-                var backend = _registry.GetStrategy(backendId);
+                var backend = _registry.Get(backendId);
                 if (backend == null) break;
 
                 try
@@ -499,7 +500,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             {
                 try
                 {
-                    var backend = _registry.GetStrategy(backendId);
+                    var backend = _registry.Get(backendId);
                     if (backend != null)
                     {
                         using var stream = await backend.RetrieveAsync(objectKey, ct);

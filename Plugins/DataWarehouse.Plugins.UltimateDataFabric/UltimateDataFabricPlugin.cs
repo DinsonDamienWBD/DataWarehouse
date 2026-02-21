@@ -1,6 +1,3 @@
-// Owner file suppresses Obsolete warning for FabricStrategyRegistry: this file owns the registry
-// and FabricStrategyBase does not implement IStrategy, preventing full migration to inherited dispatch.
-#pragma warning disable CS0618
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
@@ -50,24 +47,6 @@ public sealed class FabricResult
     public object? Data { get; init; }
     public string? Error { get; init; }
     public TimeSpan Duration { get; init; }
-}
-
-/// <summary>Registry for data fabric strategies.</summary>
-/// <remarks>
-/// <b>Migration note:</b> FabricStrategyBase does not extend StrategyBase/IStrategy, so unified
-/// IStrategy dispatch via PluginBase.StrategyRegistry is not available for this domain type.
-/// This registry is retained as the canonical store. Extend FabricStrategyBase : StrategyBase
-/// in a future release to enable full migration to inherited dispatch.
-/// </remarks>
-[Obsolete("Retained because FabricStrategyBase does not implement IStrategy. Future work: extend FabricStrategyBase : StrategyBase to enable full migration to inherited dispatch.")]
-public sealed class FabricStrategyRegistry
-{
-    private readonly BoundedDictionary<string, FabricStrategyBase> _strategies = new BoundedDictionary<string, FabricStrategyBase>(1000);
-    public int Count => _strategies.Count;
-    public IReadOnlyCollection<string> RegisteredStrategies => _strategies.Keys.ToList().AsReadOnly();
-    public void Register(FabricStrategyBase strategy) => _strategies[strategy.StrategyId] = strategy;
-    public FabricStrategyBase? Get(string name) => _strategies.TryGetValue(name, out var s) ? s : null;
-    public IEnumerable<FabricStrategyBase> GetAll() => _strategies.Values;
 }
 
 #endregion
@@ -264,7 +243,7 @@ public sealed class AIEnhancedFabricStrategy : FabricStrategyBase
 /// </summary>
 public sealed class UltimateDataFabricPlugin : IntelligenceAwarePluginBase, IDisposable
 {
-    private readonly FabricStrategyRegistry _registry = new();
+    private readonly StrategyRegistry<FabricStrategyBase> _registry = new(s => s.StrategyId);
     private FabricStrategyBase? _activeStrategy;
     private CancellationTokenSource? _cts;
     private bool _disposed;
@@ -282,7 +261,7 @@ public sealed class UltimateDataFabricPlugin : IntelligenceAwarePluginBase, IDis
 
     public string[] SemanticTags => new[] { "fabric", "topology", "virtualization", "mesh", "semantic", "catalog", "lineage", "ai" };
 
-    public FabricStrategyRegistry Registry => _registry;
+    public StrategyRegistry<FabricStrategyBase> Registry => _registry;
 
     public UltimateDataFabricPlugin()
     {

@@ -1,6 +1,3 @@
-// Owner file suppresses Obsolete warning for DataLakeStrategyRegistry: this file owns the
-// registry and retains it for category-typed lookups while base registry provides unified dispatch.
-#pragma warning disable CS0618
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -38,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateDataLake;
 /// </summary>
 public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposable
 {
-    private readonly DataLakeStrategyRegistry _registry;
+    private readonly StrategyRegistry<IDataLakeStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataCatalogEntry> _catalog = new BoundedDictionary<string, DataCatalogEntry>(1000);
     private readonly BoundedDictionary<string, DataLineageRecord> _lineage = new BoundedDictionary<string, DataLineageRecord>(1000);
@@ -74,7 +71,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     ];
 
     /// <summary>Gets the data lake strategy registry.</summary>
-    public DataLakeStrategyRegistry Registry => _registry;
+    public StrategyRegistry<IDataLakeStrategy> Registry => _registry;
 
     /// <summary>Gets or sets whether audit logging is enabled.</summary>
     public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
@@ -82,7 +79,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     /// <summary>Initializes a new instance of the Ultimate Data Lake plugin.</summary>
     public UltimateDataLakePlugin()
     {
-        _registry = new DataLakeStrategyRegistry();
+        _registry = new StrategyRegistry<IDataLakeStrategy>(s => s.StrategyId);
         DiscoverAndRegisterStrategies();
     }
 
@@ -402,7 +399,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
             && Enum.TryParse<DataLakeCategory>(catStr, true, out var cat) ? cat : (DataLakeCategory?)null;
 
-        var strategies = categoryFilter.HasValue ? _registry.GetByCategory(categoryFilter.Value) : _registry.GetAll();
+        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category ==categoryFilter.Value) : _registry.GetAll();
 
         message.Payload["strategies"] = strategies.Select(s => new Dictionary<string, object>
         {
@@ -443,14 +440,14 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         _registry.Get(strategyId) ?? throw new ArgumentException($"Data lake strategy '{strategyId}' not found");
 
     private List<IDataLakeStrategy> GetStrategiesByCategory(DataLakeCategory category) =>
-        _registry.GetByCategory(category).ToList();
+        _registry.GetByPredicate(s => s.Category ==category).ToList();
 
     private void IncrementUsageStats(string strategyId) =>
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
 
     private void DiscoverAndRegisterStrategies()
     {
-        var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+        var discovered = _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data lake strategies discovered");
 

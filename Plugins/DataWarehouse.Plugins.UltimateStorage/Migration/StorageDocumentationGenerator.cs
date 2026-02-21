@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 
-#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Migration;
 
 /// <summary>
@@ -23,13 +25,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Migration;
 /// </remarks>
 public sealed class StorageDocumentationGenerator
 {
-    private readonly StorageStrategyRegistry _registry;
+    private readonly StrategyRegistry<IStorageStrategy> _registry;
 
     /// <summary>
     /// Initializes a new instance of the StorageDocumentationGenerator.
     /// </summary>
     /// <param name="registry">The strategy registry to document.</param>
-    public StorageDocumentationGenerator(StorageStrategyRegistry registry)
+    public StorageDocumentationGenerator(StrategyRegistry<IStorageStrategy> registry)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
     }
@@ -56,7 +58,7 @@ public sealed class StorageDocumentationGenerator
         // Strategy count by category
         sb.AppendLine("## Available Strategies");
         sb.AppendLine();
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+        var strategies = _registry.GetAll().OfType<IStorageStrategyExtended>().ToList();
         var byCategory = strategies.GroupBy(s => s.Category).ToList();
 
         foreach (var group in byCategory.OrderBy(g => g.Key))
@@ -107,7 +109,7 @@ public sealed class StorageDocumentationGenerator
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
 
-        var strategy = _registry.GetStrategy(strategyId) as IStorageStrategyExtended;
+        var strategy = _registry.Get(strategyId) as IStorageStrategyExtended;
         if (strategy == null)
         {
             return $"Strategy '{strategyId}' not found.";
@@ -122,7 +124,7 @@ public sealed class StorageDocumentationGenerator
     /// <returns>Comparison matrix as formatted table.</returns>
     public string GenerateComparisonMatrix()
     {
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+        var strategies = _registry.GetAll().OfType<IStorageStrategyExtended>().ToList();
         return GenerateComparisonMatrix(strategies);
     }
 
@@ -133,7 +135,7 @@ public sealed class StorageDocumentationGenerator
     public string ListAllCapabilities()
     {
         var sb = new StringBuilder();
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+        var strategies = _registry.GetAll().OfType<IStorageStrategyExtended>().ToList();
 
         sb.AppendLine("# Storage Strategy Capabilities");
         sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
@@ -256,7 +258,7 @@ public sealed class StorageDocumentationGenerator
         ArgumentNullException.ThrowIfNull(requirements);
 
         var sb = new StringBuilder();
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+        var strategies = _registry.GetAll().OfType<IStorageStrategyExtended>().ToList();
 
         sb.AppendLine("# Storage Strategy Selection Guide");
         sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");

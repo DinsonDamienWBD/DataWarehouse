@@ -36,9 +36,7 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 /// </summary>
 public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposable
 {
-#pragma warning disable CS0618 // WorkflowStrategyRegistry is obsolete; retained for typed WorkflowStrategyBase operations (SelectBest, GetByCategory, GetSummary)
-    private readonly WorkflowStrategyRegistry _registry = new();
-#pragma warning restore CS0618
+    private readonly StrategyRegistry<WorkflowStrategyBase> _registry = new(s => s.StrategyId);
     private readonly BoundedDictionary<string, WorkflowDefinition> _workflows = new BoundedDictionary<string, WorkflowDefinition>(1000);
     private readonly BoundedDictionary<string, WorkflowResult> _executions = new BoundedDictionary<string, WorkflowResult>(1000);
     private WorkflowStrategyBase? _activeStrategy;
@@ -81,9 +79,7 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
     };
 
     /// <summary>Gets the workflow strategy registry.</summary>
-#pragma warning disable CS0618 // WorkflowStrategyRegistry is obsolete; retained for typed WorkflowStrategyBase operations
-    public WorkflowStrategyRegistry Registry => _registry;
-#pragma warning restore CS0618
+    public StrategyRegistry<WorkflowStrategyBase> Registry => _registry;
 
     /// <summary>Initializes a new instance of the Ultimate Workflow plugin.</summary>
     public UltimateWorkflowPlugin()
@@ -236,7 +232,7 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
     #region Public API
 
     /// <summary>Gets all registered strategy names.</summary>
-    public IReadOnlyCollection<string> GetRegisteredStrategies() => _registry.RegisteredStrategies;
+    public IReadOnlyCollection<string> GetRegisteredStrategies() => _registry.GetAll().Select(s => s.StrategyId).ToList().AsReadOnly();
 
     /// <summary>Gets a strategy by name.</summary>
     public WorkflowStrategyBase? GetStrategy(string name) => _registry.Get(name);
@@ -296,12 +292,12 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
         {
             ["success"] = true,
             ["count"] = _registry.Count,
-            ["strategies"] = _registry.GetSummary().Select(s => new Dictionary<string, object>
+            ["strategies"] = _registry.GetAll().Select(s => new Dictionary<string, object>
             {
-                ["name"] = s.Name,
-                ["description"] = s.Description,
-                ["category"] = s.Category.ToString(),
-                ["supportsParallel"] = s.SupportsParallel
+                ["name"] = s.Characteristics.StrategyName,
+                ["description"] = s.Characteristics.Description,
+                ["category"] = s.Characteristics.Category.ToString(),
+                ["supportsParallel"] = s.Characteristics.Capabilities.SupportsParallelExecution
             }).ToList(),
             ["activeStrategy"] = _activeStrategy?.Characteristics.StrategyName ?? "none"
         };
@@ -564,7 +560,7 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
         var metadata = base.GetMetadata();
         metadata["FeatureType"] = "UltimateWorkflow";
         metadata["StrategyCount"] = _registry.Count;
-        metadata["Strategies"] = _registry.RegisteredStrategies.ToArray();
+        metadata["Strategies"] = _registry.GetAll().Select(s => s.StrategyId).ToArray();
         metadata["ActiveStrategy"] = _activeStrategy?.Characteristics.StrategyName ?? "none";
         metadata["SemanticDescription"] = SemanticDescription;
         metadata["SemanticTags"] = SemanticTags;
