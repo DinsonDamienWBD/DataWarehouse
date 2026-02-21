@@ -199,7 +199,11 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(passport);
         IncrementCounter("passport_tag.set_tags");
 
-        var tagDict = new BoundedDictionary<string, object>(1000);
+        // Convert passport to flat tag dictionary first, then copy into BoundedDictionary
+        var flatTags = PassportToTags(passport);
+        var tagDict = new BoundedDictionary<string, object>(Math.Max(1000, flatTags.Count * 2));
+        foreach (var kv in flatTags)
+            tagDict[kv.Key] = kv.Value;
         _objectTags.AddOrUpdate(objectId, tagDict, (_, _) => tagDict);
     }
 

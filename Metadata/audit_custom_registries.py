@@ -37,6 +37,22 @@ KNOWN_UNIQUE = {
     "vectorstoreregistry": "Keyed by provider name not StrategyId; vector-specific capability indexing",
     "domainmodelregistry": "Domain model registry, not strategy registry; different lifecycle",
     "backendregistryimpl": "NOT a strategy registry at all -- backend routing with BackendDescriptor + IStorageStrategy tuple storage",
+    # Phase 65.4: strategy base-class files with GetByCategory typed lookup (UNIQUE: category index not on StrategyRegistry<T>)
+    "lineagestrategybase": "GetByCategory typed lookup for LineageCategory; retained as thin wrapper over base-class dispatch",
+    "datamanagementstrategybase": "GetByCategory typed lookup for DataManagementCategory; retained alongside DataManagementPluginBase dispatch",
+    "dataprivacystrategybase": "GetByCategory typed lookup for PrivacyCategory; retained alongside base-class dispatch",
+    "dataqualitystrategybase": "GetByCategory typed lookup for DataQualityCategory; retained alongside base-class dispatch",
+    "filesystemstrategybase": "GetByCategory typed lookup for FilesystemStrategyCategory; retained alongside StoragePluginBase dispatch",
+    "multicloudstrategybase": "GetStrategiesByCategory typed lookup; retained alongside base-class dispatch",
+    "resourcestrategybase": "GetByCategory typed lookup for ResourceCategory; retained alongside base-class dispatch",
+    "sustainabilitystrategybase": "GetByCategory typed lookup for SustainabilityCategory; retained alongside base-class dispatch",
+    "graphpartitioningstrategyregistry": "Registry for graph partitioning state (vertex assignments, community maps); not a plugin dispatch registry",
+    "graphanalyticsstrategyregistry": "GetByCategory typed lookup for GraphAnalyticsCategory; retained for algorithm category queries",
+    # Phase 65.4: inline registry classes (Pattern C) inside plugin files with GetByCategory
+    "ultimateinterfaceplugin": "Contains InterfaceStrategyRegistry with GetByCategory(InterfaceCategory); retained for typed category lookup alongside base-class dispatch",
+    "ultimatestreamingdataplugin": "Contains StreamingStrategyRegistry with GetByCategory(StreamingCategory); retained for typed category lookup alongside base-class dispatch",
+    "graphanalyticsstrategies": "Contains GraphAnalyticsAlgorithmRegistry with GetByCategory; algorithm category lookup not available on StrategyRegistry<T>",
+    "graphpartitioningstrategies": "Contains GraphPartitioningStrategyRegistry; graph partition state management, not plugin dispatch registry",
 }
 
 KNOWN_ALREADY_MIGRATED = {
@@ -55,6 +71,11 @@ NON_STRATEGY_REGISTRY_PATTERNS = [
     r"MoonshotRegistryImpl\.cs$",             # UltimateDataGovernance - moonshot registry
     r"BackendGreenScoreRegistry\.cs$",        # UltimateSustainability - green score, not strategy
     r"AppRegistrationService\.cs$",           # AppPlatform - app registration service
+    # Phase 65.4: non-strategy infrastructure files containing BoundedDictionary but not plugin dispatch registries
+    r"EventSourcingStrategies\.cs$",          # UltimateDataManagement - event streams/consumers/schemas, not strategy dispatch
+    r"KnowledgeSystem\.cs$",                  # UltimateIntelligence - knowledge sources/commands/handlers, not strategy registry
+    r"FederationSystem\.cs$",                 # UltimateIntelligence - federation instances/connections, not strategy registry
+    r"PersistenceInfrastructure\.cs$",        # UltimateIntelligence - persistence state, not strategy registry
 ]
 
 
@@ -93,6 +114,9 @@ ALREADY_MIGRATED_INDICATORS = [
     re.compile(r'\bDispatchEncryptionStrategyAsync\b'),
     re.compile(r'\bDispatchCompressionStrategyAsync\b'),
     re.compile(r'\bConnectionStrategyRegistry\b'),
+    # Phase 65.4: registries marked [Obsolete] are superseded by base-class dispatch
+    re.compile(r'\[(?:System\.)?Obsolete\b'),
+    re.compile(r'\[Obsolete\('),
 ]
 
 # Dual-index indicators (UNIQUE markers)

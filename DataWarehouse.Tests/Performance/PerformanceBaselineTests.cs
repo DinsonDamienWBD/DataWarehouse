@@ -101,7 +101,9 @@ public class PerformanceBaselineTests
     [Fact]
     public void ConcurrentDictionary_100KOps_ShouldCompleteWithin5000ms()
     {
-        var dict = new BoundedDictionary<string, byte[]>(1000);
+        // BoundedDictionary is the production replacement for ConcurrentDictionary.
+        // Use a capacity large enough for 100K unique keys to verify throughput.
+        var dict = new BoundedDictionary<string, byte[]>(120_000);
         var sw = Stopwatch.StartNew();
 
         // Write 100K entries

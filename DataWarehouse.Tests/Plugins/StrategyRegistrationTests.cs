@@ -20,7 +20,7 @@ public class StrategyRegistrationTests
     public void UltimateStorage_HasExpectedStrategyCount()
     {
         using var plugin = new UltimateStoragePlugin();
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
 
         strategies.Should().NotBeNull();
         strategies.Count.Should().BeGreaterThanOrEqualTo(50,
@@ -31,7 +31,7 @@ public class StrategyRegistrationTests
     public void UltimateStorage_HasNoDuplicateStrategyIds()
     {
         using var plugin = new UltimateStoragePlugin();
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
 
         var ids = strategies.Select(s => s.StrategyId).ToList();
         ids.Should().OnlyHaveUniqueItems("Strategy IDs within UltimateStorage must be unique");
@@ -41,7 +41,7 @@ public class StrategyRegistrationTests
     public void UltimateStorage_AllStrategiesHaveNonEmptyNames()
     {
         using var plugin = new UltimateStoragePlugin();
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
 
         foreach (var strategy in strategies)
         {
@@ -54,7 +54,7 @@ public class StrategyRegistrationTests
     public void UltimateStorage_AllStrategiesHaveNonEmptyIds()
     {
         using var plugin = new UltimateStoragePlugin();
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
 
         foreach (var strategy in strategies)
         {
@@ -67,7 +67,7 @@ public class StrategyRegistrationTests
     public void UltimateStorage_StrategyIdsHaveNoSpaces()
     {
         using var plugin = new UltimateStoragePlugin();
-        var strategies = plugin.Registry.GetAllStrategies();
+        var strategies = plugin.Registry.GetAll();
 
         foreach (var strategy in strategies)
         {
@@ -184,7 +184,7 @@ public class StrategyRegistrationTests
 
         var allIds = new List<(string PluginName, string StrategyId)>();
 
-        foreach (var s in storage.Registry.GetAllStrategies())
+        foreach (var s in storage.Registry.GetAll())
             allIds.Add(("Storage", s.StrategyId));
         foreach (var s in encryption.Registry.GetAllStrategies())
             allIds.Add(("Encryption", s.StrategyId));

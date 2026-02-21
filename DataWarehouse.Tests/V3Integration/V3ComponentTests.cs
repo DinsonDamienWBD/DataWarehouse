@@ -74,13 +74,13 @@ public class V3ComponentTests
     }
 
     [Fact]
-    public void StorageAddressKind_HasNineValues()
+    public void StorageAddressKind_HasExpectedValues()
     {
         // Act
         var values = Enum.GetValues<StorageAddressKind>();
 
-        // Assert
-        values.Should().HaveCount(9);
+        // Assert — original 9 values plus 3 DW-native address kinds added in v5.0
+        values.Should().HaveCountGreaterThanOrEqualTo(9);
         values.Should().Contain(StorageAddressKind.FilePath);
         values.Should().Contain(StorageAddressKind.ObjectKey);
         values.Should().Contain(StorageAddressKind.NetworkEndpoint);

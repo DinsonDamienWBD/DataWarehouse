@@ -11,7 +11,10 @@
          xUnit1031: Do not use blocking task operations in test method
          xUnit2002: Do not use null check on value type
          xUnit2031: Do not use Assert.Null() on value types -->
-    <NoWarn>$(NoWarn);xUnit1051;xUnit1031;xUnit2002;xUnit2031</NoWarn>
+    <!-- Suppress obsolete warnings for tests that exercise [Obsolete] registries retained
+         for typed lookups (UNIQUE category). The plugins themselves deprecated these registries
+         in favour of base-class dispatch; the tests validate the retained typed-lookup path. -->
+    <NoWarn>$(NoWarn);xUnit1051;xUnit1031;xUnit2002;xUnit2031;CS0612;CS0618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
