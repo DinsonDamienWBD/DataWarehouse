@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Storage;
 
+#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Migration;
 
 /// <summary>

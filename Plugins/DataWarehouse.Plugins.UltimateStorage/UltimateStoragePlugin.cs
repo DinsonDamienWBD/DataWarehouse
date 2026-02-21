@@ -45,7 +45,6 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 [PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDataTerminal, IDisposable
 {
-    private readonly StorageStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, StorageHealthStatus> _healthStatus = new BoundedDictionary<string, StorageHealthStatus>(1000);
     private bool _disposed;
@@ -265,9 +264,9 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     ];
 
     /// <summary>
-    /// Gets the storage strategy registry.
+    /// Gets the typed storage strategy registry (inherited from StoragePluginBase).
     /// </summary>
-    public StorageStrategyRegistry Registry => _registry;
+    public DataWarehouse.SDK.Contracts.StrategyRegistry<DataWarehouse.SDK.Contracts.Storage.IStorageStrategy> Registry => StorageStrategyRegistry;
 
     /// <inheritdoc/>
     protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
@@ -291,7 +290,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             };
 
             // Add strategy-based capabilities
-            foreach (var strategy in _registry.GetAllStrategies().OfType<IStorageStrategyExtended>())
+            foreach (var strategy in StorageStrategyRegistry.GetAll().OfType<IStorageStrategyExtended>())
             {
                 var tags = new List<string> { "storage", GetStrategyCategory(strategy.StrategyId).ToLower() };
 
@@ -351,8 +350,6 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     /// </summary>
     public UltimateStoragePlugin()
     {
-        _registry = new StorageStrategyRegistry();
-
         // Auto-discover and register strategies
         DiscoverAndRegisterStrategies();
     }
@@ -362,7 +359,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     {
         var response = await base.OnHandshakeAsync(request);
 
-        response.Metadata["RegisteredStrategies"] = _registry.GetAllStrategies().Count.ToString();
+        response.Metadata["RegisteredStrategies"] = StorageStrategyRegistry.Count.ToString();
         response.Metadata["DefaultStrategy"] = _defaultStrategyId;
         response.Metadata["AuditEnabled"] = _auditEnabled.ToString();
         response.Metadata["AutoFailoverEnabled"] = _autoFailoverEnabled.ToString();
@@ -398,7 +395,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        metadata["TotalStrategies"] = _registry.GetAllStrategies().Count;
+        metadata["TotalStrategies"] = StorageStrategyRegistry.Count;
         metadata["LocalStrategies"] = GetStrategiesByCategory("local").Count;
         metadata["CloudStrategies"] = GetStrategiesByCategory("cloud").Count;
         metadata["DistributedStrategies"] = GetStrategiesByCategory("distributed").Count;
@@ -413,7 +410,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     /// <inheritdoc/>
     protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+        var strategies = StorageStrategyRegistry.GetAll().OfType<IStorageStrategyExtended>().ToList();
 
         var localStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("local", StringComparison.OrdinalIgnoreCase));
         var cloudStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("cloud", StringComparison.OrdinalIgnoreCase));
@@ -754,7 +751,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private Task HandleListStrategiesAsync(PluginMessage message)
     {
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>();
+        var strategies = StorageStrategyRegistry.GetAll().OfType<IStorageStrategyExtended>();
 
         var strategyList = strategies.Select(s => new Dictionary<string, object>
         {
@@ -781,7 +778,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             throw new ArgumentException("Missing 'strategyId' parameter");
         }
 
-        var strategy = _registry.GetStrategy(strategyId)
+        var strategy = StorageStrategyRegistry.Get(strategyId)
             ?? throw new ArgumentException($"Strategy '{strategyId}' not found");
 
         _defaultStrategyId = strategyId;
@@ -799,7 +796,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
         message.Payload["totalBytesWritten"] = Interlocked.Read(ref _totalBytesWritten);
         message.Payload["totalBytesRead"] = Interlocked.Read(ref _totalBytesRead);
         message.Payload["totalFailures"] = Interlocked.Read(ref _totalFailures);
-        message.Payload["registeredStrategies"] = _registry.GetAllStrategies().Count;
+        message.Payload["registeredStrategies"] = StorageStrategyRegistry.Count;
 
         var usageByStrategy = new Dictionary<string, long>(_usageStats);
         message.Payload["usageByStrategy"] = usageByStrategy;
@@ -809,7 +806,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private async Task HandleHealthCheckAsync(PluginMessage message)
     {
-        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>();
+        var strategies = StorageStrategyRegistry.GetAll().OfType<IStorageStrategyExtended>();
         var healthResults = new Dictionary<string, object>();
 
         foreach (var strategy in strategies)
@@ -974,14 +971,15 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private async Task<IStorageStrategyExtended> GetStrategyWithFailoverAsync(string strategyId)
     {
-        var strategy = _registry.GetStrategy(strategyId) as IStorageStrategyExtended
+        var strategy = StorageStrategyRegistry.Get(strategyId) as IStorageStrategyExtended
             ?? throw new ArgumentException($"Storage strategy '{strategyId}' not found");
 
         // Check health status
         if (_autoFailoverEnabled && _healthStatus.TryGetValue(strategyId, out var health) && !health.IsHealthy)
         {
             // Try to find a healthy alternative in the same category
-            var alternatives = _registry.GetStrategiesByCategory(strategy.Category)
+            var alternatives = StorageStrategyRegistry.GetByPredicate(
+                    s => GetStrategyCategory(s.StrategyId).Equals(strategy.Category, StringComparison.OrdinalIgnoreCase))
                 .OfType<IStorageStrategyExtended>()
                 .Where(s => s.StrategyId != strategyId && s.IsAvailable)
                 .ToList();
@@ -1029,7 +1027,9 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private List<IStorageStrategy> GetStrategiesByCategory(string category)
     {
-        return _registry.GetStrategiesByCategory(category).ToList();
+        return StorageStrategyRegistry.GetByPredicate(
+            s => GetStrategyCategory(s.StrategyId).Equals(category, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     private static string GetStrategyCategory(string strategyId)
@@ -1069,8 +1069,8 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private void DiscoverAndRegisterStrategies()
     {
-        // Auto-discover strategies in this assembly
-        _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+        // Auto-discover strategies in this assembly using inherited typed registry
+        StorageStrategyRegistry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
     }
 
     private static string GenerateStoragePath()
@@ -1107,7 +1107,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
         // Register storage capabilities with Intelligence
         if (MessageBus != null)
         {
-            var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+            var strategies = StorageStrategyRegistry.GetAll().OfType<IStorageStrategyExtended>().ToList();
             var tieringSupport = strategies.Count(s => s.SupportsTiering);
             var versioningSupport = strategies.Count(s => s.SupportsVersioning);
             var replicationSupport = strategies.Count(s => s.SupportsReplication);
@@ -1245,14 +1245,14 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private bool HasVersioningStrategy()
     {
-        return _registry.GetAllStrategies()
+        return StorageStrategyRegistry.GetAll()
             .OfType<IStorageStrategyExtended>()
             .Any(s => s.SupportsVersioning);
     }
 
     private bool HasWormStrategy()
     {
-        return _registry.GetAllStrategies()
+        return StorageStrategyRegistry.GetAll()
             .OfType<IStorageStrategyExtended>()
             .Any(s => s.GetType().Name.Contains("Worm", StringComparison.OrdinalIgnoreCase) ||
                      s.GetType().Name.Contains("Immutable", StringComparison.OrdinalIgnoreCase));
@@ -1260,7 +1260,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
     private bool HasContentAddressableStrategy()
     {
-        return _registry.GetAllStrategies()
+        return StorageStrategyRegistry.GetAll()
             .OfType<IStorageStrategyExtended>()
             .Any(s => s.GetType().Name.Contains("CAS", StringComparison.OrdinalIgnoreCase) ||
                      s.GetType().Name.Contains("ContentAddressable", StringComparison.OrdinalIgnoreCase));
@@ -1269,7 +1269,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     private long? GetMaxObjectSize()
     {
         // Return the max across all strategies, or null if unlimited
-        var maxSizes = _registry.GetAllStrategies()
+        var maxSizes = StorageStrategyRegistry.GetAll()
             .OfType<IStorageStrategyExtended>()
             .Where(s => s.MaxObjectSize.HasValue)
             .Select(s => s.MaxObjectSize!.Value)

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
 
+#pragma warning disable CS0618 // StorageStrategyRegistry is transitionally obsolete; Feature migration planned for v6.0
 namespace DataWarehouse.Plugins.UltimateStorage.Features
 {
     /// <summary>
