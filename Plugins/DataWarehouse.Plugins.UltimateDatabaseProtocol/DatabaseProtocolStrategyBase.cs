@@ -1165,7 +1165,6 @@ public interface IDatabaseProtocolStrategyRegistry
 /// <see cref="ProtocolFamily"/> filtering) that differ from the generic IStorageStrategy contract.
 /// New plugins should prefer the base-class strategy registry over this class.
 /// </remarks>
-[System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
 public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategyRegistry
 {
     private readonly BoundedDictionary<string, IDatabaseProtocolStrategy> _strategies = new BoundedDictionary<string, IDatabaseProtocolStrategy>(1000);

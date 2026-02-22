@@ -20,7 +20,6 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration;
 /// the generic IStreamingStrategy contract.
 /// New plugins should prefer the base-class strategy registry over this class.
 /// </remarks>
-[System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
 public sealed class IoTStrategyRegistry
 {
     private readonly BoundedDictionary<string, IIoTStrategyBase> _strategies = new BoundedDictionary<string, IIoTStrategyBase>(1000);

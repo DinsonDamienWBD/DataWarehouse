@@ -29,7 +29,6 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     /// New plugins should prefer the base-class strategy registry over this class.
     /// </para>
     /// </remarks>
-    [System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. This registry is retained as a typed lookup thin wrapper for domain interfaces.")]
     public sealed class DataProtectionStrategyRegistry
     {
         private readonly BoundedDictionary<string, IDataProtectionStrategy> _strategies = new BoundedDictionary<string, IDataProtectionStrategy>(1000);

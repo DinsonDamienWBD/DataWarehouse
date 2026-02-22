@@ -14,7 +14,6 @@ namespace DataWarehouse.Plugins.UltimateSDKPorts;
 /// is retained as a typed lookup layer while base-class dispatch is used where applicable.
 /// New plugins should prefer the base-class strategy registry over this class.
 /// </remarks>
-[System.Obsolete("Prefer base-class strategy dispatch via PlatformPluginBase. This registry is retained as a typed lookup thin wrapper.")]
 public sealed class SDKPortStrategyRegistry
 {
     private readonly BoundedDictionary<string, SDKPortStrategyBase> _strategies = new BoundedDictionary<string, SDKPortStrategyBase>(1000);

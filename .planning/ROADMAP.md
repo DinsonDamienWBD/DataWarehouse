@@ -1492,10 +1492,10 @@ Wave 4 (Final gate — depends on all):
 
 ## Milestone: v6.0 Intelligent Policy Engine & Composable VDE
 
-> 22 phases (68-89) | 294 requirements across 25 categories | 145 plans | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing, deployment modes, competitive edge, adaptive index engine, VDE scalable internals, dynamic subsystem scaling, ecosystem compatibility last
+> 28 phases (68-95) | 350+ requirements across 30 categories | 195+ plans | Approach: SDK contracts first, VDE format second, then features/optimization/audit, integration testing, deployment modes, competitive edge, adaptive index engine, VDE scalable internals, dynamic subsystem scaling, ecosystem compatibility, then bare-metal device layer, VDE 2.0B federation, data plugin consolidation, and end-to-end verification last
 > Design documents: .planning/v6.0-DESIGN-DISCUSSION.md (21 architectural decisions), .planning/v6.0-VDE-FORMAT-v2.0-SPEC.md, .planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md
 
-**Milestone Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.0 format with 18 named regions, runtime VDE composition, three-tier performance model, AI-driven policy intelligence, authority chain with 3-of-5 quorum, and full OS integration for the .dwvd extension. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration into install mode, fix all CLI stubs, and test all deployment modes.
+**Milestone Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.0 format with 18 named regions, runtime VDE composition, three-tier performance model, AI-driven policy intelligence, authority chain with 3-of-5 quorum, and full OS integration for the .dwvd extension. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration into install mode, fix all CLI stubs, and test all deployment modes. Additionally: implement VDE 2.0B federated multi-VDE architecture for yottabyte+ scale (hierarchical shard catalog, federation router, placement policy, shard split/merge), bare-metal device management layer (device discovery, CompoundBlockDevice, device-level RAID, device pooling — replacing OS LVM/ZFS dependency), consolidate overlapping data plugins (lineage/catalog/fabric deduplication), and deliver full bare-metal-to-user integration testing.
 
 **Ordering Rationale:** SDK contracts gate everything (Phase 68). Policy persistence is independent of cascade logic and must exist before cascade can store results (Phase 69). Cascade engine depends on both SDK and persistence (Phase 70). VDE format and regions are independent of policy engine: format first (71), then foundational regions (72), then operational regions (73), then identity/tamper (74). Authority chain requires SDK foundation (Phase 75). Performance optimization requires cascade engine (Phase 76). AI intelligence requires authority chain and performance (Phase 77). Online module addition requires VDE format (Phase 78). OS integration is independent (Phase 79). Three-tier verification requires all VDE work (Phase 80). Migration requires VDE format and cascade (Phase 81). Plugin consolidation is intentionally late because it can break things (Phase 82). Integration testing is the final gate (Phase 83).
 
@@ -1524,6 +1524,12 @@ Phase 68 (SDK Foundation)
     +---> Phase 87 (VDE Scalable Internals) -- depends on Phase 71 (VDE Format) + Phase 86 (Adaptive Index Engine)
     +---> Phase 88 (Dynamic Subsystem Scaling) -- depends on Phase 68 (SDK Foundation) + Phase 87 (VDE Scalable Internals)
     +---> Phase 89 (Ecosystem Compatibility) -- depends on Phase 83 (Integration Testing) + Phase 88 (Dynamic Subsystem Scaling)
+    +---> Phase 90 (Device Discovery & Physical Block Device) -- depends on Phase 71 (VDE Format) + Phase 87 (VDE Scalable Internals)
+    |       +---> Phase 91 (CompoundBlockDevice & Device-Level RAID) -- depends on Phase 90
+    |               +---> Phase 92 (VDE 2.0B Federation Router) -- depends on Phase 86 (Adaptive Index) + Phase 87 (VDE Scalable) + Phase 91 (CompoundBlockDevice)
+    |                       +---> Phase 93 (VDE 2.0B Shard Lifecycle) -- depends on Phase 92
+    +---> Phase 94 (Data Plugin Consolidation) -- depends on Phase 82 (Plugin Consolidation Audit) + Phase 88 (Dynamic Subsystem Scaling)
+    +---> Phase 95 (Bare-Metal-to-User E2E Testing) -- depends on ALL prior phases (68-94)
 ```
 
 ### Phases
@@ -1550,6 +1556,12 @@ Phase 68 (SDK Foundation)
 - [ ] **Phase 87: VDE Scalable Internals** -- Allocation groups, ARC 3-tier cache, variable-width inodes (compact/standard/extended), extent-based addressing, sub-block packing, MVCC, SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums, extent-aware snapshots/replication, online defragmentation
 - [ ] **Phase 88: Dynamic Subsystem Scaling** -- SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), fix critical bugs (streaming stubs, resilience no-op, blockchain int cast), migrate all 60 plugins from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for all subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
 - [ ] **Phase 89: Ecosystem Compatibility** -- Verify existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies; fix gaps; wire PostgreSQL protocol to SQL engine; multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto); Terraform provider + Pulumi bridge; Helm chart; Jepsen distributed correctness testing; connection pooling SDK contract
+- [ ] **Phase 90: Device Discovery & Physical Block Device Management** -- DeviceDiscoveryService (NVMe, SCSI, virtio, iSCSI, NVMe-oF enumeration), PhysicalDeviceManager (SMART health, wear leveling, hot-swap, failure prediction), DevicePoolManager (tier/locality/redundancy grouping, replaces OS LVM/ZFS), IPhysicalBlockDevice interface, device topology mapping, bare-metal bootstrap without OS storage stack
+- [ ] **Phase 91: CompoundBlockDevice & Device-Level RAID** -- CompoundBlockDevice implementing IBlockDevice over device arrays, logical-to-physical block mapping with device ID, wire UltimateRAID strategies to IBlockDevice[] arrays (device-level RAID 0/1/5/6/10 + erasure coding), extent-aware allocation across devices, hot-spare management, rebuild orchestration, device failure isolation
+- [ ] **Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog** -- VdeFederationRouter (namespace resolution, routing table, path-embedded routing), ShardCatalog (4-level hierarchy: Root Catalog → Domain Catalogs → Index Shards → Data Shards), catalog VDE replication via Raft, bloom filter negative lookups, LRU catalog caching, transparent user experience (admins see shards, users see continuous namespace), recursive VDE 2.0B+ composition
+- [ ] **Phase 93: VDE 2.0B Shard Lifecycle** -- PlacementPolicyEngine (hot/warm/cold/frozen tiers, NVMe/SSD/HDD/tape mapping), shard split at capacity (key range bisection), shard merge on underutilization, background shard migration between tiers, cross-shard transactions, shard health monitoring, automatic rebalancing, zero-overhead guarantee at small scale (federation layer dormant until multi-VDE activated)
+- [ ] **Phase 94: Data Plugin Consolidation** -- Deduplicate triple-implemented lineage (UltimateDataLineage is authoritative, remove private stores from UltimateDataCatalog and UltimateDataLake), deduplicate triple-implemented catalog (UltimateDataCatalog is authoritative, remove private stores from UltimateDataLake and UltimateDataFabric), clarify UniversalFabric vs UltimateDataFabric naming/scope, wire all plugins to use authoritative stores via message bus, verify no data loss
+- [ ] **Phase 95: Bare-Metal-to-User End-to-End Testing** -- Full stack integration test: raw block devices → DevicePoolManager → CompoundBlockDevice → VDE 2.0A → VDE 2.0B federation → storage strategies → user-visible operations. Test at 3 scales: single-VDE (GB), multi-VDE (TB), federated (PB simulation). Verify RAID device-level + data-level dual protection. Verify zero-overhead at small scale. Verify transparent namespace at all scales.
 
 ### Phase Details
 
@@ -2140,9 +2152,147 @@ Wave 4: 89-11 (Pulumi + Helm) + 89-13 (Jepsen harness) -- parallel, depends on W
 Wave 5: 89-14 (Jepsen execution + report) -- depends on ALL prior waves
 ```
 
+#### Phase 90: Device Discovery & Physical Block Device Management
+**Goal**: DW can discover, enumerate, health-monitor, and pool raw physical storage devices WITHOUT depending on an OS storage stack (LVM, ZFS, Storage Spaces). This is the bare-metal foundation: from raw NVMe/SSD/HDD/tape drives to logical device pools that VDE sits on top of. UltimateFilesystem goes from 8% complete to a real device management layer.
+**Depends on**: Phase 71 (VDE Format v2.0), Phase 87 (VDE Scalable Internals — allocation groups, ARC cache)
+**Requirements**: BMDV-01 through BMDV-12
+**Success Criteria** (what must be TRUE):
+  1. DeviceDiscoveryService enumerates NVMe, SCSI, SATA, virtio, iSCSI, NVMe-oF devices on Linux (/sys/block, /dev) and Windows (WMI, SetupAPI)
+  2. PhysicalDeviceManager reports SMART health, temperature, wear level, error rate for each device; predicts failure with ≥24hr warning
+  3. DevicePoolManager creates named pools from device sets; pools are tiered by media type (NVMe/SSD/HDD/tape) and locality (rack/datacenter)
+  4. IPhysicalBlockDevice interface abstracts a single physical device: ReadAsync/WriteAsync/TrimAsync/FlushAsync with aligned I/O
+  5. Hot-swap: adding/removing a device from a pool is handled gracefully without data loss (rebuild triggers automatically)
+  6. Device topology map shows physical layout (controller→bus→device) for optimal I/O scheduling
+  7. Bare-metal bootstrap: DW starts on raw devices without any OS volume manager; pool metadata stored on reserved device sectors
+  8. All device management lives in UltimateFilesystem plugin (extends PlatformPluginBase)
+**Plans**: 6 plans
+
+Plans:
+- [ ] 90-01-PLAN.md -- IPhysicalBlockDevice interface, aligned I/O contract, Linux /sys/block discovery, Windows WMI/SetupAPI discovery
+- [ ] 90-02-PLAN.md -- PhysicalDeviceManager: SMART health monitoring, wear leveling tracking, temperature monitoring, failure prediction (EWMA + threshold)
+- [ ] 90-03-PLAN.md -- DevicePoolManager: named pools, tier classification (NVMe/SSD/HDD/tape), locality tags (rack/DC/region), pool metadata persistence on reserved sectors
+- [ ] 90-04-PLAN.md -- Device topology mapping: controller→bus→device tree, NUMA-aware I/O scheduling, NVMe namespace awareness
+- [ ] 90-05-PLAN.md -- Hot-swap and bare-metal bootstrap: graceful device add/remove, rebuild trigger, OS-free pool initialization, device-level journaling
+- [ ] 90-06-PLAN.md -- UltimateFilesystem integration: wire DeviceDiscovery + PhysicalDeviceManager + DevicePoolManager as filesystem strategies, message bus events for device lifecycle
+
+#### Phase 91: CompoundBlockDevice & Device-Level RAID
+**Goal**: Multiple physical devices are presented as a single IBlockDevice to VDE via CompoundBlockDevice. UltimateRAID strategies operate at the device level (not just data blob level), providing RAID 0/1/5/6/10 + erasure coding across physical devices. This is the "RAID at two levels" architecture: device-level RAID for physical redundancy, data-level RAID (existing) for logical redundancy.
+**Depends on**: Phase 90 (Device Discovery)
+**Requirements**: CBDV-01 through CBDV-10
+**Success Criteria** (what must be TRUE):
+  1. CompoundBlockDevice implements IBlockDevice and maps logical block addresses to (deviceId, physicalBlock) tuples
+  2. Logical-to-physical mapping supports striping (RAID 0), mirroring (RAID 1), and parity (RAID 5/6) across device arrays
+  3. UltimateRAID strategies (existing 50 strategies) are wired to operate on IPhysicalBlockDevice[] arrays, not just data blobs
+  4. Erasure coding (Reed-Solomon, fountain codes from UltimateRAID) works at the device level for 8+3, 16+4 configurations
+  5. Hot-spare devices automatically take over for failed devices; rebuild is background, I/O continues
+  6. FreeExtent in VDE's FreeSpaceManager is extended with device awareness: (deviceGroup, startBlock, blockCount)
+  7. A VDE created on a CompoundBlockDevice is indistinguishable from one on a single FileBlockDevice — all VDE operations work transparently
+  8. Dual RAID verified: device-level RAID 6 + data-level erasure coding simultaneously, with independent failure domains
+**Plans**: 5 plans
+
+Plans:
+- [ ] 91-01-PLAN.md -- CompoundBlockDevice: IBlockDevice implementation, logical→physical block mapping, stripe/mirror/parity layout engine
+- [ ] 91-02-PLAN.md -- Wire UltimateRAID strategies to IPhysicalBlockDevice[]: adapt RAID 0/1/5/6/10 for device arrays, parity block distribution
+- [ ] 91-03-PLAN.md -- Erasure coding at device level: Reed-Solomon + fountain codes on device arrays (8+3, 16+4), encoding/decoding pipeline
+- [ ] 91-04-PLAN.md -- Hot-spare management: automatic failover, background rebuild, I/O continuation, rebuild progress tracking, device-aware FreeExtent
+- [ ] 91-05-PLAN.md -- Dual RAID integration tests: device-level + data-level simultaneous operation, independent failure domain verification, VDE transparency test
+
+#### Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog
+**Goal**: Multiple VDE 2.0A instances are federated into a single logical namespace (VDE 2.0B). A hierarchical shard catalog (library-style: Root → Domain → Index → Data) routes operations to the correct VDE shard. Users see one continuous storage space; admins see the shard topology. The federation layer is dormant at small scale (zero overhead for single-VDE deployments).
+**Depends on**: Phase 86 (Adaptive Index Engine — morphing indexes for catalog), Phase 87 (VDE Scalable Internals — extent-based addressing, allocation groups), Phase 91 (CompoundBlockDevice — VDE sits on compound devices)
+**Requirements**: VFED-01 through VFED-15
+**Success Criteria** (what must be TRUE):
+  1. VdeFederationRouter resolves any namespace path to (shardVdeId, inodeNumber) in ≤5 hops for cold paths, ≤1 hop for warm-cached paths
+  2. ShardCatalog implements 4-level hierarchy: Root Catalog (single VDE, Raft-replicated 5x) → Domain Catalogs → Index Shards → Data Shards
+  3. Root catalog fits in memory (≤100MB for ≤1M top-level entries); domain catalogs use LRU caching
+  4. Bloom filters at index shard level reject 99%+ negative lookups without touching data shards
+  5. Path-embedded routing: Hash(pathSegment) → catalog slot → downstream VDE ID, no full-path scan needed
+  6. Recursive composition works: a VDE 2.0B+ super-federation treats VDE 2.0B instances as "devices" in a higher-level routing table
+  7. Transparent namespace: user operations (Store/Retrieve/Delete/List) work identically regardless of single-VDE or federated deployment
+  8. Federation layer adds 0% overhead for single-VDE deployment (router stays null until multi-VDE activated by admin)
+  9. Cross-shard List/Search operations fan out and merge results correctly with pagination
+**Plans**: 8 plans
+
+Plans:
+- [ ] 92-01-PLAN.md -- VdeFederationRouter: namespace resolution, routing table, path-embedded routing algorithm, warm-cache fast path
+- [ ] 92-02-PLAN.md -- ShardCatalog Level 0-1: Root Catalog VDE (Raft-replicated 5x), Domain Catalog VDEs, catalog entry format, catalog VDE creation
+- [ ] 92-03-PLAN.md -- ShardCatalog Level 2-3: Index Shard VDEs (B-Tree + bloom filter), Data Shard VDEs (VDE 2.0A instances), shard addressing scheme
+- [ ] 92-04-PLAN.md -- Transparent namespace: Store/Retrieve/Delete/List/Search routed through federation, single-VDE passthrough (zero overhead)
+- [ ] 92-05-PLAN.md -- Cross-shard operations: fan-out List, merge-sort Search, distributed Delete, cross-shard metadata aggregation, pagination
+- [ ] 92-06-PLAN.md -- Bloom filter integration: per-index-shard bloom filters, negative lookup rejection, false-positive handling, filter persistence in shard metadata
+- [ ] 92-07-PLAN.md -- Recursive composition (VDE 2.0B+): super-federation that treats VDE 2.0B instances as routing targets, yottabyte→brontobyte scale
+- [ ] 92-08-PLAN.md -- Federation integration tests: single-VDE vs federated behavior parity, warm/cold path latency, routing correctness, namespace transparency
+
+#### Phase 93: VDE 2.0B Shard Lifecycle
+**Goal**: Shards are living entities — they split when full, merge when underutilized, migrate between storage tiers based on access patterns, and rebalance across nodes. The placement policy engine decides where each shard lives (NVMe/SSD/HDD/tape, which datacenter, how many replicas).
+**Depends on**: Phase 92 (VDE 2.0B Federation Router)
+**Requirements**: VSHL-01 through VSHL-10
+**Success Criteria** (what must be TRUE):
+  1. PlacementPolicyEngine assigns shards to storage tiers: hot (NVMe, 3x replicated), warm (SSD, 2x), cold (HDD, erasure coded 8+3), frozen (tape, 16+4)
+  2. Shard split triggers automatically at 80% capacity: key range bisected, new shard created, index updated, zero downtime
+  3. Shard merge triggers when two adjacent underutilized shards (<20% each) are combined, freeing a shard
+  4. Background shard migration moves entire VDE shard between tiers without interrupting reads/writes (CoW + redirect)
+  5. Shard health monitoring detects degraded shards (high latency, disk errors) and triggers proactive migration
+  6. Automatic rebalancing distributes shards evenly across available CompoundBlockDevices
+  7. Cross-shard transactions use 2PC with saga fallback for multi-shard writes
+  8. Zero-overhead at single-VDE scale: shard lifecycle engine is dormant until federation is activated
+**Plans**: 6 plans
+
+Plans:
+- [ ] 93-01-PLAN.md -- PlacementPolicyEngine: tier assignment rules (hot/warm/cold/frozen), replication factor per tier, rack-awareness, cost optimization
+- [ ] 93-02-PLAN.md -- Shard split: capacity monitoring, key range bisection algorithm, atomic index update, background data redistribution
+- [ ] 93-03-PLAN.md -- Shard merge: underutilization detection, adjacent shard combining, index consolidation, shard cleanup
+- [ ] 93-04-PLAN.md -- Background shard migration: CoW-based live migration, redirect-on-access during migration, progress tracking, rollback on failure
+- [ ] 93-05-PLAN.md -- Cross-shard transactions: 2PC coordinator, saga fallback for multi-shard writes, distributed locking integration
+- [ ] 93-06-PLAN.md -- Shard lifecycle integration tests: split/merge/migrate under load, rebalancing verification, zero-overhead at small scale
+
+#### Phase 94: Data Plugin Consolidation
+**Goal**: Eliminate the triple-implementation of lineage and catalog across UltimateDataLineage/UltimateDataCatalog/UltimateDataLake. Each concern has exactly one authoritative plugin; other plugins delegate via message bus. Clarify the UniversalFabric (physical I/O routing) vs UltimateDataFabric (logical topology) naming confusion.
+**Depends on**: Phase 82 (Plugin Consolidation Audit — non-Ultimate plugins), Phase 88 (Dynamic Subsystem Scaling — persistent stores available)
+**Requirements**: DPCO-01 through DPCO-08
+**Success Criteria** (what must be TRUE):
+  1. UltimateDataLineage is the SOLE lineage store: UltimateDataCatalog's `_relationships` and UltimateDataLake's `_lineage` replaced with message bus calls to `lineage.track`/`lineage.upstream`/`lineage.downstream`
+  2. UltimateDataCatalog is the SOLE asset catalog: UltimateDataLake's `_catalog` replaced with message bus calls to `catalog.register`/`catalog.search`
+  3. UltimateDataFabric's inline `DataCatalogStrategy` delegates to UltimateDataCatalog via message bus
+  4. UniversalFabric renamed to UltimateStorageFabric (or documented with clear distinction from UltimateDataFabric) — physical I/O routing vs logical topology
+  5. All message bus delegation is async and handles the delegated plugin being unavailable gracefully (fallback to local cache)
+  6. Zero data loss: existing in-memory state migrated to authoritative stores before private stores are removed
+  7. Full solution builds with 0 errors, 0 warnings after consolidation
+  8. All 2373+ tests pass after consolidation
+**Plans**: 5 plans
+
+Plans:
+- [ ] 94-01-PLAN.md -- Lineage consolidation: migrate UltimateDataCatalog `_relationships` to message bus delegation to UltimateDataLineage; migrate UltimateDataLake `_lineage` similarly
+- [ ] 94-02-PLAN.md -- Catalog consolidation: migrate UltimateDataLake `_catalog` to message bus delegation to UltimateDataCatalog; migrate UltimateDataFabric `DataCatalogStrategy`
+- [ ] 94-03-PLAN.md -- Fabric naming clarification: document or rename UniversalFabric vs UltimateDataFabric distinction; update PLUGIN-CATALOG, message bus topics, all references
+- [ ] 94-04-PLAN.md -- Graceful degradation: async message bus delegation with local cache fallback when authoritative plugin is unavailable; circuit breaker pattern
+- [ ] 94-05-PLAN.md -- Consolidation verification: build, tests, plugin isolation check, message bus wiring audit, no private duplicate stores remaining
+
+#### Phase 95: Bare-Metal-to-User End-to-End Testing
+**Goal**: The complete storage stack — from raw physical devices through device pools, CompoundBlockDevice, RAID (device + data level), VDE 2.0A, VDE 2.0B federation, storage strategies, to user-visible operations — is tested end-to-end at three scales. This is the final gate that proves the entire bare-metal-to-user flow works as a cohesive system.
+**Depends on**: ALL phases 68-94
+**Requirements**: E2ET-01 through E2ET-08
+**Success Criteria** (what must be TRUE):
+  1. Single-VDE scale (GB): raw device → pool → CompoundBlockDevice → VDE → Store/Retrieve/Delete works end-to-end
+  2. Multi-VDE scale (TB): multiple VDEs on multiple CompoundBlockDevices, each with device-level RAID, all operations correct
+  3. Federated scale (PB simulation): VDE 2.0B federation with 100+ shard VDEs, hierarchical catalog, transparent namespace, shard split/merge under load
+  4. Dual RAID verification: device-level RAID 6 + data-level erasure coding, simulate device failure + data corruption simultaneously, verify recovery
+  5. Zero-overhead verification: single-VDE deployment benchmarked against v5.0 baseline, ≤1% regression
+  6. Transparent namespace verification: user operations identical at all 3 scales (same API, same behavior, same results)
+  7. Policy cascade through federation: VDE-level policy at federation root cascades correctly to all shard VDEs
+  8. Bare-metal bootstrap: DW starts on raw devices without OS storage stack, initializes pools, creates VDEs, serves requests
+**Plans**: 5 plans
+
+Plans:
+- [ ] 95-01-PLAN.md -- Single-VDE E2E test: raw device → pool → CompoundBlockDevice → VDE → CRUD operations, device failure injection, SMART health verification
+- [ ] 95-02-PLAN.md -- Multi-VDE E2E test: multiple VDEs, device-level RAID across pools, data-level RAID within VDE, cross-VDE operations via UniversalFabric
+- [ ] 95-03-PLAN.md -- Federated E2E test: 100+ shard VDEs, hierarchical catalog, fan-out List/Search, shard split/merge under load, namespace transparency
+- [ ] 95-04-PLAN.md -- Dual RAID + zero-overhead verification: simultaneous device + data failure, recovery correctness, single-VDE performance baseline comparison
+- [ ] 95-05-PLAN.md -- Bare-metal bootstrap + policy cascade: OS-free initialization, pool creation, VDE creation, federation activation, policy propagation through hierarchy
+
 ### Progress
 
-**Execution Order:** 68 -> 69 -> 70 -> 71 -> 72 -> 73 -> 74 -> 75 -> 76 -> 77 -> 78 -> 79 -> 80 -> 81 -> 82 -> 83 -> 84 -> 85 -> 86 -> 87 -> 88 -> 89
+**Execution Order:** 68 -> 69 -> 70 -> 71 -> 72 -> 73 -> 74 -> 75 -> 76 -> 77 -> 78 -> 79 -> 80 -> 81 -> 82 -> 83 -> 84 -> 85 -> 86 -> 87 -> 88 -> 89 -> 90 -> 91 -> 92 -> 93 -> 94 -> 95
 
 | Phase | Plans | Status | Completed |
 |-------|-------|--------|-----------|
@@ -2168,8 +2318,14 @@ Wave 5: 89-14 (Jepsen execution + report) -- depends on ALL prior waves
 | 87. VDE Scalable Internals | 0/14 | Not started | - |
 | 88. Dynamic Subsystem Scaling | 0/14 | Not started | - |
 | 89. Ecosystem Compatibility | 0/14 | Not started | - |
+| 90. Device Discovery & Physical Block Device | 0/6 | Not started | - |
+| 91. CompoundBlockDevice & Device-Level RAID | 0/5 | Not started | - |
+| 92. VDE 2.0B Federation Router & Shard Catalog | 0/8 | Not started | - |
+| 93. VDE 2.0B Shard Lifecycle | 0/6 | Not started | - |
+| 94. Data Plugin Consolidation | 0/5 | Not started | - |
+| 95. Bare-Metal-to-User E2E Testing | 0/5 | Not started | - |
 
-**Total v6.0:** 0/145 plans complete
+**Total v6.0:** 0/180 plans complete
 
 ### Phase 65.1: Deep Semantic Audit & PluginBase Persistence (INSERTED)
 

@@ -34,9 +34,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
         // NOTE(65.4-07): _registry is retained as a typed lookup layer for domain-specific interfaces
         // (IDataProtectionStrategy, DataProtectionCapabilities, etc.). Strategies also registered via
         // base-class RegisterStrategy() for unified lifecycle management via PluginBase.StrategyRegistry.
-#pragma warning disable CS0618 // DataProtectionStrategyRegistry obsolete -- retained as typed lookup thin wrapper
         private readonly DataProtectionStrategyRegistry _registry = new();
-#pragma warning restore CS0618
         private readonly BoundedDictionary<string, object> _activeOperations = new BoundedDictionary<string, object>(1000);
 
         /// <inheritdoc/>
@@ -57,7 +55,6 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
         /// <summary>
         /// Gets the strategy registry for accessing and managing strategies (typed lookup thin wrapper).
         /// </summary>
-        [System.Obsolete("Prefer base-class strategy dispatch via PluginBase.StrategyRegistry. Registry is retained as typed lookup for domain interfaces.")]
         public DataProtectionStrategyRegistry Registry => _registry;
 
         /// <summary>

@@ -33,9 +33,7 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
     // NOTE(65.4-07): SDKPortStrategyBase does not implement IStrategy, so base-class RegisterStrategy()
     // cannot be used directly. The inherited PlatformPluginBase.RegisterPlatformStrategy() is used
     // for strategies that are adapted via IStrategy. _registry is retained as the typed lookup layer.
-#pragma warning disable CS0618 // SDKPortStrategyRegistry obsolete -- retained as typed lookup thin wrapper
     private readonly SDKPortStrategyRegistry _registry = new();
-#pragma warning restore CS0618
     private readonly BoundedDictionary<string, SDKMethod> _globalMethods = new BoundedDictionary<string, SDKMethod>(1000);
     private readonly BoundedDictionary<string, TypeMapping> _globalTypeMappings = new BoundedDictionary<string, TypeMapping>(1000);
     private SDKPortStrategyBase? _activeStrategy;
@@ -73,7 +71,6 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
     };
 
     /// <summary>Gets the SDK port strategy registry (typed lookup thin wrapper).</summary>
-    [System.Obsolete("Prefer base-class strategy dispatch via PlatformPluginBase. Registry is retained as typed lookup.")]
     public SDKPortStrategyRegistry Registry => _registry;
 
     /// <summary>Initializes a new instance of the Ultimate SDK Ports plugin.</summary>
