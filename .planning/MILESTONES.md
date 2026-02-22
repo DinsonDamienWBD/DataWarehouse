@@ -92,7 +92,7 @@
 
 ## v6.0 Intelligent Policy Engine & Composable VDE (PLANNING)
 
-**Phases:** 68-89 (22 phases, 145 plans) | **Requirements:** 294 across 25 categories
+**Phases:** 68-92 (25 phases, ~175 plans) | **Requirements:** 339 across 28 categories
 
 **Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration and fix all existing CLI stubs. Close all competitive gaps against ~80 storage/data products.
 
@@ -121,9 +121,12 @@
 - VDE Scalable Internals: allocation groups, ARC 3-tier cache, variable-width inodes (compact 64B/standard 256B/extended 512B), extent-based addressing, sub-block packing, MVCC (WAL-based versioning, 3 isolation levels), SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums (Merkle tree), extent-aware CoW snapshots and replication delta, online defragmentation
 - Dynamic Subsystem Scaling: SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), critical bug fixes (streaming stubs, resilience no-op, blockchain int cast), all 60 plugins migrated from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for 23 subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
 - Ecosystem Compatibility: verify and fix existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies, wire PostgreSQL to SQL engine, multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto definitions), Terraform provider + Pulumi bridge, Helm chart for Kubernetes, Jepsen distributed correctness testing with published report, connection pooling SDK contract
+- Device-Level RAID: CompoundBlockDevice aggregating physical drives (RAID-0/1/5/6/10/Z1/Z2/Z3/JBOD), DeviceRaidStrategyBase, hot spare management, SMART predictive rebuild, background scrub, auto-configuration profiles, CLI device commands
+- VDE 2.0B Federation: multi-VDE unified namespace (dw://federation/), federation coordinator election (Raft), federated store/retrieve/list/search/migrate/snapshot, placement policy (sovereignty+tiering+capacity), cross-VDE replication, federation-level policy cascade
+- Hardware-to-Storage Integration: complete 7-layer flow from bare metal hardware through device RAID → VDE → federation → fabric → pipeline → user-visible storage, plugin adjustments for device RAID (UltimateRAID, Fabric, Observability, ResourceManager, Deployment), end-to-end integration tests, deployment wizard
 
 **Design documents:**
-- `.planning/v6.0-DESIGN-DISCUSSION.md` — 18 architectural decisions
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 24 architectural decisions (AD-01 through AD-24)
 - `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
 - `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
 

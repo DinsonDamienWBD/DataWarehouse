@@ -686,11 +686,119 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 | VOPT-27 | Phase 87 | Pending |
 | VOPT-28 | Phase 87 | Pending |
 
+### DRAID — Device-Level RAID & Compound Block Device (Phase 90)
+
+- [ ] **DRAID-01**: CompoundBlockDevice interface — IBlockDevice implementation wrapping multiple physical IBlockDevice instances with unified read/write/trim
+- [ ] **DRAID-02**: RAID-0 device strategy — block-level striping across N drives with configurable stripe size (64KB-1MB, auto-tuned from device type)
+- [ ] **DRAID-03**: RAID-1 device strategy — block-level mirroring across N drives with configurable read policy (round-robin, nearest, fastest)
+- [ ] **DRAID-04**: RAID-5 device strategy — distributed single parity with left-symmetric/right-symmetric/left-asymmetric layout options
+- [ ] **DRAID-05**: RAID-6 device strategy — distributed double parity (P+Q Reed-Solomon) for 2-drive fault tolerance
+- [ ] **DRAID-06**: RAID-10 device strategy — stripe of mirrors for combined performance and redundancy
+- [ ] **DRAID-07**: RAID-Z1/Z2/Z3 device strategies — ZFS-style variable-width stripe parity (1/2/3 parity drives)
+- [ ] **DRAID-08**: JBOD device strategy — concatenation of drives into single address space, no redundancy
+- [ ] **DRAID-09**: Device array metadata — reserved blocks on each member drive storing array UUID, member list, RAID level, stripe size, rebuild state
+- [ ] **DRAID-10**: Hot spare management — standby drives, automatic rebuild on drive failure, SMART-based predictive spare activation
+- [ ] **DRAID-11**: Background scrub — periodic parity verification and silent corruption detection with configurable schedule and I/O throttling
+- [ ] **DRAID-12**: Online drive addition/removal — grow array by adding drives, graceful drain before removal, rebalance data across new geometry
+- [ ] **DRAID-13**: Device health monitoring — SMART data collection, temperature monitoring, wear level tracking, predictive failure alerts via message bus
+- [ ] **DRAID-14**: DeviceRaidStrategyBase in SDK — abstract base for all device-level RAID strategies with rebuild, scrub, and health interfaces
+- [ ] **DRAID-15**: Auto-configuration profiles — detect drive count/types and suggest optimal RAID level (Single/Development/Standard/Enterprise/Hyperscale/Performance)
+- [ ] **DRAID-16**: CLI commands — `dw device list`, `dw device create-array`, `dw device status`, `dw device add-drive`, `dw device remove-drive`, `dw device scrub`
+- [ ] **DRAID-17**: SSD-aware optimizations — TRIM passthrough, wear-leveling-aware stripe placement, separate metadata/WAL arrays for write amplification reduction
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DRAID-01 | Phase 90 | Pending |
+| DRAID-02 | Phase 90 | Pending |
+| DRAID-03 | Phase 90 | Pending |
+| DRAID-04 | Phase 90 | Pending |
+| DRAID-05 | Phase 90 | Pending |
+| DRAID-06 | Phase 90 | Pending |
+| DRAID-07 | Phase 90 | Pending |
+| DRAID-08 | Phase 90 | Pending |
+| DRAID-09 | Phase 90 | Pending |
+| DRAID-10 | Phase 90 | Pending |
+| DRAID-11 | Phase 90 | Pending |
+| DRAID-12 | Phase 90 | Pending |
+| DRAID-13 | Phase 90 | Pending |
+| DRAID-14 | Phase 90 | Pending |
+| DRAID-15 | Phase 90 | Pending |
+| DRAID-16 | Phase 90 | Pending |
+| DRAID-17 | Phase 90 | Pending |
+
+### VFED — VDE 2.0B Federation Architecture (Phase 91)
+
+- [ ] **VFED-01**: FederationDescriptor in VDE Superblock Extended Metadata — federation ID, member role, namespace prefix, routing table, coordinator VDE ID, epoch
+- [ ] **VFED-02**: Federation routing table — cached locally per member VDE, refreshed via SWIM gossip protocol, entries include VDE ID, endpoint, namespaces, status, capabilities
+- [ ] **VFED-03**: Federation coordinator election via UltimateConsensus (Raft) — single leader for metadata operations, re-election on failure within 10s
+- [ ] **VFED-04**: Federated store operation — route to correct VDE based on placement policy (sovereignty, locality, capacity), overflow to next eligible VDE
+- [ ] **VFED-05**: Federated retrieve operation — route to owning VDE, fallback to replica on unavailability
+- [ ] **VFED-06**: Federated list operation — fan-out to all member VDEs, cursor-based cross-VDE pagination, merged result stream
+- [ ] **VFED-07**: Federated search operation — parallel fan-out search, per-VDE local index, merge + rank results
+- [ ] **VFED-08**: Cross-VDE object migration — move objects between member VDEs for rebalancing, sovereignty changes, tiering
+- [ ] **VFED-09**: Coordinated cross-VDE snapshot — 2PC protocol for consistent snapshot across all member VDEs
+- [ ] **VFED-10**: Federation-level placement policy — sovereignty rules (tag-based routing), tiering rules (access pattern), capacity thresholds, overflow strategy
+- [ ] **VFED-11**: Cross-VDE replication — critical objects replicated to 2+ VDEs with geo-diversity constraint
+- [ ] **VFED-12**: Federation membership management — VDE join/leave/fail handling, epoch increment, routing table rebuild
+- [ ] **VFED-13**: Federation namespace resolution — `dw://federation-name/path` resolves to member VDE + local path
+- [ ] **VFED-14**: FederationReplicationStrategy in UltimateReplication — cross-VDE sync, conflict resolution, delta transfer
+- [ ] **VFED-15**: FederationFabricStrategy in UniversalFabric — register federations as fabric endpoints, route dw:// URIs to federation
+- [ ] **VFED-16**: Federation observability — per-VDE and federation-wide health, cross-VDE latency monitoring, capacity utilization dashboards
+- [ ] **VFED-17**: CLI commands — `dw federation create`, `dw federation join`, `dw federation leave`, `dw federation status`, `dw federation migrate`
+- [ ] **VFED-18**: Federation policy cascade — federation-level policy tightens but cannot loosen member VDE policy
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VFED-01 | Phase 91 | Pending |
+| VFED-02 | Phase 91 | Pending |
+| VFED-03 | Phase 91 | Pending |
+| VFED-04 | Phase 91 | Pending |
+| VFED-05 | Phase 91 | Pending |
+| VFED-06 | Phase 91 | Pending |
+| VFED-07 | Phase 91 | Pending |
+| VFED-08 | Phase 91 | Pending |
+| VFED-09 | Phase 91 | Pending |
+| VFED-10 | Phase 91 | Pending |
+| VFED-11 | Phase 91 | Pending |
+| VFED-12 | Phase 91 | Pending |
+| VFED-13 | Phase 91 | Pending |
+| VFED-14 | Phase 91 | Pending |
+| VFED-15 | Phase 91 | Pending |
+| VFED-16 | Phase 91 | Pending |
+| VFED-17 | Phase 91 | Pending |
+| VFED-18 | Phase 91 | Pending |
+
+### FLOW — Hardware-to-Storage Integration & Plugin Adjustments (Phase 92)
+
+- [ ] **FLOW-01**: DeviceInventory service — enumerate all block devices, classify (NVMe/SSD/HDD/USB/Network), read SMART data, detect partitions/filesystems, report availability
+- [ ] **FLOW-02**: UltimateRAID plugin adjustment — add DeviceRaidStrategyBase alongside existing data-level strategies, dual dispatch (device vs data RAID)
+- [ ] **FLOW-03**: UltimateStorage adjustment — verify VdeStorageStrategy works transparently on CompoundBlockDevice, add device array health to storage health
+- [ ] **FLOW-04**: UniversalFabric adjustment — register compound devices and VDE federations as fabric endpoints
+- [ ] **FLOW-05**: UniversalObservability adjustment — device health metrics (SMART, rebuild progress, RAID array health, per-drive IOPS/latency), new dashboard panels
+- [ ] **FLOW-06**: UltimateResourceManager adjustment — track capacity across device arrays, alert on low space, coordinate drive additions/removals
+- [ ] **FLOW-07**: UltimateDeployment adjustment — device array creation as part of deployment workflow, auto-detect drives, suggest RAID, create arrays before VDE
+- [ ] **FLOW-08**: End-to-end integration tests — bare metal → device RAID → VDE → federation → fabric → pipeline → user store/retrieve/search/list
+- [ ] **FLOW-09**: Deployment wizard — guided setup from bare metal to operational storage (CLI interactive + GUI), supports all deployment profiles
+- [ ] **FLOW-10**: Documentation — complete bare-metal-to-storage architecture guide with flow diagrams
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FLOW-01 | Phase 92 | Pending |
+| FLOW-02 | Phase 92 | Pending |
+| FLOW-03 | Phase 92 | Pending |
+| FLOW-04 | Phase 92 | Pending |
+| FLOW-05 | Phase 92 | Pending |
+| FLOW-06 | Phase 92 | Pending |
+| FLOW-07 | Phase 92 | Pending |
+| FLOW-08 | Phase 92 | Pending |
+| FLOW-09 | Phase 92 | Pending |
+| FLOW-10 | Phase 92 | Pending |
+
 **Coverage:**
-- v6.0 requirements: 294 total (SDKF:12, CASC:8, PERF:7, AIPI:11, AUTH:9, PERS:7, VDEF:18, VREG:18, VTMP:10, OMOD:7, FEXT:8, TIER:5, PLUG:6, MIGR:6, INTG:8, VADV:3, PADV:3, HSCL:10, MRES:12, DPLY:13, EDGE:13, AIE:27, ECOS:18, DSCL:27, VOPT:28)
-- Mapped to phases: 294
+- v6.0 requirements: 339 total (SDKF:12, CASC:8, PERF:7, AIPI:11, AUTH:9, PERS:7, VDEF:18, VREG:18, VTMP:10, OMOD:7, FEXT:8, TIER:5, PLUG:6, MIGR:6, INTG:8, VADV:3, PADV:3, HSCL:10, MRES:12, DPLY:13, EDGE:13, AIE:27, ECOS:18, DSCL:27, VOPT:28, DRAID:17, VFED:18, FLOW:10)
+- Mapped to phases: 339
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after Ecosystem Compatibility design*
+*Last updated: 2026-02-22 after VDE 2.0B Federation, Device-Level RAID, and Hardware-to-Storage Flow*
