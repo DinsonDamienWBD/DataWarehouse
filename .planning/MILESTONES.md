@@ -92,9 +92,9 @@
 
 ## v6.0 Intelligent Policy Engine & Composable VDE (PLANNING)
 
-**Phases:** 68-83 (16 phases, 73 plans) | **Requirements:** 146 across 17 categories
+**Phases:** 68-89 (22 phases, 145 plans) | **Requirements:** 294 across 25 categories
 
-**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins.
+**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration and fix all existing CLI stubs. Close all competitive gaps against ~80 storage/data products.
 
 **Planned deliverables:**
 - PolicyEngine SDK: IPolicyEngine, IEffectivePolicy, cascade resolution, compiled policies
@@ -108,9 +108,22 @@
 - .dwvd file extension with OS registration (Windows/Linux/macOS)
 - Plugin consolidation audit: 17 non-Ultimate plugins reviewed
 - IntelligenceAwarePluginBase for AI hooks on all plugins (except UltimateIntelligence)
+- Deployment topology: DW-only, VDE-only, DW+VDE deployment modes with CLI/GUI selection
+- VDE Composer/Builder: CLI command (`dw vde create`) + GUI wizard for composable VDE creation
+- Shell handler & file extension registration integrated into install mode (mode c)
+- CLI stub fixes: real ServerCommands implementation, sync-over-async bug fix
+- Deployment mode integration tests for all three modes (connect/live/install) × all topologies
+- Metadata Residency Strategy: per-feature VdeOnly/VdePrimary/PluginOnly configuration, write ordering (Atomic/Sync/Lazy), hardware key reference pattern, corruption fallback + auto-repair, lazy/eager migration
+- Competitive Edge: VDE-native NAS/SAN block export, AD/Kerberos auth, TLA+ formal verification, OS-level security (seccomp/pledge/W^X), streaming SQL engine, deterministic I/O, yottabyte addressing, ML pipelines, native Delta Lake/Iceberg
+- Adaptive Index Engine: 7-level continuous morphing spectrum (Direct Pointer → Sorted Array → ART → Bε-tree → Learned Overlay → Sharded Forest → Distributed Probabilistic Routing) with bidirectional morph (shrinks backward on delete), autonomous IndexMorphAdvisor, Index RAID (striping/mirroring/sharding/tiering), Bw-Tree lock-free concurrency, Masstree hot-path namespace, Disruptor message bus (100M+ msgs/sec), extendible hashing inode table (trillion objects), native HNSW+PQ with ILGPU GPU acceleration, Hilbert curve mapping, ALEX learned index, native io_uring (LibraryImport, NVMe passthrough, 33x throughput), trained Zstd dictionaries, SIMD-accelerated hot paths, Bloofi distributed filter, Clock-SI transactions, count-min sketch access tracking
+- Variable-Width Addressing: 32/48/64/128-bit dynamic (default 32-bit = zero overhead for 99% of VDEs, online width promotion)
+- Dynamic Scaling: configurable write concurrency, dynamic extents, auto-growing DVV/inode cache, hierarchical replication
+- VDE Scalable Internals: allocation groups, ARC 3-tier cache, variable-width inodes (compact 64B/standard 256B/extended 512B), extent-based addressing, sub-block packing, MVCC (WAL-based versioning, 3 isolation levels), SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums (Merkle tree), extent-aware CoW snapshots and replication delta, online defragmentation
+- Dynamic Subsystem Scaling: SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), critical bug fixes (streaming stubs, resilience no-op, blockchain int cast), all 60 plugins migrated from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for 23 subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
+- Ecosystem Compatibility: verify and fix existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies, wire PostgreSQL to SQL engine, multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto definitions), Terraform provider + Pulumi bridge, Helm chart for Kubernetes, Jepsen distributed correctness testing with published report, connection pooling SDK contract
 
 **Design documents:**
-- `.planning/v6.0-DESIGN-DISCUSSION.md` — 12 architectural decisions
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 18 architectural decisions
 - `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
 - `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
 
