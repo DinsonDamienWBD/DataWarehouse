@@ -3,6 +3,7 @@
 // </copyright>
 
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -175,6 +176,38 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
         _strategies["automotive"] = new AutomotiveEdgeStrategy(MessageBus);
         _strategies["smart-city"] = new SmartCityEdgeStrategy(MessageBus);
         _strategies["energy"] = new EnergyGridEdgeStrategy(MessageBus);
+
+        // Dual-register: scan for any IStrategy-compatible (StrategyBase) types in this assembly
+        // and register them with the base OrchestrationPluginBase registry.
+        // Current edge strategies implement IEdgeComputingStrategy (not IStrategy), so they
+        // use the local _strategies registry only. This scan future-proofs for StrategyBase types.
+        DiscoverAndRegisterBaseStrategies();
+    }
+
+    /// <summary>
+    /// Discovers any StrategyBase-derived types in the assembly and registers them with
+    /// the OrchestrationPluginBase's IStrategy registry for standard dispatch support.
+    /// </summary>
+    private void DiscoverAndRegisterBaseStrategies()
+    {
+        var strategyTypes = Assembly.GetExecutingAssembly()
+            .GetTypes()
+            .Where(t => !t.IsAbstract && typeof(IStrategy).IsAssignableFrom(t));
+
+        foreach (var type in strategyTypes)
+        {
+            try
+            {
+                if (Activator.CreateInstance(type) is IStrategy strategy)
+                {
+                    RegisterOrchestrationStrategy(strategy);
+                }
+            }
+            catch
+            {
+                // Strategy failed to instantiate, skip
+            }
+        }
     }
 
     /// <inheritdoc/>

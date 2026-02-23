@@ -156,10 +156,16 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
         // Auto-discover all strategies in this assembly
         var discovered = _registry.AutoDiscover(Assembly.GetExecutingAssembly());
 
-        // Publish registration events for each discovered strategy
+        // Dual-register: populate base-class IStrategy registry alongside local ConnectionStrategyRegistry.
+        // ConnectionStrategyBase : StrategyBase : IStrategy, so all discovered strategies implement IStrategy.
         var strategies = _registry.GetAll();
         foreach (var strategy in strategies)
         {
+            if (strategy is IStrategy iStrategy)
+            {
+                RegisterStrategy(iStrategy);
+            }
+
             await PublishStrategyRegisteredAsync(strategy);
         }
 

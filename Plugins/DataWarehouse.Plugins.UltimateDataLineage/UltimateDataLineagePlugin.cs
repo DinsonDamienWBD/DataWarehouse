@@ -520,6 +520,16 @@ public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDispo
     private void DiscoverAndRegisterStrategies()
     {
         _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+
+        // Dual-register: populate base-class DataManagementPluginBase -> PluginBase IStrategy registry
+        // LineageStrategyBase : StrategyBase : IStrategy, so all discovered strategies implement IStrategy.
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (strategy is IStrategy iStrategy)
+            {
+                RegisterDataManagementStrategy(iStrategy);
+            }
+        }
     }
 
     #endregion

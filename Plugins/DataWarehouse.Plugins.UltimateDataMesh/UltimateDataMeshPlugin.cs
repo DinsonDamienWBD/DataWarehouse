@@ -510,6 +510,16 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         var discovered = _registry.DiscoverFromAssembly(Assembly.GetExecutingAssembly());
         if (discovered == 0)
             System.Diagnostics.Debug.WriteLine($"[{Name}] Warning: No data mesh strategies discovered");
+
+        // Dual-register: populate base-class DataManagementPluginBase -> PluginBase IStrategy registry
+        // DataMeshStrategyBase : StrategyBase : IStrategy, so all discovered strategies implement IStrategy.
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (strategy is IStrategy iStrategy)
+            {
+                RegisterDataManagementStrategy(iStrategy);
+            }
+        }
     }
 
     #endregion

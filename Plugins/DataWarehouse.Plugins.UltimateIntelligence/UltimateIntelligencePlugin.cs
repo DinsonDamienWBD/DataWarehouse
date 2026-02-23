@@ -103,6 +103,8 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
 
     /// <summary>
     /// Registers an intelligence strategy with the plugin.
+    /// Dual-registers with the base-class IStrategy registry when the strategy implements IStrategy
+    /// (all IntelligenceStrategyBase derivatives extend StrategyBase : IStrategy).
     /// </summary>
     /// <param name="strategy">The strategy to register.</param>
     public void RegisterStrategy(IIntelligenceStrategy strategy)
@@ -110,6 +112,12 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         ArgumentNullException.ThrowIfNull(strategy);
         _allStrategies[strategy.StrategyId] = strategy;
         _strategiesByCategory[strategy.Category][strategy.StrategyId] = strategy;
+
+        // Dual-register with base-class DataTransformationPluginBase -> PluginBase IStrategy registry
+        if (strategy is IStrategy iStrategy)
+        {
+            base.RegisterStrategy(iStrategy);
+        }
     }
 
     /// <summary>

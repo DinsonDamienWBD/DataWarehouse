@@ -106,6 +106,7 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
 
     /// <summary>
     /// Discovers and registers all format strategies in this assembly.
+    /// Dual-registers with the FormatPluginBase typed registry and the PluginBase IStrategy registry.
     /// </summary>
     private void DiscoverAndRegisterStrategies()
     {
@@ -120,6 +121,16 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
                 if (Activator.CreateInstance(type) is IDataFormatStrategy strategy)
                 {
                     _registry[strategy.StrategyId] = strategy;
+
+                    // Dual-register with FormatPluginBase typed registry
+                    RegisterFormatStrategy(strategy);
+
+                    // Dual-register with PluginBase IStrategy registry
+                    // DataFormatStrategyBase : StrategyBase : IStrategy
+                    if (strategy is IStrategy iStrategy)
+                    {
+                        RegisterStrategy(iStrategy);
+                    }
 
                     // Configure Intelligence integration if available
                     if (strategy is DataFormatStrategyBase baseStrategy && MessageBus != null)

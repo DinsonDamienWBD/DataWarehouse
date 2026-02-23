@@ -524,6 +524,16 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
     private void DiscoverAndRegisterStrategies()
     {
         _registry.AutoDiscover(Assembly.GetExecutingAssembly());
+
+        // Dual-register: populate base-class InfrastructurePluginBase -> PluginBase IStrategy registry
+        // ResourceStrategyBase : StrategyBase : IStrategy, so all discovered strategies implement IStrategy.
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (strategy is IStrategy iStrategy)
+            {
+                RegisterStrategy(iStrategy);
+            }
+        }
     }
 
     #endregion
