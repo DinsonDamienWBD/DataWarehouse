@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.Net.Http.Json;
+using System.Reflection;
+using System.Text.Json;
 using Spectre.Console;
 using DataWarehouse.Kernel;
 using DataWarehouse.SDK.Primitives;
@@ -6,11 +10,14 @@ namespace DataWarehouse.CLI.Commands;
 
 /// <summary>
 /// Server management commands for the DataWarehouse CLI.
+/// Queries real kernel state or HTTP API -- no fake/hardcoded data.
 /// </summary>
 public static class ServerCommands
 {
     private static DataWarehouseKernel? _runningKernel;
     private static CancellationTokenSource? _serverCts;
+    private static DateTime? _startTime;
+    private static int _lastPort = 8080;
 
     public static async Task StartServerAsync(int port, string mode)
     {
@@ -25,6 +32,7 @@ public static class ServerCommands
         AnsiConsole.MarkupLine($"  Mode: [cyan]{mode}[/]\n");
 
         _serverCts = new CancellationTokenSource();
+        _lastPort = port;
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
@@ -40,8 +48,16 @@ public static class ServerCommands
                         .WithOperatingMode(operatingMode)
                         .BuildAndInitializeAsync(_serverCts.Token);
 
-                    ctx.Status("Starting plugins...");
-                    await Task.Delay(500);
+                    _startTime = DateTime.UtcNow;
+
+                    ctx.Status("Verifying kernel ready...");
+                    if (!_runningKernel.IsReady)
+                    {
+                        AnsiConsole.MarkupLine("[red]Kernel initialized but not ready.[/]");
+                        _runningKernel = null;
+                        _startTime = null;
+                        return;
+                    }
 
                     ctx.Status("Server ready!");
                 }
@@ -49,21 +65,21 @@ public static class ServerCommands
                 {
                     AnsiConsole.MarkupLine($"[red]Failed to start server: {ex.Message}[/]");
                     _runningKernel = null;
+                    _startTime = null;
                     return;
                 }
             });
 
         if (_runningKernel != null)
         {
+            var pluginCount = _runningKernel.Plugins.GetAllPlugins().Count();
             AnsiConsole.MarkupLine("[green]Server started successfully![/]");
             AnsiConsole.MarkupLine($"  Kernel ID: [cyan]{_runningKernel.KernelId}[/]");
+            AnsiConsole.MarkupLine($"  Plugins loaded: [cyan]{pluginCount}[/]");
             AnsiConsole.MarkupLine($"  REST API: [cyan]http://localhost:{port}/api[/]");
             AnsiConsole.MarkupLine($"  gRPC: [cyan]grpc://localhost:{port + 1}[/]");
             AnsiConsole.MarkupLine($"  Dashboard: [cyan]http://localhost:{port}[/]");
             AnsiConsole.MarkupLine("\n[gray]Use 'dw server status' to monitor or 'dw server stop' to shutdown.[/]");
-
-            // In a real implementation, this would run the server
-            // For CLI, we just initialize and return
         }
     }
 
@@ -81,22 +97,16 @@ public static class ServerCommands
             .Spinner(Spinner.Known.Dots)
             .StartAsync("Shutting down...", async ctx =>
             {
-                if (graceful)
+                if (!graceful)
                 {
-                    ctx.Status("Draining connections...");
-                    await Task.Delay(500);
-
-                    ctx.Status("Flushing buffers...");
-                    await Task.Delay(300);
-
-                    ctx.Status("Stopping plugins...");
-                    await Task.Delay(400);
+                    ctx.Status("Cancelling operations...");
+                    _serverCts?.Cancel();
                 }
 
                 ctx.Status("Disposing kernel...");
-                _serverCts?.Cancel();
                 await _runningKernel.DisposeAsync();
                 _runningKernel = null;
+                _startTime = null;
             });
 
         AnsiConsole.MarkupLine("[green]Server stopped successfully.[/]");
@@ -104,88 +114,125 @@ public static class ServerCommands
 
     public static async Task ShowStatusAsync()
     {
-        await AnsiConsole.Status()
-            .StartAsync("Checking server status...", async ctx =>
+        if (_runningKernel != null)
+        {
+            // Local kernel is running -- show real data
+            var uptime = _startTime.HasValue
+                ? DateTime.UtcNow - _startTime.Value
+                : TimeSpan.Zero;
+
+            var process = Process.GetCurrentProcess();
+            var memoryMb = process.WorkingSet64 / (1024 * 1024);
+            var pluginCount = _runningKernel.Plugins.GetAllPlugins().Count();
+
+            var panel = new Panel(new Markup(
+                $"[bold]Server Status:[/] [green]Running (local)[/]\n" +
+                $"[bold]Kernel ID:[/] {_runningKernel.KernelId}\n" +
+                $"[bold]Mode:[/] {_runningKernel.OperatingMode}\n" +
+                $"[bold]Plugins:[/] {pluginCount} loaded\n" +
+                $"[bold]Memory:[/] {memoryMb} MB\n" +
+                $"[bold]Uptime:[/] {FormatUptime(uptime)}\n" +
+                $"[bold].NET:[/] {Environment.Version}"))
             {
-                await Task.Delay(300);
+                Header = new PanelHeader("Local DataWarehouse Server"),
+                Border = BoxBorder.Rounded
+            };
 
-                if (_runningKernel == null)
+            AnsiConsole.Write(panel);
+            return;
+        }
+
+        // No local kernel -- try HTTP API check for remote/external server
+        AnsiConsole.MarkupLine("[yellow]No local server instance running.[/]");
+        AnsiConsole.MarkupLine("\nChecking for remote server...");
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var url = $"http://localhost:{_lastPort}/api/v1/info";
+            var response = await client.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var info = JsonSerializer.Deserialize<JsonElement>(json);
+
+                var version = info.TryGetProperty("version", out var v) ? v.GetString() ?? "unknown" : "unknown";
+                var remoteUptime = info.TryGetProperty("uptime", out var u) ? u.GetString() ?? "unknown" : "unknown";
+                var connections = info.TryGetProperty("connections", out var c) ? c.GetInt32().ToString() : "N/A";
+
+                var panel = new Panel(new Markup(
+                    $"[bold]Server Status:[/] [green]Running (remote)[/]\n" +
+                    $"[bold]Endpoint:[/] http://localhost:{_lastPort}\n" +
+                    $"[bold]Version:[/] {version}\n" +
+                    $"[bold]Uptime:[/] {remoteUptime}\n" +
+                    $"[bold]Connections:[/] {connections}"))
                 {
-                    // Check if a server is running externally
-                    AnsiConsole.MarkupLine("[yellow]No local server instance running.[/]");
-                    AnsiConsole.MarkupLine("\nChecking for remote server...");
+                    Header = new PanelHeader("Remote DataWarehouse Server"),
+                    Border = BoxBorder.Rounded
+                };
 
-                    // Simulate checking for running server
-                    await Task.Delay(200);
+                AnsiConsole.Write(panel);
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            // HTTP check failed -- server not reachable
+        }
 
-                    var panel = new Panel(new Markup(
-                        "[bold]Server Status:[/] [green]Running[/]\n" +
-                        "[bold]Uptime:[/] 15d 7h 23m\n" +
-                        "[bold]Connections:[/] 45 active\n" +
-                        "[bold]Requests/sec:[/] 1,234\n" +
-                        "[bold]Memory:[/] 4.2 GB / 16 GB\n" +
-                        "[bold]CPU:[/] 23%"
-                    ))
-                    {
-                        Header = new PanelHeader("DataWarehouse Server"),
-                        Border = BoxBorder.Rounded
-                    };
-
-                    AnsiConsole.Write(panel);
-                }
-                else
-                {
-                    var panel = new Panel(new Markup(
-                        $"[bold]Server Status:[/] [green]Running[/]\n" +
-                        $"[bold]Kernel ID:[/] {_runningKernel.KernelId}\n" +
-                        $"[bold]Mode:[/] {_runningKernel.OperatingMode}\n" +
-                        $"[bold]Plugins:[/] {_runningKernel.Plugins.GetAllPlugins().Count()} loaded\n" +
-                        "[bold]Memory:[/] 256 MB\n" +
-                        "[bold]Uptime:[/] Just started"
-                    ))
-                    {
-                        Header = new PanelHeader("Local DataWarehouse Server"),
-                        Border = BoxBorder.Rounded
-                    };
-
-                    AnsiConsole.Write(panel);
-                }
-            });
+        AnsiConsole.MarkupLine("[red]No server instance detected on port {0}.[/]", _lastPort);
+        AnsiConsole.MarkupLine("[grey]Start a server with 'dw server start' or connect to a remote instance.[/]");
     }
 
-    public static async Task ShowInfoAsync()
+    public static Task ShowInfoAsync()
     {
-        await AnsiConsole.Status()
-            .StartAsync("Loading server information...", async ctx =>
-            {
-                await Task.Delay(300);
+        var assembly = typeof(ServerCommands).Assembly;
+        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                      ?? assembly.GetName().Version?.ToString()
+                      ?? "0.0.0";
 
-                AnsiConsole.Write(new FigletText("DataWarehouse")
-                    .Color(Color.Blue));
+        var pluginDisplay = _runningKernel != null
+            ? _runningKernel.Plugins.GetAllPlugins().Count().ToString()
+            : "N/A (server not running)";
 
-                var table = new Table()
-                    .Border(TableBorder.None)
-                    .HideHeaders();
+        AnsiConsole.Write(new FigletText("DataWarehouse")
+            .Color(Color.Blue));
 
-                table.AddColumn("");
-                table.AddColumn("");
+        var table = new Table()
+            .Border(TableBorder.None)
+            .HideHeaders();
 
-                table.AddRow("[bold]Version:[/]", "[cyan]1.0.0[/]");
-                table.AddRow("[bold]Build:[/]", "[cyan]2026.01.19.1234[/]");
-                table.AddRow("[bold]Runtime:[/]", $"[cyan].NET {Environment.Version}[/]");
-                table.AddRow("[bold]OS:[/]", $"[cyan]{Environment.OSVersion}[/]");
-                table.AddRow("[bold]Machine:[/]", $"[cyan]{Environment.MachineName}[/]");
-                table.AddRow("[bold]Processors:[/]", $"[cyan]{Environment.ProcessorCount}[/]");
-                table.AddRow("", "");
-                table.AddRow("[bold]SDK Version:[/]", "[cyan]1.0.0[/]");
-                table.AddRow("[bold]Kernel Version:[/]", "[cyan]1.0.0[/]");
-                table.AddRow("[bold]RAID Levels:[/]", "[cyan]41 supported[/]");
-                table.AddRow("[bold]Plugins Available:[/]", "[cyan]20+[/]");
-                table.AddRow("", "");
-                table.AddRow("[bold]License:[/]", "[cyan]Enterprise[/]");
-                table.AddRow("[bold]Support:[/]", "[cyan]support@datawarehouse.io[/]");
+        table.AddColumn("");
+        table.AddColumn("");
 
-                AnsiConsole.Write(table);
-            });
+        table.AddRow("[bold]Version:[/]", $"[cyan]{Markup.Escape(version)}[/]");
+        table.AddRow("[bold]Runtime:[/]", $"[cyan].NET {Environment.Version}[/]");
+        table.AddRow("[bold]OS:[/]", $"[cyan]{Environment.OSVersion}[/]");
+        table.AddRow("[bold]Machine:[/]", $"[cyan]{Environment.MachineName}[/]");
+        table.AddRow("[bold]Processors:[/]", $"[cyan]{Environment.ProcessorCount}[/]");
+        table.AddRow("", "");
+        table.AddRow("[bold]Plugins Loaded:[/]", $"[cyan]{pluginDisplay}[/]");
+        table.AddRow("[bold]Kernel Status:[/]", _runningKernel != null
+            ? "[green]Running[/]"
+            : "[yellow]Not running[/]");
+        table.AddRow("", "");
+        table.AddRow("[bold]License:[/]", "[cyan]Enterprise[/]");
+        table.AddRow("[bold]Support:[/]", "[cyan]support@datawarehouse.io[/]");
+
+        AnsiConsole.Write(table);
+
+        return Task.CompletedTask;
+    }
+
+    private static string FormatUptime(TimeSpan uptime)
+    {
+        if (uptime.TotalDays >= 1)
+            return $"{(int)uptime.TotalDays}d {uptime.Hours}h {uptime.Minutes}m";
+        if (uptime.TotalHours >= 1)
+            return $"{(int)uptime.TotalHours}h {uptime.Minutes}m {uptime.Seconds}s";
+        if (uptime.TotalMinutes >= 1)
+            return $"{(int)uptime.TotalMinutes}m {uptime.Seconds}s";
+        return $"{uptime.Seconds}s";
     }
 }
