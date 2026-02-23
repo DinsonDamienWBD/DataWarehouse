@@ -37,6 +37,7 @@
 - [Phase 65.5]: Batch 2 handlers resolve strategy by strategyId or category, DataProtection performs real async dispatch
 - [Phase 65.5]: Batch 2 dual-registration: 7 plugins modified, SemanticSync already done, EdgeComputing uses assembly-scanning (strategies not IStrategy-compatible)
 - [Phase 65.5-05]: Batch 1 dual-registration: 3 plugins actively dual-registered (Sustainability, MultiCloud, StreamingData); 5 documented as blocked (strategy bases don't extend StrategyBase)
+- [Phase 65.5]: HMAC algorithms removed from SupportedAlgorithms (span-based API lacks key parameter); AirGapBridge _masterKey persisted via SaveStateAsync; UltimateWorkflow AIOptimized key aligned to AIOptimizedWorkflow
 
 ## Performance Metrics
 
@@ -63,7 +64,8 @@
 | Phase 65.5 P08 | 8min | 1 tasks | 5 files |
 | Phase 65.5 P06 | 10min | 1 tasks | 7 files |
 | 65.5  | 05   | 10min    | 1     | 8     |
+| Phase 65.5 P09 | 5min | 1 tasks | 9 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T08:15:00Z
-- **Stopped At:** Completed 65.5-05-PLAN.md
+- **Stopped At:** Completed 65.5-09-PLAN.md
