@@ -654,13 +654,9 @@ public sealed class UltimateDocGenPlugin : PlatformPluginBase, IDisposable
 
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
+        var response = await base.OnHandshakeAsync(request);
         _activeStrategy ??= _registry.Get("OpenApiDoc") ?? _registry.GetAll().FirstOrDefault();
-        return await Task.FromResult(new HandshakeResponse
-        {
-            PluginId = Id, Name = Name, Version = ParseSemanticVersion(Version),
-            Category = Category, Success = true, ReadyState = PluginReadyState.Ready,
-            Capabilities = GetCapabilities(), Metadata = GetMetadata()
-        });
+        return response;
     }
 
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)

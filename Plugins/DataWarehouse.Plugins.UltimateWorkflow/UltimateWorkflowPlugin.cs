@@ -90,19 +90,9 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
     /// <inheritdoc/>
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
+        var response = await base.OnHandshakeAsync(request);
         _activeStrategy ??= _registry.Get("TopologicalDag") ?? _registry.GetAll().FirstOrDefault();
-
-        return await Task.FromResult(new HandshakeResponse
-        {
-            PluginId = Id,
-            Name = Name,
-            Version = ParseSemanticVersion(Version),
-            Category = Category,
-            Success = true,
-            ReadyState = PluginReadyState.Ready,
-            Capabilities = GetCapabilities(),
-            Metadata = GetMetadata()
-        });
+        return response;
     }
 
     /// <inheritdoc/>
