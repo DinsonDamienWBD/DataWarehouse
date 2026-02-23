@@ -72,7 +72,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
     }
 
     /// <inheritdoc/>
-    public override async Task StartAsync(CancellationToken ct)
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
         // Initialize audit service
         if (MessageBus != null)
@@ -278,7 +278,7 @@ internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransi
     }
 
     /// <inheritdoc/>
-    public override Task StopAsync()
+    protected override Task OnStopCoreAsync()
     {
         // Dispose subscription
         _transferRequestSubscription?.Dispose();

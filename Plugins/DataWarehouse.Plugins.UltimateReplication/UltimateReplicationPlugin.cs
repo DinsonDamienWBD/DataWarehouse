@@ -172,22 +172,23 @@ namespace DataWarehouse.Plugins.UltimateReplication
         /// <inheritdoc/>
         public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            _nodeId = $"repl-{Guid.NewGuid():N}"[..16];
+            // Load persisted node identity, or generate and persist a new one
+            var storedId = await LoadStateAsync("nodeId");
+            if (storedId != null && storedId.Length > 0)
+            {
+                _nodeId = System.Text.Encoding.UTF8.GetString(storedId);
+            }
+            else
+            {
+                _nodeId = $"repl-{Guid.NewGuid():N}"[..16];
+                await SaveStateAsync("nodeId", System.Text.Encoding.UTF8.GetBytes(_nodeId));
+            }
 
             // Set default strategy
             _activeStrategy ??= _registry.Get("CRDT") ?? _registry.GetAll().FirstOrDefault().Value;
 
-            return await Task.FromResult(new HandshakeResponse
-            {
-                PluginId = Id,
-                Name = Name,
-                Version = ParseSemanticVersion(Version),
-                Category = Category,
-                Success = true,
-                ReadyState = PluginReadyState.Ready,
-                Capabilities = GetCapabilities(),
-                Metadata = GetMetadata()
-            });
+            var response = await base.OnHandshakeAsync(request);
+            return response;
         }
 
         /// <inheritdoc/>

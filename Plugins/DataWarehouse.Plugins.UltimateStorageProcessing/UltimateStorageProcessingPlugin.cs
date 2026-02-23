@@ -322,7 +322,6 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
         }
         catch (Exception ex)
         {
-            Interlocked.Increment(ref _totalProcessed);
             Interlocked.Increment(ref _totalFailures);
             return new ProcessingResult
             {

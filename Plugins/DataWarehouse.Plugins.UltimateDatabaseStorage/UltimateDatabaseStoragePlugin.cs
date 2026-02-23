@@ -155,17 +155,8 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     /// <inheritdoc/>
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        return new HandshakeResponse
-        {
-            PluginId = Id,
-            Name = Name,
-            Version = new Version(1, 0, 0),
-            Category = Category,
-            Success = true,
-            ReadyState = PluginReadyState.Ready,
-            Capabilities = GetCapabilities(),
-            Metadata = GetMetadata()
-        };
+        var response = await base.OnHandshakeAsync(request);
+        return response;
     }
 
     /// <inheritdoc/>

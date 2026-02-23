@@ -463,7 +463,87 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     #endregion
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        // Restore persisted catalog entries
+        var catalogData = await LoadStateAsync("catalog", ct);
+        if (catalogData != null && catalogData.Length > 0)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataCatalogEntry>>(catalogData);
+                if (entries != null)
+                {
+                    foreach (var kvp in entries)
+                        _catalog[kvp.Key] = kvp.Value;
+                }
+            }
+            catch { /* Graceful degradation -- start with empty catalog */ }
+        }
+
+        // Restore persisted lineage records
+        var lineageData = await LoadStateAsync("lineage", ct);
+        if (lineageData != null && lineageData.Length > 0)
+        {
+            try
+            {
+                var records = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataLineageRecord>>(lineageData);
+                if (records != null)
+                {
+                    foreach (var kvp in records)
+                        _lineage[kvp.Key] = kvp.Value;
+                }
+            }
+            catch { /* Graceful degradation -- start with empty lineage */ }
+        }
+
+        // Restore persisted access policies
+        var policyData = await LoadStateAsync("policies", ct);
+        if (policyData != null && policyData.Length > 0)
+        {
+            try
+            {
+                var policies = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataLakeAccessPolicy>>(policyData);
+                if (policies != null)
+                {
+                    foreach (var kvp in policies)
+                        _policies[kvp.Key] = kvp.Value;
+                }
+            }
+            catch { /* Graceful degradation -- start with empty policies */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnStopCoreAsync()
+    {
+        // Persist catalog entries
+        try
+        {
+            var catalogDict = new Dictionary<string, DataCatalogEntry>(_catalog);
+            var catalogBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(catalogDict);
+            await SaveStateAsync("catalog", catalogBytes);
+        }
+        catch { /* Best-effort persistence */ }
+
+        // Persist lineage records
+        try
+        {
+            var lineageDict = new Dictionary<string, DataLineageRecord>(_lineage);
+            var lineageBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(lineageDict);
+            await SaveStateAsync("lineage", lineageBytes);
+        }
+        catch { /* Best-effort persistence */ }
+
+        // Persist access policies
+        try
+        {
+            var policyDict = new Dictionary<string, DataLakeAccessPolicy>(_policies);
+            var policyBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(policyDict);
+            await SaveStateAsync("policies", policyBytes);
+        }
+        catch { /* Best-effort persistence */ }
+    }
 
     /// <summary>Disposes resources.</summary>
     protected override void Dispose(bool disposing)

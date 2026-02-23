@@ -58,10 +58,10 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     public override PluginCategory Category => PluginCategory.StorageProvider;
 
     /// <inheritdoc/>
-    public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <inheritdoc/>
-    public override Task StopAsync() => Task.CompletedTask;
+    protected override Task OnStopCoreAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
