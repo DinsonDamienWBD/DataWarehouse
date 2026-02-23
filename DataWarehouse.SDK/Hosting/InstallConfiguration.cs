@@ -50,4 +50,19 @@ public sealed class InstallConfiguration
     /// Admin password (if CreateDefaultAdmin is true).
     /// </summary>
     public string? AdminPassword { get; set; }
+
+    /// <summary>
+    /// Deployment topology: DW-only, VDE-only, or DW+VDE co-located (default).
+    /// </summary>
+    public DeploymentTopology Topology { get; set; } = DeploymentTopology.DwPlusVde;
+
+    /// <summary>
+    /// Remote VDE URL to connect to (used when Topology == DwOnly).
+    /// </summary>
+    public string? RemoteVdeUrl { get; set; }
+
+    /// <summary>
+    /// Port for VDE to accept remote DW connections (used when Topology == VdeOnly).
+    /// </summary>
+    public int VdeListenPort { get; set; } = 9443;
 }
