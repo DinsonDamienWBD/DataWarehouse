@@ -49,6 +49,12 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
     /// <summary>
     /// List of all supported hash algorithms.
     /// </summary>
+    /// <remarks>
+    /// HMAC algorithms (HMAC-SHA256, HMAC-SHA384, HMAC-SHA512, HMAC-SHA3-256, HMAC-SHA3-384, HMAC-SHA3-512)
+    /// are supported via the keyed async API but are NOT listed here because the span-based
+    /// <see cref="ComputeHashCore"/> cannot accept key material.  Advertising them in this list
+    /// caused callers to hit <see cref="NotSupportedException"/> at runtime.
+    /// </remarks>
     public override IReadOnlyList<HashAlgorithmType> SupportedAlgorithms { get; } = new[]
     {
         HashAlgorithmType.SHA256,
@@ -59,13 +65,7 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
         HashAlgorithmType.SHA3_512,
         HashAlgorithmType.Keccak256,
         HashAlgorithmType.Keccak384,
-        HashAlgorithmType.Keccak512,
-        HashAlgorithmType.HMAC_SHA256,
-        HashAlgorithmType.HMAC_SHA384,
-        HashAlgorithmType.HMAC_SHA512,
-        HashAlgorithmType.HMAC_SHA3_256,
-        HashAlgorithmType.HMAC_SHA3_384,
-        HashAlgorithmType.HMAC_SHA3_512
+        HashAlgorithmType.Keccak512
     };
 
     /// <summary>

@@ -432,6 +432,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.S
         // Subscribe to standard RAID topics
         if (MessageBus != null)
         {
+            MessageBus.Subscribe(RaidTopics.Initialize, HandleInitializeAsync);
             MessageBus.Subscribe(RaidTopics.Write, HandleWriteAsync);
             MessageBus.Subscribe(RaidTopics.Read, HandleReadAsync);
             MessageBus.Subscribe(RaidTopics.Rebuild, HandleRebuildAsync);

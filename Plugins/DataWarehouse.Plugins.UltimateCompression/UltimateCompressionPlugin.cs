@@ -372,8 +372,18 @@ namespace DataWarehouse.Plugins.UltimateCompression
             switch (message.Type)
             {
                 case "compression.ultimate.list":
-                    // Return list of available algorithms
-                    // Note: Reply mechanism would need to be handled by caller
+                    var algorithms = _strategies.Values.Select(s => new Dictionary<string, object>
+                    {
+                        ["name"] = s.Characteristics.AlgorithmName,
+                        ["supportsStreaming"] = s.Characteristics.SupportsStreaming,
+                        ["supportsParallel"] = s.Characteristics.SupportsParallelCompression,
+                        ["compressionRatio"] = s.Characteristics.TypicalCompressionRatio,
+                        ["compressionSpeed"] = s.Characteristics.CompressionSpeed,
+                        ["decompressionSpeed"] = s.Characteristics.DecompressionSpeed
+                    }).ToList();
+                    message.Payload["strategies"] = algorithms;
+                    message.Payload["count"] = algorithms.Count;
+                    message.Payload["activeStrategy"] = _activeStrategy?.Characteristics.AlgorithmName ?? "auto";
                     break;
 
                 case "compression.ultimate.select":

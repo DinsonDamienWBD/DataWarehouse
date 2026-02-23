@@ -33,6 +33,23 @@ public static class RaidTopics
     // ========================================
 
     /// <summary>
+    /// Topic for initializing a RAID array with a specified strategy and configuration.
+    /// </summary>
+    /// <remarks>
+    /// Request payload:
+    /// <list type="bullet">
+    ///   <item><c>strategyId</c>: RAID strategy identifier</item>
+    ///   <item><c>config</c>: RaidConfiguration object</item>
+    /// </list>
+    /// Response payload:
+    /// <list type="bullet">
+    ///   <item><c>success</c>: Boolean indicating initialization success</item>
+    ///   <item><c>arrayId</c>: Unique identifier for the initialized array</item>
+    /// </list>
+    /// </remarks>
+    public const string Initialize = $"{Prefix}.initialize";
+
+    /// <summary>
     /// Topic for write operations to RAID array.
     /// </summary>
     /// <remarks>

@@ -9,7 +9,7 @@ public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
 {
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
-        StrategyName = "AIOptimized",
+        StrategyName = "AIOptimizedWorkflow",
         Description = "AI-enhanced workflow optimization with predictive scheduling and resource allocation",
         Category = WorkflowCategory.AIEnhanced,
         Capabilities = new(

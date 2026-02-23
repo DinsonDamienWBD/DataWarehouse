@@ -565,6 +565,9 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         message.Payload["success"] = true;
         message.Payload["defaultStrategy"] = strategyId;
 
+        // Persist default strategy across restarts
+        _ = SaveStateAsync("defaultStrategy", System.Text.Encoding.UTF8.GetBytes(strategyId));
+
         return Task.CompletedTask;
     }
 
@@ -594,6 +597,10 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
 
         message.Payload["fipsMode"] = _fipsMode;
         message.Payload["defaultStrategy"] = _defaultStrategyId;
+
+        // Persist FIPS mode and default strategy across restarts
+        _ = SaveStateAsync("fipsMode", new byte[] { (byte)(_fipsMode ? 1 : 0) });
+        _ = SaveStateAsync("defaultStrategy", System.Text.Encoding.UTF8.GetBytes(_defaultStrategyId));
 
         return Task.CompletedTask;
     }
@@ -1038,9 +1045,26 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     }
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct)
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
-        return Task.CompletedTask;
+        // Restore persisted FIPS mode
+        var fipsData = await LoadStateAsync("fipsMode", ct);
+        if (fipsData != null && fipsData.Length >= 1)
+        {
+            _fipsMode = fipsData[0] != 0;
+        }
+
+        // Restore persisted default strategy
+        var strategyData = await LoadStateAsync("defaultStrategy", ct);
+        if (strategyData != null && strategyData.Length > 0)
+        {
+            var storedId = System.Text.Encoding.UTF8.GetString(strategyData);
+            // Only apply if the strategy still exists in the registry
+            if (_registry.GetStrategy(storedId) != null)
+            {
+                _defaultStrategyId = storedId;
+            }
+        }
     }
 
     #endregion

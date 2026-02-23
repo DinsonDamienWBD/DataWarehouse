@@ -501,7 +501,7 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
         var workflowId = message.Payload.GetValueOrDefault("workflowId")?.ToString();
         if (_workflows.TryGetValue(workflowId ?? "", out var workflow))
         {
-            var aiStrategy = _registry.Get("AIOptimized");
+            var aiStrategy = _registry.Get("AIOptimizedWorkflow");
             if (aiStrategy != null)
             {
                 _activeStrategy = aiStrategy;
