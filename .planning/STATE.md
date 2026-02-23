@@ -21,7 +21,7 @@
 - Phase 78: COMPLETE (5/5 plans, online module addition with WAL, defrag, indirection)
 - Phase 79: COMPLETE (4/4 plans, MIME type + content detection + OS integration + import engine)
 - Phase 80: COMPLETE (4/4 plans, three-tier verification: tier mapping + benchmarks + unified suite)
-- Phase 81: 81-03 complete (V5ConfigMigrator + PolicyCompatibilityGate + AiAutonomyDefaults)
+- Phase 81: 81-01, 81-03 complete (VdeFormatDetector + CompatibilityModeContext + V1CompatibilityLayer + V5ConfigMigrator + PolicyCompatibilityGate + AiAutonomyDefaults)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -129,6 +129,7 @@
 - [Phase 80]: Four Tier 3 fallback modes (InMemoryDefault, NoOpSafe, FileBasedSimple, ConfigDriven); BasicFunctionalityAvailable always true at Tier 3
 - [Phase 80-02]: Tier2PipelineVerifier with FrozenDictionary plugin mapping for all 19 modules; Tier2VerificationResult computed Tier2Verified; both manifest=0 and manifest=0x7FFFF verification
 - [Phase 80-04]: 17 region-equipped modules default Tier 1; 2 region-less (Sustainability, Transit) default Tier 2; 100+1000 iteration Stopwatch benchmarks for 5 features; ThreeTierVerificationSuite consolidates TIER-01..TIER-05
+- [Phase 81-01]: VdeFormatException as new exception in Compatibility namespace; v1.0 skips namespace anchor validation; 18 degraded + 6 available features for v1.0 compat; V1CompatibilityLayer caches parsed superblock
 - [Phase 81-03]: FlushAsync (not SaveAllAsync) for migration persistence; 23 v5.0 config keys mapped; record-with path clamping; AiAutonomyDefaults is pure static class
 
 ## Performance Metrics
@@ -229,9 +230,10 @@
 | 80    | 02   | 2min     | 1     | 2     |
 | 80    | 01   | 5min     | 1     | 2     |
 | 80    | 04   | 4min     | 2     | 3     |
+| 81    | 01   | 3min     | 2     | 3     |
 | 81    | 03   | 3min     | 2     | 3     |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T16:32:45Z
 - **Timestamp:** 2026-02-23T16:45:00Z
-- **Stopped At:** Completed 81-03-PLAN.md (V5ConfigMigrator + PolicyCompatibilityGate + AiAutonomyDefaults)
+- **Stopped At:** Completed 81-01-PLAN.md (VdeFormatDetector + CompatibilityModeContext + V1CompatibilityLayer)
