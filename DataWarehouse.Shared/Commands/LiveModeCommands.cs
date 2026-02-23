@@ -35,7 +35,7 @@ public sealed class LiveStartCommand : ICommand
         var maxMemory = parameters.TryGetValue("memory", out var m) ? Convert.ToInt32(m) : 256;
 
         // Check if an instance is already running
-        var existingInstance = PortableMediaDetector.FindLocalLiveInstance(new[] { port });
+        var existingInstance = await PortableMediaDetector.FindLocalLiveInstanceAsync(new[] { port });
         if (existingInstance != null)
         {
             return CommandResult.Fail(
@@ -166,7 +166,7 @@ public sealed class LiveStatusCommand : ICommand
     public IReadOnlyList<string> RequiredFeatures { get; } = Array.Empty<string>();
 
     /// <inheritdoc />
-    public Task<CommandResult> ExecuteAsync(
+    public async Task<CommandResult> ExecuteAsync(
         CommandContext context,
         Dictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
@@ -191,21 +191,21 @@ public sealed class LiveStatusCommand : ICommand
                 ["loadedPlugins"] = status.LoadedPlugins
             };
 
-            return Task.FromResult(CommandResult.Ok(data,
-                $"Live instance running on port {status.Port} (uptime: {uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}, persistence: {(status.PersistData ? "ON" : "OFF")})"));
+            return CommandResult.Ok(data,
+                $"Live instance running on port {status.Port} (uptime: {uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}, persistence: {(status.PersistData ? "ON" : "OFF")})");
         }
 
         // Try to find via network scan
-        var found = PortableMediaDetector.FindLocalLiveInstance();
+        var found = await PortableMediaDetector.FindLocalLiveInstanceAsync();
         if (found != null)
         {
-            return Task.FromResult(CommandResult.Ok(
+            return CommandResult.Ok(
                 new { running = true, url = found, managedExternally = true },
-                $"Live instance detected at {found} (not managed by this process)."));
+                $"Live instance detected at {found} (not managed by this process).");
         }
 
-        return Task.FromResult(CommandResult.Ok(
+        return CommandResult.Ok(
             new { running = false },
-            "No live instance running."));
+            "No live instance running.");
     }
 }
