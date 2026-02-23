@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 84-deployment-topology-cli-modes
-- **Plan:** 5/6
+- **Plan:** 6/6
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -142,6 +142,7 @@
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
 - [Phase 83-05]: 201 VDE format tests: 120 module/profile/superblock/trailer/inode/region tests + 40 tamper detection (5 levels, policy serialization) + 41 migration (format detection, v1 compat, 10 configs, progress tracking)
 - [Phase 84-01]: DeploymentTopology enum (DwPlusVde/DwOnly/VdeOnly) + descriptor helpers; InstallConfiguration Topology/RemoteVdeUrl/VdeListenPort; CLI --topology/--remote-vde/--vde-port flags
+- [Phase 84-02]: VDE Composer CLI: dw vde create/list-modules/inspect; VdeCommands.cs re-included in csproj after Commands/** exclusion; non-interactive fallback defaults to VdePrimary residency
 
 ## Performance Metrics
 
@@ -253,7 +254,8 @@
 | 83    | 05   | 25min    | 2     | 4     |
 | 84    | 01   | 4min     | 2     | 4     |
 | 84    | 05   | 5min     | 2     | 4     |
+| 84    | 02   | 7min     | 2     | 4     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T18:41:22Z
-- **Stopped At:** Completed 84-05-PLAN.md (ServerCommands real kernel/HTTP + sync-over-async fix)
+- **Timestamp:** 2026-02-23T18:43:48Z
+- **Stopped At:** Completed 84-02-PLAN.md (VDE Composer CLI: dw vde create/list-modules/inspect)
