@@ -34,6 +34,7 @@
 - [Phase 65.5]: UltimateDataPrivacy re-parented to SecurityPluginBase; UltimateRAID re-parented to StoragePluginBase with block-to-key bridging
 - [Phase 65.5-04]: Keyword shadowing and deadlock risks eliminated: `new void Dispose` -> `override`, sync-over-async removed, dual _messageBus fields removed, ConcurrentQueue for audit log
 - [Phase 65.5-07]: 28 no-op message handlers wired across 5 plugins; governance compliance evaluates real rules (ownership, classification, policies); strategy metadata in responses
+- [Phase 65.5]: Batch 2 handlers resolve strategy by strategyId or category, DataProtection performs real async dispatch
 
 ## Performance Metrics
 
@@ -57,7 +58,8 @@
 | Phase 65.5 P01 | 6min | 2 tasks | 2 files |
 | 65.5  | 04   | 8min     | 1     | 6     |
 | 65.5  | 07   | 6min     | 1     | 5     |
+| Phase 65.5 P08 | 8min | 1 tasks | 5 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T08:11:00Z
-- **Stopped At:** Completed 65.5-07-PLAN.md
+- **Stopped At:** Completed 65.5-08-PLAN.md
