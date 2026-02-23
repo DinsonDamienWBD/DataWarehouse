@@ -108,8 +108,7 @@ public sealed class AddressWidthPromotionEngine
     /// <param name="currentWidth">Current address width.</param>
     public bool ShouldPromote(long currentBlockCount, AddressWidth currentWidth)
     {
-        if (currentBlockCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(currentBlockCount));
+        ArgumentOutOfRangeException.ThrowIfNegative(currentBlockCount);
 
         long maxBlocks = WideBlockAddress.MaxBlockCount(currentWidth);
 
@@ -143,8 +142,7 @@ public sealed class AddressWidthPromotionEngine
     /// <param name="currentBlockCount">Current number of allocated blocks.</param>
     public AddressWidth RecommendWidth(long currentBlockCount)
     {
-        if (currentBlockCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(currentBlockCount));
+        ArgumentOutOfRangeException.ThrowIfNegative(currentBlockCount);
 
         long needed = currentBlockCount;
         // Apply headroom if it won't overflow
