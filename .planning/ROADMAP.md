@@ -2126,31 +2126,26 @@ Wave 5: 88-13 (Universal migration audit) + 88-14 (Integration tests) -- depends
   8. `helm install dw datawarehouse/datawarehouse` deploys a working DW cluster on Kubernetes.
   9. Jepsen report: DW passes linearizability, snapshot isolation, and Raft correctness tests under network partitions and process kills. Report published.
   10. Connection pooling: all inter-node communication uses pooled connections. No per-RPC socket creation. Pool health-checked.
-**Plans**: 14 plans
+**Plans**: 10 plans
 
 Plans:
-- [ ] 89-01-PLAN.md -- Verify PostgreSQL wire protocol: audit `PostgreSqlProtocolStrategy.cs` (964 lines) for completeness; test with psql, pgAdmin, DBeaver, SQLAlchemy, npgsql, JDBC; fix startup handshake, auth, simple/extended query, COPY, error handling, SSL; implement missing message types (ECOS-01)
-- [ ] 89-02-PLAN.md -- PostgreSQL → SQL engine integration: wire `PostgreSqlProtocolStrategy` to `SqlParserEngine` → `CostBasedQueryPlanner` → `QueryExecutionEngine`; type mapping (PostgreSQL OIDs → DW ColumnDataType); `\d` catalog queries; prepared statements; BEGIN/COMMIT/ROLLBACK → MVCC (ECOS-02)
-- [ ] 89-03-PLAN.md -- Verify Parquet/Arrow/ORC: audit `ParquetCompatibleWriter.cs` (666 lines), `ParquetStrategy.cs`, `ArrowStrategy.cs`, `OrcStrategy.cs`; test round-trip with pandas/PyArrow/Spark; column pruning, row group skipping, compression codecs, all data types; fix gaps (ECOS-03, ECOS-04, ECOS-05)
-- [ ] 89-04-PLAN.md -- Parquet/Arrow VDE integration: VDE columnar regions use Arrow memory format; zero-copy Parquet→Arrow→VDE and VDE→Parquet paths; zone maps from Parquet row group statistics; Arrow Flight protocol strategy (ECOS-06)
-- [ ] 89-05-PLAN.md -- SDK `.proto` definitions: protobuf service definitions for all DW operations (Store/Retrieve/Query/Tag/Search/Stream/Admin); proto versioning strategy; code generation pipeline for all languages (ECOS-12)
-- [ ] 89-06-PLAN.md -- Python SDK: gRPC client generated from `.proto`; idiomatic Python wrapper (context managers, generators, type hints); pandas integration; PyPI packaging; Jupyter notebook examples; test suite (ECOS-07)
-- [ ] 89-07-PLAN.md -- Java SDK + JDBC driver: gRPC client from `.proto`; JDBC driver wrapping PostgreSQL wire protocol; Maven Central publishing; Spark connector; test suite (ECOS-08)
-- [ ] 89-08-PLAN.md -- Go SDK: gRPC client from `.proto`; idiomatic Go patterns (context.Context, error returns); pkg.go.dev module; used by Terraform provider; test suite (ECOS-09)
-- [ ] 89-09-PLAN.md -- Rust + JavaScript SDKs: Rust gRPC client (tonic) on crates.io; TypeScript gRPC-web client on npm; test suites (ECOS-10, ECOS-11)
-- [ ] 89-10-PLAN.md -- Terraform provider: `terraform-provider-datawarehouse` in Go; resources for instances, VDEs, users, policies, plugins, replication; data sources for status, capabilities; Terraform Registry publishing; acceptance tests (ECOS-13)
-- [ ] 89-11-PLAN.md -- Pulumi provider + Helm chart: Pulumi bridge from Terraform provider; Helm chart (StatefulSet, PVC, ConfigMap, Secret, Service, Ingress); single-node and clustered modes; `helm test`; Pulumi examples in Python/TS/Go/C# (ECOS-14, ECOS-15)
-- [ ] 89-12-PLAN.md -- Connection pooling: `IConnectionPool<TConnection>` SDK contract; TCP pool (Raft, replication, fabric), gRPC channel pool, HTTP/2 pool; configurable min/max/idle/health; per-node limits; replace all per-call socket creation (ECOS-18)
-- [ ] 89-13-PLAN.md -- Jepsen test harness: Docker-based multi-node deployment; fault injection (partition, kill, clock skew, disk corruption); workload generators (register, set, list-append, bank); Elle consistency checker integration (ECOS-16)
-- [ ] 89-14-PLAN.md -- Jepsen test execution: linearizability tests, Raft correctness under partition, CRDT convergence, WAL crash recovery, MVCC snapshot isolation, DVV replication consistency, split-brain prevention; generate and publish Jepsen report (ECOS-17)
+- [ ] 89-01-PLAN.md -- SDK .proto definitions: protobuf service definitions for all DW operations (Store/Retrieve/Query/Tag/Search/Stream/Admin); C# proto mirror types; versioning strategy (ECOS-12)
+- [ ] 89-02-PLAN.md -- Connection pooling SDK contract: IConnectionPool<TConnection> with TCP, gRPC, HTTP/2 implementations; per-node limits; health checking; idle eviction (ECOS-18)
+- [ ] 89-03-PLAN.md -- Verify PostgreSQL wire protocol: audit PostgreSqlProtocolStrategy.cs for completeness; fix gaps in startup, auth, simple/extended query, COPY, error handling, SSL (ECOS-01)
+- [ ] 89-04-PLAN.md -- Verify Parquet/Arrow/ORC: audit all three strategies; fix data type handling, compression codecs, statistics; cross-format verification (ECOS-03, ECOS-04, ECOS-05)
+- [ ] 89-05-PLAN.md -- PostgreSQL SQL engine integration: wire protocol to SqlParserEngine/CostBasedQueryPlanner/QueryExecutionEngine; OID type mapping; pg_catalog queries; transactions (ECOS-02)
+- [ ] 89-06-PLAN.md -- Parquet/Arrow VDE integration: Arrow-VDE zero-copy bridge; Parquet zone map population; Arrow Flight protocol strategy (ECOS-06)
+- [ ] 89-07-PLAN.md -- Multi-language SDK code generator: SDK API specification + code generation engine producing Python/Java/Go/Rust/TypeScript clients from proto definitions (ECOS-07 through ECOS-11)
+- [ ] 89-08-PLAN.md -- IaC providers and Helm chart: Terraform provider specification; Pulumi bridge; Helm chart for K8s deployment (ECOS-13, ECOS-14, ECOS-15)
+- [ ] 89-09-PLAN.md -- Jepsen test harness: Docker-based cluster deployment; fault injection (partition/kill/clock/disk); workload generators (register/set/list-append/bank); Elle checker (ECOS-16)
+- [ ] 89-10-PLAN.md -- Jepsen test scenarios and report: 7 test scenarios (linearizability, Raft, CRDT, WAL, MVCC, DVV, split-brain); HTML/JSON/Markdown report generator (ECOS-17)
 
 Wave structure:
 ```
-Wave 1: 89-01 (Verify PostgreSQL) + 89-03 (Verify Parquet/Arrow/ORC) + 89-05 (Proto definitions) + 89-12 (Connection pooling) -- parallel, foundational verification & infrastructure
-Wave 2: 89-02 (PostgreSQL→SQL engine) + 89-04 (Parquet/Arrow VDE integration) + 89-06 (Python SDK) + 89-08 (Go SDK) -- parallel, depends on Wave 1
-Wave 3: 89-07 (Java SDK + JDBC) + 89-09 (Rust + JS SDKs) + 89-10 (Terraform provider) -- parallel, depends on Wave 2 (Go SDK for Terraform)
-Wave 4: 89-11 (Pulumi + Helm) + 89-13 (Jepsen harness) -- parallel, depends on Wave 3
-Wave 5: 89-14 (Jepsen execution + report) -- depends on ALL prior waves
+Wave 1: 89-01 (Proto definitions) + 89-02 (Connection pooling) + 89-03 (Verify PostgreSQL) + 89-04 (Verify Parquet/Arrow/ORC) -- parallel, foundational
+Wave 2: 89-05 (PostgreSQL->SQL engine, needs 89-03) + 89-06 (VDE columnar integration, needs 89-04) + 89-07 (SDK generators, needs 89-01) -- parallel
+Wave 3: 89-08 (IaC + Helm, needs 89-07) + 89-09 (Jepsen harness, needs 89-05) -- parallel
+Wave 4: 89-10 (Jepsen scenarios + report, needs 89-09) -- final
 ```
 
 #### Phase 90: Device Discovery & Physical Block Device Management
