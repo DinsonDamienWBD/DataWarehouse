@@ -200,6 +200,7 @@
 - [Phase 89]: DataWarehouseGrpcServices static registry provides all 6 service descriptors
 - [Phase 89]: CancelRequest opens new TCP connection per PostgreSQL spec; CopyBothResponse drains in normal query; multi-statement accumulates rowsAffected
 - [Phase 89]: PostgreSQL OID type mapping uses text format (code 0) for all types for maximum client compatibility; QueryPlanNode disambiguated via using alias
+- [Phase 89]: MemoryMarshal.AsBytes for zero-copy Arrow primitive conversion; Arrow string columns use offset+data encoding; zone map entries per-column keyed
 
 ## Performance Metrics
 
@@ -367,7 +368,8 @@
 | Phase 89 P01 | 6min | 2 tasks | 3 files |
 | Phase 89 P03 | 7min | 2 tasks | 2 files |
 | Phase 89 P05 | 5min | 2 tasks | 3 files |
+| Phase 89 P06 | 6min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T23:50:10Z
-- **Stopped At:** Completed 89-05-PLAN.md
+- **Stopped At:** Completed 89-06-PLAN.md
