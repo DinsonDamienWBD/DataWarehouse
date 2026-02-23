@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 86-adaptive-index-engine
-- **Plan:** 10/16
+- **Plan:** 11/16
 - **Status:** IN PROGRESS
-- **Last Completed:** 86-10-PLAN.md
+- **Last Completed:** 86-11-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -162,6 +162,7 @@
 - [Phase 86-10]: PaddedSequence 128-byte StructLayout offset 56 for cache-line isolation; DisruptorRingBuffer<T> pre-allocated power-of-two with lock-free sequences; 4 wait strategies (BusySpin/Yielding/Sleeping/Blocking); DisruptorMessageBus auto-detects Disruptor vs Channel<T> on ProcessorCount>=4; P99 latency via sorted circular buffer
 - [Phase 86]: Hilbert 2D/16-bit default for shard routing; volatile CdfModel swap for lock-free readers; per-shard AdaptiveIndexEngine for independent morph; auto-split samples 1000 keys for median
 - [Phase 86]: ALEX uses 2-level RMI with linear CDF models, hit-rate-driven retrain, auto-deactivation
+- [Phase 86-11]: ExtendibleHashTable: lowest-bits directory indexing; bucket split reuses old block for low; MigrateFromLinearArray pre-allocates per directory slot; CA1512 ThrowIfLessThan pattern
 
 ## Performance Metrics
 
@@ -290,7 +291,8 @@
 | 86    | 10   | 4min     | 2     | 2     |
 | Phase 86 P04 | 6min | 2 tasks | 3 files |
 | Phase 86 P03 | 5min | 2 tasks | 2 files |
+| 86    | 11   | 3min     | 1     | 2     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T20:22:00Z
-- **Stopped At:** Completed 86-03-PLAN.md
+- **Timestamp:** 2026-02-23T20:27:00Z
+- **Stopped At:** Completed 86-11-PLAN.md (Extendible hashing inode table)
