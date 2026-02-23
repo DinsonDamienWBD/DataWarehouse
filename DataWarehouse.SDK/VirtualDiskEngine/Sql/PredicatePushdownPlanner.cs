@@ -343,7 +343,7 @@ public sealed class PredicatePushdownPlanner
             };
         }
 
-        return hasAnyFilter ? filters : null;
+        return hasAnyFilter ? filters! : null;
     }
 
     // ── Row-level Evaluation ────────────────────────────────────────────
