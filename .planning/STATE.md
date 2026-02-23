@@ -64,6 +64,7 @@
 - [Phase 70-01]: Virtual ApplyCascade extensibility point for Plan 02; secondary location index for O(1) HasOverrideAsync; path segment count maps to PolicyLevel (1=VDE through 5=Block)
 - [Phase 70]: [Phase 70-02]: Inherit enum value treated as no-explicit-cascade for category-default fallback; Enforce scan checks entire chain for higher-level Enforce before evaluating most-specific; MostRestrictive intersects custom params
 - [Phase 70-06]: GDPR parameter checks use empty-string value match (key existence only) for retention_policy and export_format; weighted scoring sum(passed.Weight)/sum(all.Weight)*100; grade A=90+ B=80+ C=70+ D=60+ F<60
+- [Phase 70]: Override store uses composite featureId:level keys with well-known __cascade_override__ persistence convention; resolution order: Enforce > user override > explicit > category default
 
 ## Performance Metrics
 
@@ -113,7 +114,8 @@
 | 70    | 01   | 5min     | 2     | 3     |
 | Phase 70 P02 | 3min | 2 tasks | 3 files |
 | 70    | 06   | 4min     | 2     | 2     |
+| Phase 70 P03 | 4min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T11:01:16Z
-- **Stopped At:** Completed 70-06-PLAN.md (Phase 70 COMPLETE)
+- **Stopped At:** Completed 70-03-PLAN.md (CascadeOverrideStore + engine integration)
