@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 87-vde-scalable-internals
-- **Plan:** 1/15
+- **Plan:** 8/15
 - **Status:** IN PROGRESS
-- **Last Completed:** 87-01-PLAN.md
+- **Last Completed:** 87-08-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -175,6 +175,7 @@
 - [Phase 87]: Size classes 64/128/256/512/1024/2048 bytes; delegate-based AllocationGroup integration for SubBlockPacker
 - [Phase 87]: SemaphoreSlim for MVCC version store block allocation; read-your-own-writes via WriteSet; Serializable conflict detection via committed write set tracking
 - [Phase 87]: EXTN block type tag (0x4558544E); InsertEntry takes blockSize for capacity; 40% merge threshold; long.MinValue for root split first key
+- [Phase 87]: PreparedQueryCache LRU via LinkedList+Dictionary; SQL fingerprinting replaces literals with ?; MergeJoinExecutor buffers right duplicates for many-to-many; IndexOnlyScan reuses existing ZoneMapEntry (no duplicate struct)
 - [Phase 87]: SemaphoreSlim for MVCC version store block allocation; read-your-own-writes via WriteSet; Serializable conflict detection via committed write set tracking
 
 ## Performance Metrics
@@ -318,7 +319,8 @@
 | Phase 87 P06 | 4min | 2 tasks | 3 files |
 | Phase 87 P04 | 4min | 2 tasks | 3 files |
 | Phase 87 P07 | 3min | 2 tasks | 2 files |
+| Phase 87 P08 | 6min | 2 tasks | 3 files |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T21:21:18Z
-- **Stopped At:** Completed 87-07-PLAN.md
+- **Timestamp:** 2026-02-23T21:36:26Z
+- **Stopped At:** Completed 87-08-PLAN.md
