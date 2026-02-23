@@ -89,6 +89,10 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             if (context is null)
                 throw new ArgumentNullException(nameof(context));
 
+            // CASC-06: If cache is available, take a snapshot at the start of resolution.
+            // All lookups for this resolution use this snapshot, even if policies change mid-operation.
+            var snapshot = _cache?.GetSnapshot();
+
             var levels = ParsePathToLevels(context.Path);
             var resolutionChain = new List<FeaturePolicy>();
 
@@ -96,7 +100,18 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             for (var i = levels.Count - 1; i >= 0; i--)
             {
                 var (level, pathForLevel) = levels[i];
-                var policy = await _store.GetAsync(featureId, level, pathForLevel, ct).ConfigureAwait(false);
+
+                FeaturePolicy? policy;
+                if (snapshot is not null)
+                {
+                    // Read from immutable snapshot (CASC-06 snapshot isolation)
+                    policy = snapshot.TryGetPolicy(featureId, level, pathForLevel);
+                }
+                else
+                {
+                    // Fall back to direct store query (backward compatible)
+                    policy = await _store.GetAsync(featureId, level, pathForLevel, ct).ConfigureAwait(false);
+                }
 
                 if (policy is not null)
                 {
@@ -126,6 +141,10 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             // Apply cascade strategy
             var (intensity, aiAutonomy, mergedParams, decidedAt) = ApplyCascade(cascadeStrategy, resolutionChain);
 
+            // CASC-06: Use snapshot timestamp when available so in-flight operations
+            // record when their policy view was captured, not when resolution completed.
+            var snapshotTimestamp = snapshot?.Timestamp ?? DateTimeOffset.UtcNow;
+
             return new EffectivePolicy(
                 featureId: featureId,
                 effectiveIntensity: intensity,
@@ -134,7 +153,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 decidedAtLevel: decidedAt,
                 resolutionChain: resolutionChain.AsReadOnly(),
                 mergedParameters: mergedParams,
-                snapshotTimestamp: DateTimeOffset.UtcNow);
+                snapshotTimestamp: snapshotTimestamp);
         }
 
         /// <inheritdoc />
@@ -171,6 +190,54 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
 
             _activeProfile = profile;
             await _persistence.SaveProfileAsync(profile, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Validates a policy for circular references and structural issues before storing it (CASC-07).
+        /// This is a pre-write validation hook: if validation fails (circular reference detected),
+        /// <see cref="PolicyCircularReferenceException"/> is thrown and the policy is NOT stored.
+        /// </summary>
+        /// <param name="featureId">The feature identifier for the policy.</param>
+        /// <param name="level">The hierarchy level at which the policy will be stored.</param>
+        /// <param name="path">The VDE path at which the policy will be stored.</param>
+        /// <param name="policy">The policy to validate.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A <see cref="PolicyValidationResult"/> with any warnings (errors cause an exception).</returns>
+        /// <exception cref="PolicyCircularReferenceException">Thrown when a circular reference is detected.</exception>
+        public async Task<PolicyValidationResult> ValidatePolicyAsync(
+            string featureId,
+            PolicyLevel level,
+            string path,
+            FeaturePolicy policy,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // CircularReferenceDetector.ValidateAsync throws PolicyCircularReferenceException on cycles
+            var result = await CircularReferenceDetector.ValidateAsync(
+                featureId, level, path, policy, _store, ct: ct).ConfigureAwait(false);
+
+            if (!result.IsValid)
+            {
+                // Non-circular blocking errors (e.g., chain depth exceeded)
+                throw new InvalidOperationException(
+                    $"Policy validation failed for '{featureId}' at '{path}': {string.Join("; ", result.Errors)}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Notifies the versioned cache that the policy store has been modified.
+        /// Updates the cache snapshot from the current store state. If no cache is configured,
+        /// this method is a no-op.
+        /// </summary>
+        /// <param name="featureIds">The set of feature IDs to refresh in the cache.</param>
+        /// <param name="ct">Cancellation token.</param>
+        public async Task NotifyCacheUpdateAsync(IEnumerable<string> featureIds, CancellationToken ct = default)
+        {
+            if (_cache is null) return;
+            await _cache.UpdateFromStoreAsync(_store, featureIds, ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -376,6 +443,12 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             CascadeStrategy strategy,
             IReadOnlyList<FeaturePolicy> chain)
         {
+            // CASC-08: For Merge strategy, delegate conflict resolution to the configured resolver
+            if (strategy == CascadeStrategy.Merge && _conflictResolver is not null)
+            {
+                return ApplyMergeWithConflictResolver(chain);
+            }
+
             return strategy switch
             {
                 CascadeStrategy.Inherit => CascadeStrategies.Inherit(chain),
@@ -385,6 +458,27 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 CascadeStrategy.Merge => CascadeStrategies.Merge(chain),
                 _ => CascadeStrategies.Override(chain), // Unknown strategy falls back to Override
             };
+        }
+
+        /// <summary>
+        /// Applies the Merge strategy with per-tag-key conflict resolution via <see cref="MergeConflictResolver"/> (CASC-08).
+        /// Intensity and AI autonomy come from the most-specific entry (chain[0]).
+        /// Custom parameters from all levels are collected and conflicts resolved per-key.
+        /// </summary>
+        private (int Intensity, AiAutonomyLevel AiAutonomy, Dictionary<string, string> MergedParams, PolicyLevel DecidedAt) ApplyMergeWithConflictResolver(
+            IReadOnlyList<FeaturePolicy> chain)
+        {
+            var winner = chain[0];
+
+            // Collect custom parameter dictionaries ordered most-specific first
+            var paramsByLevel = new List<Dictionary<string, string>?>(chain.Count);
+            for (var i = 0; i < chain.Count; i++)
+            {
+                paramsByLevel.Add(chain[i].CustomParameters);
+            }
+
+            var mergedParams = _conflictResolver!.ResolveAll(paramsByLevel);
+            return (winner.IntensityLevel, winner.AiAutonomy, mergedParams, winner.Level);
         }
 
         /// <summary>
