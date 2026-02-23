@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using DataWarehouse.CLI.Commands;
 using DataWarehouse.CLI.ShellCompletions;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.Shared;
@@ -289,6 +290,7 @@ public static class Program
         rootCommand.Subcommands.Add(CreateLiveCommand(formatOption));
         rootCommand.Subcommands.Add(CreateServiceCommand(formatOption));
         rootCommand.Subcommands.Add(CreateDisconnectCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateVdeCommand(formatOption));
 
         // Default handler
         rootCommand.SetAction((ParseResult parseResult) =>
@@ -323,6 +325,7 @@ public static class Program
         AnsiConsole.MarkupLine("  [cyan]service[/]     - Service management");
         AnsiConsole.MarkupLine("  [cyan]connect[/]     - Connect to an instance");
         AnsiConsole.MarkupLine("  [cyan]disconnect[/]  - Disconnect from current instance");
+        AnsiConsole.MarkupLine("  [cyan]vde[/]         - VDE (Virtual Disk Engine) management");
         AnsiConsole.MarkupLine("  [cyan]completions[/] - Generate shell completions");
         AnsiConsole.MarkupLine("\nUse [cyan]dw [command] --help[/] for more information.");
     }
@@ -757,6 +760,63 @@ public static class Program
         });
 
         command.Subcommands.Add(verifyCommand);
+
+        return command;
+    }
+
+    private static Command CreateVdeCommand(Option<OutputFormat> formatOption)
+    {
+        var command = new Command("vde", "VDE (Virtual Disk Engine) - Create, inspect, and manage DWVD v2.0 files");
+
+        // dw vde create
+        var createCommand = new Command("create", "Create a new VDE file with selected modules");
+
+        var outputOption = new Option<string>("--output", "-o") { Description = "Output .dwvd file path", Required = true };
+        var modulesOption = new Option<string>("--modules", "-m") { Description = "Comma-separated module names (e.g., security,tags,replication)", Required = true };
+        var profileOption = new Option<string?>("--profile") { Description = "Named profile (minimal, standard, enterprise, max-security, edge-iot, analytics)" };
+        var blockSizeOption = new Option<int>("--block-size") { Description = "Block size in bytes (power of 2, 512-65536)", DefaultValueFactory = _ => 4096 };
+        var totalBlocksOption = new Option<long>("--total-blocks") { Description = "Total blocks (default 1048576 = 4GB at 4K blocks)", DefaultValueFactory = _ => 1048576L };
+        var residencyOption = new Option<string?>("--residency") { Description = "Residency strategy: VdePrimary, PluginOnly, VdeFirstSync, FallbackAndRepair" };
+
+        createCommand.Options.Add(outputOption);
+        createCommand.Options.Add(modulesOption);
+        createCommand.Options.Add(profileOption);
+        createCommand.Options.Add(blockSizeOption);
+        createCommand.Options.Add(totalBlocksOption);
+        createCommand.Options.Add(residencyOption);
+
+        createCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var output = parseResult.GetValue(outputOption)!;
+            var modules = parseResult.GetValue(modulesOption)!;
+            var profileName = parseResult.GetValue(profileOption);
+            var blockSize = parseResult.GetValue(blockSizeOption);
+            var totalBlocks = parseResult.GetValue(totalBlocksOption);
+            var residency = parseResult.GetValue(residencyOption);
+
+            return await VdeCommands.CreateAsync(output, modules, profileName, blockSize, totalBlocks, residency);
+        });
+
+        // dw vde list-modules
+        var listModulesCommand = new Command("list-modules", "List all available VDE modules");
+        listModulesCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            return await VdeCommands.ListModulesAsync();
+        });
+
+        // dw vde inspect
+        var inspectCommand = new Command("inspect", "Inspect an existing VDE file");
+        var pathArg = new Argument<string>("path") { Description = "Path to the .dwvd file to inspect" };
+        inspectCommand.Arguments.Add(pathArg);
+        inspectCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var path = parseResult.GetValue(pathArg)!;
+            return await VdeCommands.InspectAsync(path);
+        });
+
+        command.Subcommands.Add(createCommand);
+        command.Subcommands.Add(listModulesCommand);
+        command.Subcommands.Add(inspectCommand);
 
         return command;
     }

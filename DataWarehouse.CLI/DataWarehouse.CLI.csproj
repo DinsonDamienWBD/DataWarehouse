@@ -30,6 +30,8 @@
   <!-- Exclude old Commands folder - business logic moved to DataWarehouse.Shared -->
   <ItemGroup>
     <Compile Remove="Commands\**" />
+    <!-- Re-include VDE commands (CLI-only, uses Spectre.Console for rich output) -->
+    <Compile Include="Commands\VdeCommands.cs" />
   </ItemGroup>
 
   <ItemGroup>
