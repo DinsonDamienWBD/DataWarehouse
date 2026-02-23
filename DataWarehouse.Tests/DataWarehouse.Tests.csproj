@@ -58,9 +58,8 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalObservability\DataWarehouse.Plugins.UniversalObservability.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalDashboards\DataWarehouse.Plugins.UniversalDashboards.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AedsCore\DataWarehouse.Plugins.AedsCore.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AppPlatform\DataWarehouse.Plugins.AppPlatform.csproj" />
 
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.KubernetesCsi\DataWarehouse.Plugins.KubernetesCsi.csproj" />
+
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.PluginMarketplace\DataWarehouse.Plugins.PluginMarketplace.csproj" />
 
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateBlockchain\DataWarehouse.Plugins.UltimateBlockchain.csproj" />
@@ -96,7 +95,6 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStreamingData\DataWarehouse.Plugins.UltimateStreamingData.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateSustainability\DataWarehouse.Plugins.UltimateSustainability.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateWorkflow\DataWarehouse.Plugins.UltimateWorkflow.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Virtualization.SqlOverObject\DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.SemanticSync\DataWarehouse.Plugins.SemanticSync.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalFabric\DataWarehouse.Plugins.UniversalFabric.csproj" />
   </ItemGroup>
