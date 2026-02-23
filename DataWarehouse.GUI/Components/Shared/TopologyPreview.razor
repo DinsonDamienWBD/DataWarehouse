@@ -1,0 +1,75 @@
+@using DataWarehouse.SDK.VirtualDiskEngine.Format
+
+<div class="card">
+    <div class="card-header">Topology Preview</div>
+    <div class="card-body">
+        <!-- ASCII Box Diagram -->
+        <div style="font-family: monospace; white-space: pre; line-height: 1.6; padding: 0.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px;">
+@((MarkupString)GetTopologyDiagram())
+        </div>
+
+        <!-- Active Module Badges -->
+        @if (ActiveModules is { Count: > 0 })
+        {
+            <div class="mt-3">
+                <strong>Active Modules:</strong>
+                <div class="d-flex gap-1 mt-1" style="flex-wrap: wrap;">
+                    @foreach (var moduleId in ActiveModules)
+                    {
+                        var mod = ModuleRegistry.GetModule(moduleId);
+                        <span class="badge badge-info" title="@mod.Name">@mod.Abbreviation</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public DeploymentTopology Topology { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<ModuleId>? ActiveModules { get; set; }
+
+    private string GetTopologyDiagram() => Topology switch
+    {
+        DeploymentTopology.DwPlusVde =>
+            """
+            ┌─────────────────────────────────────────┐
+            │              Local Host                  │
+            │                                          │
+            │  ┌──────────────┐   ┌──────────────┐    │
+            │  │  DW Kernel   │◄─►│  VDE Engine   │    │
+            │  └──────────────┘   └──────────────┘    │
+            │                                          │
+            └─────────────────────────────────────────┘
+            """,
+
+        DeploymentTopology.DwOnly =>
+            """
+            ┌──────────────────┐          ┌──────────────────┐
+            │    Local Host    │          │   Remote Host    │
+            │                  │          │                  │
+            │  ┌────────────┐  │ network  │  ┌────────────┐  │
+            │  │ DW Kernel  │──┼─────────►│  │ VDE Engine │  │
+            │  └────────────┘  │          │  └────────────┘  │
+            │                  │          │                  │
+            └──────────────────┘          └──────────────────┘
+            """,
+
+        DeploymentTopology.VdeOnly =>
+            """
+            ┌──────────────────┐          ┌──────────────────┐
+            │   Remote Host    │          │    Local Host    │
+            │                  │          │                  │
+            │  ┌────────────┐  │ network  │  ┌────────────┐  │
+            │  │ DW Kernel  │──┼─────────►│  │ VDE Engine │  │
+            │  └────────────┘  │          │  └────────────┘  │
+            │                  │          │                  │
+            └──────────────────┘          └──────────────────┘
+            """,
+
+        _ => "Unknown topology",
+    };
+}

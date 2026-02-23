@@ -1,0 +1,474 @@
+@page "/vde-composer"
+@using DataWarehouse.SDK.VirtualDiskEngine.Format
+@inject NavigationManager Navigation
+
+<div class="content-header">
+    <h2>VDE Composer</h2>
+    <p class="text-muted">Step @_currentStep of 4: @GetStepTitle()</p>
+</div>
+
+<div class="content-body">
+    <!-- Step indicator -->
+    <div class="d-flex gap-2 mb-4">
+        @for (int i = 1; i <= 4; i++)
+        {
+            var step = i;
+            <div class="@(step == _currentStep ? "badge badge-success" : step < _currentStep ? "badge badge-info" : "badge badge-secondary")"
+                 style="padding: 0.5rem 1rem; cursor: pointer;"
+                 @onclick="() => GoToStep(step)">
+                @step. @GetStepTitle(step)
+            </div>
+        }
+    </div>
+
+    <!-- Step 1: Module Selection -->
+    @if (_currentStep == 1)
+    {
+        <div class="card">
+            <div class="card-header">Select VDE Modules</div>
+            <div class="card-body">
+                @foreach (var category in _moduleCategories)
+                {
+                    <h5 class="mt-3 mb-2">@category.Name</h5>
+                    <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                        @foreach (var moduleId in category.Modules)
+                        {
+                            var mod = ModuleRegistry.GetModule(moduleId);
+                            var id = moduleId;
+                            <div class="card @(_selectedModules.Contains(id) ? "border-primary" : "")"
+                                 style="min-width: 200px; max-width: 280px; cursor: pointer;"
+                                 @onclick="() => ToggleModule(id)">
+                                <div class="card-body" style="padding: 0.75rem;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="checkbox" checked="@_selectedModules.Contains(id)"
+                                               @onclick:stopPropagation="true"
+                                               @onchange="() => ToggleModule(id)" />
+                                        <strong>@mod.Name</strong>
+                                        <span class="badge badge-secondary">@mod.Abbreviation</span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        @GetModuleDescription(id)
+                                    </small>
+                                    @if (mod.HasRegion)
+                                    {
+                                        <small class="text-muted">Regions: @string.Join(", ", mod.RegionNames)</small>
+                                    }
+                                    @if (mod.HasInodeFields)
+                                    {
+                                        <small class="text-muted d-block">Inode: +@(mod.InodeFieldBytes)B</small>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mt-3">
+                    <button class="btn btn-primary" @onclick="() => GoToStep(2)"
+                            disabled="@(_selectedModules.Count == 0)">
+                        Next: Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Step 2: Configuration -->
+    @if (_currentStep == 2)
+    {
+        <div class="card">
+            <div class="card-header">Module Configuration</div>
+            <div class="card-body">
+                <!-- Block Size -->
+                <div class="mb-3">
+                    <label><strong>Block Size</strong></label>
+                    <select class="form-control" style="max-width: 200px;"
+                            @onchange="OnBlockSizeChanged">
+                        @foreach (var size in _blockSizes)
+                        {
+                            <option value="@size" selected="@(size == _blockSize)">@FormatBlockSize(size)</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Total Size -->
+                <div class="mb-3">
+                    <label><strong>Total Size</strong></label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="number" class="form-control" style="max-width: 150px;"
+                               value="@_totalSizeValue"
+                               @onchange="OnTotalSizeChanged" min="1" />
+                        <select class="form-control" style="max-width: 100px;"
+                                @onchange="OnSizeUnitChanged">
+                            <option value="MB" selected="@(_sizeUnit == "MB")">MB</option>
+                            <option value="GB" selected="@(_sizeUnit == "GB")">GB</option>
+                            <option value="TB" selected="@(_sizeUnit == "TB")">TB</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Per-module config levels -->
+                <h5 class="mt-4">Per-Module Configuration Levels</h5>
+                <p class="text-muted small">0 = minimal, 15 = maximum</p>
+
+                @foreach (var moduleId in _selectedModules.OrderBy(m => (byte)m))
+                {
+                    var mod = ModuleRegistry.GetModule(moduleId);
+                    var id = moduleId;
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <span style="min-width: 120px;">@mod.Name (@mod.Abbreviation)</span>
+                        <input type="range" min="0" max="15" value="@GetConfigLevel(id)"
+                               @onchange="(e) => SetConfigLevel(id, e)" style="flex: 1; max-width: 300px;" />
+                        <span class="badge badge-info" style="min-width: 30px;">@GetConfigLevel(id)</span>
+                        <small class="text-muted">@GetLevelDescription(GetConfigLevel(id))</small>
+                    </div>
+                }
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-secondary" @onclick="() => GoToStep(1)">Back</button>
+                    <button class="btn btn-primary" @onclick="() => GoToStep(3)">Next: Preview</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Step 3: Preview -->
+    @if (_currentStep == 3)
+    {
+        <div class="card">
+            <div class="card-header">VDE Preview</div>
+            <div class="card-body">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Module Manifest</strong>
+                            <div class="mt-1" style="font-family: monospace; font-size: 1.1rem;">
+                                0x@(ComputeManifest().ToString("X8"))
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Inode Extension</strong>
+                            <div class="mt-1">@ComputeInodeBytes() bytes</div>
+                        </div>
+                    </div>
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Block Size</strong>
+                            <div class="mt-1">@FormatBlockSize(_blockSize)</div>
+                        </div>
+                    </div>
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Total Size</strong>
+                            <div class="mt-1">@_totalSizeValue @_sizeUnit</div>
+                        </div>
+                    </div>
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Total Blocks</strong>
+                            <div class="mt-1">@ComputeTotalBlocks().ToString("N0")</div>
+                        </div>
+                    </div>
+                    <div class="card" style="min-width: 200px;">
+                        <div class="card-body">
+                            <strong>Metadata Overhead</strong>
+                            <div class="mt-1">~@EstimateMetadataOverhead()%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected modules list -->
+                <h5 class="mt-3">Selected Modules (@_selectedModules.Count)</h5>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Module</th>
+                            <th>Abbreviation</th>
+                            <th>Level</th>
+                            <th>Inode Bytes</th>
+                            <th>Regions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var moduleId in _selectedModules.OrderBy(m => (byte)m))
+                        {
+                            var mod = ModuleRegistry.GetModule(moduleId);
+                            <tr>
+                                <td>@mod.Name</td>
+                                <td><span class="badge badge-info">@mod.Abbreviation</span></td>
+                                <td>@GetConfigLevel(moduleId)</td>
+                                <td>@mod.InodeFieldBytes</td>
+                                <td>@(mod.HasRegion ? string.Join(", ", mod.RegionNames) : "None")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <!-- Topology Preview -->
+                <div class="mt-3">
+                    <TopologyPreview Topology="_topology" ActiveModules="_selectedModulesList" />
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-secondary" @onclick="() => GoToStep(2)">Back</button>
+                    <button class="btn btn-primary" @onclick="() => GoToStep(4)">Next: Create</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Step 4: Create -->
+    @if (_currentStep == 4)
+    {
+        <div class="card">
+            <div class="card-header">Create VDE</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label><strong>Output Path</strong></label>
+                    <input type="text" class="form-control" @bind="_outputPath"
+                           placeholder="C:\Data\my-datawarehouse.dwvd" />
+                </div>
+
+                <div class="mb-3">
+                    <label><strong>CLI Equivalent Command</strong></label>
+                    <div style="font-family: monospace; padding: 0.75rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px; word-break: break-all;">
+                        @GetCliCommand()
+                    </div>
+                    <button class="btn btn-secondary btn-sm mt-1" @onclick="CopyCliCommand">
+                        Copy Command
+                    </button>
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-secondary" @onclick="() => GoToStep(3)">Back</button>
+                    <button class="btn btn-primary" @onclick="CreateVde"
+                            disabled="@(string.IsNullOrWhiteSpace(_outputPath))">
+                        Create VDE
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_createResult))
+                {
+                    <div class="alert @(_createSuccess ? "alert-success" : "alert-warning") mt-3">
+                        @_createResult
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private int _currentStep = 1;
+    private readonly HashSet<ModuleId> _selectedModules = new();
+    private IReadOnlyList<ModuleId> _selectedModulesList = Array.Empty<ModuleId>();
+    private readonly Dictionary<ModuleId, byte> _configLevels = new();
+    private int _blockSize = 4096;
+    private long _totalSizeValue = 1;
+    private string _sizeUnit = "GB";
+    private DeploymentTopology _topology = DeploymentTopology.DwPlusVde;
+    private string _outputPath = "";
+    private string _createResult = "";
+    private bool _createSuccess;
+
+    private static readonly int[] _blockSizes = { 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
+
+    private static readonly ModuleCategory[] _moduleCategories =
+    {
+        new("Security", new[] { ModuleId.Security, ModuleId.Compliance, ModuleId.Privacy }),
+        new("Storage", new[] { ModuleId.Raid, ModuleId.Compression, ModuleId.Snapshot, ModuleId.Streaming }),
+        new("Intelligence", new[] { ModuleId.Intelligence, ModuleId.Tags, ModuleId.Query, ModuleId.Compute }),
+        new("Infrastructure", new[] { ModuleId.Replication, ModuleId.Consensus, ModuleId.Fabric, ModuleId.Integrity, ModuleId.Observability, ModuleId.AuditLog }),
+        new("Other", new[] { ModuleId.Sustainability, ModuleId.Transit }),
+    };
+
+    protected override void OnInitialized()
+    {
+        // Parse topology from query string if provided
+        var uri = new Uri(Navigation.Uri);
+        var queryString = uri.Query.TrimStart('?');
+        foreach (var param in queryString.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = param.Split('=', 2);
+            if (parts.Length == 2 && parts[0] == "topology" &&
+                Enum.TryParse<DeploymentTopology>(parts[1], out var topo))
+            {
+                _topology = topo;
+            }
+        }
+    }
+
+    private void ToggleModule(ModuleId id)
+    {
+        if (!_selectedModules.Remove(id))
+        {
+            _selectedModules.Add(id);
+            if (!_configLevels.ContainsKey(id))
+            {
+                _configLevels[id] = 2; // Default level
+            }
+        }
+        _selectedModulesList = _selectedModules.OrderBy(m => (byte)m).ToArray();
+    }
+
+    private byte GetConfigLevel(ModuleId id) =>
+        _configLevels.TryGetValue(id, out var level) ? level : (byte)2;
+
+    private void SetConfigLevel(ModuleId id, ChangeEventArgs e)
+    {
+        if (byte.TryParse(e.Value?.ToString(), out var level))
+        {
+            _configLevels[id] = level;
+        }
+    }
+
+    private void OnBlockSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+        {
+            _blockSize = size;
+        }
+    }
+
+    private void OnTotalSizeChanged(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var val) && val > 0)
+        {
+            _totalSizeValue = val;
+        }
+    }
+
+    private void OnSizeUnitChanged(ChangeEventArgs e)
+    {
+        _sizeUnit = e.Value?.ToString() ?? "GB";
+    }
+
+    private void GoToStep(int step)
+    {
+        if (step >= 1 && step <= 4)
+        {
+            _currentStep = step;
+        }
+    }
+
+    private uint ComputeManifest()
+    {
+        uint manifest = 0;
+        foreach (var id in _selectedModules)
+        {
+            manifest |= 1u << (int)id;
+        }
+        return manifest;
+    }
+
+    private int ComputeInodeBytes() =>
+        ModuleRegistry.CalculateTotalInodeFieldBytes(ComputeManifest());
+
+    private long ComputeTotalBlocks()
+    {
+        long totalBytes = _sizeUnit switch
+        {
+            "MB" => _totalSizeValue * 1024 * 1024,
+            "GB" => _totalSizeValue * 1024 * 1024 * 1024,
+            "TB" => _totalSizeValue * 1024L * 1024 * 1024 * 1024,
+            _ => _totalSizeValue * 1024 * 1024 * 1024,
+        };
+        return totalBytes / _blockSize;
+    }
+
+    private int EstimateMetadataOverhead()
+    {
+        // Rough estimate: 10 reserved blocks + regions for each module with regions
+        var activeModules = ModuleRegistry.GetActiveModules(ComputeManifest());
+        int regionCount = activeModules.Sum(m => m.RegionNames.Length);
+        long totalBlocks = ComputeTotalBlocks();
+        if (totalBlocks <= 0) return 0;
+
+        // ~10 superblock/reserved + ~64 blocks per region
+        long metadataBlocks = 10 + (regionCount * 64);
+        int percentage = (int)((metadataBlocks * 100) / totalBlocks);
+        return Math.Max(1, Math.Min(percentage, 50));
+    }
+
+    private string GetCliCommand()
+    {
+        var modules = string.Join(",", _selectedModules.OrderBy(m => (byte)m).Select(m => m.ToString()));
+        return $"dw vde create --output \"{_outputPath}\" --modules {modules} " +
+               $"--block-size {_blockSize} --size {_totalSizeValue}{_sizeUnit}";
+    }
+
+    private void CopyCliCommand()
+    {
+        // In a real app, this would use JS interop to copy to clipboard
+        _createResult = "CLI command copied to clipboard (use JS interop in production).";
+        _createSuccess = true;
+    }
+
+    private void CreateVde()
+    {
+        // In a real app, this would call the VDE creation service
+        _createResult = $"VDE creation initiated at: {_outputPath} " +
+                       $"(Manifest: 0x{ComputeManifest():X8}, " +
+                       $"Blocks: {ComputeTotalBlocks():N0}, " +
+                       $"BlockSize: {_blockSize})";
+        _createSuccess = true;
+    }
+
+    private string GetStepTitle() => GetStepTitle(_currentStep);
+
+    private static string GetStepTitle(int step) => step switch
+    {
+        1 => "Module Selection",
+        2 => "Configuration",
+        3 => "Preview",
+        4 => "Create",
+        _ => "Unknown",
+    };
+
+    private static string FormatBlockSize(int bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        _ => $"{bytes / 1024} KB",
+    };
+
+    private static string GetLevelDescription(byte level) => level switch
+    {
+        0 => "Disabled",
+        1 => "Basic",
+        2 => "Standard",
+        3 => "Enhanced",
+        <= 5 => "Advanced",
+        <= 10 => "High",
+        <= 14 => "Very High",
+        15 => "Maximum",
+        _ => "Custom",
+    };
+
+    private static string GetModuleDescription(ModuleId id) => id switch
+    {
+        ModuleId.Security => "Policy vault, encryption header",
+        ModuleId.Compliance => "Compliance vault, audit log",
+        ModuleId.Intelligence => "Intelligence cache",
+        ModuleId.Tags => "Tag index region",
+        ModuleId.Replication => "Replication state tracking",
+        ModuleId.Raid => "RAID metadata management",
+        ModuleId.Streaming => "Streaming append, data WAL",
+        ModuleId.Compute => "Compute code cache",
+        ModuleId.Fabric => "Cross-VDE reference table",
+        ModuleId.Consensus => "Consensus log region",
+        ModuleId.Compression => "Dictionary-based compression",
+        ModuleId.Integrity => "Merkle integrity tree",
+        ModuleId.Snapshot => "Snapshot table management",
+        ModuleId.Query => "B-tree index forest",
+        ModuleId.Privacy => "Anonymization table",
+        ModuleId.Sustainability => "Sustainability tracking",
+        ModuleId.Transit => "Data transit coordination",
+        ModuleId.Observability => "Metrics log region",
+        ModuleId.AuditLog => "Audit log region",
+        _ => "VDE module",
+    };
+
+    private sealed record ModuleCategory(string Name, ModuleId[] Modules);
+}
