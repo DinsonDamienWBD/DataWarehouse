@@ -481,6 +481,49 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     #endregion
 
     /// <inheritdoc/>
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        // Restore persisted commit indices
+        var commitData = await LoadStateAsync("commitIndices", ct);
+        if (commitData != null && _perGroupCommitIndex.Length > 0)
+        {
+            try
+            {
+                var indices = System.Text.Json.JsonSerializer.Deserialize<long[]>(commitData);
+                if (indices != null && indices.Length == _perGroupCommitIndex.Length)
+                    Array.Copy(indices, _perGroupCommitIndex, indices.Length);
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        // Restore active strategy
+        var stratData = await LoadStateAsync("activeStrategy", ct);
+        if (stratData != null)
+        {
+            try
+            {
+                var stratName = System.Text.Encoding.UTF8.GetString(stratData);
+                if (_strategies.TryGetValue(stratName, out var strategy))
+                    _activeStrategy = strategy;
+            }
+            catch { /* corrupted state — use default */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        if (_perGroupCommitIndex.Length > 0)
+        {
+            var commitBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_perGroupCommitIndex);
+            await SaveStateAsync("commitIndices", commitBytes, ct);
+        }
+
+        await SaveStateAsync("activeStrategy",
+            System.Text.Encoding.UTF8.GetBytes(_activeStrategy.AlgorithmName), ct);
+    }
+
+    /// <inheritdoc/>
     protected override List<PluginCapabilityDescriptor> GetCapabilities()
     {
         return new List<PluginCapabilityDescriptor>

@@ -756,9 +756,43 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     }
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct)
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
-        return Task.CompletedTask;
+        var policyData = await LoadStateAsync("policies", ct);
+        if (policyData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, PolicyDto>>(policyData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _policies[kvp.Key] = new DataManagementPolicy
+                        {
+                            PolicyId = kvp.Value.PolicyId,
+                            Name = kvp.Value.Name,
+                            CreatedAt = kvp.Value.CreatedAt
+                        };
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        var dtos = _policies.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new PolicyDto { PolicyId = kvp.Value.PolicyId, Name = kvp.Value.Name, CreatedAt = kvp.Value.CreatedAt });
+        var policyBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(dtos);
+        await SaveStateAsync("policies", policyBytes, ct);
+    }
+
+    /// <summary>Serializable DTO for DataManagementPolicy (private nested class cannot be deserialized directly).</summary>
+    private sealed class PolicyDto
+    {
+        public string PolicyId { get; set; } = "";
+        public string Name { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
     }
 
     #endregion

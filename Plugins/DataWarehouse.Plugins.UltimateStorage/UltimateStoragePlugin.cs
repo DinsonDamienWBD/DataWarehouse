@@ -1219,9 +1219,38 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     }
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct)
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
-        return Task.CompletedTask;
+        var strategyData = await LoadStateAsync("defaultStrategy", ct);
+        if (strategyData != null)
+        {
+            try
+            {
+                var strategyId = System.Text.Encoding.UTF8.GetString(strategyData);
+                if (StorageStrategyRegistry.Get(strategyId) != null)
+                    _defaultStrategyId = strategyId;
+            }
+            catch { /* corrupted state — use default */ }
+        }
+
+        var failoverData = await LoadStateAsync("autoFailover", ct);
+        if (failoverData != null)
+        {
+            try
+            {
+                _autoFailoverEnabled = failoverData[0] == 1;
+            }
+            catch { /* corrupted state — use default */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        await SaveStateAsync("defaultStrategy",
+            System.Text.Encoding.UTF8.GetBytes(_defaultStrategyId), ct);
+        await SaveStateAsync("autoFailover",
+            new byte[] { (byte)(_autoFailoverEnabled ? 1 : 0) }, ct);
     }
 
     #endregion

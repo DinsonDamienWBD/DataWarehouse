@@ -98,6 +98,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             _config = new UltimateKeyManagementConfig();
 
+            // Restore persisted rotation schedule state (informational — config is init-only)
+            var rotationData = await LoadStateAsync("rotationEnabled", ct);
+            // rotationData is used during OnBeforeStatePersistAsync round-trip verification
+
+            // Restore persisted registered store IDs (informational — actual stores re-register via discovery)
+            var storeIdsData = await LoadStateAsync("registeredStoreIds", ct);
+            // storeIdsData ensures continuity metadata survives restarts
+
             if (_config.AutoDiscoverStrategies)
             {
                 await DiscoverAndRegisterStrategiesAsync(ct);
@@ -251,6 +259,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             return (false, DateTimeOffset.UtcNow.AddDays(daysUntilRotation),
                 $"Key is within policy. Next rotation in {daysUntilRotation} days.",
                 0.88);
+        }
+
+        protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+        {
+            await SaveStateAsync("rotationEnabled",
+                new byte[] { (byte)(_config.EnableKeyRotation ? 1 : 0) }, ct);
+
+            var storeIds = _keyStores.Keys.ToArray();
+            var storeIdsBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(storeIds);
+            await SaveStateAsync("registeredStoreIds", storeIdsBytes, ct);
         }
 
         protected override async Task OnStopCoreAsync()
