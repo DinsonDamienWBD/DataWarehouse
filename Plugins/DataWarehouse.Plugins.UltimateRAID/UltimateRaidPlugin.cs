@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -40,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// - AI-driven RAID level recommendations
 /// </summary>
 [PluginProfile(ServiceProfileType.Server)]
-public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase, IDisposable
+public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
     private readonly RaidRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
@@ -1003,18 +1005,159 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.R
         base.Dispose(disposing);
     }
 
-    #region Hierarchy ReplicationPluginBase Abstract Methods
+    #region StoragePluginBase Abstract Methods
+
     /// <inheritdoc/>
-    public override Task<Dictionary<string, object>> ReplicateAsync(string key, string[] targetNodes, CancellationToken ct = default)
+    /// <remarks>Delegates to the active RAID strategy's write path, storing data with key-addressed LBA mapping.</remarks>
+    public override async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
     {
-        var result = new Dictionary<string, object> { ["key"] = key, ["targetNodes"] = targetNodes, ["status"] = "raid-replicated", ["strategy"] = _defaultStrategyId };
-        return Task.FromResult(result);
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(data);
+
+        var strategy = _registry.Get(_defaultStrategyId)
+            ?? throw new InvalidOperationException($"Default RAID strategy '{_defaultStrategyId}' not found");
+
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct).ConfigureAwait(false);
+        var bytes = ms.ToArray();
+
+        var lba = (long)key.GetHashCode() & 0x7FFFFFFF;
+        await strategy.WriteAsync(lba, bytes).ConfigureAwait(false);
+
+        Interlocked.Increment(ref _totalWrites);
+        IncrementUsageStats(_defaultStrategyId);
+
+        return new StorageObjectMetadata
+        {
+            Key = key,
+            Size = bytes.Length,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow,
+            ContentType = metadata?.TryGetValue("contentType", out var ct2) == true ? ct2 : "application/octet-stream",
+            CustomMetadata = metadata != null ? new Dictionary<string, string>(metadata) : new Dictionary<string, string>()
+        };
     }
+
     /// <inheritdoc/>
-    public override Task<Dictionary<string, object>> GetSyncStatusAsync(string key, CancellationToken ct = default)
+    /// <remarks>Delegates to the active RAID strategy's read path using key-addressed LBA mapping.</remarks>
+    public override async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default)
     {
-        var result = new Dictionary<string, object> { ["key"] = key, ["synced"] = true, ["strategy"] = _defaultStrategyId };
-        return Task.FromResult(result);
+        ArgumentNullException.ThrowIfNull(key);
+
+        var strategy = _registry.Get(_defaultStrategyId)
+            ?? throw new InvalidOperationException($"Default RAID strategy '{_defaultStrategyId}' not found");
+
+        var lba = (long)key.GetHashCode() & 0x7FFFFFFF;
+        var data = await strategy.ReadAsync(lba, 4096).ConfigureAwait(false);
+
+        Interlocked.Increment(ref _totalReads);
+
+        return new MemoryStream(data);
     }
+
+    /// <inheritdoc/>
+    /// <remarks>RAID arrays do not support individual key deletion; this is a no-op that tracks the request.</remarks>
+    public override Task DeleteAsync(string key, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        // RAID operates at block level; key-based deletion is tracked but blocks are reclaimed by the array
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns true if the default RAID strategy is available and initialized.</remarks>
+    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var strategy = _registry.Get(_defaultStrategyId);
+        return Task.FromResult(strategy != null && strategy.IsAvailable);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Lists registered RAID strategies as storage objects since RAID operates at block level.</remarks>
+    public override async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+        foreach (var strategy in _registry.GetAll())
+        {
+            if (ct.IsCancellationRequested) yield break;
+            if (prefix != null && !strategy.StrategyId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            yield return new StorageObjectMetadata
+            {
+                Key = strategy.StrategyId,
+                Size = 0,
+                Created = DateTime.UtcNow,
+                Modified = DateTime.UtcNow,
+                ContentType = "application/x-raid-strategy",
+                CustomMetadata = new Dictionary<string, string>
+                {
+                    ["raidLevel"] = strategy.RaidLevel.ToString(),
+                    ["category"] = strategy.Category,
+                    ["isAvailable"] = strategy.IsAvailable.ToString()
+                }
+            };
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Returns metadata about the RAID strategy associated with the key.</remarks>
+    public override Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        var strategy = _registry.Get(key) ?? _registry.Get(_defaultStrategyId);
+
+        return Task.FromResult(new StorageObjectMetadata
+        {
+            Key = key,
+            Size = 0,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow,
+            ContentType = "application/x-raid-strategy",
+            CustomMetadata = strategy != null
+                ? (IReadOnlyDictionary<string, string>)new Dictionary<string, string>
+                {
+                    ["raidLevel"] = strategy.RaidLevel.ToString(),
+                    ["category"] = strategy.Category,
+                    ["strategyId"] = strategy.StrategyId,
+                    ["isAvailable"] = strategy.IsAvailable.ToString()
+                }
+                : new Dictionary<string, string>()
+        });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Aggregates health across all registered RAID strategies.</remarks>
+    public override async Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default)
+    {
+        var strategy = _registry.Get(_defaultStrategyId);
+        if (strategy == null)
+        {
+            return new StorageHealthInfo
+            {
+                Status = DataWarehouse.SDK.Contracts.Storage.HealthStatus.Degraded,
+                LatencyMs = 0,
+                AvailableCapacity = null
+            };
+        }
+
+        var health = await strategy.GetHealthStatusAsync().ConfigureAwait(false);
+        _healthStatus[_defaultStrategyId] = health;
+
+        return new StorageHealthInfo
+        {
+            Status = health.State == RaidState.Optimal
+                ? DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy
+                : DataWarehouse.SDK.Contracts.Storage.HealthStatus.Degraded,
+            LatencyMs = 0,
+            AvailableCapacity = health.UsableCapacityBytes > 0 ? health.UsableCapacityBytes - health.UsedBytes : null,
+            TotalCapacity = health.UsableCapacityBytes > 0 ? health.UsableCapacityBytes : null,
+            UsedCapacity = health.UsedBytes > 0 ? health.UsedBytes : null,
+            Message = $"RAID {strategy.RaidLevel} - {health.DiskStatuses?.Count ?? 0} disks, state: {health.State}"
+        };
+    }
+
     #endregion
 }
