@@ -172,6 +172,7 @@
 - [Phase 86]: Hilbert 2D/16-bit default for shard routing; volatile CdfModel swap for lock-free readers; per-shard AdaptiveIndexEngine for independent morph; auto-split samples 1000 keys for median
 - [Phase 87]: CompactInode64 uses truncated 4-byte owner hash; InodeFormat enum values match byte sizes (64/256/512)
 - [Phase 87]: ReaderWriterLockSlim with UpgradeableReadLock for ARC Get; L2 PutAsync no-op (OS page cache); L3 open-addressing 16-probe with XxHash64 slot checksums
+- [Phase 87]: Size classes 64/128/256/512/1024/2048 bytes; delegate-based AllocationGroup integration for SubBlockPacker
 
 ## Performance Metrics
 
@@ -310,7 +311,8 @@
 | 86    | 15   | 4min     | 2     | 2     |
 | Phase 87 P03 | 6min | 2 tasks | 3 files |
 | Phase 87 P02 | 6min | 2 tasks | 4 files |
+| Phase 87 P05 | 3min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:21:18Z
-- **Stopped At:** Completed 87-02-PLAN.md
+- **Stopped At:** Completed 87-05-PLAN.md
