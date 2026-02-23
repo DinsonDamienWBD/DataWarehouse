@@ -185,6 +185,7 @@
 - [Phase 87]: Leaf hashes use SHA256(XxHash64 bytes) for consistent 32-byte Merkle nodes; 48-byte node format; BFS serialization
 - [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
 - [Phase 88]: BoundedCache uses ReaderWriterLockSlim; ARC ghost lists key-only capped at MaxEntries; 256B/entry auto-size heuristic; TTL cleanup at max(TTL/4, 1s)
+- [Phase 88]: InternalBlock shadow index retained for fast audit chain traversal; SegmentedBlockStore is authoritative persistence
 
 ## Performance Metrics
 
@@ -340,4 +341,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 88-02-PLAN.md
+- **Stopped At:** Completed 88-04-PLAN.md
