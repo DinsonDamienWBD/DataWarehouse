@@ -123,6 +123,7 @@
 - [Phase 79-03]: freedesktop shared-mime-info XML via XDocument; file(1) uses ubyte vs /etc/magic byte for version sub-rules; macOS secondary UTIs conform to PrimaryUti+public.data (not public.disk-image); all install scripts idempotent user-local
 - [Phase 79]: Secondary ProgIDs follow DataWarehouse.Dwvd{Kind} naming; PowerShell targets HKCU for non-admin registration; shell verbs use dw open/inspect/verify "%1" pattern
 - [Phase 79-04]: Priority-ordered magic detection DWVD>VHDX>QCOW2>VMDK>VDI>VHD; Raw/Img by extension+sector-aligned size; VDI via 0xBEDA107F at offset 64; VHDX logical size via metadata region GUID lookup at 1MB; byte-level data copy (sparse-aware deferred)
+- [Phase 80]: Four Tier 3 fallback modes (InMemoryDefault, NoOpSafe, FileBasedSimple, ConfigDriven); BasicFunctionalityAvailable always true at Tier 3
 
 ## Performance Metrics
 
@@ -218,7 +219,8 @@
 | 79    | 03   | 4min     | 2     | 3     |
 | Phase 79 P02 | 3min | 2 tasks | 3 files |
 | 79    | 04   | 5min     | 2     | 5     |
+| Phase 80 P03 | 2min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T16:13:00Z
-- **Stopped At:** Completed 79-04-PLAN.md (import engine for 7 foreign formats + import suggestions)
+- **Stopped At:** Completed 80-03-PLAN.md (Tier 3 basic fallback verification for all 19 modules)
