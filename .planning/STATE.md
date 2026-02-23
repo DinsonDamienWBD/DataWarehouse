@@ -197,6 +197,7 @@
 - [Phase 89-02]: ConcurrentBag<PoolEntry<T>> per-node idle pools with SemaphoreSlim per-node and global capacity gates; GrpcPooledChannel wraps endpoint metadata (not Grpc.Net.Client) for SDK isolation; Socket.Poll liveness detection for TCP
 - [Phase 89]: Proto mirror types use length-prefixed binary ToBytes/FromBytes for runtime gRPC serving
 - [Phase 89]: DataWarehouseGrpcServices static registry provides all 6 service descriptors
+- [Phase 89]: CancelRequest opens new TCP connection per PostgreSQL spec; CopyBothResponse drains in normal query; multi-statement accumulates rowsAffected
 
 ## Performance Metrics
 
@@ -361,7 +362,8 @@
 | Phase 88 P14 | 12min | 2 tasks | 4 files |
 | Phase 89 P02 | 4min | 2 tasks | 2 files |
 | Phase 89 P01 | 6min | 2 tasks | 3 files |
+| Phase 89 P03 | 7min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T23:39:06Z
-- **Stopped At:** Completed 89-01-PLAN.md
+- **Stopped At:** Completed 89-03-PLAN.md
