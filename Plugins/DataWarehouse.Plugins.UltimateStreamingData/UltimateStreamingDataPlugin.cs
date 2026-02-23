@@ -38,7 +38,6 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     private readonly StreamingStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, StreamingPolicy> _policies = new BoundedDictionary<string, StreamingPolicy>(1000);
-    private bool _disposed;
 
     // Configuration
     private volatile bool _auditEnabled = true;
@@ -222,10 +221,7 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
         UsageByStrategy = _usageStats.ToDictionary(k => k.Key, v => v.Value)
     };
 
-    private new void ThrowIfDisposed()
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(UltimateStreamingDataPlugin));
-    }
+    // Uses base PluginBase.ThrowIfDisposed() and IsDisposed (no local shadowing).
 
     #region Hierarchy StreamingPluginBase Abstract Methods
 
@@ -332,17 +328,16 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
 
     protected override void Dispose(bool disposing)
     {
+        if (IsDisposed) return;
+
         if (disposing)
         {
-            if (_disposed) return;
-            _disposed = true;
-
             foreach (var strategy in _registry.GetAllStrategies())
             {
-            if (strategy is IDisposable disposable)
-            {
-            disposable.Dispose();
-            }
+                if (strategy is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             }
         }
         base.Dispose(disposing);
@@ -671,9 +666,6 @@ public sealed class StreamingStrategyRegistry
 /// </summary>
 public abstract class StreamingDataStrategyBase : StrategyBase, IStreamingDataStrategy, IInitializable
 {
-    private new bool _initialized;
-    private readonly object _initLock = new();
-
     // Metrics
     private long _totalReads;
     private long _totalWrites;
@@ -694,23 +686,8 @@ public abstract class StreamingDataStrategyBase : StrategyBase, IStreamingDataSt
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
 
-    public new bool IsInitialized => _initialized;
-
-    public new virtual Task InitializeAsync(CancellationToken ct = default)
-    {
-        lock (_initLock)
-        {
-            if (_initialized) return Task.CompletedTask;
-            _initialized = true;
-        }
-        return Task.CompletedTask;
-    }
-
-    protected new void ThrowIfNotInitialized()
-    {
-        if (!_initialized)
-            throw new InvalidOperationException($"Strategy {StrategyId} is not initialized.");
-    }
+    // IInitializable.InitializeAsync is satisfied by StrategyBase.InitializeAsync.
+    // Use base IsInitialized and ThrowIfNotInitialized (no local shadowing).
 
     protected void RecordRead(long bytes, double latencyMs, bool hit = true, bool miss = false)
     {

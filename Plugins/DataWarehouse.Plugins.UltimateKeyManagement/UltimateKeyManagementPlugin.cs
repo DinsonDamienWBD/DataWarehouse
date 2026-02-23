@@ -25,7 +25,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         private readonly BoundedDictionary<string, IKeyStoreStrategy> _strategies = new BoundedDictionary<string, IKeyStoreStrategy>(1000);
         private UltimateKeyManagementConfig _config = new();
         private KeyRotationScheduler? _rotationScheduler;
-        private IMessageBus? _messageBus;
         private bool _initialized;
         private bool _disposed;
 
@@ -106,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             if (_config.EnableKeyRotation)
             {
-                _rotationScheduler = new KeyRotationScheduler(_config, _messageBus);
+                _rotationScheduler = new KeyRotationScheduler(_config, MessageBus);
 
                 foreach (var (strategyId, strategy) in _strategies)
                 {
@@ -145,13 +144,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         /// </summary>
         private async Task RegisterKeyManagementCapabilitiesAsync(CancellationToken ct)
         {
-            if (_messageBus == null) return;
+            if (MessageBus == null) return;
 
             var envelopeCount = _strategies.Values.Count(s => s.Capabilities.SupportsEnvelope);
             var rotationCount = _strategies.Values.Count(s => s.Capabilities.SupportsRotation);
             var hsmCount = _strategies.Values.Count(s => s.Capabilities.SupportsHsm);
 
-            await _messageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+            await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
             {
                 Type = "capability.register",
                 Source = Id,
@@ -185,15 +184,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         /// </summary>
         private void SubscribeToKeyRotationRequests()
         {
-            if (_messageBus == null) return;
+            if (MessageBus == null) return;
 
-            _messageBus.Subscribe("intelligence.request.key-rotation-prediction", async msg =>
+            MessageBus.Subscribe("intelligence.request.key-rotation-prediction", async msg =>
             {
                 if (msg.Payload.TryGetValue("keyId", out var kidObj) && kidObj is string keyId)
                 {
                     var prediction = PredictKeyRotation(keyId, msg.Payload);
 
-                    await _messageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
+                    await MessageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
                     {
                         Type = "key-rotation-prediction.response",
                         CorrelationId = msg.CorrelationId,
@@ -389,17 +388,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             if (_config.StrategyConfigurations.TryGetValue(strategyId, out var config))
             {
                 var configCopy = new Dictionary<string, object>(config);
-                if (_messageBus != null)
+                if (MessageBus != null)
                 {
-                    configCopy["MessageBus"] = _messageBus;
+                    configCopy["MessageBus"] = MessageBus;
                 }
                 return configCopy;
             }
 
             var defaultConfig = new Dictionary<string, object>();
-            if (_messageBus != null)
+            if (MessageBus != null)
             {
-                defaultConfig["MessageBus"] = _messageBus;
+                defaultConfig["MessageBus"] = MessageBus;
             }
             return defaultConfig;
         }
@@ -554,7 +553,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
         private async Task PublishEventAsync(string eventType, Dictionary<string, object> payload)
         {
-            if (_messageBus == null || !_config.PublishKeyEvents)
+            if (MessageBus == null || !_config.PublishKeyEvents)
                 return;
 
             try
@@ -565,7 +564,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                     Payload = payload
                 };
 
-                await _messageBus.PublishAsync(eventType, message);
+                await MessageBus.PublishAsync(eventType, message);
             }
             catch
             {
@@ -629,7 +628,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             if (request.Config != null && request.Config.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is IMessageBus messageBus)
             {
-                _messageBus = messageBus;
                 SetMessageBus(messageBus);
             }
 
@@ -643,9 +641,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 if (_disposed) return;
                 _disposed = true;
 
-                // Sync dispose: must stop synchronously. Task.Run avoids deadlocks.
-                Task.Run(() => StopAsync()).ConfigureAwait(false).GetAwaiter().GetResult();
-
+                // Synchronous dispose: dispose strategies directly.
+                // Prefer DisposeAsyncCore for graceful async shutdown.
                 foreach (var strategy in _strategies.Values)
                 {
                     if (strategy is IDisposable disposable)

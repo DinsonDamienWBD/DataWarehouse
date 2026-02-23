@@ -46,7 +46,7 @@ namespace DataWarehouse.Plugins.ChaosVaccination;
 /// 11. ChaosVaccinationMessageHandler (needs all above) -- post-intelligence
 /// </summary>
 [SdkCompatibility("5.0.0", Notes = "Phase 61: Chaos vaccination orchestrator")]
-public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
+public sealed class ChaosVaccinationPlugin : ResiliencePluginBase
 {
     // Sub-component fields (initialized in dependency order during startup)
     private ChaosInjectionEngine? _engine;
@@ -556,14 +556,11 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
         metadata["GlobalBlastRadiusLimit"] = _options.GlobalBlastRadiusLimit.ToString();
         metadata["SafeMode"] = _options.SafeMode;
         metadata["InjectorCount"] = _engine?.Injectors.Count ?? 0;
-        // GetMetadata is a synchronous contract (PluginBase.GetMetadata). Use Task.Run to avoid
-        // deadlocks on synchronization-context-bound threads when awaiting the async calls.
-        metadata["ImmuneMemorySize"] = _immuneSystem != null
-            ? Task.Run(() => _immuneSystem.GetImmuneMemoryAsync()).ConfigureAwait(false).GetAwaiter().GetResult().Count
-            : 0;
-        metadata["ActiveZones"] = _enforcer != null
-            ? Task.Run(() => _enforcer.GetActiveZonesAsync()).ConfigureAwait(false).GetAwaiter().GetResult().Count
-            : 0;
+        // GetMetadata is a synchronous contract -- report -1 (unknown) when sub-components
+        // are initialized, since the actual counts require async calls.  Callers that need
+        // runtime counts should use GetResilienceHealthAsync instead.
+        metadata["ImmuneMemorySize"] = _immuneSystem != null ? -1 : 0;
+        metadata["ActiveZones"] = _enforcer != null ? -1 : 0;
         return metadata;
     }
 
@@ -745,29 +742,33 @@ public sealed class ChaosVaccinationPlugin : ResiliencePluginBase, IDisposable
     /// <summary>
     /// Releases resources held by this plugin, including all sub-components.
     /// </summary>
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed)
             return;
 
-        // Unregister message handler subscriptions
-        _messageHandler?.UnregisterSubscriptions();
-
-        // Dispose bus subscriptions
-        foreach (var subscription in _subscriptions)
+        if (disposing)
         {
-            subscription.Dispose();
-        }
-        _subscriptions.Clear();
+            // Unregister message handler subscriptions
+            _messageHandler?.UnregisterSubscriptions();
 
-        // Dispose sub-components in reverse dependency order
-        _resilienceIntegration?.Dispose();
-        _scheduler?.Dispose();
-        _enforcer?.Dispose();
-        _propagationMonitor?.Dispose();
-        _zoneManager?.Dispose();
-        _engine?.Dispose();
+            // Dispose bus subscriptions
+            foreach (var subscription in _subscriptions)
+            {
+                subscription.Dispose();
+            }
+            _subscriptions.Clear();
+
+            // Dispose sub-components in reverse dependency order
+            _resilienceIntegration?.Dispose();
+            _scheduler?.Dispose();
+            _enforcer?.Dispose();
+            _propagationMonitor?.Dispose();
+            _zoneManager?.Dispose();
+            _engine?.Dispose();
+        }
 
         _disposed = true;
+        base.Dispose(disposing);
     }
 }

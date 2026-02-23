@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -66,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     {
         private readonly BoundedDictionary<string, IAccessControlStrategy> _strategies = new BoundedDictionary<string, IAccessControlStrategy>(1000);
         private readonly BoundedDictionary<string, double> _strategyWeights = new BoundedDictionary<string, double>(1000);
-        private readonly List<PolicyAccessDecision> _auditLog = new();
+        private readonly ConcurrentQueue<PolicyAccessDecision> _auditLog = new();
         private IAccessControlStrategy? _defaultStrategy;
         private PolicyEvaluationMode _evaluationMode = PolicyEvaluationMode.FirstMatch;
         private bool _initialized;
@@ -289,12 +290,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
 
         private void LogAccessDecision(PolicyAccessDecision decision)
         {
-            _auditLog.Add(decision);
+            _auditLog.Enqueue(decision);
 
-            // Keep only last 1000 decisions in memory
-            if (_auditLog.Count > 1000)
+            // Keep only last 1000 decisions in memory (best-effort trim)
+            while (_auditLog.Count > 1000)
             {
-                _auditLog.RemoveRange(0, _auditLog.Count - 1000);
+                _auditLog.TryDequeue(out _);
             }
         }
 
@@ -303,7 +304,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         /// </summary>
         public IReadOnlyList<PolicyAccessDecision> GetAuditLog(int maxCount = 100)
         {
-            return _auditLog.TakeLast(maxCount).ToList().AsReadOnly();
+            return _auditLog.Reverse().Take(maxCount).Reverse().ToList().AsReadOnly();
         }
 
         /// <inheritdoc/>

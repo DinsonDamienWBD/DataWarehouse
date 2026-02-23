@@ -41,7 +41,6 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
     private LinuxSpecific? _linuxSpecific;
     private MacOsSpecific? _macOsSpecific;
     private IKernelContext? _kernelContext;
-    private IMessageBus? _messageBus;
     private IDisposable? _messageSubscription;
     private Thread? _fuseThread;
     private CancellationTokenSource? _cts;
@@ -107,8 +106,7 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
     {
         _kernelContext = request.Context;
 
-        // Use message bus from base class for inter-plugin communication
-        _messageBus = MessageBus;
+        // MessageBus is available from base class for inter-plugin communication
 
         // Validate platform support
         if (!IsPlatformSupported)
@@ -675,7 +673,7 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
     private void SubscribeToMessages()
     {
         // Use base class MessageBus property (null check removed - MessageBus is guaranteed available after initialization)
-        _messageSubscription = _messageBus?.Subscribe("filesystem.*", async msg =>
+        _messageSubscription = MessageBus?.Subscribe("filesystem.*", async msg =>
         {
             await OnMessageAsync(msg);
         });
@@ -699,9 +697,9 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
                 payloadDict["data"] = payload;
             }
 
-            if (_messageBus != null)
+            if (MessageBus != null)
             {
-                await _messageBus.PublishAsync(topic, new PluginMessage
+                await MessageBus.PublishAsync(topic, new PluginMessage
                 {
                     Type = topic,
                     Source = Id,

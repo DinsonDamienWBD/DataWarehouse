@@ -35,7 +35,6 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
     private readonly StrategyRegistry<IDataIntegrationStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, IntegrationPolicy> _policies = new BoundedDictionary<string, IntegrationPolicy>(1000);
-    private bool _disposed;
 
     // Configuration
     private volatile bool _auditEnabled = true;
@@ -175,24 +174,18 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
         UsageByStrategy = _usageStats.ToDictionary(k => k.Key, v => v.Value)
     };
 
-    private new void ThrowIfDisposed()
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(UltimateDataIntegrationPlugin));
-    }
-
     protected override void Dispose(bool disposing)
     {
+        if (IsDisposed) return;
+
         if (disposing)
         {
-            if (_disposed) return;
-            _disposed = true;
-
             foreach (var strategy in _registry.GetAll())
             {
-            if (strategy is IDisposable disposable)
-            {
-            disposable.Dispose();
-            }
+                if (strategy is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             }
         }
         base.Dispose(disposing);
