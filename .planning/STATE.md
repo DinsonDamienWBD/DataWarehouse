@@ -13,7 +13,7 @@
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
 - Phase 71: COMPLETE (6/6 plans, 23 format files, VDE v2.0 creator operational)
 - Phase 72: COMPLETE (5/5 plans, 9 region files, streaming/WORM/compliance)
-- Phase 73: 1/5 plans complete (73-01)
+- Phase 73: 2/5 plans complete (73-01, 73-02)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -85,6 +85,7 @@
 - [Phase 72]: Dirty bitmap uses variable-length multi-block serialization for VDEs larger than 32K blocks; RAID parity at fixed offset in block 1; ReplicationWatermark includes PendingBlockCount for lag estimation
 - [Phase 72-05]: ECDSA P-256 for compliance signatures (64-byte r||s); streaming region tracks metadata only; WORM write log overflows across blocks
 - [Phase 73-01]: Swap-with-last removal for O(1) Remove on dictionary-indexed regions; IntelligenceCacheEntry 43B fixed, VdeReference 74B fixed; DetectBrokenLinks accepts IReadOnlySet<Guid>
+- [Phase 73]: ComputeCodeCache hex-encoded SHA-256 Dictionary keys for O(1) lookup; Snapshot tombstone deletion preserves parent-child chains; GetSnapshotChain cycle detection via HashSet
 
 ## Performance Metrics
 
@@ -149,7 +150,8 @@
 | Phase 72 P04 | 4min | 2 tasks | 2 files |
 | 72    | 05   | 5min     | 2     | 3     |
 | 73    | 01   | 3min     | 2     | 2     |
+| Phase 73 P02 | 3min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T12:48:36Z
-- **Stopped At:** Completed 73-01-PLAN.md (Intelligence Cache + Cross-VDE Reference Table)
+- **Stopped At:** Completed 73-02-PLAN.md (Compute Code Cache + Snapshot Table)
