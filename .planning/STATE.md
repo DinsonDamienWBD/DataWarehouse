@@ -156,6 +156,7 @@
 - [Phase 85-07]: UInt128-backed WideBlockAddress (32/48/64/128-bit on-disk widths); AddressWidthPromotionEngine 75% threshold with 4x headroom; VdeFeatureStore with monotonic model versioning, lineage tracking, inference caching
 - [Phase 85]: Per-table SemaphoreSlim for serialized version increments; sorted lock acquisition for multi-table deadlock prevention; binary search for timestamp-to-version resolution; schema evolution validates backward compatibility
 - [Phase 86-02]: Be-tree Level 3 with epsilon=0.5; buffer capacity sqrt(maxEntries); timestamp-based message resolution; flush cascade partitions by child range; BoundedDictionary LRU node cache (2000); WAL-protected splits and flushes
+- [Phase 86]: BwTree generic TKey:IComparable<TKey> for reusability; epoch-based GC with per-thread tracking; Masstree big-endian 8-byte ulong slices for lexicographic order
 
 ## Performance Metrics
 
@@ -279,7 +280,8 @@
 | 85    | 07   | 5min     | 2     | 3     |
 | Phase 85 P08 | 5min | 2 tasks | 3 files |
 | 86    | 02   | 5min     | 2     | 5     |
+| Phase 86 P09 | 9min | 2 tasks | 6 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T20:10:00Z
-- **Stopped At:** Completed 86-02-PLAN.md (Be-tree Level 3 with epsilon=0.5 message buffers)
+- **Stopped At:** Completed 86-09-PLAN.md (Bw-Tree + Masstree)
