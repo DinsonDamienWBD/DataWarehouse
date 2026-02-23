@@ -54,7 +54,6 @@ public class PluginSmokeTests : IDisposable
 
         // === Data Management Plugins ===
         new object[] { "UltimateDataCatalog", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDataCatalog.UltimateDataCatalogPlugin()), "catalog" },
-        new object[] { "UltimateDataFabric", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDataFabric.UltimateDataFabricPlugin()), "fabric" },
         new object[] { "UltimateDataFormat", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDataFormat.UltimateDataFormatPlugin()), "dataformat" },
         new object[] { "UltimateDataGovernance", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDataGovernance.UltimateDataGovernancePlugin()), "governance" },
         new object[] { "UltimateDataIntegration", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDataIntegration.UltimateDataIntegrationPlugin()), "integration" },
@@ -74,13 +73,12 @@ public class PluginSmokeTests : IDisposable
         // === Compute Plugins ===
         new object[] { "UltimateCompute", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateCompute.UltimateComputePlugin()), "compute" },
         new object[] { "UltimateServerless", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateServerless.UltimateServerlessPlugin()), "serverless" },
-        new object[] { "SelfEmulatingObjects", new Func<PluginBase>(() => new DataWarehouse.Plugins.SelfEmulatingObjects.SelfEmulatingObjectsPlugin()), "selfemulating" },
-        new object[] { "ComputeWasm", new Func<PluginBase>(() => new DataWarehouse.Plugins.Compute.Wasm.WasmComputePlugin()), "wasm" },
+        // SelfEmulatingObjects and Compute.Wasm consolidated into UltimateCompute (Phase 65.5-11)
 
         // === Streaming / Transport Plugins ===
         new object[] { "UltimateStreamingData", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateStreamingData.UltimateStreamingDataPlugin()), "streaming" },
         new object[] { "UltimateIoTIntegration", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateIoTIntegration.UltimateIoTIntegrationPlugin()), "iot" },
-        new object[] { "AdaptiveTransport", new Func<PluginBase>(() => new DataWarehouse.Plugins.AdaptiveTransport.AdaptiveTransportPlugin()), "transport" },
+        // AdaptiveTransport consolidated into UltimateStreamingData (Phase 65.5-12)
         new object[] { "UltimateRTOSBridge", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateRTOSBridge.UltimateRTOSBridgePlugin()), "rtos" },
 
         // === Replication / Consensus Plugins ===
@@ -93,13 +91,12 @@ public class PluginSmokeTests : IDisposable
         new object[] { "UltimateSDKPorts", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateSDKPorts.UltimateSDKPortsPlugin()), "sdk" },
         new object[] { "UltimateDocGen", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDocGen.UltimateDocGenPlugin()), "docgen" },
         new object[] { "AppPlatform", new Func<PluginBase>(() => new DataWarehouse.Plugins.AppPlatform.AppPlatformPlugin()), "platform" },
-        new object[] { "DataMarketplace", new Func<PluginBase>(() => new DataWarehouse.Plugins.DataMarketplace.DataMarketplacePlugin()), "marketplace" },
         new object[] { "PluginMarketplace", new Func<PluginBase>(() => new DataWarehouse.Plugins.PluginMarketplace.PluginMarketplacePlugin()), "marketplace" },
 
         // === Interface Plugins ===
         new object[] { "UltimateConnector", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateConnector.UltimateConnectorPlugin()), "connector" },
         new object[] { "UltimateInterface", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateInterface.UltimateInterfacePlugin()), "interface" },
-        new object[] { "FuseDriver", new Func<PluginBase>(() => new DataWarehouse.Plugins.FuseDriver.FuseDriverPlugin()), "fuse" },
+        // FuseDriver consolidated into UltimateFilesystem (Phase 65.5-11)
         new object[] { "KubernetesCsi", new Func<PluginBase>(() => new DataWarehouse.Plugins.KubernetesCsi.KubernetesCsiPlugin()), "csi" },
         new object[] { "UniversalDashboards", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalDashboards.UniversalDashboardsPlugin()), "dashboard" },
 
@@ -110,7 +107,7 @@ public class PluginSmokeTests : IDisposable
 
         // === Resilience Plugins ===
         new object[] { "UltimateResilience", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateResilience.UltimateResiliencePlugin()), "resilience" },
-        new object[] { "ChaosVaccination", new Func<PluginBase>(() => new DataWarehouse.Plugins.ChaosVaccination.ChaosVaccinationPlugin()), "chaos" },
+        // ChaosVaccination consolidated into UltimateResilience (Phase 65.5-12)
 
         // === Observability Plugins ===
         new object[] { "UniversalObservability", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalObservability.UniversalObservabilityPlugin()), "observability" },
@@ -127,8 +124,7 @@ public class PluginSmokeTests : IDisposable
         // === Storage Fabric ===
         new object[] { "UniversalFabric", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalFabric.UniversalFabricPlugin()), "fabric" },
 
-        // === AirGap ===
-        new object[] { "AirGapBridge", new Func<PluginBase>(() => new DataWarehouse.Plugins.AirGapBridge.AirGapBridgePlugin()), "airgap" },
+        // AirGapBridge consolidated into UltimateDataTransit (Phase 65.5-12)
 
         // === Plugins requiring DI (ILogger) - use Moq ===
         new object[] { "UltimateBlockchain", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateBlockchain.UltimateBlockchainPlugin(new Mock<ILogger<DataWarehouse.Plugins.UltimateBlockchain.UltimateBlockchainPlugin>>().Object)), "blockchain" },
@@ -137,7 +133,7 @@ public class PluginSmokeTests : IDisposable
     };
 
     // Note: TamperProofPlugin requires many DI dependencies and is tested separately in its own test class.
-    // WinFspDriverPlugin targets net10.0-windows only and is tested via reflection in WinFspDriverTests.cs.
+    // WinFspDriver consolidated into UltimateFilesystem (Phase 65.5-11).
 
     [Theory]
     [MemberData(nameof(AllPluginFactories))]

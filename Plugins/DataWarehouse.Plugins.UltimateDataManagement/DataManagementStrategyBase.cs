@@ -52,7 +52,13 @@ public enum DataManagementCategory
     /// <summary>
     /// Event sourcing strategies for event-driven architectures.
     /// </summary>
-    EventSourcing
+    EventSourcing,
+
+    /// <summary>
+    /// Data fabric strategies for distributed data architecture (topology, virtualization, mesh, semantic layer).
+    /// Merged from UltimateDataFabric plugin (T137).
+    /// </summary>
+    Fabric
 }
 
 /// <summary>
