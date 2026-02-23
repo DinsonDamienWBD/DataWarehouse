@@ -313,6 +313,10 @@ public sealed class UltimateDocGenPlugin : PlatformPluginBase, IDisposable
 
     private void DiscoverAndRegisterStrategies()
     {
+        // NOTE(65.5-05): DocGenStrategyBase does not implement IStrategy, so
+        // RegisterPlatformStrategy(IStrategy) cannot be called directly.
+        // Base-class dual-registration will become possible when DocGenStrategyBase extends StrategyBase.
+        // For now, the local DocGenStrategyRegistry is the authoritative lookup layer.
         _registry.Register(new OpenApiDocStrategy());
         _registry.Register(new GraphQLSchemaDocStrategy());
         _registry.Register(new GrpcDocStrategy());

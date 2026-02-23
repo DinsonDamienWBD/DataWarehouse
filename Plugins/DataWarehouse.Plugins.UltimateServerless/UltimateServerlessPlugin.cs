@@ -535,7 +535,13 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
             {
                 if (Activator.CreateInstance(strategyType) is ServerlessStrategyBase strategy)
                 {
+                    // Local typed registry
                     _strategies[strategy.StrategyId] = strategy;
+
+                    // NOTE(65.5-05): ServerlessStrategyBase does not implement IComputeRuntimeStrategy
+                    // or IStrategy, so RegisterComputeStrategy() cannot be called directly.
+                    // Base-class PluginBase.RegisterStrategy(IStrategy) requires IStrategy.
+                    // Dual-registration will become possible when ServerlessStrategyBase extends StrategyBase.
                 }
             }
             catch

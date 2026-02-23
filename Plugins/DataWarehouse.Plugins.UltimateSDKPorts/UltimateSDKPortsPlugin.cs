@@ -30,9 +30,9 @@ namespace DataWarehouse.Plugins.UltimateSDKPorts;
 /// </summary>
 public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
 {
-    // NOTE(65.4-07): SDKPortStrategyBase does not implement IStrategy, so base-class RegisterStrategy()
-    // cannot be used directly. The inherited PlatformPluginBase.RegisterPlatformStrategy() is used
-    // for strategies that are adapted via IStrategy. _registry is retained as the typed lookup layer.
+    // NOTE(65.4-07, 65.5-05): SDKPortStrategyBase does not implement IStrategy, so base-class
+    // RegisterPlatformStrategy(IStrategy) cannot be called directly. The _registry is retained
+    // as the typed lookup layer. Dual-registration will become possible when SDKPortStrategyBase extends StrategyBase.
     private readonly SDKPortStrategyRegistry _registry = new();
     private readonly BoundedDictionary<string, SDKMethod> _globalMethods = new BoundedDictionary<string, SDKMethod>(1000);
     private readonly BoundedDictionary<string, TypeMapping> _globalTypeMappings = new BoundedDictionary<string, TypeMapping>(1000);

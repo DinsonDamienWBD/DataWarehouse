@@ -143,6 +143,7 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 
     /// <summary>
     /// Discovers and registers all sustainability strategies via reflection.
+    /// Dual-registration: local typed registries + base-class PluginBase.RegisterStrategy(IStrategy).
     /// </summary>
     private void DiscoverAndRegisterStrategies()
     {
@@ -156,8 +157,12 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
             {
                 if (Activator.CreateInstance(strategyType) is SustainabilityStrategyBase strategy)
                 {
+                    // Local typed registries
                     _strategies[strategy.StrategyId] = strategy;
                     _registry.Register(strategy);
+
+                    // Base-class registration (65.5-05): SustainabilityStrategyBase extends StrategyBase (IStrategy)
+                    RegisterStrategy(strategy);
                 }
             }
             catch

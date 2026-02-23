@@ -441,7 +441,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                     if (Activator.CreateInstance(type) is IComplianceStrategy strategy)
                     {
                         await strategy.InitializeAsync(new Dictionary<string, object>(), ct);
+                        // Local typed registry
                         _strategies[strategy.StrategyId] = strategy;
+
+                        // NOTE(65.5-05): IComplianceStrategy does not implement ISecurityStrategy or IStrategy,
+                        // so RegisterSecurityStrategy() / RegisterStrategy() cannot be called directly.
+                        // Dual-registration will become possible when compliance strategies extend StrategyBase.
                     }
                 }
                 catch

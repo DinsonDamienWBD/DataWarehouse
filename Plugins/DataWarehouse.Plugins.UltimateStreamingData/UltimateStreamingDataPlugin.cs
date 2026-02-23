@@ -117,7 +117,16 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
             {
                 if (Activator.CreateInstance(type) is IStreamingDataStrategy strategy)
                 {
+                    // Local typed registry
                     _registry.Register(strategy);
+
+                    // Base-class registration (65.5-05): StreamingDataStrategyBase extends StrategyBase (IStrategy)
+                    // NOTE: IStreamingDataStrategy != IStreamingStrategy (SDK), so RegisterStreamingStrategy()
+                    // cannot be used. Using generic RegisterStrategy(IStrategy) instead.
+                    if (strategy is IStrategy istrategy)
+                    {
+                        RegisterStrategy(istrategy);
+                    }
                 }
             }
             catch
