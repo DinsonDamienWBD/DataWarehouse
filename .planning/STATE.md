@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 79-file-extension-os-integration
-- **Plan:** 1/4 (79-01 complete)
+- **Plan:** 2/4 (79-01, 79-02 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -19,7 +19,7 @@
 - Phase 76: COMPLETE (5/5 plans, materialized cache + bloom filter + delegate compiler + fast-path engine + simulation sandbox)
 - Phase 77: COMPLETE (5/5 plans, hybrid autonomy + self-mod guard + factory)
 - Phase 78: COMPLETE (5/5 plans, online module addition with WAL, defrag, indirection)
-- Phase 79: 1/4 plans complete (79-01)
+- Phase 79: 2/4 plans complete (79-01, 79-02)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -120,6 +120,7 @@
 - [Phase 78-04]: ModuleConfigField wraps raw ulong superblock fields for nibble-encoded level get/set; combined execution (regions+inode) does Option 1 first then 2/3; Tier 2 fallback structurally guaranteed; recommendation priority 2>1>3>4
 - [Phase 78-05]: IndirectionTable INDR magic, version 1, XxHash64 checksum; fixed region boundary block 10; defrag skipped below 5% fragmentation; indirection table block after highest region; wasted blocks = free runs < 16 blocks
 - [Phase 79-01]: DWVD MIME type application/vnd.datawarehouse.dwvd; 5-step content detection (magic->version->namespace->flags->seal) with ~0.2 cumulative confidence per step; 4 secondary extensions (.snap/.delta/.meta/.lock); MagicSignature.Validate() structurally guarantees namespace step
+- [Phase 79]: Secondary ProgIDs follow DataWarehouse.Dwvd{Kind} naming; PowerShell targets HKCU for non-admin registration; shell verbs use dw open/inspect/verify "%1" pattern
 
 ## Performance Metrics
 
@@ -212,7 +213,8 @@
 | 78    | 04   | 6min     | 2     | 3     |
 | 78    | 05   | 5min     | 2     | 3     |
 | 79    | 01   | 3min     | 2     | 4     |
+| Phase 79 P02 | 3min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T15:54:00Z
-- **Stopped At:** Completed 79-01-PLAN.md (MIME type + content detection + secondary extensions)
+- **Stopped At:** Completed 79-02-PLAN.md (Windows ProgID shell handlers + registry builder)
