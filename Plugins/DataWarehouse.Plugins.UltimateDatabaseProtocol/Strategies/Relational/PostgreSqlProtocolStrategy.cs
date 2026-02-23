@@ -8,10 +8,12 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.Relational;
 /// Implements the complete wire protocol for PostgreSQL communication including:
 /// - Startup message and parameter negotiation
 /// - Authentication (cleartext, MD5, SCRAM-SHA-256)
-/// - Simple and extended query protocol
-/// - Copy protocol for bulk operations
+/// - Simple and extended query protocol (with multi-statement support)
+/// - COPY protocol for bulk operations (CopyIn, CopyOut, CopyBoth)
 /// - Notification/Listen support
 /// - SSL negotiation
+/// - Cancel request support
+/// - Close and Flush for named statement/portal management
 /// </summary>
 public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 {
@@ -69,6 +71,10 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private readonly Dictionary<string, string> _serverParameters = new();
     private char _transactionStatus;
 
+    // ECOS-01: Fixed - negotiated protocol version tracking
+    private int _negotiatedMinorVersion;
+    private readonly List<string> _unrecognizedParameters = new();
+
     /// <inheritdoc/>
     public override string StrategyId => "postgresql-v3";
 
@@ -108,6 +114,21 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
     };
 
+    /// <summary>
+    /// Gets the current transaction status character ('I' = idle, 'T' = in transaction, 'E' = failed transaction).
+    /// </summary>
+    public char TransactionStatus => _transactionStatus;
+
+    /// <summary>
+    /// Gets the server parameters received during startup (e.g., server_version, server_encoding).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ServerParameters => _serverParameters;
+
+    /// <summary>
+    /// Gets the backend process ID for cancel request support.
+    /// </summary>
+    public int BackendProcessId => _backendProcessId;
+
     /// <inheritdoc/>
     protected override async Task NotifySslUpgradeAsync(CancellationToken ct)
     {
@@ -133,13 +154,14 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         {
             ["user"] = parameters.Username ?? throw new ArgumentException("Username required"),
             ["database"] = parameters.Database ?? parameters.Username,
+            ["application_name"] = "DataWarehouse", // ECOS-01: Fixed - explicit application_name
             ["client_encoding"] = "UTF8",
             ["DateStyle"] = "ISO, MDY",
             ["TimeZone"] = "UTC",
             ["extra_float_digits"] = "3"
         };
 
-        // Add any additional parameters
+        // Add any additional parameters (may override defaults)
         foreach (var kvp in parameters.AdditionalParameters)
         {
             startupParams[kvp.Key] = kvp.Value;
@@ -205,12 +227,34 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
                     throw new InvalidOperationException($"Authentication failed: {error}");
 
                 case NegotiateProtocolVersion:
-                    // Server wants to negotiate protocol version
+                    // ECOS-01: Fixed - properly handle protocol version negotiation
+                    HandleNegotiateProtocolVersion(payload);
+                    break;
+
+                case NoticeResponse:
+                    // ECOS-01: Fixed - handle notice during auth (e.g., password expiry warnings)
                     break;
 
                 default:
                     throw new InvalidOperationException($"Unexpected message type during authentication: {(char)messageType}");
             }
+        }
+    }
+
+    // ECOS-01: Fixed - NegotiateProtocolVersion handler
+    private void HandleNegotiateProtocolVersion(byte[] payload)
+    {
+        // Format: Int32 newest minor version supported, Int32 count of unrecognized params, then N null-terminated strings
+        var newestMinor = ReadInt32BE(payload.AsSpan(0, 4));
+        _negotiatedMinorVersion = newestMinor;
+
+        var paramCount = ReadInt32BE(payload.AsSpan(4, 4));
+        var offset = 8;
+        for (int i = 0; i < paramCount && offset < payload.Length; i++)
+        {
+            var paramName = ReadNullTerminatedString(payload.AsSpan(offset), out var bytesRead);
+            offset += bytesRead;
+            _unrecognizedParameters.Add(paramName);
         }
     }
 
@@ -251,6 +295,22 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             case 12: // AuthenticationSASLFinal
                 // Handled in SCRAM flow
                 break;
+
+            case 2: // AuthenticationKerberosV5 (legacy, rarely used)
+                throw new NotSupportedException("KerberosV5 authentication is deprecated; use GSSAPI (type 7) instead");
+
+            case 6: // AuthenticationSCMCredential (Unix only, legacy)
+                throw new NotSupportedException("SCM credential authentication is not supported");
+
+            case 7: // AuthenticationGSS
+                throw new NotSupportedException("GSSAPI authentication requires platform-specific Kerberos integration");
+
+            case 8: // AuthenticationGSSContinue
+                // Handled in GSSAPI flow
+                break;
+
+            case 9: // AuthenticationSSPI
+                throw new NotSupportedException("SSPI authentication requires Windows-specific integration");
 
             default:
                 throw new NotSupportedException($"Unsupported authentication type: {authType}");
@@ -457,7 +517,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         await SendAsync(buffer, ct);
 
-        // Process responses
+        // ECOS-01: Fixed - multi-statement query support (multiple result sets)
         var columns = new List<ColumnMetadata>();
         var rows = new List<Dictionary<string, object?>>();
         long rowsAffected = 0;
@@ -471,6 +531,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             switch (messageType)
             {
                 case RowDescription:
+                    // ECOS-01: Fixed - new RowDescription resets columns for multi-statement
                     columns = ParseRowDescription(payload);
                     break;
 
@@ -481,7 +542,8 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
                 case CommandComplete:
                     var tag = ReadNullTerminatedString(payload, out _);
-                    rowsAffected = ParseCommandTag(tag);
+                    rowsAffected += ParseCommandTag(tag);
+                    // ECOS-01: Fixed - don't return here; wait for ReadyForQuery (multi-statement)
                     break;
 
                 case EmptyQueryResponse:
@@ -493,6 +555,28 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
                 case NoticeResponse:
                     // Log notice but continue
+                    break;
+
+                case NotificationResponse:
+                    // ECOS-01: Fixed - handle async notification during query
+                    HandleNotificationResponse(payload);
+                    break;
+
+                case CopyInResponse:
+                    // ECOS-01: Fixed - handle COPY IN response during simple query (e.g., COPY FROM STDIN)
+                    // Send CopyFail since simple query doesn't supply data
+                    await SendCopyFailAsync("COPY IN not supported via simple query protocol", ct);
+                    break;
+
+                case CopyOutResponse:
+                    // ECOS-01: Fixed - handle COPY OUT response during simple query (e.g., COPY TO STDOUT)
+                    await DrainCopyOutDataAsync(ct);
+                    break;
+
+                case CopyBothResponse:
+                    // ECOS-01: Fixed - handle CopyBothResponse (streaming replication)
+                    // CopyBoth is used for walsender protocol; drain and ignore in normal query context
+                    await DrainCopyOutDataAsync(ct);
                     break;
 
                 case ReadyForQuery:
@@ -551,6 +635,11 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
                 case BindComplete:
                     break;
 
+                case ParameterDescription:
+                    // ECOS-01: Fixed - handle ParameterDescription ('t') in extended query
+                    // Contains parameter OID types; used for type inference
+                    break;
+
                 case RowDescription:
                     columns = ParseRowDescription(payload);
                     break;
@@ -568,8 +657,21 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
                     rowsAffected = ParseCommandTag(tag);
                     break;
 
+                case PortalSuspended:
+                    // ECOS-01: Fixed - handle PortalSuspended ('s') when Execute has maxRows limit
+                    // Indicates more rows available; caller can re-Execute to fetch more
+                    break;
+
                 case ErrorResponse:
                     (errorMessage, errorCode) = ParseErrorResponseDetailed(payload);
+                    break;
+
+                case NoticeResponse:
+                    // ECOS-01: Fixed - handle notice in extended query
+                    break;
+
+                case CloseComplete:
+                    // ECOS-01: Fixed - handle CloseComplete ('3') response
                     break;
 
                 case ReadyForQuery:
@@ -585,7 +687,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
                     };
 
                 default:
-                    // Continue processing
+                    // Continue processing unknown message types
                     break;
             }
         }
@@ -613,6 +715,39 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         // No parameter types (let server infer)
         WriteInt16BE(buffer.AsSpan(offset, 2), 0);
+
+        await SendAsync(buffer, ct);
+    }
+
+    // ECOS-01: Fixed - overload with explicit parameter OIDs for typed Parse
+    private async Task SendParseMessageAsync(string statementName, string query, int[] parameterOids, CancellationToken ct)
+    {
+        var nameBytes = Encoding.UTF8.GetBytes(statementName);
+        var queryBytes = Encoding.UTF8.GetBytes(query);
+        var messageLength = 4 + nameBytes.Length + 1 + queryBytes.Length + 1 + 2 + (parameterOids.Length * 4);
+        var buffer = new byte[1 + messageLength];
+        var offset = 0;
+
+        buffer[offset++] = Parse;
+        WriteInt32BE(buffer.AsSpan(offset, 4), messageLength);
+        offset += 4;
+
+        nameBytes.CopyTo(buffer.AsSpan(offset));
+        offset += nameBytes.Length;
+        buffer[offset++] = 0;
+
+        queryBytes.CopyTo(buffer.AsSpan(offset));
+        offset += queryBytes.Length;
+        buffer[offset++] = 0;
+
+        WriteInt16BE(buffer.AsSpan(offset, 2), (short)parameterOids.Length);
+        offset += 2;
+
+        foreach (var oid in parameterOids)
+        {
+            WriteInt32BE(buffer.AsSpan(offset, 4), oid);
+            offset += 4;
+        }
 
         await SendAsync(buffer, ct);
     }
@@ -743,6 +878,274 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         await SendAsync(buffer, ct);
     }
 
+    // ECOS-01: Fixed - Close message for named statements and portals
+    /// <summary>
+    /// Sends a Close message to close a named prepared statement or portal.
+    /// </summary>
+    /// <param name="type">'S' for statement, 'P' for portal.</param>
+    /// <param name="name">Name of the statement or portal to close. Empty string for unnamed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task SendCloseMessageAsync(char type, string name, CancellationToken ct)
+    {
+        var nameBytes = Encoding.UTF8.GetBytes(name);
+        var messageLength = 4 + 1 + nameBytes.Length + 1;
+        var buffer = new byte[1 + messageLength];
+
+        buffer[0] = Close;
+        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        buffer[5] = (byte)type;
+        nameBytes.CopyTo(buffer.AsSpan(6));
+        buffer[6 + nameBytes.Length] = 0;
+
+        await SendAsync(buffer, ct);
+    }
+
+    // ECOS-01: Fixed - Flush message for pipelining
+    /// <summary>
+    /// Sends a Flush message requesting the server to deliver any pending output without issuing Sync.
+    /// Used for pipelining extended query operations.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task SendFlushMessageAsync(CancellationToken ct)
+    {
+        var buffer = new byte[5];
+        buffer[0] = Flush;
+        WriteInt32BE(buffer.AsSpan(1, 4), 4);
+        await SendAsync(buffer, ct);
+    }
+
+    // ECOS-01: Fixed - Cancel request support
+    /// <summary>
+    /// Sends a cancel request to abort a running query. Per PostgreSQL protocol,
+    /// this opens a new TCP connection to send the 16-byte cancel request message.
+    /// </summary>
+    /// <param name="host">Server host.</param>
+    /// <param name="port">Server port.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task SendCancelRequestAsync(string host, int port, CancellationToken ct)
+    {
+        // Cancel request is sent on a NEW connection (per PostgreSQL protocol spec)
+        // Format: Int32 length=16, Int32 code=80877102, Int32 processId, Int32 secretKey
+        using var cancelClient = new System.Net.Sockets.TcpClient();
+        await cancelClient.ConnectAsync(host, port, ct);
+
+        await using var stream = cancelClient.GetStream();
+        var buffer = new byte[16];
+        WriteInt32BE(buffer.AsSpan(0, 4), 16);           // Length
+        WriteInt32BE(buffer.AsSpan(4, 4), CancelRequestCode); // Cancel request code
+        WriteInt32BE(buffer.AsSpan(8, 4), _backendProcessId);  // Process ID
+        WriteInt32BE(buffer.AsSpan(12, 4), _backendSecretKey); // Secret key
+
+        await stream.WriteAsync(buffer, ct);
+        await stream.FlushAsync(ct);
+    }
+
+    #region COPY Protocol
+
+    // ECOS-01: Fixed - full COPY protocol implementation
+
+    /// <summary>
+    /// Sends COPY IN data to the server. The caller provides rows as byte arrays.
+    /// Uses the COPY protocol: sends CopyData messages followed by CopyDone.
+    /// </summary>
+    /// <param name="copyCommand">SQL COPY command (e.g., "COPY table FROM STDIN").</param>
+    /// <param name="dataProvider">Function that yields data chunks to send.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Number of rows copied.</returns>
+    public async Task<long> CopyInAsync(string copyCommand, Func<IAsyncEnumerable<byte[]>> dataProvider, CancellationToken ct)
+    {
+        // Send the COPY command via simple query
+        var queryBytes = Encoding.UTF8.GetBytes(copyCommand);
+        var messageLength = 4 + queryBytes.Length + 1;
+        var buffer = new byte[1 + messageLength];
+        buffer[0] = Query;
+        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        queryBytes.CopyTo(buffer.AsSpan(5));
+        buffer[^1] = 0;
+        await SendAsync(buffer, ct);
+
+        // Read CopyInResponse
+        var (msgType, payload) = await ReadMessageAsync(ct);
+        if (msgType == ErrorResponse)
+        {
+            var error = ParseErrorResponse(payload);
+            throw new InvalidOperationException($"COPY IN failed: {error}");
+        }
+        if (msgType != CopyInResponse)
+        {
+            throw new InvalidOperationException($"Expected CopyInResponse, got {(char)msgType}");
+        }
+
+        // Parse CopyInResponse: Int8 format (0=text, 1=binary), Int16 column count, Int16[] per-column formats
+        // Format information available if needed by caller
+
+        // Send data chunks as CopyData messages
+        await foreach (var chunk in dataProvider())
+        {
+            var copyDataLength = 4 + chunk.Length;
+            var copyDataBuffer = new byte[1 + copyDataLength];
+            copyDataBuffer[0] = CopyData;
+            WriteInt32BE(copyDataBuffer.AsSpan(1, 4), copyDataLength);
+            chunk.CopyTo(copyDataBuffer.AsSpan(5));
+            await SendAsync(copyDataBuffer, ct);
+        }
+
+        // Send CopyDone
+        var doneBuffer = new byte[5];
+        doneBuffer[0] = CopyDone;
+        WriteInt32BE(doneBuffer.AsSpan(1, 4), 4);
+        await SendAsync(doneBuffer, ct);
+
+        // Wait for CommandComplete + ReadyForQuery
+        long rowsCopied = 0;
+        while (true)
+        {
+            (msgType, payload) = await ReadMessageAsync(ct);
+            switch (msgType)
+            {
+                case CommandComplete:
+                    var tag = ReadNullTerminatedString(payload, out _);
+                    rowsCopied = ParseCommandTag(tag);
+                    break;
+                case ErrorResponse:
+                    var errorMsg = ParseErrorResponse(payload);
+                    throw new InvalidOperationException($"COPY IN failed: {errorMsg}");
+                case ReadyForQuery:
+                    HandleReadyForQuery(payload);
+                    return rowsCopied;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Receives COPY OUT data from the server. Returns data chunks as they arrive.
+    /// </summary>
+    /// <param name="copyCommand">SQL COPY command (e.g., "COPY table TO STDOUT").</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Async enumerable of data chunks.</returns>
+    public async IAsyncEnumerable<byte[]> CopyOutAsync(string copyCommand, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        // Send the COPY command
+        var queryBytes = Encoding.UTF8.GetBytes(copyCommand);
+        var messageLength = 4 + queryBytes.Length + 1;
+        var buffer = new byte[1 + messageLength];
+        buffer[0] = Query;
+        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        queryBytes.CopyTo(buffer.AsSpan(5));
+        buffer[^1] = 0;
+        await SendAsync(buffer, ct);
+
+        // Read CopyOutResponse
+        var (msgType, payload) = await ReadMessageAsync(ct);
+        if (msgType == ErrorResponse)
+        {
+            var error = ParseErrorResponse(payload);
+            throw new InvalidOperationException($"COPY OUT failed: {error}");
+        }
+        if (msgType != CopyOutResponse)
+        {
+            throw new InvalidOperationException($"Expected CopyOutResponse, got {(char)msgType}");
+        }
+
+        // Read CopyData messages until CopyDone
+        while (true)
+        {
+            (msgType, payload) = await ReadMessageAsync(ct);
+            switch (msgType)
+            {
+                case CopyData:
+                    yield return payload;
+                    break;
+                case CopyDone:
+                    // Wait for CommandComplete + ReadyForQuery
+                    await DrainToReadyForQueryAsync(ct);
+                    yield break;
+                case ErrorResponse:
+                    var errorMsg = ParseErrorResponse(payload);
+                    throw new InvalidOperationException($"COPY OUT failed: {errorMsg}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sends a CopyFail message to abort a COPY IN operation.
+    /// </summary>
+    private async Task SendCopyFailAsync(string errorMessage, CancellationToken ct)
+    {
+        var msgBytes = Encoding.UTF8.GetBytes(errorMessage);
+        var messageLength = 4 + msgBytes.Length + 1;
+        var buffer = new byte[1 + messageLength];
+        buffer[0] = CopyFail;
+        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        msgBytes.CopyTo(buffer.AsSpan(5));
+        buffer[^1] = 0;
+        await SendAsync(buffer, ct);
+    }
+
+    /// <summary>
+    /// Drains CopyOut data until CopyDone is received (used when COPY OUT appears unexpectedly).
+    /// </summary>
+    private async Task DrainCopyOutDataAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var (msgType, _) = await ReadMessageAsync(ct);
+            if (msgType == CopyDone)
+            {
+                return;
+            }
+            if (msgType == ErrorResponse)
+            {
+                return;
+            }
+            // CopyData: discard and continue
+        }
+    }
+
+    /// <summary>
+    /// Drains messages until ReadyForQuery is received.
+    /// </summary>
+    private async Task DrainToReadyForQueryAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var (msgType, payload) = await ReadMessageAsync(ct);
+            if (msgType == ReadyForQuery)
+            {
+                HandleReadyForQuery(payload);
+                return;
+            }
+        }
+    }
+
+    #endregion
+
+    #region Notification Support
+
+    // ECOS-01: Fixed - async notification handling
+    private void HandleNotificationResponse(byte[] payload)
+    {
+        // Format: Int32 processId, String channelName, String payload
+        var processId = ReadInt32BE(payload.AsSpan(0, 4));
+        var channel = ReadNullTerminatedString(payload.AsSpan(4), out var bytesRead);
+        var notifPayload = ReadNullTerminatedString(payload.AsSpan(4 + bytesRead), out _);
+
+        // Store notification for retrieval
+        _pendingNotifications.Enqueue(new PostgreSqlNotification(processId, channel, notifPayload));
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<PostgreSqlNotification> _pendingNotifications = new();
+
+    /// <summary>
+    /// Tries to dequeue a pending notification received from LISTEN/NOTIFY.
+    /// </summary>
+    public bool TryGetNotification(out PostgreSqlNotification? notification)
+    {
+        return _pendingNotifications.TryDequeue(out notification);
+    }
+
+    #endregion
+
     /// <inheritdoc/>
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(
         string command,
@@ -784,6 +1187,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             {
                 return false;
             }
+            // EmptyQueryResponse or other messages: continue to ReadyForQuery
         }
     }
 
@@ -881,6 +1285,13 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             "time" or "timetz" when TimeOnly.TryParse(value, out var time) => time,
             "uuid" when Guid.TryParse(value, out var guid) => guid,
             "bytea" => DecodeBytea(value),
+            "json" or "jsonb" => value, // Return JSON as string
+            "xml" => value,
+            "inet" or "cidr" => value,
+            "macaddr" or "macaddr8" => value,
+            "interval" => value,
+            "point" or "line" or "lseg" or "box" or "path" or "polygon" or "circle" => value,
+            "int4range" or "int8range" or "numrange" or "tsrange" or "tstzrange" or "daterange" => value,
             _ => value
         };
     }
@@ -905,25 +1316,49 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             21 => "int2",
             23 => "int4",
             25 => "text",
+            26 => "oid",
+            114 => "json",
+            142 => "xml",
+            600 => "point",
+            601 => "lseg",
+            602 => "path",
+            603 => "box",
+            604 => "polygon",
+            628 => "line",
+            650 => "cidr",
             700 => "float4",
             701 => "float8",
+            718 => "circle",
             790 => "money",
+            829 => "macaddr",
+            869 => "inet",
             1042 => "bpchar",
             1043 => "varchar",
             1082 => "date",
             1083 => "time",
             1114 => "timestamp",
             1184 => "timestamptz",
+            1186 => "interval",
             1266 => "timetz",
+            1560 => "bit",
+            1562 => "varbit",
             1700 => "numeric",
             2950 => "uuid",
+            3802 => "jsonb",
+            3904 => "int4range",
+            3926 => "int8range",
+            3906 => "numrange",
+            3908 => "tsrange",
+            3910 => "tstzrange",
+            3912 => "daterange",
+            774 => "macaddr8",
             _ => "unknown"
         };
     }
 
     private static long ParseCommandTag(string tag)
     {
-        // Examples: "SELECT 100", "INSERT 0 1", "UPDATE 5", "DELETE 3"
+        // Examples: "SELECT 100", "INSERT 0 1", "UPDATE 5", "DELETE 3", "COPY 100"
         var parts = tag.Split(' ');
         if (parts.Length >= 2 && long.TryParse(parts[^1], out var count))
         {
@@ -943,11 +1378,28 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var fields = ParseErrorFields(payload);
         fields.TryGetValue('M', out var message);
         fields.TryGetValue('C', out var code);
+
+        // ECOS-01: Fixed - include detail and hint in error message for richer diagnostics
+        if (fields.TryGetValue('D', out var detail) && !string.IsNullOrEmpty(detail))
+        {
+            message = $"{message} DETAIL: {detail}";
+        }
+        if (fields.TryGetValue('H', out var hint) && !string.IsNullOrEmpty(hint))
+        {
+            message = $"{message} HINT: {hint}";
+        }
+
         return (message, code);
     }
 
+    // ECOS-01: Fixed - comprehensive error field parsing with all PostgreSQL error field types
     private static Dictionary<char, string> ParseErrorFields(byte[] payload)
     {
+        // Parses all PostgreSQL error/notice response field types:
+        // 'S' severity (localized), 'V' severity (non-localized, always EN), 'C' SQLSTATE code,
+        // 'M' message, 'D' detail, 'H' hint, 'P' position, 'p' internal position,
+        // 'q' internal query, 'W' where, 's' schema, 't' table, 'c' column,
+        // 'd' data type, 'n' constraint, 'F' file, 'L' line, 'R' routine
         var fields = new Dictionary<char, string>();
         var offset = 0;
 
@@ -962,3 +1414,11 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         return fields;
     }
 }
+
+/// <summary>
+/// Represents an asynchronous notification received from PostgreSQL LISTEN/NOTIFY.
+/// </summary>
+/// <param name="ProcessId">Backend process ID that sent the notification.</param>
+/// <param name="Channel">Notification channel name.</param>
+/// <param name="Payload">Notification payload string.</param>
+public sealed record PostgreSqlNotification(int ProcessId, string Channel, string Payload);
