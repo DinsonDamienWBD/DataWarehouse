@@ -114,6 +114,7 @@
 - [Phase 77]: Composite key {featureId}:{PolicyLevel} for 470 autonomy config points; product-of-confidences for rationale chain scoring; security features always consult ThreatDetector+SensitivityAnalyzer
 - [Phase 77-05]: HybridAutonomyProfile per-category presets (Paranoid/Balanced/Performance); AiSelfModificationGuard fail-closed with ai:/system:ai prefix detection; AiPolicyIntelligenceFactory wires all 10+ components; AIPI-01 through AIPI-11 complete
 - [Phase 78-02]: Zero-filled padding bytes are valid lazy-init state for all module fields; WAL backup in superblock mirror block 7; BuildUpdatedLayout maintains sorted ModuleFieldEntry by ModuleId; CanClaimPadding is static pure method (no I/O)
+- [Phase 78]: WAL entry format: [TargetBlock:8][DataLength:4][Data:N][XxHash64:8]; region sizing heuristic capped at totalBlocks/16
 
 ## Performance Metrics
 
@@ -201,7 +202,8 @@
 | Phase 77 P04 | 4min | 2 tasks | 2 files |
 | 77    | 05   | 3min     | 2     | 3     |
 | 78    | 02   | 4min     | 2     | 2     |
+| Phase 78 P01 | 5min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T15:26:03Z
-- **Stopped At:** Completed 78-02-PLAN.md (PaddingInventory + InodePaddingClaim)
+- **Stopped At:** Completed 78-01-PLAN.md (FreeSpaceScanner + WalJournaledRegionWriter + OnlineRegionAddition)
