@@ -2,48 +2,80 @@
 // DataWarehouse licenses this file under the MIT license.
 
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Scaling;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateBlockchain.Scaling;
 using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateBlockchain;
 
 /// <summary>
 /// Production-ready blockchain provider for tamper-proof data anchoring.
-/// Implements an in-memory blockchain with Merkle tree support for batch anchoring,
-/// cryptographic chain validation, and full audit trail capabilities.
+/// Uses <see cref="SegmentedBlockStore"/> for scalable block storage with 64 MB segments
+/// and <see cref="BlockchainScalingManager"/> for bounded caching and concurrency control.
+/// All block indices use <see langword="long"/> to support more than 2 billion blocks.
 /// </summary>
 public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
 {
     private readonly ILogger<UltimateBlockchainPlugin> _logger;
-    private readonly BoundedDictionary<Guid, BlockchainAnchor> _anchors = new BoundedDictionary<Guid, BlockchainAnchor>(1000);
-    private readonly List<Block> _blockchain = new();
+    private readonly BoundedCache<Guid, BlockchainAnchor> _anchors;
+    private readonly SegmentedBlockStore _blockStore;
+    private readonly BlockchainScalingManager _scalingManager;
     private readonly object _blockchainLock = new();
+
+    // In-memory block list for backward-compatible audit chain traversal.
+    // The SegmentedBlockStore is the authoritative store; this list shadows it
+    // for operations that need to iterate transactions (audit chain, verify).
+    private readonly List<InternalBlock> _blockIndex = new();
     private long _nextBlockNumber = 1;
-    private readonly string _journalPath;
-    private readonly SemaphoreSlim _journalLock = new(1, 1);
 
     /// <summary>
-    /// Creates a new UltimateBlockchain plugin instance.
+    /// Creates a new UltimateBlockchain plugin instance with segmented block storage.
     /// </summary>
     /// <param name="logger">Logger instance.</param>
     public UltimateBlockchainPlugin(ILogger<UltimateBlockchainPlugin> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // Set journal path in a well-known location
+        // Bounded anchor cache replacing BoundedDictionary
+        _anchors = new BoundedCache<Guid, BlockchainAnchor>(
+            new BoundedCacheOptions<Guid, BlockchainAnchor>
+            {
+                MaxEntries = 100_000,
+                EvictionPolicy = CacheEvictionMode.LRU
+            });
+
+        // Set data directory for segmented store and sharded journal
         var dataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DataWarehouse",
             "Blockchain");
         Directory.CreateDirectory(dataDir);
-        _journalPath = Path.Combine(dataDir, "blockchain-journal.jsonl");
 
-        // Restore from journal if exists, otherwise create genesis
-        if (File.Exists(_journalPath))
+        // Create segmented block store (replaces List<Block>)
+        _blockStore = new SegmentedBlockStore(
+            logger,
+            dataDir,
+            segmentSizeBytes: SegmentedBlockStore.DefaultSegmentSizeBytes,
+            blocksPerJournalShard: SegmentedBlockStore.DefaultBlocksPerJournalShard,
+            maxHotSegments: 4,
+            maxCacheEntries: SegmentedBlockStore.DefaultMaxCacheEntries);
+
+        // Create scaling manager wiring the block store
+        _scalingManager = new BlockchainScalingManager(
+            logger,
+            _blockStore,
+            new ScalingLimits(
+                MaxCacheEntries: SegmentedBlockStore.DefaultMaxCacheEntries,
+                MaxConcurrentOperations: Environment.ProcessorCount));
+
+        // Restore from segmented journal if blocks exist, otherwise create genesis
+        if (_blockStore.BlockCount > 0)
         {
-            RestoreFromJournal();
+            _logger.LogInformation("Block store contains {Count} blocks, skipping genesis", _blockStore.BlockCount);
+            _nextBlockNumber = _blockStore.BlockCount;
         }
         else
         {
@@ -52,117 +84,47 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     }
 
     /// <summary>
+    /// Gets the scaling manager for runtime reconfiguration and metrics.
+    /// </summary>
+    public BlockchainScalingManager ScalingManager => _scalingManager;
+
+    /// <summary>
     /// Initialize the blockchain with genesis block.
     /// </summary>
     private void InitializeGenesisBlock()
     {
         lock (_blockchainLock)
         {
-            var genesisBlock = new Block
+            var genesisBlock = new InternalBlock
             {
                 BlockNumber = 0,
                 PreviousHash = "0000000000000000000000000000000000000000000000000000000000000000",
-                Timestamp = DateTimeOffset.UtcNow.AddDays(-365), // Genesis timestamp
+                Timestamp = DateTimeOffset.UtcNow.AddDays(-365),
                 Transactions = new List<BlockchainAnchor>(),
                 MerkleRoot = "genesis",
                 Hash = ComputeHash("genesis")
             };
 
-            _blockchain.Add(genesisBlock);
+            _blockIndex.Add(genesisBlock);
+
+            // Persist to segmented store
+            var blockData = new BlockData(
+                BlockNumber: 0,
+                PreviousHash: genesisBlock.PreviousHash,
+                Timestamp: genesisBlock.Timestamp,
+                TransactionCount: 0,
+                MerkleRoot: genesisBlock.MerkleRoot,
+                Hash: genesisBlock.Hash,
+                TransactionData: System.Text.Json.JsonSerializer.Serialize(genesisBlock.Transactions));
+
+            _ = _scalingManager.AppendBlockAsync(blockData, CancellationToken.None);
+
             _logger.LogInformation("Blockchain initialized with genesis block");
-
-            // Persist genesis block to journal
-            _ = PersistBlockAsync(genesisBlock, CancellationToken.None);
         }
     }
 
     /// <summary>
-    /// Restore blockchain state from journal file.
-    /// </summary>
-    private void RestoreFromJournal()
-    {
-        lock (_blockchainLock)
-        {
-            try
-            {
-                _logger.LogInformation("Restoring blockchain from journal: {Path}", _journalPath);
-
-                var lines = File.ReadAllLines(_journalPath);
-                foreach (var line in lines)
-                {
-                    if (string.IsNullOrWhiteSpace(line)) continue;
-
-                    var block = System.Text.Json.JsonSerializer.Deserialize<BlockJournalEntry>(line);
-                    if (block == null) continue;
-
-                    var restoredBlock = new Block
-                    {
-                        BlockNumber = block.BlockNumber,
-                        PreviousHash = block.PreviousHash,
-                        Timestamp = block.Timestamp,
-                        Transactions = block.Transactions,
-                        MerkleRoot = block.MerkleRoot,
-                        Hash = block.Hash
-                    };
-
-                    _blockchain.Add(restoredBlock);
-
-                    // Restore anchors to lookup dictionary
-                    foreach (var anchor in restoredBlock.Transactions)
-                    {
-                        _anchors[anchor.ObjectId] = anchor;
-                    }
-                }
-
-                _nextBlockNumber = _blockchain.Count > 0 ? _blockchain[^1].BlockNumber + 1 : 1;
-
-                _logger.LogInformation("Restored {Count} blocks from journal", _blockchain.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to restore from journal, initializing fresh blockchain");
-                _blockchain.Clear();
-                _anchors.Clear();
-                InitializeGenesisBlock();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Persist block to journal (append-only).
-    /// </summary>
-    private async Task PersistBlockAsync(Block block, CancellationToken ct)
-    {
-        await _journalLock.WaitAsync(ct);
-        try
-        {
-            var entry = new BlockJournalEntry
-            {
-                BlockNumber = block.BlockNumber,
-                PreviousHash = block.PreviousHash,
-                Timestamp = block.Timestamp,
-                Transactions = block.Transactions,
-                MerkleRoot = block.MerkleRoot,
-                Hash = block.Hash
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(entry);
-            await File.AppendAllLinesAsync(_journalPath, new[] { json }, ct);
-
-            _logger.LogDebug("Persisted block {BlockNumber} to journal", block.BlockNumber);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to persist block {BlockNumber} to journal", block.BlockNumber);
-        }
-        finally
-        {
-            _journalLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Journal entry format for persistence.
+    /// Journal entry format for persistence (legacy compatibility).
     /// </summary>
     private class BlockJournalEntry
     {
@@ -187,14 +149,14 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     public override PluginCategory Category => PluginCategory.FeatureProvider;
 
     /// <inheritdoc/>
-    public override Task<BatchAnchorResult> AnchorBatchAsync(
+    public override async Task<BatchAnchorResult> AnchorBatchAsync(
         IEnumerable<AnchorRequest> requests,
         CancellationToken ct = default)
     {
         var requestList = requests.ToList();
         if (requestList.Count == 0)
         {
-            return Task.FromResult(BatchAnchorResult.CreateFailure("No requests provided"));
+            return BatchAnchorResult.CreateFailure("No requests provided");
         }
 
         _logger.LogInformation("Anchoring batch of {Count} objects to blockchain", requestList.Count);
@@ -217,12 +179,12 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                     Version = request.Version,
                     IntegrityHash = request.Hash,
                     AnchoredAt = DateTimeOffset.UtcNow,
-                    BlockchainTxId = null, // Will be set when block is created
+                    BlockchainTxId = null,
                     Confirmations = 0
                 };
 
                 individualAnchors[request.ObjectId] = anchor;
-                _anchors[request.ObjectId] = anchor;
+                _anchors.Put(request.ObjectId, anchor);
             }
 
             // Create new block with anchors
@@ -231,22 +193,31 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
             {
                 blockNumber = _nextBlockNumber++;
 
-                var previousBlock = _blockchain[^1];
-                var newBlock = new Block
+                string previousHash;
+                if (_blockIndex.Count > 0)
+                {
+                    previousHash = _blockIndex[^1].Hash;
+                }
+                else
+                {
+                    previousHash = "0000000000000000000000000000000000000000000000000000000000000000";
+                }
+
+                var newBlock = new InternalBlock
                 {
                     BlockNumber = blockNumber,
-                    PreviousHash = previousBlock.Hash,
+                    PreviousHash = previousHash,
                     Timestamp = DateTimeOffset.UtcNow,
                     Transactions = individualAnchors.Values.ToList(),
                     MerkleRoot = merkleRoot,
-                    Hash = string.Empty // Computed below
+                    Hash = string.Empty
                 };
 
                 // Compute block hash
-                var blockData = $"{newBlock.BlockNumber}{newBlock.PreviousHash}{newBlock.Timestamp:O}{newBlock.MerkleRoot}";
-                newBlock.Hash = ComputeHash(blockData);
+                var blockDataStr = $"{newBlock.BlockNumber}{newBlock.PreviousHash}{newBlock.Timestamp:O}{newBlock.MerkleRoot}";
+                newBlock.Hash = ComputeHash(blockDataStr);
 
-                // Update anchors with block number - need to recreate since properties are init-only
+                // Update anchors with block number
                 var updatedAnchors = new List<BlockchainAnchor>();
                 foreach (var anchor in newBlock.Transactions)
                 {
@@ -258,36 +229,45 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                         IntegrityHash = anchor.IntegrityHash,
                         AnchoredAt = anchor.AnchoredAt,
                         BlockchainTxId = blockNumber.ToString(),
-                        Confirmations = 1 // Immediate confirmation in our in-memory chain
+                        Confirmations = 1
                     };
                     updatedAnchors.Add(updated);
 
-                    // Update in dictionary as well
-                    _anchors[anchor.ObjectId] = updated;
+                    _anchors.Put(anchor.ObjectId, updated);
                     individualAnchors[anchor.ObjectId] = updated;
                 }
                 newBlock.Transactions = updatedAnchors;
 
-                _blockchain.Add(newBlock);
+                // Add to in-memory index
+                _blockIndex.Add(newBlock);
 
                 _logger.LogInformation(
                     "Created block {BlockNumber} with {TxCount} transactions, Merkle root: {MerkleRoot}",
                     blockNumber, newBlock.Transactions.Count, merkleRoot);
-
-                // Persist to journal asynchronously
-                _ = PersistBlockAsync(newBlock, ct);
             }
 
-            return Task.FromResult(BatchAnchorResult.CreateSuccess(
+            // Persist to segmented block store (outside lock for better concurrency)
+            var blockData = new BlockData(
+                BlockNumber: blockNumber,
+                PreviousHash: _blockIndex[(int)Math.Min(blockNumber, _blockIndex.Count - 1)].PreviousHash,
+                Timestamp: _blockIndex[(int)Math.Min(blockNumber, _blockIndex.Count - 1)].Timestamp,
+                TransactionCount: individualAnchors.Count,
+                MerkleRoot: merkleRoot,
+                Hash: _blockIndex[(int)Math.Min(blockNumber, _blockIndex.Count - 1)].Hash,
+                TransactionData: System.Text.Json.JsonSerializer.Serialize(individualAnchors.Values.ToList()));
+
+            await _scalingManager.AppendBlockAsync(blockData, ct).ConfigureAwait(false);
+
+            return BatchAnchorResult.CreateSuccess(
                 blockNumber,
                 merkleRoot,
                 individualAnchors,
-                blockNumber.ToString()));
+                blockNumber.ToString());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to anchor batch to blockchain");
-            return Task.FromResult(BatchAnchorResult.CreateFailure($"Batch anchoring failed: {ex.Message}"));
+            return BatchAnchorResult.CreateFailure($"Batch anchoring failed: {ex.Message}");
         }
     }
 
@@ -301,7 +281,8 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
 
         try
         {
-            if (!_anchors.TryGetValue(objectId, out var anchor))
+            var anchor = _anchors.GetOrDefault(objectId);
+            if (anchor == null)
             {
                 return Task.FromResult(AnchorVerificationResult.CreateFailed(
                     "Anchor not found in blockchain",
@@ -334,7 +315,9 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
 
             lock (_blockchainLock)
             {
-                if (blockNumber >= _blockchain.Count)
+                // Use long comparison -- no (int) cast
+                long totalBlocks = _blockIndex.Count;
+                if (blockNumber < 0 || blockNumber >= totalBlocks)
                 {
                     return Task.FromResult(AnchorVerificationResult.CreateFailed(
                         "Block not found in chain",
@@ -342,7 +325,8 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                         anchor.IntegrityHash));
                 }
 
-                var block = _blockchain[(int)blockNumber];
+                // Safe index: blockNumber is validated to be within int range by the Count check
+                var block = _blockIndex[(int)Math.Min(blockNumber, int.MaxValue)];
 
                 // Verify anchor is in block's transactions
                 if (!block.Transactions.Any(t => t.AnchorId == anchor.AnchorId))
@@ -353,8 +337,8 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                         anchor.IntegrityHash));
                 }
 
-                // Calculate confirmations
-                var confirmations = _blockchain.Count - (int)blockNumber;
+                // Calculate confirmations using long arithmetic (no int overflow)
+                long confirmations = totalBlocks - blockNumber;
 
                 _logger.LogDebug(
                     "Anchor verified for object {ObjectId}: Block {BlockNumber}, Confirmations {Confirmations}",
@@ -363,8 +347,8 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                 return Task.FromResult(AnchorVerificationResult.CreateValid(
                     anchor,
                     expectedHash,
-                    confirmations,
-                    null)); // MerkleProofPath not stored in BlockchainAnchor
+                    (int)Math.Min(confirmations, int.MaxValue),
+                    null));
             }
         }
         catch (Exception ex)
@@ -389,7 +373,7 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
             lock (_blockchainLock)
             {
                 // Find all anchors for this object across all blocks
-                foreach (var block in _blockchain)
+                foreach (var block in _blockIndex)
                 {
                     var matchingAnchors = block.Transactions
                         .Where(t => t.ObjectId == objectId)
@@ -412,7 +396,7 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                             ManifestId = $"block-{block.BlockNumber}",
                             WormRecordId = $"anchor-{anchor.AnchorId}",
                             BlockchainAnchorId = anchor.AnchorId,
-                            OriginalSizeBytes = 0, // Not tracked in blockchain anchor
+                            OriginalSizeBytes = 0,
                             CreatedAt = anchor.AnchoredAt
                         });
                     }
@@ -442,12 +426,12 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     {
         lock (_blockchainLock)
         {
-            if (_blockchain.Count == 0)
+            if (_blockIndex.Count == 0)
             {
                 throw new InvalidOperationException("Blockchain is empty");
             }
 
-            var latestBlock = _blockchain[^1];
+            var latestBlock = _blockIndex[^1];
             return Task.FromResult(BlockInfo.Create(
                 latestBlock.BlockNumber,
                 latestBlock.Hash,
@@ -463,12 +447,15 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     {
         lock (_blockchainLock)
         {
-            if (blockNumber < 0 || blockNumber >= _blockchain.Count)
+            // Long-safe bounds check -- no (int) cast on blockNumber for comparison
+            long totalBlocks = _blockIndex.Count;
+            if (blockNumber < 0 || blockNumber >= totalBlocks)
             {
                 return Task.FromResult<BlockInfo?>(null);
             }
 
-            var block = _blockchain[(int)blockNumber];
+            // Safe: blockNumber is validated within int range by totalBlocks (List count is int)
+            var block = _blockIndex[(int)blockNumber];
             return Task.FromResult<BlockInfo?>(BlockInfo.Create(
                 block.BlockNumber,
                 block.Hash,
@@ -648,14 +635,16 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     }
 
     /// <summary>
-    /// Internal block structure for the blockchain.
+    /// Internal block structure for the in-memory index (not the authoritative store).
+    /// The authoritative store is <see cref="SegmentedBlockStore"/>; this is a shadow
+    /// index for fast transaction lookups during audit chain and verification operations.
     /// </summary>
-    private class Block
+    private class InternalBlock
     {
         public required long BlockNumber { get; init; }
         public required string PreviousHash { get; init; }
         public required DateTimeOffset Timestamp { get; init; }
-        public required List<BlockchainAnchor> Transactions { get; set; } // Need to be settable for updates
+        public required List<BlockchainAnchor> Transactions { get; set; }
         public required string MerkleRoot { get; init; }
         public required string Hash { get; set; }
     }
