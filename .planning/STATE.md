@@ -2,8 +2,8 @@
 
 ## Current Position
 - **Phase:** 78-online-module-addition
-- **Plan:** 4/5 (78-01, 78-02, 78-03, 78-04 complete)
-- **Status:** IN PROGRESS
+- **Plan:** 5/5 (78-01, 78-02, 78-03, 78-04, 78-05 complete)
+- **Status:** COMPLETE
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -18,7 +18,7 @@
 - Phase 75: COMPLETE (4/4 plans, authority chain + escalation + quorum + hardware tokens + dead man's switch)
 - Phase 76: COMPLETE (5/5 plans, materialized cache + bloom filter + delegate compiler + fast-path engine + simulation sandbox)
 - Phase 77: COMPLETE (5/5 plans, hybrid autonomy + self-mod guard + factory)
-- Phase 78: IN PROGRESS (4/5 plans)
+- Phase 78: COMPLETE (5/5 plans, online module addition with WAL, defrag, indirection)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -117,6 +117,7 @@
 - [Phase 78]: WAL entry format: [TargetBlock:8][DataLength:4][Data:N][XxHash64:8]; region sizing heuristic capped at totalBlocks/16
 - [Phase 78-03]: MCHK custom block tag for migration checkpoints; checkpoint block at last block of old inode table; region directory update via RemoveRegion+AddRegion; extent-aware copy skips recreated metadata blocks
 - [Phase 78-04]: ModuleConfigField wraps raw ulong superblock fields for nibble-encoded level get/set; combined execution (regions+inode) does Option 1 first then 2/3; Tier 2 fallback structurally guaranteed; recommendation priority 2>1>3>4
+- [Phase 78-05]: IndirectionTable INDR magic, version 1, XxHash64 checksum; fixed region boundary block 10; defrag skipped below 5% fragmentation; indirection table block after highest region; wasted blocks = free runs < 16 blocks
 
 ## Performance Metrics
 
@@ -207,7 +208,8 @@
 | Phase 78 P01 | 5min | 2 tasks | 3 files |
 | 78    | 03   | 8min     | 2     | 3     |
 | 78    | 04   | 6min     | 2     | 3     |
+| 78    | 05   | 5min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T15:48:00Z
-- **Stopped At:** Completed 78-04-PLAN.md (ModuleAdditionOrchestrator + ModuleAdditionOptions + Tier2FallbackGuard)
+- **Timestamp:** 2026-02-23T15:54:00Z
+- **Stopped At:** Completed 78-05-PLAN.md (RegionIndirectionLayer + FragmentationMetrics + OnlineDefragmenter) - Phase 78 COMPLETE
