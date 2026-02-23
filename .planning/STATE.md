@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 72-vde-regions-foundation
-- **Plan:** 1/5 (72-01 complete)
+- **Plan:** 2/5 (72-02 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -12,7 +12,7 @@
 - Phase 69: COMPLETE (5/5 plans, policy persistence + marketplace)
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
 - Phase 71: COMPLETE (6/6 plans, 23 format files, VDE v2.0 creator operational)
-- Phase 72: 1/5 plans complete (72-01)
+- Phase 72: 2/5 plans complete (72-01, 72-02)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -79,6 +79,7 @@
 - [Phase 71-06]: SafeHandle passed directly to DeviceIoControl P/Invoke (Sonar S3869); FSCTL_SET_SPARSE failure non-fatal
 - [Phase 71-06]: Module region default size 64 blocks; WalHeader 82 bytes with alignment padding; Metadata WAL 0.5%/min 64, Data WAL 1%/min 128
 - [Phase 72-01]: PolicyDefinition is class (variable-length Data); KeySlot zero-pads WrappedKey/KeySalt for deterministic layout; FixedTimeEquals for HMAC comparison; rotation log keeps most recent N events from remaining block 1 space
+- [Phase 72]: [Phase 72-02]: 1-indexed heap Merkle tree; stackalloc hoisted for CA2014; ZeroChildrenHash pre-computed; VerifyProof static for lightweight clients
 
 ## Performance Metrics
 
@@ -138,7 +139,8 @@
 | 71    | 05   | 4min     | 2     | 4     |
 | 71    | 06   | 5min     | 2     | 4     |
 | 72    | 01   | 4min     | 2     | 2     |
+| Phase 72 P02 | 3min | 1 tasks | 1 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T12:19:21Z
-- **Stopped At:** Completed 72-01-PLAN.md (Policy Vault + Encryption Header regions)
+- **Stopped At:** Completed 72-02-PLAN.md (Integrity Tree Region)
