@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 84-deployment-topology-cli-modes
-- **Plan:** 1/6
+- **Plan:** 5/6
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -252,7 +252,8 @@
 | 83    | 04   | 18min    | 1     | 1     |
 | 83    | 05   | 25min    | 2     | 4     |
 | 84    | 01   | 4min     | 2     | 4     |
+| 84    | 05   | 5min     | 2     | 4     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T18:40:46Z
-- **Stopped At:** Completed 84-01-PLAN.md (DeploymentTopology enum + CLI --topology flag)
+- **Timestamp:** 2026-02-23T18:41:22Z
+- **Stopped At:** Completed 84-05-PLAN.md (ServerCommands real kernel/HTTP + sync-over-async fix)
