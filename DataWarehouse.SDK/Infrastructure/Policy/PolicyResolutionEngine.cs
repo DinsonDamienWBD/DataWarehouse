@@ -28,6 +28,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     {
         private readonly IPolicyStore _store;
         private readonly IPolicyPersistence _persistence;
+        private readonly PolicyCategoryDefaults _categoryDefaults;
         private volatile OperationalProfile _activeProfile;
 
         /// <summary>
@@ -38,14 +39,20 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         /// <param name="defaultProfile">
         /// Optional default operational profile. If null, <see cref="OperationalProfile.Standard()"/> is used.
         /// </param>
+        /// <param name="categoryDefaults">
+        /// Optional category-to-cascade-strategy defaults. If null, a default instance with
+        /// built-in mappings (Security=MostRestrictive, Compliance=Enforce, etc.) is used.
+        /// </param>
         public PolicyResolutionEngine(
             IPolicyStore store,
             IPolicyPersistence persistence,
-            OperationalProfile? defaultProfile = null)
+            OperationalProfile? defaultProfile = null,
+            PolicyCategoryDefaults? categoryDefaults = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
             _activeProfile = defaultProfile ?? OperationalProfile.Standard();
+            _categoryDefaults = categoryDefaults ?? new PolicyCategoryDefaults();
         }
 
         /// <inheritdoc />
@@ -89,8 +96,8 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 return BuildDefaultPolicy(featureId);
             }
 
-            // Determine the cascade strategy from the most-specific policy
-            var cascadeStrategy = resolutionChain[0].Cascade;
+            // Determine the effective cascade strategy
+            var cascadeStrategy = DetermineEffectiveCascade(featureId, resolutionChain);
 
             // Apply cascade strategy
             var (intensity, aiAutonomy, mergedParams, decidedAt) = ApplyCascade(cascadeStrategy, resolutionChain);
@@ -192,7 +199,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 return BuildDefaultPolicy(featureId);
             }
 
-            var cascadeStrategy = resolutionChain[0].Cascade;
+            var cascadeStrategy = DetermineEffectiveCascade(featureId, resolutionChain);
             var (intensity, aiAutonomy, mergedParams, decidedAt) = ApplyCascade(cascadeStrategy, resolutionChain);
 
             return new EffectivePolicy(
@@ -207,9 +214,46 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         }
 
         /// <summary>
-        /// Applies the cascade strategy to a resolution chain. Handles Inherit and Override
-        /// as the baseline. Designed as a virtual method so Plan 02 can override to add
-        /// MostRestrictive, Enforce, and Merge strategies.
+        /// Determines the effective cascade strategy for a feature and resolution chain.
+        /// <para>
+        /// Resolution order:
+        /// <list type="number">
+        ///   <item><description>CASC-05: If ANY entry in the chain at a HIGHER level than the most-specific
+        ///   has <see cref="CascadeStrategy.Enforce"/>, use Enforce. This ensures a VDE-level Enforce
+        ///   overrides a Container-level Override.</description></item>
+        ///   <item><description>If the most-specific policy has an explicit non-Inherit cascade, use that.</description></item>
+        ///   <item><description>Look up the feature's category default from <see cref="PolicyCategoryDefaults"/>.</description></item>
+        /// </list>
+        /// </para>
+        /// </summary>
+        private CascadeStrategy DetermineEffectiveCascade(string featureId, IReadOnlyList<FeaturePolicy> chain)
+        {
+            // CASC-05: Scan entire chain for Enforce at a higher level than the most-specific entry.
+            // chain[0] is most-specific (e.g., Block), entries with larger PolicyLevel values are higher.
+            var mostSpecificLevel = chain[0].Level;
+
+            for (var i = 1; i < chain.Count; i++)
+            {
+                if (chain[i].Cascade == CascadeStrategy.Enforce && (int)chain[i].Level > (int)mostSpecificLevel)
+                {
+                    return CascadeStrategy.Enforce;
+                }
+            }
+
+            // Use the most-specific policy's explicit cascade if it is not Inherit (the default/zero-equivalent)
+            var explicitCascade = chain[0].Cascade;
+            if (explicitCascade != CascadeStrategy.Inherit)
+            {
+                return explicitCascade;
+            }
+
+            // Fall back to category defaults
+            return _categoryDefaults.GetDefaultStrategy(featureId);
+        }
+
+        /// <summary>
+        /// Applies the cascade strategy to a resolution chain by dispatching to the
+        /// appropriate <see cref="CascadeStrategies"/> static method.
         /// </summary>
         /// <param name="strategy">The cascade strategy to apply.</param>
         /// <param name="chain">The resolution chain, ordered most-specific first.</param>
@@ -220,61 +264,15 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             CascadeStrategy strategy,
             IReadOnlyList<FeaturePolicy> chain)
         {
-            // Both Inherit and Override resolve to the first non-null in chain (most-specific)
-            // since the chain already has only non-null entries ordered most-specific first.
-            //
-            // Inherit: use first non-null, walk up if null (already handled by skip logic in ResolveAsync)
-            // Override: most-specific takes full precedence, ignoring parents
-            //
-            // For strategies not yet implemented (MostRestrictive, Enforce, Merge),
-            // fall back to Override behavior. Plan 02 will override this method.
-
-            var winner = chain[0];
-            var mergedParams = new Dictionary<string, string>();
-
-            switch (strategy)
+            return strategy switch
             {
-                case CascadeStrategy.Inherit:
-                    // Inherit: use the most-specific non-null policy.
-                    // Merge custom parameters from all levels (least-specific first, most-specific wins).
-                    for (var i = chain.Count - 1; i >= 0; i--)
-                    {
-                        if (chain[i].CustomParameters is { } customParams)
-                        {
-                            foreach (var kvp in customParams)
-                            {
-                                mergedParams[kvp.Key] = kvp.Value;
-                            }
-                        }
-                    }
-
-                    return (winner.IntensityLevel, winner.AiAutonomy, mergedParams, winner.Level);
-
-                case CascadeStrategy.Override:
-                    // Override: most-specific only, discard all parent parameters
-                    if (winner.CustomParameters is { } winnerParams)
-                    {
-                        foreach (var kvp in winnerParams)
-                        {
-                            mergedParams[kvp.Key] = kvp.Value;
-                        }
-                    }
-
-                    return (winner.IntensityLevel, winner.AiAutonomy, mergedParams, winner.Level);
-
-                default:
-                    // MostRestrictive, Enforce, Merge -- placeholder until Plan 02
-                    // Fall back to Override behavior
-                    if (winner.CustomParameters is { } defaultParams)
-                    {
-                        foreach (var kvp in defaultParams)
-                        {
-                            mergedParams[kvp.Key] = kvp.Value;
-                        }
-                    }
-
-                    return (winner.IntensityLevel, winner.AiAutonomy, mergedParams, winner.Level);
-            }
+                CascadeStrategy.Inherit => CascadeStrategies.Inherit(chain),
+                CascadeStrategy.Override => CascadeStrategies.Override(chain),
+                CascadeStrategy.MostRestrictive => CascadeStrategies.MostRestrictive(chain),
+                CascadeStrategy.Enforce => CascadeStrategies.Enforce(chain),
+                CascadeStrategy.Merge => CascadeStrategies.Merge(chain),
+                _ => CascadeStrategies.Override(chain), // Unknown strategy falls back to Override
+            };
         }
 
         /// <summary>
