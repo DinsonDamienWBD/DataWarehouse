@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 86-adaptive-index-engine
-- **Plan:** 11/16
+- **Plan:** 12/16
 - **Status:** IN PROGRESS
-- **Last Completed:** 86-11-PLAN.md
+- **Last Completed:** 86-12-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -167,6 +167,7 @@
 - [Phase 86]: ALEX beneficial when R/W > 0.7 and entropy < 3.0; 2x threshold self-tuning on P99 regression; 3-revert permanent transition disable
 - [Phase 86]: ClockSiTimestamp readonly struct with PhysicalTime ticks + LogicalCounter; Bloofi leaf removal requires periodic rebuild; CRUSH Straw2 XxHash64 composite input
 - [Phase 86]: XxHash64 for deterministic stripe routing; CAS count-min sketch decay; SortedSet merge-sort for multi-stripe range queries; Timer-based tier management 30s/60s
+- [Phase 86-12]: DllImport over LibraryImport for opaque struct refs; ConcurrentDictionary thread-ring indexing over ThreadStatic (S2696); O_DIRECT for all io_uring file access; IoUring struct 216 bytes opaque for x86-64
 
 ## Performance Metrics
 
@@ -300,7 +301,8 @@
 | Phase 86 P06 | 8min | 2 tasks | 3 files |
 | Phase 86 P05 | 10min | 2 tasks | 4 files |
 | Phase 86 P08 | 4min | 2 tasks | 4 files |
+| 86    | 12   | 6min     | 2     | 2     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T20:27:00Z
-- **Stopped At:** Completed 86-08-PLAN.md (Index RAID)
+- **Timestamp:** 2026-02-23T20:51:00Z
+- **Stopped At:** Completed 86-12-PLAN.md (io_uring Native Integration)
