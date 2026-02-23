@@ -70,6 +70,7 @@
 - [Phase 70]: [Phase 70-05]: 63 xUnit tests verify all CASC-01 through CASC-08; InMemoryPolicyStore+InMemoryPolicyPersistence pattern for zero-mock testing
 - [Phase 71-01]: NamespaceAnchor stored as ulong for zero-alloc; block type tags big-endian (first ASCII char in MSB); 28 tags (22 core + 6 module extensions); FormatVersionInfo 16 bytes (2+2+4+4+4)
 - [Phase 71]: SuperblockV2 constructor-based immutability; RegionPointerTable is class for mutable slots; XxHash64 for block trailer checksums; fixed byte[] for hash buffers
+- [Phase 71]: FrozenDictionary for module registry; inline static init via builder methods (S3963); IEquatable on manifest/config structs
 
 ## Performance Metrics
 
@@ -124,7 +125,8 @@
 | Phase 70 P05 | 11min | 2 tasks | 3 files |
 | 71    | 01   | 4min     | 2     | 4     |
 | Phase 71 P02 | 5min | 2 tasks | 5 files |
+| Phase 71 P04 | 4min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T11:38:43Z
-- **Stopped At:** Completed 71-02-PLAN.md (VDE v2.0 superblock group)
+- **Stopped At:** Completed 71-04-PLAN.md (VDE v2.0 module system)
