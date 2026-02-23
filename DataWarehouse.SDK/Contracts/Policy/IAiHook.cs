@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Infrastructure.Intelligence;
 
 namespace DataWarehouse.SDK.Contracts.Policy;
 
@@ -32,12 +33,14 @@ public interface IAiHook
 
 /// <summary>
 /// Emits observations (metrics, events, anomalies) from a plugin to the AI observation pipeline.
-/// Observations are lock-free and async — zero hot-path impact (AIPI-01 contract placeholder).
+/// Observations are lock-free and async — zero hot-path impact (AIPI-01).
+/// Writes to an AiObservationRingBuffer when attached; gracefully no-ops when not wired.
 /// </summary>
 public sealed class ObservationEmitter
 {
     private readonly string _pluginId;
     private readonly IMessageBus? _messageBus;
+    private AiObservationRingBuffer? _ringBuffer;
 
     /// <summary>
     /// Creates a new observation emitter for the specified plugin.
@@ -51,7 +54,17 @@ public sealed class ObservationEmitter
     }
 
     /// <summary>
+    /// Attaches the ring buffer for observation delivery. Called by the pipeline during initialization.
+    /// </summary>
+    /// <param name="buffer">The ring buffer to write observations to.</param>
+    internal void AttachRingBuffer(AiObservationRingBuffer buffer)
+    {
+        _ringBuffer = buffer;
+    }
+
+    /// <summary>
     /// Emit a metric observation (e.g., compression ratio, encryption latency).
+    /// Writes to the ring buffer if attached; returns immediately if not (fire-and-forget).
     /// </summary>
     /// <param name="metricName">Name of the metric being observed.</param>
     /// <param name="value">The metric value.</param>
@@ -59,13 +72,14 @@ public sealed class ObservationEmitter
     /// <returns>A task representing the async operation.</returns>
     public Task EmitMetricAsync(string metricName, double value, CancellationToken ct = default)
     {
-        // Phase 77 (AI Policy Intelligence) will implement the full pipeline.
-        // For now, this is a no-op that compiles clean — the contract is what matters in Phase 68.
+        _ringBuffer?.TryWrite(new ObservationEvent(
+            _pluginId, metricName, value, null, null, DateTimeOffset.UtcNow));
         return Task.CompletedTask;
     }
 
     /// <summary>
     /// Emit an anomaly observation (e.g., unexpected pattern, performance degradation).
+    /// Writes to the ring buffer if attached; returns immediately if not (fire-and-forget).
     /// </summary>
     /// <param name="anomalyType">Type of anomaly detected.</param>
     /// <param name="description">Human-readable description of the anomaly.</param>
@@ -73,7 +87,8 @@ public sealed class ObservationEmitter
     /// <returns>A task representing the async operation.</returns>
     public Task EmitAnomalyAsync(string anomalyType, string description, CancellationToken ct = default)
     {
-        // Phase 77 (AI Policy Intelligence) will implement the full pipeline.
+        _ringBuffer?.TryWrite(new ObservationEvent(
+            _pluginId, "anomaly", 0.0, anomalyType, description, DateTimeOffset.UtcNow));
         return Task.CompletedTask;
     }
 }
