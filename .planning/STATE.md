@@ -189,6 +189,7 @@
 - [Phase 88]: InternalBlock shadow index retained for fast audit chain traversal; SegmentedBlockStore is authoritative persistence
 - [Phase 88]: FNV-1a hash for stable partition routing; ring buffer fallback to ConcurrentQueue for no-data-loss; WAL length-prefix binary format; backpressure 70%/85%/95% thresholds
 - [Phase 88-05]: Length-prefix binary format for segment entries; ConsensusScalingManager independent of MultiRaftManager to avoid coupling; BoundedCache TTL for connection pool idle timeout; P99 RTT sliding window for adaptive election timeouts
+- [Phase 88]: Glob-to-regex for namespace strategy routing; SHA-256 per-chunk hash comparison; ConcurrentDictionary only for per-collection locks; hash-based partition routing
 
 ## Performance Metrics
 
@@ -343,7 +344,8 @@
 | Phase 88 P03 | 8min | 2 tasks | 2 files |
 | Phase 88 P04 | 6min | 2 tasks | 3 files |
 | Phase 88 P06 | 6min | 2 tasks | 3 files |
+| Phase 88 P07 | 6min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T22:24:40Z
-- **Stopped At:** Completed 88-06-PLAN.md
+- **Stopped At:** Completed 88-07-PLAN.md
