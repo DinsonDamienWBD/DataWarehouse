@@ -143,6 +143,7 @@
 - [Phase 83-05]: 201 VDE format tests: 120 module/profile/superblock/trailer/inode/region tests + 40 tamper detection (5 levels, policy serialization) + 41 migration (format detection, v1 compat, 10 configs, progress tracking)
 - [Phase 84-01]: DeploymentTopology enum (DwPlusVde/DwOnly/VdeOnly) + descriptor helpers; InstallConfiguration Topology/RemoteVdeUrl/VdeListenPort; CLI --topology/--remote-vde/--vde-port flags
 - [Phase 84-02]: VDE Composer CLI: dw vde create/list-modules/inspect; VdeCommands.cs re-included in csproj after Commands/** exclusion; non-interactive fallback defaults to VdePrimary residency
+- [Phase 84-03]: GUI mode-selection page (Connect/Live/Install) with topology sub-selection; VDE Composer 4-step wizard (19 modules grouped by category); TopologyPreview ASCII diagrams; manual query string parsing for MAUI compatibility
 - [Phase 84]: [Phase 84-04]: Non-fatal shell registration for VDE topologies; PowerShell EncodedCommand for Windows HKCU; direct File.WriteAllText for Linux/macOS
 
 ## Performance Metrics
@@ -257,7 +258,8 @@
 | 84    | 05   | 5min     | 2     | 4     |
 | 84    | 02   | 7min     | 2     | 4     |
 | Phase 84 P04 | 5min | 2 tasks | 2 files |
+| 84    | 03   | 5min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T18:43:48Z
-- **Stopped At:** Completed 84-04-PLAN.md (Shell handler & file extension registration)
+- **Timestamp:** 2026-02-23T18:51:00Z
+- **Stopped At:** Completed 84-03-PLAN.md (GUI mode-selection page & VDE Composer wizard)
