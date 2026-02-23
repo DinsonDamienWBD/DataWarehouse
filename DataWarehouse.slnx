@@ -25,8 +25,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AppPlatform/DataWarehouse.Plugins.AppPlatform.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ChaosVaccination/DataWarehouse.Plugins.ChaosVaccination.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compute.Wasm/DataWarehouse.Plugins.Compute.Wasm.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.DataMarketplace/DataWarehouse.Plugins.DataMarketplace.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.KubernetesCsi/DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PluginMarketplace/DataWarehouse.Plugins.PluginMarketplace.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfEmulatingObjects/DataWarehouse.Plugins.SelfEmulatingObjects.csproj" />
@@ -43,7 +41,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/DataWarehouse.Plugins.UltimateDatabaseProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataCatalog/DataWarehouse.Plugins.UltimateDataCatalog.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFabric/DataWarehouse.Plugins.UltimateDataFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFormat/DataWarehouse.Plugins.UltimateDataFormat.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataGovernance/DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataIntegration/DataWarehouse.Plugins.UltimateDataIntegration.csproj" />
@@ -83,9 +80,8 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalFabric/DataWarehouse.Plugins.UniversalFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
-      <Platform Solution="Debug|*" Project="x64" />
-    </Project>
+
+
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />

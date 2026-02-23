@@ -63,7 +63,7 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AppPlatform\DataWarehouse.Plugins.AppPlatform.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compute.Wasm\DataWarehouse.Plugins.Compute.Wasm.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.DataMarketplace\DataWarehouse.Plugins.DataMarketplace.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.FuseDriver\DataWarehouse.Plugins.FuseDriver.csproj" />
+
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.KubernetesCsi\DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.PluginMarketplace\DataWarehouse.Plugins.PluginMarketplace.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.SelfEmulatingObjects\DataWarehouse.Plugins.SelfEmulatingObjects.csproj" />

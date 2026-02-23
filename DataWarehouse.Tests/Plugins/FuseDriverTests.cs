@@ -1,94 +1,81 @@
-using DataWarehouse.Plugins.FuseDriver;
-using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.UltimateFilesystem;
+using DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 using Xunit;
 
 namespace DataWarehouse.Tests.Plugins;
 
 /// <summary>
-/// Tests for FuseDriver plugin.
-/// Validates plugin identity, platform detection, and configuration.
+/// Tests for UnixFuseFilesystemStrategy (consolidated from FuseDriver plugin).
+/// Validates strategy identity, capabilities, and detection behavior.
 /// </summary>
 [Trait("Category", "Unit")]
-[Trait("Plugin", "FuseDriver")]
+[Trait("Plugin", "UltimateFilesystem")]
 public class FuseDriverTests
 {
     [Fact]
-    public void FuseDriverPlugin_CanBeConstructed_WithDefaultConstructor()
+    public void UnixFuseFilesystemStrategy_CanBeConstructed()
     {
         // Act
-        using var plugin = new FuseDriverPlugin();
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.NotNull(plugin);
+        Assert.NotNull(strategy);
     }
 
     [Fact]
-    public void FuseDriverPlugin_HasCorrectIdentity()
+    public void UnixFuseFilesystemStrategy_HasCorrectIdentity()
     {
         // Arrange
-        using var plugin = new FuseDriverPlugin();
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.Equal("com.datawarehouse.plugins.filesystem.fuse", plugin.Id);
-        Assert.Equal("FUSE Filesystem Driver", plugin.Name);
-        Assert.Equal("1.0.0", plugin.Version);
+        Assert.Equal("driver-unix-fuse", strategy.StrategyId);
+        Assert.Equal("Unix FUSE Driver", strategy.DisplayName);
     }
 
     [Fact]
-    public void FuseDriverPlugin_CategoryIsInterfaceProvider()
+    public void UnixFuseFilesystemStrategy_CategoryIsVirtual()
     {
         // Arrange
-        using var plugin = new FuseDriverPlugin();
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.Equal(PluginCategory.InterfaceProvider, plugin.Category);
+        Assert.Equal(FilesystemStrategyCategory.Virtual, strategy.Category);
     }
 
     [Fact]
-    public void FuseDriverPlugin_ProtocolIsFuse()
+    public void UnixFuseFilesystemStrategy_HasCorrectCapabilities()
     {
         // Arrange
-        using var plugin = new FuseDriverPlugin();
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.Equal("FUSE", plugin.Protocol);
+        Assert.True(strategy.Capabilities.SupportsDirectIo);
+        Assert.True(strategy.Capabilities.SupportsAsyncIo);
+        Assert.True(strategy.Capabilities.SupportsMmap);
+        Assert.True(strategy.Capabilities.SupportsAutoDetect);
     }
 
     [Fact]
-    public void FuseDriverPlugin_PlatformDetection_ReturnsValidValue()
+    public void UnixFuseFilesystemStrategy_HasSemanticDescription()
     {
         // Arrange
-        using var plugin = new FuseDriverPlugin();
-
-        // Assert - on Windows, FUSE is not supported; on Linux/macOS it may be
-        var platform = plugin.Platform;
-        Assert.True(Enum.IsDefined(typeof(FusePlatform), platform));
-    }
-
-    [Fact]
-    public void FuseConfig_DefaultValues_AreReasonable()
-    {
-        // Act
-        var config = new FuseConfig();
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.NotNull(config);
-        // CurrentPlatform should return a valid enum value
-        var platform = FuseConfig.CurrentPlatform;
-        Assert.True(Enum.IsDefined(typeof(FusePlatform), platform));
+        Assert.Contains("FUSE", strategy.SemanticDescription);
+        Assert.Contains("POSIX", strategy.SemanticDescription);
     }
 
     [Fact]
-    public void FuseDriverPlugin_CanBeConstructed_WithConfig()
+    public void UnixFuseFilesystemStrategy_HasTags()
     {
         // Arrange
-        var config = new FuseConfig();
-
-        // Act
-        using var plugin = new FuseDriverPlugin(config);
+        var strategy = new UnixFuseFilesystemStrategy();
 
         // Assert
-        Assert.NotNull(plugin);
-        Assert.Equal("com.datawarehouse.plugins.filesystem.fuse", plugin.Id);
+        Assert.Contains("fuse", strategy.Tags);
+        Assert.Contains("unix", strategy.Tags);
+        Assert.Contains("linux", strategy.Tags);
     }
 }
