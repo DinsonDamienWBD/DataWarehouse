@@ -1,9 +1,9 @@
 # Execution State
 
 ## Current Position
-- **Phase:** 70-cascade-engine
-- **Plan:** 6/6 (70-06 complete)
-- **Status:** PHASE COMPLETE
+- **Phase:** 71-vde-format-v2
+- **Plan:** 1/6 (71-01 complete)
+- **Status:** IN PROGRESS
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -11,6 +11,7 @@
 - Phase 68: COMPLETE (4/4 plans, 8/8 success criteria verified)
 - Phase 69: COMPLETE (5/5 plans, policy persistence + marketplace)
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
+- Phase 71: 1/6 plans complete (71-01)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -67,6 +68,7 @@
 - [Phase 70]: Override store uses composite featureId:level keys with well-known __cascade_override__ persistence convention; resolution order: Enforce > user override > explicit > category default
 - [Phase 70-04]: Double-buffered VersionedPolicyCache with ImmutableDictionary+Interlocked.Exchange (CASC-06); CircularReferenceDetector walks redirect/inherit_from chains up to 20 hops (CASC-07); MergeConflictResolver per-tag-key MostRestrictive/Closest/Union with Closest default (CASC-08)
 - [Phase 70]: [Phase 70-05]: 63 xUnit tests verify all CASC-01 through CASC-08; InMemoryPolicyStore+InMemoryPolicyPersistence pattern for zero-mock testing
+- [Phase 71-01]: NamespaceAnchor stored as ulong for zero-alloc; block type tags big-endian (first ASCII char in MSB); 28 tags (22 core + 6 module extensions); FormatVersionInfo 16 bytes (2+2+4+4+4)
 
 ## Performance Metrics
 
@@ -119,7 +121,8 @@
 | Phase 70 P03 | 4min | 2 tasks | 2 files |
 | 70    | 04   | 4min     | 2     | 4     |
 | Phase 70 P05 | 11min | 2 tasks | 3 files |
+| 71    | 01   | 4min     | 2     | 4     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T11:07:51Z
-- **Stopped At:** Completed 70-05-PLAN.md (cascade engine test suite)
+- **Timestamp:** 2026-02-23T11:38:43Z
+- **Stopped At:** Completed 71-01-PLAN.md (VDE v2.0 format constants and identity)
