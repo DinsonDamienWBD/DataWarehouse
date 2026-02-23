@@ -29,6 +29,9 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         private readonly IPolicyStore _store;
         private readonly IPolicyPersistence _persistence;
         private readonly PolicyCategoryDefaults _categoryDefaults;
+        private readonly CascadeOverrideStore? _overrideStore;
+        private readonly VersionedPolicyCache? _cache;
+        private readonly MergeConflictResolver? _conflictResolver;
         private volatile OperationalProfile _activeProfile;
 
         /// <summary>
@@ -43,16 +46,37 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         /// Optional category-to-cascade-strategy defaults. If null, a default instance with
         /// built-in mappings (Security=MostRestrictive, Compliance=Enforce, etc.) is used.
         /// </param>
+        /// <param name="overrideStore">
+        /// Optional cascade override store for per-feature per-level user overrides (CASC-03).
+        /// If null, no user overrides are applied and the engine falls back to policy explicit
+        /// cascade or category defaults.
+        /// </param>
+        /// <param name="cache">
+        /// Optional versioned policy cache for snapshot isolation (CASC-06). When provided,
+        /// resolution reads from the cache snapshot instead of live store queries, ensuring
+        /// in-flight operations see a consistent view.
+        /// </param>
+        /// <param name="conflictResolver">
+        /// Optional merge conflict resolver for per-tag-key resolution (CASC-08). When provided,
+        /// the Merge cascade strategy delegates conflicting keys to this resolver instead of
+        /// always using child-wins semantics.
+        /// </param>
         public PolicyResolutionEngine(
             IPolicyStore store,
             IPolicyPersistence persistence,
             OperationalProfile? defaultProfile = null,
-            PolicyCategoryDefaults? categoryDefaults = null)
+            PolicyCategoryDefaults? categoryDefaults = null,
+            CascadeOverrideStore? overrideStore = null,
+            VersionedPolicyCache? cache = null,
+            MergeConflictResolver? conflictResolver = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
             _activeProfile = defaultProfile ?? OperationalProfile.Standard();
             _categoryDefaults = categoryDefaults ?? new PolicyCategoryDefaults();
+            _overrideStore = overrideStore;
+            _cache = cache;
+            _conflictResolver = conflictResolver;
         }
 
         /// <inheritdoc />
@@ -149,6 +173,69 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             await _persistence.SaveProfileAsync(profile, ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Sets a cascade strategy override for a specific feature at a specific hierarchy level
+        /// and persists the change. Requires the engine to have been initialized with a
+        /// <see cref="CascadeOverrideStore"/>.
+        /// </summary>
+        /// <param name="featureId">The feature identifier (e.g., "encryption", "compression").</param>
+        /// <param name="level">The hierarchy level at which the override applies.</param>
+        /// <param name="strategy">The cascade strategy to use instead of the category default.</param>
+        /// <param name="ct">Cancellation token for cooperative cancellation.</param>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when no <see cref="CascadeOverrideStore"/> was provided at construction time.
+        /// </exception>
+        public async Task SetCascadeOverrideAsync(string featureId, PolicyLevel level, CascadeStrategy strategy, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (_overrideStore is null)
+                throw new InvalidOperationException("No CascadeOverrideStore was configured for this engine instance.");
+
+            _overrideStore.SetOverride(featureId, level, strategy);
+            await _overrideStore.SaveToPersistenceAsync(_persistence, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Removes a cascade strategy override for a specific feature at a specific hierarchy level
+        /// and persists the change. Returns <c>false</c> if the override did not exist.
+        /// </summary>
+        /// <param name="featureId">The feature identifier.</param>
+        /// <param name="level">The hierarchy level.</param>
+        /// <param name="ct">Cancellation token for cooperative cancellation.</param>
+        /// <returns><c>true</c> if the override was found and removed; <c>false</c> otherwise.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when no <see cref="CascadeOverrideStore"/> was provided at construction time.
+        /// </exception>
+        public async Task<bool> RemoveCascadeOverrideAsync(string featureId, PolicyLevel level, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (_overrideStore is null)
+                throw new InvalidOperationException("No CascadeOverrideStore was configured for this engine instance.");
+
+            var removed = _overrideStore.RemoveOverride(featureId, level);
+            if (removed)
+            {
+                await _overrideStore.SaveToPersistenceAsync(_persistence, ct).ConfigureAwait(false);
+            }
+
+            return removed;
+        }
+
+        /// <summary>
+        /// Returns all current cascade strategy overrides as a read-only dictionary.
+        /// Returns an empty dictionary if no <see cref="CascadeOverrideStore"/> was configured.
+        /// </summary>
+        /// <returns>A snapshot of all stored cascade overrides keyed by (FeatureId, Level).</returns>
+        public IReadOnlyDictionary<(string FeatureId, PolicyLevel Level), CascadeStrategy> GetCascadeOverrides()
+        {
+            if (_overrideStore is null)
+                return new Dictionary<(string, PolicyLevel), CascadeStrategy>();
+
+            return _overrideStore.GetAllOverrides();
+        }
+
         /// <inheritdoc />
         public async Task<IEffectivePolicy> SimulateAsync(string featureId, PolicyResolutionContext context, FeaturePolicy hypotheticalPolicy, CancellationToken ct = default)
         {
@@ -221,6 +308,9 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         ///   <item><description>CASC-05: If ANY entry in the chain at a HIGHER level than the most-specific
         ///   has <see cref="CascadeStrategy.Enforce"/>, use Enforce. This ensures a VDE-level Enforce
         ///   overrides a Container-level Override.</description></item>
+        ///   <item><description>CASC-03: Check <see cref="CascadeOverrideStore"/> for a user override
+        ///   at the most-specific level in the chain. User overrides with Enforce strategy also
+        ///   participate in the Enforce scan above.</description></item>
         ///   <item><description>If the most-specific policy has an explicit non-Inherit cascade, use that.</description></item>
         ///   <item><description>Look up the feature's category default from <see cref="PolicyCategoryDefaults"/>.</description></item>
         /// </list>
@@ -238,6 +328,28 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 {
                     return CascadeStrategy.Enforce;
                 }
+            }
+
+            // CASC-05 extension: Check if any user override in the chain uses Enforce at a higher level.
+            // This ensures user-injected Enforce overrides win over lower-level Override policies.
+            if (_overrideStore is not null)
+            {
+                for (var i = 1; i < chain.Count; i++)
+                {
+                    if (_overrideStore.TryGetOverride(featureId, chain[i].Level, out var overrideStrategy)
+                        && overrideStrategy == CascadeStrategy.Enforce
+                        && (int)chain[i].Level > (int)mostSpecificLevel)
+                    {
+                        return CascadeStrategy.Enforce;
+                    }
+                }
+            }
+
+            // CASC-03: Check user override store for the most-specific level before policy explicit cascade
+            if (_overrideStore is not null
+                && _overrideStore.TryGetOverride(featureId, mostSpecificLevel, out var userOverride))
+            {
+                return userOverride;
             }
 
             // Use the most-specific policy's explicit cascade if it is not Inherit (the default/zero-equivalent)
