@@ -150,6 +150,7 @@
 - [Phase 84-06]: 51 integration tests (24 topology + 17 VDE composer + 10 shell registration); source analysis for CLI stub verification; VDE create/inspect round-trip; all 3 topologies and 19 modules covered
 - [Phase 85-03]: TLA+ formal verification: 4 models (WAL/Raft/BTree/Superblock), 15 safety invariants, C#-to-TLA+ generator framework, CI script generator for TLC model checker
 - [Phase 85]: ZeroCopyBlockReader uses managed byte[] from MemoryMappedViewAccessor (no direct Memory<byte> API); VdeBlockExportPath auto-fallback for encrypted regions
+- [Phase 85]: Core seccomp profile: 85 syscalls incl io_uring; plugin profile denies execve/socket/clone/mount/ptrace; weighted security scoring Critical=25/High=15/Medium=10/Low=5
 
 ## Performance Metrics
 
@@ -267,7 +268,8 @@
 | 84    | 06   | 8min     | 2     | 3     |
 | 85    | 03   | 9min     | 2     | 5     |
 | Phase 85 P01 | 5min | 2 tasks | 3 files |
+| Phase 85 P04 | 6min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T19:25:00Z
-- **Stopped At:** Completed 85-03-PLAN.md (TLA+ formal verification models)
+- **Stopped At:** Completed 85-04-PLAN.md (OS-level security hardening)
