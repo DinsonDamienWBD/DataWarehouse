@@ -534,6 +534,48 @@ public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDispo
 
     #endregion
 
+    /// <inheritdoc/>
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        var nodeData = await LoadStateAsync("nodes", ct);
+        if (nodeData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, LineageNode>>(nodeData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _nodes[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var edgeData = await LoadStateAsync("edges", ct);
+        if (edgeData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, LineageEdge>>(edgeData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _edges[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        var nodeBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, LineageNode>(_nodes));
+        await SaveStateAsync("nodes", nodeBytes, ct);
+
+        var edgeBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, LineageEdge>(_edges));
+        await SaveStateAsync("edges", edgeBytes, ct);
+    }
+
     /// <summary>
     /// Disposes resources.
     /// </summary>

@@ -510,7 +510,63 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     #endregion
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        var assetData = await LoadStateAsync("assets", ct);
+        if (assetData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CatalogAsset>>(assetData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _assets[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var relData = await LoadStateAsync("relationships", ct);
+        if (relData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CatalogRelationship>>(relData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _relationships[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var glossData = await LoadStateAsync("glossary", ct);
+        if (glossData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, BusinessTerm>>(glossData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _glossary[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        var assetBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, CatalogAsset>(_assets));
+        await SaveStateAsync("assets", assetBytes, ct);
+
+        var relBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, CatalogRelationship>(_relationships));
+        await SaveStateAsync("relationships", relBytes, ct);
+
+        var glossBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, BusinessTerm>(_glossary));
+        await SaveStateAsync("glossary", glossBytes, ct);
+    }
 
     /// <summary>Disposes resources.</summary>
     protected override void Dispose(bool disposing)

@@ -525,7 +525,88 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
     #endregion
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        var domainData = await LoadStateAsync("domains", ct);
+        if (domainData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataDomain>>(domainData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _domains[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var productData = await LoadStateAsync("products", ct);
+        if (productData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataProduct>>(productData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _products[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var consumerData = await LoadStateAsync("consumers", ct);
+        if (consumerData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataConsumer>>(consumerData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _consumers[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var shareData = await LoadStateAsync("shares", ct);
+        if (shareData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CrossDomainShare>>(shareData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _shares[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var policyData = await LoadStateAsync("policies", ct);
+        if (policyData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, GovernancePolicy>>(policyData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _policies[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        await SaveStateAsync("domains", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, DataDomain>(_domains)), ct);
+        await SaveStateAsync("products", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, DataProduct>(_products)), ct);
+        await SaveStateAsync("consumers", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, DataConsumer>(_consumers)), ct);
+        await SaveStateAsync("shares", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, CrossDomainShare>(_shares)), ct);
+        await SaveStateAsync("policies", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, GovernancePolicy>(_policies)), ct);
+    }
 
     /// <summary>Disposes resources.</summary>
     protected override void Dispose(bool disposing)

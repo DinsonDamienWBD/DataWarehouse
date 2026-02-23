@@ -482,7 +482,48 @@ public sealed class UltimateDataPrivacyPlugin : SecurityPluginBase, IDisposable
     #endregion
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        // Restore persisted consent records
+        var consentData = await LoadStateAsync("consents", ct);
+        if (consentData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, ConsentRecord>>(consentData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _consents[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        // Restore persisted privacy policies
+        var policyData = await LoadStateAsync("policies", ct);
+        if (policyData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, PrivacyPolicy>>(policyData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _policies[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        var consentBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, ConsentRecord>(_consents));
+        await SaveStateAsync("consents", consentBytes, ct);
+
+        var policyBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, PrivacyPolicy>(_policies));
+        await SaveStateAsync("policies", policyBytes, ct);
+    }
 
     /// <summary>Disposes resources.</summary>
     protected override void Dispose(bool disposing)

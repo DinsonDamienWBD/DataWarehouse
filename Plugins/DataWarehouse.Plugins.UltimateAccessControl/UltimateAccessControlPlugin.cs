@@ -455,7 +455,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         }
 
         /// <inheritdoc/>
-        protected override Task OnStartCoreAsync(CancellationToken ct)
+        protected override async Task OnStartCoreAsync(CancellationToken ct)
         {
             // Register typed message handler for access evaluation requests (KS3 pattern)
             RegisterHandler<AccessEvaluationRequest, AccessEvaluationResponse>(
@@ -477,7 +477,44 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
                     };
                 });
 
-            return Task.CompletedTask;
+            // Restore persisted evaluation mode
+            var modeData = await LoadStateAsync("evaluationMode", ct);
+            if (modeData != null)
+            {
+                try
+                {
+                    var modeStr = System.Text.Encoding.UTF8.GetString(modeData);
+                    if (Enum.TryParse<PolicyEvaluationMode>(modeStr, out var mode))
+                        _evaluationMode = mode;
+                }
+                catch { /* corrupted state — use default */ }
+            }
+
+            // Restore persisted default strategy
+            var defaultData = await LoadStateAsync("defaultStrategy", ct);
+            if (defaultData != null)
+            {
+                try
+                {
+                    var strategyId = System.Text.Encoding.UTF8.GetString(defaultData);
+                    if (_strategies.TryGetValue(strategyId, out var strategy))
+                        _defaultStrategy = strategy;
+                }
+                catch { /* corrupted state — use default */ }
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+        {
+            await SaveStateAsync("evaluationMode",
+                System.Text.Encoding.UTF8.GetBytes(_evaluationMode.ToString()), ct);
+
+            if (_defaultStrategy != null)
+            {
+                await SaveStateAsync("defaultStrategy",
+                    System.Text.Encoding.UTF8.GetBytes(_defaultStrategy.StrategyId), ct);
+            }
         }
 
         /// <inheritdoc/>

@@ -561,7 +561,63 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     #endregion
 
     /// <inheritdoc/>
-    protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        var policyData = await LoadStateAsync("policies", ct);
+        if (policyData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, GovernancePolicy>>(policyData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _policies[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var ownerData = await LoadStateAsync("ownerships", ct);
+        if (ownerData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataOwnership>>(ownerData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _ownerships[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+
+        var classData = await LoadStateAsync("classifications", ct);
+        if (classData != null)
+        {
+            try
+            {
+                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataClassification>>(classData);
+                if (entries != null)
+                    foreach (var kvp in entries)
+                        _classifications[kvp.Key] = kvp.Value;
+            }
+            catch { /* corrupted state — start fresh */ }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    {
+        var policyBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, GovernancePolicy>(_policies));
+        await SaveStateAsync("policies", policyBytes, ct);
+
+        var ownerBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, DataOwnership>(_ownerships));
+        await SaveStateAsync("ownerships", ownerBytes, ct);
+
+        var classBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, DataClassification>(_classifications));
+        await SaveStateAsync("classifications", classBytes, ct);
+    }
 
     /// <summary>Disposes resources.</summary>
     protected override void Dispose(bool disposing)
