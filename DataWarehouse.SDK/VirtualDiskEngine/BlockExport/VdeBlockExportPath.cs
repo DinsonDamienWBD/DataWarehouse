@@ -65,7 +65,7 @@ public readonly record struct ExportStatistics(
 /// <b>Encrypted region handling:</b>
 /// If a block resides in an encrypted region (detected via <see cref="RegionFlags.Encrypted"/>),
 /// the zero-copy path cannot serve it directly. The export path automatically falls back to
-/// the standard <see cref="IBlockDevice.ReadAsync"/> path for such blocks and increments
+/// the standard <see cref="IBlockDevice.ReadBlockAsync"/> path for such blocks and increments
 /// <see cref="ExportStatistics.FallbackCount"/>.
 /// </para>
 ///
