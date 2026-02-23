@@ -108,13 +108,16 @@ public static class BlockTypeTags
     /// <summary>Emergency Recovery ("ERCV").</summary>
     public const uint ERCV = 0x45524356;
 
+    /// <summary>Extent tree node ("EXTN").</summary>
+    public const uint EXTN = 0x4558544E;
+
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
     {
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
-        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV
+        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV, EXTN
     }.ToFrozenSet();
 
     /// <summary>
