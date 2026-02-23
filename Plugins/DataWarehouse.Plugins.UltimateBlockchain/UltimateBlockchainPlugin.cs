@@ -146,7 +146,7 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    public override PluginCategory Category => PluginCategory.FeatureProvider;
+    public override SDK.Primitives.PluginCategory Category => SDK.Primitives.PluginCategory.FeatureProvider;
 
     /// <inheritdoc/>
     public override async Task<BatchAnchorResult> AnchorBatchAsync(
