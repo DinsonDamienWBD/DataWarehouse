@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 80-three-tier-performance-verification
-- **Plan:** 1/4 (80-02 complete)
+- **Plan:** 1/4 (80-01 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -124,6 +124,7 @@
 - [Phase 79-03]: freedesktop shared-mime-info XML via XDocument; file(1) uses ubyte vs /etc/magic byte for version sub-rules; macOS secondary UTIs conform to PrimaryUti+public.data (not public.disk-image); all install scripts idempotent user-local
 - [Phase 79]: Secondary ProgIDs follow DataWarehouse.Dwvd{Kind} naming; PowerShell targets HKCU for non-admin registration; shell verbs use dw open/inspect/verify "%1" pattern
 - [Phase 79-04]: Priority-ordered magic detection DWVD>VHDX>QCOW2>VMDK>VDI>VHD; Raw/Img by extension+sector-aligned size; VDI via 0xBEDA107F at offset 64; VHDX logical size via metadata region GUID lookup at 1MB; byte-level data copy (sparse-aware deferred)
+- [Phase 80-01]: FrozenDictionary<ModuleId, Func> dispatch for 17 region round-trip verifiers; Query uses TagIndexRegion; 4096-byte verification block size; Sustainability (4B inode) and Transit (1B inode) verified via inode-only path
 - [Phase 80]: Four Tier 3 fallback modes (InMemoryDefault, NoOpSafe, FileBasedSimple, ConfigDriven); BasicFunctionalityAvailable always true at Tier 3
 - [Phase 80-02]: Tier2PipelineVerifier with FrozenDictionary plugin mapping for all 19 modules; Tier2VerificationResult computed Tier2Verified; both manifest=0 and manifest=0x7FFFF verification
 
@@ -223,7 +224,8 @@
 | 79    | 04   | 5min     | 2     | 5     |
 | Phase 80 P03 | 2min | 1 tasks | 2 files |
 | 80    | 02   | 2min     | 1     | 2     |
+| 80    | 01   | 5min     | 1     | 2     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T16:23:16Z
-- **Stopped At:** Completed 80-02-PLAN.md (Tier 2 pipeline verification for all 19 modules)
+- **Timestamp:** 2026-02-23T16:27:00Z
+- **Stopped At:** Completed 80-01-PLAN.md (Tier 1 module verifier for all 19 VDE modules)
