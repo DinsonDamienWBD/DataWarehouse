@@ -163,6 +163,7 @@
 - [Phase 86]: Hilbert 2D/16-bit default for shard routing; volatile CdfModel swap for lock-free readers; per-shard AdaptiveIndexEngine for independent morph; auto-split samples 1000 keys for median
 - [Phase 86]: ALEX uses 2-level RMI with linear CDF models, hit-rate-driven retrain, auto-deactivation
 - [Phase 86-11]: ExtendibleHashTable: lowest-bits directory indexing; bucket split reuses old block for low; MigrateFromLinearArray pre-allocates per directory slot; CA1512 ThrowIfLessThan pattern
+- [Phase 86]: MorphWalMarker fixed 64-byte for predictable WAL serialization; ConcurrentQueue dual-write for zero-downtime; SemaphoreSlim(1,1) single-morph guard
 
 ## Performance Metrics
 
@@ -292,7 +293,8 @@
 | Phase 86 P04 | 6min | 2 tasks | 3 files |
 | Phase 86 P03 | 5min | 2 tasks | 2 files |
 | 86    | 11   | 3min     | 1     | 2     |
+| Phase 86 P07 | 7min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T20:27:00Z
-- **Stopped At:** Completed 86-11-PLAN.md (Extendible hashing inode table)
+- **Stopped At:** Completed 86-07-PLAN.md (Morph transition engine)
