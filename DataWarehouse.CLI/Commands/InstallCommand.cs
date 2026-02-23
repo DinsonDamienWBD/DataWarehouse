@@ -105,6 +105,24 @@ public static class InstallCommand
                         {
                             AnsiConsole.MarkupLine($"  Auto-start: [green]Enabled[/]");
                         }
+
+                        // Register shell handlers for VDE-capable topologies
+                        if (DeploymentTopologyDescriptor.RequiresVdeEngine(deploymentTopology))
+                        {
+                            ctx.Status("[cyan]Registering file extensions...[/]");
+                            var shellResult = InstallShellRegistration.RegisterFileExtensions(
+                                path,
+                                new Progress<string>(msg => ctx.Status($"[cyan]{msg}[/]")));
+
+                            if (shellResult.Success)
+                            {
+                                AnsiConsole.MarkupLine($"  File extensions: [green]{string.Join(", ", shellResult.RegisteredExtensions)}[/]");
+                            }
+                            else
+                            {
+                                AnsiConsole.MarkupLine($"  File extensions: [yellow]Registration failed: {shellResult.Error}[/]");
+                            }
+                        }
                     }
                     else
                     {
