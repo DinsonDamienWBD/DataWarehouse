@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 78-online-module-addition
-- **Plan:** 3/5 (78-01, 78-02, 78-03 complete)
+- **Plan:** 4/5 (78-01, 78-02, 78-03, 78-04 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -18,7 +18,7 @@
 - Phase 75: COMPLETE (4/4 plans, authority chain + escalation + quorum + hardware tokens + dead man's switch)
 - Phase 76: COMPLETE (5/5 plans, materialized cache + bloom filter + delegate compiler + fast-path engine + simulation sandbox)
 - Phase 77: COMPLETE (5/5 plans, hybrid autonomy + self-mod guard + factory)
-- Phase 78: IN PROGRESS (3/5 plans)
+- Phase 78: IN PROGRESS (4/5 plans)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -116,6 +116,7 @@
 - [Phase 78-02]: Zero-filled padding bytes are valid lazy-init state for all module fields; WAL backup in superblock mirror block 7; BuildUpdatedLayout maintains sorted ModuleFieldEntry by ModuleId; CanClaimPadding is static pure method (no I/O)
 - [Phase 78]: WAL entry format: [TargetBlock:8][DataLength:4][Data:N][XxHash64:8]; region sizing heuristic capped at totalBlocks/16
 - [Phase 78-03]: MCHK custom block tag for migration checkpoints; checkpoint block at last block of old inode table; region directory update via RemoveRegion+AddRegion; extent-aware copy skips recreated metadata blocks
+- [Phase 78-04]: ModuleConfigField wraps raw ulong superblock fields for nibble-encoded level get/set; combined execution (regions+inode) does Option 1 first then 2/3; Tier 2 fallback structurally guaranteed; recommendation priority 2>1>3>4
 
 ## Performance Metrics
 
@@ -205,7 +206,8 @@
 | 78    | 02   | 4min     | 2     | 2     |
 | Phase 78 P01 | 5min | 2 tasks | 3 files |
 | 78    | 03   | 8min     | 2     | 3     |
+| 78    | 04   | 6min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T15:39:58Z
-- **Stopped At:** Completed 78-03-PLAN.md (MigrationCheckpoint + BackgroundInodeMigration + ExtentAwareVdeCopy)
+- **Timestamp:** 2026-02-23T15:48:00Z
+- **Stopped At:** Completed 78-04-PLAN.md (ModuleAdditionOrchestrator + ModuleAdditionOptions + Tier2FallbackGuard)
