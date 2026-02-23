@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 85-competitive-edge
-- **Plan:** 6/8
+- **Plan:** 7/8
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -152,6 +152,7 @@
 - [Phase 85]: ZeroCopyBlockReader uses managed byte[] from MemoryMappedViewAccessor (no direct Memory<byte> API); VdeBlockExportPath auto-fallback for encrypted regions
 - [Phase 85]: Core seccomp profile: 85 syscalls incl io_uring; plugin profile denies execve/socket/clone/mount/ptrace; weighted security scoring Critical=25/High=15/Medium=10/Low=5
 - [Phase 85-06]: Deterministic I/O: PreAllocatedBufferPool with GC.AllocateArray(pinned:true) + ConcurrentQueue free-list; EDF DeadlineScheduler on dedicated AboveNormal thread; WcetAnnotation for DO-178C/IEC 61508; configurable DeadlineMissAction (Log/Throw/CircuitBreak)
+- [Phase 85-05]: Streaming SQL engine with 4 window types (tumbling/hopping/session/sliding); bounded Channel backpressure; watermark = max(eventTime) - interval; MaterializedView with Interlocked versioning; stream-table joins via RegisterTableAsync
 
 ## Performance Metrics
 
@@ -271,7 +272,8 @@
 | Phase 85 P01 | 5min | 2 tasks | 3 files |
 | Phase 85 P04 | 6min | 2 tasks | 3 files |
 | 85    | 06   | 4min     | 2     | 3     |
+| 85    | 05   | 5min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T19:40:00Z
-- **Stopped At:** Completed 85-06-PLAN.md (deterministic I/O mode)
+- **Timestamp:** 2026-02-23T19:40:04Z
+- **Stopped At:** Completed 85-05-PLAN.md (streaming SQL engine)
