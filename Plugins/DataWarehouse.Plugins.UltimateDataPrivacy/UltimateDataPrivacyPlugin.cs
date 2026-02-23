@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateDataPrivacy;
 /// - Privacy budget management
 /// - Comprehensive audit trails
 /// </summary>
-public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDisposable
+public sealed class UltimateDataPrivacyPlugin : SecurityPluginBase, IDisposable
 {
     private readonly DataPrivacyStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
@@ -51,7 +51,7 @@ public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDispo
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    public override string DataManagementDomain => "DataPrivacy";
+    public override string SecurityDomain => "DataPrivacy";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 
@@ -129,7 +129,7 @@ public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDispo
                     CapabilityId = "dataprivacy",
                     DisplayName = "Ultimate Data Privacy",
                     Description = SemanticDescription,
-                    Category = SDK.Contracts.CapabilityCategory.DataManagement,
+                    Category = SDK.Contracts.CapabilityCategory.Security,
                     PluginId = Id,
                     PluginName = Name,
                     PluginVersion = Version,
@@ -147,7 +147,7 @@ public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDispo
                     CapabilityId = $"privacy.{strategy.StrategyId}",
                     DisplayName = strategy.DisplayName,
                     Description = strategy.SemanticDescription,
-                    Category = SDK.Contracts.CapabilityCategory.DataManagement,
+                    Category = SDK.Contracts.CapabilityCategory.Security,
                     SubCategory = strategy.Category.ToString(),
                     PluginId = Id,
                     PluginName = Name,
