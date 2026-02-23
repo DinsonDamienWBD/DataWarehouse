@@ -384,31 +384,164 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         private Task HandleListStrategiesAsync(PluginMessage message)
         {
-            // Return list of available strategies
+            var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
+                && Enum.TryParse<DataProtectionCategory>(catStr, true, out var cat)
+                ? cat
+                : (DataProtectionCategory?)null;
+
+            var strategies = categoryFilter.HasValue
+                ? _registry.GetByCategory(categoryFilter.Value)
+                : _registry.Strategies;
+
+            var strategyList = strategies.Select(s => new Dictionary<string, object>
+            {
+                ["id"] = s.StrategyId,
+                ["name"] = s.StrategyName,
+                ["category"] = s.Category.ToString(),
+                ["capabilities"] = s.Capabilities.ToString()
+            }).ToList();
+
+            message.Payload["strategies"] = strategyList;
+            message.Payload["count"] = strategyList.Count;
+            message.Payload["success"] = true;
             return Task.CompletedTask;
         }
 
         private Task HandleSelectStrategyAsync(PluginMessage message)
         {
-            // Select best strategy based on criteria
+            var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
+                && Enum.TryParse<DataProtectionCategory>(catStr, true, out var cat)
+                ? cat
+                : (DataProtectionCategory?)null;
+
+            var requiredCaps = DataProtectionCapabilities.None;
+            if (message.Payload.TryGetValue("requiredCapabilities", out var capsObj) && capsObj is string capsStr
+                && Enum.TryParse<DataProtectionCapabilities>(capsStr, true, out var caps))
+            {
+                requiredCaps = caps;
+            }
+
+            var strategy = _registry.SelectBestStrategy(categoryFilter, requiredCaps);
+
+            if (strategy != null)
+            {
+                message.Payload["success"] = true;
+                message.Payload["strategyId"] = strategy.StrategyId;
+                message.Payload["strategyName"] = strategy.StrategyName;
+                message.Payload["category"] = strategy.Category.ToString();
+                message.Payload["capabilities"] = strategy.Capabilities.ToString();
+            }
+            else
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "No matching strategy found for the specified criteria";
+            }
+
             return Task.CompletedTask;
         }
 
-        private Task HandleBackupRequestAsync(PluginMessage message)
+        private async Task HandleBackupRequestAsync(PluginMessage message)
         {
-            // Handle backup request
-            return Task.CompletedTask;
+            var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+                ? sid : null;
+
+            if (string.IsNullOrEmpty(strategyId))
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing 'strategyId' parameter";
+                return;
+            }
+
+            var strategy = _registry.GetStrategy(strategyId);
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = $"Strategy '{strategyId}' not found";
+                return;
+            }
+
+            var request = new BackupRequest
+            {
+                BackupName = message.Payload.TryGetValue("backupName", out var nameObj) && nameObj is string name ? name : null,
+                Sources = message.Payload.TryGetValue("sources", out var srcObj) && srcObj is IEnumerable<string> sources
+                    ? sources.ToArray() : Array.Empty<string>(),
+                Destination = message.Payload.TryGetValue("destination", out var destObj) && destObj is string dest ? dest : null,
+                EnableCompression = !message.Payload.TryGetValue("enableCompression", out var compObj) || compObj is not false,
+                EnableEncryption = message.Payload.TryGetValue("enableEncryption", out var encObj) && encObj is true
+            };
+
+            var result = await strategy.CreateBackupAsync(request);
+
+            message.Payload["success"] = result.Success;
+            message.Payload["backupId"] = result.BackupId;
+            message.Payload["strategyId"] = strategyId;
+            message.Payload["totalBytes"] = result.TotalBytes;
+            message.Payload["storedBytes"] = result.StoredBytes;
+            message.Payload["fileCount"] = result.FileCount;
+            if (result.ErrorMessage != null)
+                message.Payload["error"] = result.ErrorMessage;
         }
 
-        private Task HandleRestoreRequestAsync(PluginMessage message)
+        private async Task HandleRestoreRequestAsync(PluginMessage message)
         {
-            // Handle restore request
-            return Task.CompletedTask;
+            var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+                ? sid : null;
+            var backupId = message.Payload.TryGetValue("backupId", out var bidObj) && bidObj is string bid
+                ? bid : null;
+
+            if (string.IsNullOrEmpty(strategyId) || string.IsNullOrEmpty(backupId))
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing 'strategyId' or 'backupId' parameter";
+                return;
+            }
+
+            var strategy = _registry.GetStrategy(strategyId);
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = $"Strategy '{strategyId}' not found";
+                return;
+            }
+
+            var request = new RestoreRequest
+            {
+                BackupId = backupId,
+                TargetPath = message.Payload.TryGetValue("targetPath", out var tpObj) && tpObj is string tp ? tp : null,
+                OverwriteExisting = message.Payload.TryGetValue("overwrite", out var owObj) && owObj is true
+            };
+
+            var result = await strategy.RestoreAsync(request);
+
+            message.Payload["success"] = result.Success;
+            message.Payload["restoreId"] = result.RestoreId;
+            message.Payload["strategyId"] = strategyId;
+            message.Payload["totalBytes"] = result.TotalBytes;
+            message.Payload["fileCount"] = result.FileCount;
+            if (result.ErrorMessage != null)
+                message.Payload["error"] = result.ErrorMessage;
         }
 
         private Task HandleStatisticsRequestAsync(PluginMessage message)
         {
-            // Return aggregated statistics
+            var stats = _registry.GetAggregatedStatistics();
+
+            message.Payload["success"] = true;
+            message.Payload["totalBackups"] = stats.TotalBackups;
+            message.Payload["successfulBackups"] = stats.SuccessfulBackups;
+            message.Payload["failedBackups"] = stats.FailedBackups;
+            message.Payload["totalRestores"] = stats.TotalRestores;
+            message.Payload["successfulRestores"] = stats.SuccessfulRestores;
+            message.Payload["failedRestores"] = stats.FailedRestores;
+            message.Payload["totalBytesBackedUp"] = stats.TotalBytesBackedUp;
+            message.Payload["totalBytesStored"] = stats.TotalBytesStored;
+            message.Payload["totalBytesRestored"] = stats.TotalBytesRestored;
+            message.Payload["deduplicationRatio"] = stats.DeduplicationRatio;
+            message.Payload["spaceSavingsPercent"] = stats.SpaceSavingsPercent;
+            message.Payload["totalValidations"] = stats.TotalValidations;
+            message.Payload["registeredStrategies"] = _registry.Count;
+            message.Payload["categorySummary"] = _registry.GetCategorySummary()
+                .ToDictionary(kv => kv.Key.ToString(), kv => (object)kv.Value);
             return Task.CompletedTask;
         }
 

@@ -241,8 +241,19 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
 
     #region Message Handlers
 
-    private Task HandleDomainRegisterAsync(PluginMessage message)
+    private async Task HandleDomainRegisterAsync(PluginMessage message)
     {
+        // Dispatch to domain ownership strategy if specified
+        if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId && !string.IsNullOrWhiteSpace(strategyId))
+        {
+            var strategy = GetStrategyOrThrow(strategyId);
+            IncrementUsageStats(strategyId);
+            if (strategy is DataWarehouse.SDK.Contracts.StrategyBase strategyBase)
+                await strategyBase.InitializeAsync();
+            message.Payload["strategyName"] = strategy.DisplayName;
+            message.Payload["strategyCategory"] = strategy.Category.ToString();
+        }
+
         var domain = new DataDomain
         {
             DomainId = GetRequiredString(message.Payload, "domainId"),
@@ -257,7 +268,6 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         Interlocked.Increment(ref _totalOperations);
         message.Payload["domain"] = domain;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleDomainListAsync(PluginMessage message)
@@ -267,8 +277,19 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         return Task.CompletedTask;
     }
 
-    private Task HandleProductCreateAsync(PluginMessage message)
+    private async Task HandleProductCreateAsync(PluginMessage message)
     {
+        // Dispatch to data product strategy if specified
+        if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId && !string.IsNullOrWhiteSpace(strategyId))
+        {
+            var strategy = GetStrategyOrThrow(strategyId);
+            IncrementUsageStats(strategyId);
+            if (strategy is DataWarehouse.SDK.Contracts.StrategyBase strategyBase)
+                await strategyBase.InitializeAsync();
+            message.Payload["strategyName"] = strategy.DisplayName;
+            message.Payload["strategyCategory"] = strategy.Category.ToString();
+        }
+
         var product = new DataProduct
         {
             ProductId = GetRequiredString(message.Payload, "productId"),
@@ -286,7 +307,6 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         Interlocked.Increment(ref _totalOperations);
         message.Payload["product"] = product;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleProductListAsync(PluginMessage message)
@@ -317,8 +337,19 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         return Task.CompletedTask;
     }
 
-    private Task HandleShareRequestAsync(PluginMessage message)
+    private async Task HandleShareRequestAsync(PluginMessage message)
     {
+        // Dispatch to cross-domain sharing strategy if specified
+        if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId && !string.IsNullOrWhiteSpace(strategyId))
+        {
+            var strategy = GetStrategyOrThrow(strategyId);
+            IncrementUsageStats(strategyId);
+            if (strategy is DataWarehouse.SDK.Contracts.StrategyBase strategyBase)
+                await strategyBase.InitializeAsync();
+            message.Payload["strategyName"] = strategy.DisplayName;
+            message.Payload["strategyCategory"] = strategy.Category.ToString();
+        }
+
         var share = new CrossDomainShare
         {
             ShareId = Guid.NewGuid().ToString("N"),
@@ -331,7 +362,6 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         Interlocked.Increment(ref _totalOperations);
         message.Payload["share"] = share;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleShareApproveAsync(PluginMessage message)
@@ -359,8 +389,19 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         return Task.CompletedTask;
     }
 
-    private Task HandlePolicyCreateAsync(PluginMessage message)
+    private async Task HandlePolicyCreateAsync(PluginMessage message)
     {
+        // Dispatch to federated governance strategy if specified
+        if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId && !string.IsNullOrWhiteSpace(strategyId))
+        {
+            var strategy = GetStrategyOrThrow(strategyId);
+            IncrementUsageStats(strategyId);
+            if (strategy is DataWarehouse.SDK.Contracts.StrategyBase strategyBase)
+                await strategyBase.InitializeAsync();
+            message.Payload["strategyName"] = strategy.DisplayName;
+            message.Payload["strategyCategory"] = strategy.Category.ToString();
+        }
+
         var policy = new GovernancePolicy
         {
             PolicyId = GetRequiredString(message.Payload, "policyId"),
@@ -378,11 +419,22 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         Interlocked.Increment(ref _totalOperations);
         message.Payload["policy"] = policy;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleDiscoverAsync(PluginMessage message)
+    private async Task HandleDiscoverAsync(PluginMessage message)
     {
+        // Dispatch to domain discovery strategy if specified
+        if (message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string strategyId && !string.IsNullOrWhiteSpace(strategyId))
+        {
+            var strategy = GetStrategyOrThrow(strategyId);
+            IncrementUsageStats(strategyId);
+            if (strategy is DataWarehouse.SDK.Contracts.StrategyBase strategyBase)
+                await strategyBase.InitializeAsync();
+            message.Payload["strategyName"] = strategy.DisplayName;
+            message.Payload["strategyCategory"] = strategy.Category.ToString();
+            message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        }
+
         var query = message.Payload.TryGetValue("query", out var queryObj) && queryObj is string q ? q : "";
         var domainFilter = message.Payload.TryGetValue("domainId", out var domObj) && domObj is string dom ? dom : null;
 
@@ -396,7 +448,6 @@ public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposab
         message.Payload["products"] = products;
         message.Payload["count"] = products.Count;
         Interlocked.Increment(ref _totalOperations);
-        return Task.CompletedTask;
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)

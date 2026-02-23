@@ -311,14 +311,24 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         return Task.CompletedTask;
     }
 
-    private Task HandleStewardshipAsync(PluginMessage message)
+    private async Task HandleStewardshipAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataGovernanceStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["healthStatus"] = strategyBase.GetHealth().ToString();
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsAudit"] = strategy.Capabilities.SupportsAudit;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleClassifyAsync(PluginMessage message)
@@ -353,46 +363,129 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         return Task.CompletedTask;
     }
 
-    private Task HandleLineageAsync(PluginMessage message)
+    private async Task HandleLineageAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataGovernanceStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["healthStatus"] = strategyBase.GetHealth().ToString();
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsRealTime"] = strategy.Capabilities.SupportsRealTime;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleRetentionAsync(PluginMessage message)
+    private async Task HandleRetentionAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataGovernanceStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["healthStatus"] = strategyBase.GetHealth().ToString();
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsAudit"] = strategy.Capabilities.SupportsAudit;
+        message.Payload["activePolicies"] = _policies.Values.Where(p => p.IsActive).Count();
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleComplianceAsync(PluginMessage message)
+    private async Task HandleComplianceAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _complianceChecks);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataGovernanceStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["healthStatus"] = strategyBase.GetHealth().ToString();
+        }
+
+        // Evaluate real compliance rules against active policies
+        var assetId = GetString(message.Payload, "assetId", "");
+        var compliant = true;
+        var violations = new List<string>();
+        var evaluatedRules = 0;
+
+        // Rule 1: Check if data has an owner assigned
+        if (!string.IsNullOrEmpty(assetId) && !_ownerships.ContainsKey(assetId))
+        {
+            compliant = false;
+            violations.Add($"Asset '{assetId}' has no owner assigned");
+        }
+        evaluatedRules++;
+
+        // Rule 2: Check if data has a classification assigned
+        if (!string.IsNullOrEmpty(assetId) && !_classifications.ContainsKey(assetId))
+        {
+            compliant = false;
+            violations.Add($"Asset '{assetId}' has no classification assigned");
+        }
+        evaluatedRules++;
+
+        // Rule 3: Check active policies exist for the compliance domain
+        var activePolicies = _policies.Values.Where(p => p.IsActive).ToList();
+        if (!activePolicies.Any())
+        {
+            compliant = false;
+            violations.Add("No active governance policies configured");
+        }
+        evaluatedRules++;
+
+        // Rule 4: Check if auto-enforcement is enabled when policies require it
+        if (activePolicies.Any(p => p.Type.Equals("enforcement", StringComparison.OrdinalIgnoreCase)) && !_autoEnforcementEnabled)
+        {
+            violations.Add("Enforcement policies exist but auto-enforcement is disabled");
+        }
+        evaluatedRules++;
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["compliant"] = compliant;
+        message.Payload["violations"] = violations;
+        message.Payload["evaluatedRules"] = evaluatedRules;
+        message.Payload["activePoliciesCount"] = activePolicies.Count;
         message.Payload["success"] = true;
-        message.Payload["compliant"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleAuditAsync(PluginMessage message)
+    private async Task HandleAuditAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataGovernanceStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["healthStatus"] = strategyBase.GetHealth().ToString();
+            message.Payload["counters"] = strategyBase.GetCounters();
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsAudit"] = strategy.Capabilities.SupportsAudit;
+        message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
+        message.Payload["complianceChecks"] = Interlocked.Read(ref _complianceChecks);
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)

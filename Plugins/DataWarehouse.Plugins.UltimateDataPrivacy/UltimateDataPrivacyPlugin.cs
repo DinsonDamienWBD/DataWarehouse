@@ -227,57 +227,95 @@ public sealed class UltimateDataPrivacyPlugin : SecurityPluginBase, IDisposable
 
     #region Message Handlers
 
-    private Task HandleAnonymizeAsync(PluginMessage message)
+    private async Task HandleAnonymizeAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _anonymizationOps);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsReversible"] = strategy.Capabilities.SupportsReversible;
+        message.Payload["supportsFormatPreserving"] = strategy.Capabilities.SupportsFormatPreserving;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandlePseudonymizeAsync(PluginMessage message)
+    private async Task HandlePseudonymizeAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsReversible"] = strategy.Capabilities.SupportsReversible;
+        message.Payload["supportsFormatPreserving"] = strategy.Capabilities.SupportsFormatPreserving;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleTokenizeAsync(PluginMessage message)
+    private async Task HandleTokenizeAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _tokenizationOps);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsReversible"] = strategy.Capabilities.SupportsReversible;
+        message.Payload["supportsFormatPreserving"] = strategy.Capabilities.SupportsFormatPreserving;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleMaskAsync(PluginMessage message)
+    private async Task HandleMaskAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _maskingOps);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsReversible"] = strategy.Capabilities.SupportsReversible;
+        message.Payload["supportsFormatPreserving"] = strategy.Capabilities.SupportsFormatPreserving;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleDifferentialAsync(PluginMessage message)
+    private async Task HandleDifferentialAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleConsentAsync(PluginMessage message)
@@ -310,25 +348,73 @@ public sealed class UltimateDataPrivacyPlugin : SecurityPluginBase, IDisposable
         return Task.CompletedTask;
     }
 
-    private Task HandleComplianceAsync(PluginMessage message)
+    private async Task HandleComplianceAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        // Evaluate compliance based on active policies and consent records
+        var userId = GetString(message.Payload, "userId", "");
+        var compliant = true;
+        var violations = new List<string>();
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            // Check if user has active consent records
+            var userConsents = _consents.Values.Where(c => c.UserId == userId).ToList();
+            if (!userConsents.Any())
+            {
+                compliant = false;
+                violations.Add("No consent records found for user");
+            }
+            else if (userConsents.Any(c => !c.Granted))
+            {
+                compliant = false;
+                violations.Add("User has revoked consent for some processing types");
+            }
+        }
+
+        // Check if relevant policies exist
+        if (_policies.Count == 0)
+        {
+            violations.Add("No privacy policies configured");
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["compliant"] = compliant;
+        message.Payload["violations"] = violations;
+        message.Payload["evaluatedPolicies"] = _policies.Count;
         message.Payload["success"] = true;
-        message.Payload["compliant"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleMetricsAsync(PluginMessage message)
+    private async Task HandleMetricsAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataPrivacyStrategyBase strategyBase)
+        {
+            await strategyBase.InitializeAsync();
+            message.Payload["isHealthy"] = strategyBase.IsHealthy();
+            message.Payload["counters"] = strategyBase.GetCounters();
+        }
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["totalOps"] = Interlocked.Read(ref _totalOperations);
+        message.Payload["anonymizationOps"] = Interlocked.Read(ref _anonymizationOps);
+        message.Payload["tokenizationOps"] = Interlocked.Read(ref _tokenizationOps);
+        message.Payload["maskingOps"] = Interlocked.Read(ref _maskingOps);
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)

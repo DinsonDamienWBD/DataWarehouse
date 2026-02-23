@@ -393,8 +393,51 @@ public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposabl
     private Task HandleInvokeAsync(PluginMessage message)
     {
         Interlocked.Increment(ref _totalRequests);
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid ? sid : null;
+        var category = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
+            && Enum.TryParse<MicroservicesCategory>(catStr, true, out var mc) ? mc : (MicroservicesCategory?)null;
+
+        MicroservicesStrategyBase? strategy = null;
+
+        if (strategyId != null)
+        {
+            strategy = GetStrategy(strategyId);
+        }
+        else if (category.HasValue)
+        {
+            strategy = GetStrategiesForCategory(category.Value).FirstOrDefault();
+        }
+
+        if (strategy == null)
+        {
+            Interlocked.Increment(ref _failedRequests);
+            message.Payload["success"] = false;
+            message.Payload["status"] = "failed";
+            message.Payload["error"] = strategyId != null
+                ? $"Strategy '{strategyId}' not found"
+                : "No matching strategy found. Provide 'strategyId' or 'category'.";
+            return Task.CompletedTask;
+        }
+
         Interlocked.Increment(ref _successfulRequests);
+
+        message.Payload["success"] = true;
         message.Payload["status"] = "invoked";
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["description"] = strategy.SemanticDescription;
+        message.Payload["capabilities"] = new Dictionary<string, object>
+        {
+            ["supportsServiceDiscovery"] = strategy.Capabilities.SupportsServiceDiscovery,
+            ["supportsHealthCheck"] = strategy.Capabilities.SupportsHealthCheck,
+            ["supportsLoadBalancing"] = strategy.Capabilities.SupportsLoadBalancing,
+            ["supportsCircuitBreaker"] = strategy.Capabilities.SupportsCircuitBreaker,
+            ["supportsDistributedTracing"] = strategy.Capabilities.SupportsDistributedTracing,
+            ["supportsRetry"] = strategy.Capabilities.SupportsRetry,
+            ["supportsRateLimiting"] = strategy.Capabilities.SupportsRateLimiting
+        };
         return Task.CompletedTask;
     }
 
@@ -467,7 +510,12 @@ public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposabl
             {
                 if (Activator.CreateInstance(strategyType) is MicroservicesStrategyBase strategy)
                 {
+                    // Local typed registry
                     _strategies[strategy.StrategyId] = strategy;
+
+                    // NOTE(65.5-05): MicroservicesStrategyBase does not implement IStrategy, so
+                    // RegisterPlatformStrategy(IStrategy) cannot be called directly.
+                    // Dual-registration will become possible when MicroservicesStrategyBase extends StrategyBase.
                 }
             }
             catch

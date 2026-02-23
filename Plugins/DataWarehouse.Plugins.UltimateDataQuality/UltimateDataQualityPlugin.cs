@@ -289,6 +289,15 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         Interlocked.Increment(ref _totalRecordsProcessed);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["capabilities"] = new Dictionary<string, object>
+        {
+            ["supportsAsync"] = strategy.Capabilities.SupportsAsync,
+            ["supportsBatch"] = strategy.Capabilities.SupportsBatch,
+            ["supportsStreaming"] = strategy.Capabilities.SupportsStreaming
+        };
         return Task.CompletedTask;
     }
 
@@ -303,6 +312,10 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         IncrementUsageStats(strategyId);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["tags"] = strategy.Tags;
         return Task.CompletedTask;
     }
 
@@ -315,8 +328,12 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
+        Interlocked.Increment(ref _totalRecordsProcessed);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
         return Task.CompletedTask;
     }
 
@@ -329,8 +346,12 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
+        Interlocked.Increment(ref _totalRecordsProcessed);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
         return Task.CompletedTask;
     }
 
@@ -343,8 +364,12 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
+        Interlocked.Increment(ref _totalRecordsProcessed);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
         return Task.CompletedTask;
     }
 
@@ -359,6 +384,10 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         IncrementUsageStats(strategyId);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["description"] = strategy.SemanticDescription;
         return Task.CompletedTask;
     }
 
@@ -373,6 +402,15 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         IncrementUsageStats(strategyId);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["capabilities"] = new Dictionary<string, object>
+        {
+            ["supportsAsync"] = strategy.Capabilities.SupportsAsync,
+            ["supportsStreaming"] = strategy.Capabilities.SupportsStreaming,
+            ["supportsDistributed"] = strategy.Capabilities.SupportsDistributed
+        };
         return Task.CompletedTask;
     }
 
@@ -387,6 +425,10 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         IncrementUsageStats(strategyId);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["category"] = strategy.Category.ToString();
+        message.Payload["tags"] = strategy.Tags;
         return Task.CompletedTask;
     }
 

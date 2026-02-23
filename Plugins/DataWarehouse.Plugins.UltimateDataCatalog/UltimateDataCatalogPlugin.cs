@@ -237,14 +237,24 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
 
     #region Message Handlers
 
-    private Task HandleDiscoverAsync(PluginMessage message)
+    private async Task HandleDiscoverAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataCatalogStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsBatch"] = strategy.Capabilities.SupportsBatch;
+        message.Payload["supportsRealTime"] = strategy.Capabilities.SupportsRealTime;
+        message.Payload["supportsFederation"] = strategy.Capabilities.SupportsFederation;
+        message.Payload["catalogAssetCount"] = _assets.Count;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleRegisterAsync(PluginMessage message)
@@ -340,14 +350,22 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         return Task.CompletedTask;
     }
 
-    private Task HandleDocumentAsync(PluginMessage message)
+    private async Task HandleDocumentAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataCatalogStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsVersioning"] = strategy.Capabilities.SupportsVersioning;
+        message.Payload["glossaryTermCount"] = _glossary.Count;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleGlossaryAsync(PluginMessage message)
@@ -386,25 +404,40 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         return Task.CompletedTask;
     }
 
-    private Task HandleAccessAsync(PluginMessage message)
+    private async Task HandleAccessAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _apiCalls);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataCatalogStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsMultiTenancy"] = strategy.Capabilities.SupportsMultiTenancy;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleSchemaAsync(PluginMessage message)
+    private async Task HandleSchemaAsync(PluginMessage message)
     {
         var strategyId = GetRequiredString(message.Payload, "strategyId");
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
         Interlocked.Increment(ref _totalOperations);
+
+        if (strategy is DataCatalogStrategyBase strategyBase)
+            await strategyBase.InitializeAsync();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsVersioning"] = strategy.Capabilities.SupportsVersioning;
+        message.Payload["supportsFederation"] = strategy.Capabilities.SupportsFederation;
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private Task HandleListStrategiesAsync(PluginMessage message)

@@ -197,42 +197,84 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     private Task HandleListStrategiesAsync(PluginMessage message)
     {
         var strategies = GetAllDatabaseStrategies()
-            .Select(s => new
+            .Select(s => new Dictionary<string, object>
             {
-                s.StrategyId,
-                s.Name,
-                s.Engine,
-                Category = s.DatabaseCategory.ToString(),
-                Tier = s.Tier.ToString(),
-                s.SupportsTransactions,
-                s.SupportsSql,
-                s.IsConnected
+                ["strategyId"] = s.StrategyId,
+                ["name"] = s.Name,
+                ["engine"] = s.Engine,
+                ["category"] = s.DatabaseCategory.ToString(),
+                ["tier"] = s.Tier.ToString(),
+                ["supportsTransactions"] = s.SupportsTransactions,
+                ["supportsSql"] = s.SupportsSql,
+                ["isConnected"] = s.IsConnected
             })
             .ToList();
 
-        // Response would be sent via message context
+        message.Payload["strategies"] = strategies;
+        message.Payload["count"] = strategies.Count;
+        message.Payload["success"] = true;
         return Task.CompletedTask;
     }
 
     private Task HandleGetStrategyAsync(PluginMessage message)
     {
-        if (message.Payload.TryGetValue("strategyId", out var idObj) && idObj is string strategyId)
+        if (!message.Payload.TryGetValue("strategyId", out var idObj) || idObj is not string strategyId)
         {
-            var strategy = GetDatabaseStrategy(strategyId);
-            if (strategy != null)
-            {
-                var stats = strategy.GetDatabaseStatistics();
-                // Response would be sent via message context
-            }
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing 'strategyId' parameter";
+            return Task.CompletedTask;
         }
+
+        var strategy = GetDatabaseStrategy(strategyId);
+        if (strategy == null)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Strategy '{strategyId}' not found";
+            return Task.CompletedTask;
+        }
+
+        var stats = strategy.GetDatabaseStatistics();
+        message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["name"] = strategy.Name;
+        message.Payload["engine"] = strategy.Engine;
+        message.Payload["category"] = strategy.DatabaseCategory.ToString();
+        message.Payload["tier"] = strategy.Tier.ToString();
+        message.Payload["supportsTransactions"] = strategy.SupportsTransactions;
+        message.Payload["supportsSql"] = strategy.SupportsSql;
+        message.Payload["isConnected"] = strategy.IsConnected;
+        message.Payload["statistics"] = new Dictionary<string, object>
+        {
+            ["totalBytesStored"] = stats.TotalBytesStored,
+            ["totalBytesRetrieved"] = stats.TotalBytesRetrieved,
+            ["storeOperations"] = stats.StoreOperations,
+            ["retrieveOperations"] = stats.RetrieveOperations,
+            ["deleteOperations"] = stats.DeleteOperations,
+            ["queryOperations"] = stats.QueryOperations
+        };
         return Task.CompletedTask;
     }
 
     private Task HandleGetStatisticsAsync(PluginMessage message)
     {
         var stats = GetAllDatabaseStrategies()
-            .ToDictionary(s => s.StrategyId, s => s.GetDatabaseStatistics());
-        // Response would be sent via message context
+            .ToDictionary(s => s.StrategyId, s =>
+            {
+                var dbStats = s.GetDatabaseStatistics();
+                return (object)new Dictionary<string, object>
+                {
+                    ["totalBytesStored"] = dbStats.TotalBytesStored,
+                    ["totalBytesRetrieved"] = dbStats.TotalBytesRetrieved,
+                    ["storeOperations"] = dbStats.StoreOperations,
+                    ["retrieveOperations"] = dbStats.RetrieveOperations,
+                    ["deleteOperations"] = dbStats.DeleteOperations,
+                    ["queryOperations"] = dbStats.QueryOperations
+                };
+            });
+
+        message.Payload["statistics"] = stats;
+        message.Payload["strategyCount"] = stats.Count;
+        message.Payload["success"] = true;
         return Task.CompletedTask;
     }
 

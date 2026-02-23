@@ -290,7 +290,21 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
-        // Delegate to strategy-specific handling
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsBatch"] = strategy.Capabilities.SupportsBatch;
+        message.Payload["supportsDistributed"] = strategy.Capabilities.SupportsDistributed;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites,
+            ["totalBytesRead"] = stats.TotalBytesRead
+        };
         message.Payload["success"] = true;
     }
 
@@ -301,11 +315,19 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
             throw new ArgumentException("Missing 'policyId' parameter");
         }
 
+        if (!_policies.TryGetValue(policyId, out var policy))
+        {
+            throw new ArgumentException($"Retention policy '{policyId}' not found");
+        }
+
+        message.Payload["policyName"] = policy.Name;
+        message.Payload["appliedAt"] = DateTimeOffset.UtcNow;
         message.Payload["success"] = true;
+        Interlocked.Increment(ref _totalOperations);
         return Task.CompletedTask;
     }
 
-    private Task HandleVersionAsync(PluginMessage message)
+    private async Task HandleVersionAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -315,11 +337,23 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsTransactions"] = strategy.Capabilities.SupportsTransactions;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalWrites"] = stats.TotalWrites,
+            ["totalBytesWritten"] = stats.TotalBytesWritten
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleTierAsync(PluginMessage message)
+    private async Task HandleTierAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -329,11 +363,24 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsTTL"] = strategy.Capabilities.SupportsTTL;
+        message.Payload["typicalLatencyMs"] = strategy.Capabilities.TypicalLatencyMs;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleShardAsync(PluginMessage message)
+    private async Task HandleShardAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -343,11 +390,24 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsDistributed"] = strategy.Capabilities.SupportsDistributed;
+        message.Payload["maxThroughput"] = strategy.Capabilities.MaxThroughput;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleLifecycleAsync(PluginMessage message)
+    private async Task HandleLifecycleAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -357,11 +417,25 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsTTL"] = strategy.Capabilities.SupportsTTL;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites,
+            ["totalDeletes"] = stats.TotalDeletes,
+            ["totalFailures"] = stats.TotalFailures
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleCacheAsync(PluginMessage message)
+    private async Task HandleCacheAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -371,11 +445,26 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsTTL"] = strategy.Capabilities.SupportsTTL;
+        message.Payload["supportsDistributed"] = strategy.Capabilities.SupportsDistributed;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["cacheHits"] = stats.CacheHits,
+            ["cacheMisses"] = stats.CacheMisses,
+            ["cacheHitRatio"] = stats.CacheHitRatio,
+            ["totalReads"] = stats.TotalReads
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
-    private Task HandleIndexAsync(PluginMessage message)
+    private async Task HandleIndexAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -385,8 +474,22 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
+        // Initialize and dispatch to the resolved strategy
+        await strategy.InitializeAsync();
+        var stats = strategy.GetStatistics();
+
+        message.Payload["strategyName"] = strategy.DisplayName;
+        message.Payload["strategyCategory"] = strategy.Category.ToString();
+        message.Payload["strategyDescription"] = strategy.SemanticDescription;
+        message.Payload["supportsBatch"] = strategy.Capabilities.SupportsBatch;
+        message.Payload["typicalLatencyMs"] = strategy.Capabilities.TypicalLatencyMs;
+        message.Payload["operationStats"] = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites,
+            ["averageLatencyMs"] = stats.AverageLatencyMs
+        };
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private async Task HandleOptimizeAsync(PluginMessage message)

@@ -362,10 +362,40 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     private Task HandleExecuteAsync(PluginMessage message)
     {
         Interlocked.Increment(ref _totalOperations);
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid ? sid : null;
+        var category = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr ? catStr : null;
+
+        IMultiCloudStrategy? strategy = null;
+
+        if (strategyId != null)
+        {
+            strategy = _registry.GetStrategy(strategyId);
+        }
+        else if (category != null)
+        {
+            strategy = _registry.GetStrategiesByCategory(category).FirstOrDefault();
+        }
+
+        if (strategy == null)
+        {
+            Interlocked.Increment(ref _failedOperations);
+            message.Payload["success"] = false;
+            message.Payload["error"] = strategyId != null
+                ? $"Strategy '{strategyId}' not found"
+                : "No matching strategy found. Provide 'strategyId' or 'category'.";
+            return Task.CompletedTask;
+        }
+
         Interlocked.Increment(ref _successfulOperations);
 
+        var stats = strategy.GetStatistics();
         message.Payload["success"] = true;
-        message.Payload["message"] = "Multi-cloud operation executed";
+        message.Payload["message"] = $"Multi-cloud operation executed via {strategy.StrategyName}";
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.StrategyName;
+        message.Payload["category"] = strategy.Category;
+        message.Payload["totalExecutions"] = stats.TotalExecutions;
 
         return Task.CompletedTask;
     }
@@ -395,19 +425,75 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     {
         Interlocked.Increment(ref _replicationCount);
 
+        // Resolve a replication-capable strategy
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid ? sid : null;
+        IMultiCloudStrategy? strategy = null;
+
+        if (strategyId != null)
+        {
+            strategy = _registry.GetStrategy(strategyId);
+        }
+        else
+        {
+            strategy = _registry.GetStrategiesByCategory("Replication").FirstOrDefault()
+                ?? _registry.GetAllStrategies().FirstOrDefault(s => s.Characteristics.SupportsCrossCloudReplication);
+        }
+
+        if (strategy == null)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "No replication strategy available";
+            return Task.CompletedTask;
+        }
+
+        var sourceProvider = message.Payload.TryGetValue("sourceProvider", out var sp) && sp is string src ? src : null;
+        var targetProvider = message.Payload.TryGetValue("targetProvider", out var tp) && tp is string tgt ? tgt : null;
+
         message.Payload["success"] = true;
         message.Payload["replicated"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.StrategyName;
+        message.Payload["category"] = strategy.Category;
+        message.Payload["sourceProvider"] = sourceProvider ?? string.Empty;
+        message.Payload["targetProvider"] = targetProvider ?? string.Empty;
+        message.Payload["replicationId"] = Guid.NewGuid().ToString("N");
 
         return Task.CompletedTask;
     }
 
     private Task HandleOptimizeCostAsync(PluginMessage message)
     {
+        // Resolve a cost-optimization strategy
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid ? sid : null;
+        IMultiCloudStrategy? strategy = null;
+
+        if (strategyId != null)
+        {
+            strategy = _registry.GetStrategy(strategyId);
+        }
+        else
+        {
+            strategy = _registry.GetStrategiesByCategory("CostOptimization").FirstOrDefault()
+                ?? _registry.GetAllStrategies().FirstOrDefault(s => s.Characteristics.SupportsCostOptimization);
+        }
+
+        if (strategy == null)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "No cost optimization strategy available";
+            return Task.CompletedTask;
+        }
+
+        var stats = strategy.GetStatistics();
         var estimatedSavings = 150.0;
         Interlocked.Exchange(ref _totalCostSavings, _totalCostSavings + estimatedSavings);
 
         message.Payload["success"] = true;
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.StrategyName;
+        message.Payload["category"] = strategy.Category;
         message.Payload["estimatedMonthlySavings"] = estimatedSavings;
+        message.Payload["totalExecutions"] = stats.TotalExecutions;
         message.Payload["recommendations"] = new[]
         {
             "Move cold data to cheaper storage tier",
@@ -441,9 +527,44 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
 
     private Task HandleMigrateAsync(PluginMessage message)
     {
+        Interlocked.Increment(ref _totalOperations);
+
+        // Resolve a portability/migration strategy
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid ? sid : null;
+        IMultiCloudStrategy? strategy = null;
+
+        if (strategyId != null)
+        {
+            strategy = _registry.GetStrategy(strategyId);
+        }
+        else
+        {
+            strategy = _registry.GetStrategiesByCategory("Portability").FirstOrDefault()
+                ?? _registry.GetStrategiesByCategory("Hybrid").FirstOrDefault()
+                ?? _registry.GetAllStrategies().FirstOrDefault();
+        }
+
+        if (strategy == null)
+        {
+            Interlocked.Increment(ref _failedOperations);
+            message.Payload["success"] = false;
+            message.Payload["error"] = "No migration strategy available";
+            return Task.CompletedTask;
+        }
+
+        Interlocked.Increment(ref _successfulOperations);
+
+        var sourceProvider = message.Payload.TryGetValue("sourceProvider", out var sp) && sp is string src ? src : null;
+        var targetProvider = message.Payload.TryGetValue("targetProvider", out var tp) && tp is string tgt ? tgt : null;
+
         message.Payload["success"] = true;
         message.Payload["status"] = "migration_started";
         message.Payload["migrationId"] = Guid.NewGuid().ToString("N");
+        message.Payload["strategyId"] = strategy.StrategyId;
+        message.Payload["strategyName"] = strategy.StrategyName;
+        message.Payload["category"] = strategy.Category;
+        message.Payload["sourceProvider"] = sourceProvider ?? string.Empty;
+        message.Payload["targetProvider"] = targetProvider ?? string.Empty;
 
         return Task.CompletedTask;
     }
@@ -469,6 +590,15 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     private void DiscoverAndRegisterStrategies()
     {
         _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+
+        // Base-class registration (65.5-05): MultiCloudStrategyBase extends StrategyBase (IStrategy)
+        foreach (var strategy in _registry.GetAllStrategies())
+        {
+            if (strategy is IStrategy istrategy)
+            {
+                RegisterStrategy(istrategy);
+            }
+        }
     }
 
     private IEnumerable<string> GetStrategyCategories()
