@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 85-competitive-edge
-- **Plan:** 3/8
+- **Plan:** 6/8
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -138,7 +138,7 @@
 - [Phase 82]: 3,036 strategies post-merge exceeds 2,968 baseline; 52 plugins verified; Phase 82 COMPLETE
 - Phase 83: COMPLETE (5/5 plans, 201+280+35 integration tests for policy/cascade/performance/VDE format)
 - Phase 84: COMPLETE (6/6 plans, topology+VDE composer+GUI+shell registration+CLI fixes+51 integration tests)
-- Phase 85: 3/8 plans (85-01, 85-02, 85-03)
+- Phase 85: 6/8 plans (85-01, 85-02, 85-03, 85-04, 85-05, 85-06)
 - [Phase 83-01]: 201 new Policy tests (70 contract + 61 persistence + 70 edge case); 490 total Policy tests passing; all 5 CascadeStrategy, 5 PolicyLevel, 6 OperationalProfilePreset values covered; all 5 persistence backends round-trip verified
 - [Phase 83-02]: 280 per-feature multi-level tests; 7 feature categories x 5 levels x 5 cascades; 94-feature classification table verified; bloom filter + skip optimizer + deployment tier tested; MostRestrictive picks lowest intensity (most restrictive)
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
@@ -151,6 +151,7 @@
 - [Phase 85-03]: TLA+ formal verification: 4 models (WAL/Raft/BTree/Superblock), 15 safety invariants, C#-to-TLA+ generator framework, CI script generator for TLC model checker
 - [Phase 85]: ZeroCopyBlockReader uses managed byte[] from MemoryMappedViewAccessor (no direct Memory<byte> API); VdeBlockExportPath auto-fallback for encrypted regions
 - [Phase 85]: Core seccomp profile: 85 syscalls incl io_uring; plugin profile denies execve/socket/clone/mount/ptrace; weighted security scoring Critical=25/High=15/Medium=10/Low=5
+- [Phase 85-06]: Deterministic I/O: PreAllocatedBufferPool with GC.AllocateArray(pinned:true) + ConcurrentQueue free-list; EDF DeadlineScheduler on dedicated AboveNormal thread; WcetAnnotation for DO-178C/IEC 61508; configurable DeadlineMissAction (Log/Throw/CircuitBreak)
 
 ## Performance Metrics
 
@@ -269,7 +270,8 @@
 | 85    | 03   | 9min     | 2     | 5     |
 | Phase 85 P01 | 5min | 2 tasks | 3 files |
 | Phase 85 P04 | 6min | 2 tasks | 3 files |
+| 85    | 06   | 4min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T19:25:00Z
-- **Stopped At:** Completed 85-04-PLAN.md (OS-level security hardening)
+- **Timestamp:** 2026-02-24T19:40:00Z
+- **Stopped At:** Completed 85-06-PLAN.md (deterministic I/O mode)
