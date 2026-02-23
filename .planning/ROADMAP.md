@@ -2037,31 +2037,32 @@ Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
   12. Hierarchical checksums: corruption in one block of a 1GB file detected and localized via Merkle tree binary search in ≤20 I/O operations.
   13. Extent-aware CoW snapshots: snapshot of 1TB VDE with 1M files creates ≤10MB of snapshot metadata (vs ~4GB with per-block tracking).
   14. Online defragmentation: background defrag compacts fragmented allocation groups while VDE serves normal read/write operations without downtime.
-**Plans**: 14 plans
+**Plans**: 15 plans
 
 Plans:
-- [ ] 87-01-PLAN.md -- Allocation groups: AllocationGroup struct, AllocationGroupDescriptorTable VDE region, per-group bitmap and lock, first-fit/best-fit policy, dynamic group creation as VDE grows (VOPT-01, VOPT-02)
-- [ ] 87-02-PLAN.md -- ARC cache L1: AdaptiveReplacementCache<TKey,TValue> with T1/T2/B1/B2 lists, ghost-list-driven adaptation, auto-sizing from available RAM, replace DefaultCacheManager hot paths (VOPT-03)
-- [ ] 87-03-PLAN.md -- ARC cache L2 + L3: memory-mapped VDE region access via MemoryMappedFile, NVMe read cache with write-through, tiered cache coordinator selecting L1→L2→L3 (VOPT-04, VOPT-05)
-- [ ] 87-04-PLAN.md -- Variable-width inodes: CompactInode64 (inline data ≤48 bytes), fix Standard256 indirect blocks (NotSupportedException), ExtendedInode512 (xattrs, nanosecond timestamps, version chain), InodeLayoutDescriptor in superblock (VOPT-06, VOPT-07, VOPT-08, VOPT-10)
-- [ ] 87-05-PLAN.md -- Extent-based addressing: ExtentTree (start block + length), inline storage ≤4 extents in inode, overflow to extent block, replace direct+indirect pointer model; sub-block packing for small objects (VOPT-09, VOPT-11)
-- [ ] 87-06-PLAN.md -- MVCC core: WAL-based version tracking, VersionChainHead in inode, MVCC Region for old versions, snapshot acquisition/release, version visibility check (VOPT-12)
-- [ ] 87-07-PLAN.md -- MVCC GC + isolation levels: background vacuum (incremental, concurrent), Read Committed / Snapshot Isolation / Serializable with predicate locks, configurable retention window (VOPT-13, VOPT-14)
-- [ ] 87-08-PLAN.md -- SQL OLTP optimization: prepared query cache (fingerprint-based), merge join for sorted Bε-tree scans, index-only scans (VOPT-15)
-- [ ] 87-09-PLAN.md -- SQL OLAP: columnar VDE region with RLE + dictionary encoding, zone maps (per-extent min/max/null_count), predicate pushdown into storage scan (VOPT-16, VOPT-17, VOPT-20)
-- [ ] 87-10-PLAN.md -- SIMD SQL + spill-to-disk: Vector256/Avx2 in ColumnarEngine for aggregations and predicates, spill-to-temp-region for over-budget aggregations, runtime capability detection (VOPT-18, VOPT-19)
-- [ ] 87-11-PLAN.md -- Persistent roaring bitmap tag index: Roaring bitmap implementation (array/bitset/run containers), persistent storage in Tag Index region, tag bloom filter per allocation group, Bε-tree sub-index for high-cardinality tags (VOPT-21, VOPT-22)
-- [ ] 87-12-PLAN.md -- Per-extent encryption + compression: extent-level AES-GCM (single IV per extent), extent-level compression with per-extent dictionary, backward compat with per-block mode (VOPT-23, VOPT-24)
-- [ ] 87-13-PLAN.md -- Hierarchical checksums + extent-aware CoW: per-block XxHash64 + per-extent CRC32C + per-object Merkle root, binary-search corruption localization, extent-level CoW snapshots, extent-level replication delta (VOPT-25, VOPT-26, VOPT-27)
-- [ ] 87-14-PLAN.md -- Online defragmentation + integration tests: background extent compaction within allocation groups, WAL-journaled, I/O budget; end-to-end tests covering all VOPT requirements at small (1MB) and large (1TB+) scales (VOPT-28)
+- [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
+- [ ] 87-02-PLAN.md -- ARC 3-tier cache: IArcCache, L1 AdaptiveReplacementCache (T1/T2/B1/B2, auto-sized from RAM), L2 mmap (zero-copy), L3 NVMe read cache (VOPT-03, VOPT-04, VOPT-05)
+- [ ] 87-03-PLAN.md -- Variable-width inodes: CompactInode64 (48B inline), ExtendedInode512 (xattrs, nanosecond ts, MVCC chain, encryption IV), MixedInodeAllocator auto-selection (VOPT-06, VOPT-07, VOPT-08, VOPT-10)
+- [ ] 87-04-PLAN.md -- Extent-based addressing: ExtentTreeNode B+tree on-disk format, ExtentTree with insert/lookup/split/merge, replaces indirect pointers (VOPT-09)
+- [ ] 87-05-PLAN.md -- Sub-block packing: SubBlockBitmap secondary bitmap, SubBlockPacker tail-merging small objects into shared blocks (VOPT-11)
+- [ ] 87-06-PLAN.md -- MVCC core: MvccTransaction with snapshot/read-write sets, MvccVersionStore in dedicated MVCC region, MvccManager transaction lifecycle (VOPT-12)
+- [ ] 87-07-PLAN.md -- MVCC GC + isolation: MvccGarbageCollector incremental vacuum, MvccIsolationEnforcer for ReadCommitted/Snapshot/Serializable with predicate locks (VOPT-13, VOPT-14)
+- [ ] 87-08-PLAN.md -- SQL OLTP: PreparedQueryCache (fingerprint-based LRU), MergeJoinExecutor on sorted scans, IndexOnlyScan with zone maps (VOPT-15)
+- [ ] 87-09-PLAN.md -- Columnar + zone maps: ColumnarEncoding (RLE/dictionary), ColumnarRegionEngine, ZoneMapIndex per-extent min/max/null_count (VOPT-16, VOPT-17)
+- [ ] 87-10-PLAN.md -- SIMD SQL + spill + pushdown: SimdAggregator (Vector256/Avx2 with scalar fallback), SpillToDiskOperator, PredicatePushdownPlanner (VOPT-18, VOPT-19, VOPT-20)
+- [ ] 87-11-PLAN.md -- Persistent tag index: RoaringBitmapTagIndex (array/bitmap/run containers, AND/OR/NOT), TagBloomFilter 1KB per allocation group (VOPT-21, VOPT-22)
+- [ ] 87-12-PLAN.md -- Per-extent encryption + compression: PerExtentEncryptor (AES-256-GCM, one IV per extent), PerExtentCompressor (Brotli with optional dictionary) (VOPT-23, VOPT-24)
+- [ ] 87-13-PLAN.md -- Hierarchical checksums: HierarchicalChecksumTree (XxHash64 + CRC32C + Merkle root), MerkleIntegrityVerifier with binary-search corruption localization (VOPT-25)
+- [ ] 87-14-PLAN.md -- Extent-aware CoW + replication delta: ExtentAwareCowManager (extent-level refcounting), ExtentDeltaReplicator (extent-granularity delta shipping) (VOPT-26, VOPT-27)
+- [ ] 87-15-PLAN.md -- Online defragmentation: DefragmentationPolicy, OnlineDefragmenter with I/O budgeting, WAL-journaled crash safety, free extent merging (VOPT-28)
 
 Wave structure:
 ```
-Wave 1: 87-01 (Allocation groups) + 87-02 (ARC L1) + 87-04 (Variable inodes) -- parallel, foundational
-Wave 2: 87-03 (ARC L2/L3) + 87-05 (Extent addressing) + 87-06 (MVCC core) + 87-11 (Roaring bitmaps) -- parallel, depends on Wave 1
-Wave 3: 87-07 (MVCC GC) + 87-08 (SQL OLTP) + 87-09 (SQL OLAP) + 87-12 (Per-extent crypto) -- parallel, depends on Wave 2
-Wave 4: 87-10 (SIMD SQL) + 87-13 (Checksums + CoW) -- parallel, depends on Wave 3
-Wave 5: 87-14 (Defrag + integration tests) -- depends on ALL prior waves
+Wave 1: 87-01 (Allocation groups) + 87-02 (ARC cache) + 87-03 (Variable inodes) -- parallel, foundational
+Wave 2: 87-04 (Extent tree) + 87-05 (Sub-block packing) + 87-06 (MVCC core) -- depends on Wave 1
+Wave 3: 87-07 (MVCC GC+isolation) + 87-08 (SQL OLTP) + 87-09 (Columnar+zone maps) -- depends on Wave 2
+Wave 4: 87-10 (SIMD+spill+pushdown) + 87-11 (Tag index) + 87-12 (Per-extent crypto) -- depends on Wave 3
+Wave 5: 87-13 (Checksums+Merkle) + 87-14 (CoW+replication) + 87-15 (Defrag) -- depends on Wave 4
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling
