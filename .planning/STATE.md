@@ -178,6 +178,7 @@
 - [Phase 87]: PreparedQueryCache LRU via LinkedList+Dictionary; SQL fingerprinting replaces literals with ?; MergeJoinExecutor buffers right duplicates for many-to-many; IndexOnlyScan reuses existing ZoneMapEntry (no duplicate struct)
 - [Phase 87]: SemaphoreSlim for MVCC version store block allocation; read-your-own-writes via WriteSet; Serializable conflict detection via committed write set tracking
 - [Phase 87]: ZoneMapEntry consolidated into ZoneMapIndex.cs; COLR/ZMAP block type tags added; 40-byte serialization with IEquatable
+- [Phase 87]: Embedded roaring bitmap with three container types (Array/Bitmap/Run) for zero external dependencies; XxHash64 golden ratio seeds for bloom filter
 
 ## Performance Metrics
 
@@ -322,7 +323,8 @@
 | Phase 87 P07 | 3min | 2 tasks | 2 files |
 | Phase 87 P08 | 6min | 2 tasks | 3 files |
 | Phase 87 P09 | 8min | 2 tasks | 4 files |
+| Phase 87 P11 | 5min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 87-09-PLAN.md
+- **Stopped At:** Completed 87-11-PLAN.md
