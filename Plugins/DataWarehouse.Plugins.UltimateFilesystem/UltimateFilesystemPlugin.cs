@@ -470,17 +470,33 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
 
     private bool DetectKernelBypassSupport()
     {
-        // Check for io_uring support on Linux
+        // Check for io_uring support on Linux (requires kernel >= 5.1)
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            // Check kernel version >= 5.1
             try
             {
-                var version = Environment.OSVersion.Version;
-                return version.Major >= 5 && version.Minor >= 1;
+                // Environment.OSVersion returns wrong values on Linux (.NET reports
+                // the compatibility layer version, not the actual kernel version).
+                // Parse /proc/version directly for the real kernel version.
+                // Example content: "Linux version 5.15.0-91-generic (buildd@...) ..."
+                var procVersion = System.IO.File.ReadAllText("/proc/version");
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    procVersion,
+                    @"Linux version (\d+)\.(\d+)");
+
+                if (match.Success
+                    && int.TryParse(match.Groups[1].Value, out var major)
+                    && int.TryParse(match.Groups[2].Value, out var minor))
+                {
+                    // io_uring was introduced in kernel 5.1
+                    return major > 5 || (major == 5 && minor >= 1);
+                }
+
+                return false;
             }
             catch
             {
+                // /proc/version may not be available (containers, unusual configs)
                 return false;
             }
         }
@@ -509,27 +525,73 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     /// </summary>
 
     #region Hierarchy StoragePluginBase Abstract Methods
+
+    // UltimateFilesystem uses block-level I/O via filesystem strategies (HandleReadAsync/HandleWriteAsync),
+    // not the key-based object storage model from StoragePluginBase. These abstract methods are required
+    // by StoragePluginBase but are not the intended API surface. Callers should use the filesystem.*
+    // message bus topics instead. Throwing NotSupportedException makes this contract explicit.
+
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// UltimateFilesystem uses block-level I/O. Use filesystem.write message bus topic instead.
+    /// </exception>
     public override Task<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
-        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow });
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Use the 'filesystem.write' message bus topic instead of StoreAsync.");
+
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// UltimateFilesystem uses block-level I/O. Use filesystem.read message bus topic instead.
+    /// </exception>
     public override Task<Stream> RetrieveAsync(string key, CancellationToken ct = default)
-        => Task.FromResult<Stream>(Stream.Null);
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Use the 'filesystem.read' message bus topic instead of RetrieveAsync.");
+
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// UltimateFilesystem uses block-level I/O. Use filesystem message bus topics instead.
+    /// </exception>
     public override Task DeleteAsync(string key, CancellationToken ct = default)
-        => Task.CompletedTask;
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Object-level delete is not supported; use filesystem-level operations.");
+
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// UltimateFilesystem uses block-level I/O. Use filesystem.detect message bus topic instead.
+    /// </exception>
     public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
-        => Task.FromResult(false);
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Use the 'filesystem.detect' message bus topic instead of ExistsAsync.");
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// UltimateFilesystem uses block-level I/O. Object-level listing is not supported.
+    /// Use the 'filesystem.list-strategies' message bus topic instead.
+    /// Yields no results to maintain the IAsyncEnumerable contract without throwing.
+    /// </remarks>
+#pragma warning disable CS1998 // Async method lacks 'await' operators
     public override async IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    { await Task.CompletedTask; yield break; }
+    {
+        yield break;
+    }
+#pragma warning restore CS1998
+
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// UltimateFilesystem uses block-level I/O. Use filesystem.metadata message bus topic instead.
+    /// </exception>
     public override Task<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default)
-        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow });
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Use the 'filesystem.metadata' message bus topic instead of GetMetadataAsync.");
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// GetHealthAsync is the one StoragePluginBase method that is meaningful for UltimateFilesystem,
+    /// as it reports the overall health of the filesystem subsystem rather than object-level state.
+    /// </remarks>
     public override Task<DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo> GetHealthAsync(CancellationToken ct = default)
-        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo { Status = DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy, LatencyMs = 0 });
+        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo
+        {
+            Status = DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy,
+            LatencyMs = 0,
+            Message = $"UltimateFilesystem: {_registry.Count} strategies registered, {_mountCache.Count} mounts active"
+        });
+
     #endregion
 
         protected override void Dispose(bool disposing)

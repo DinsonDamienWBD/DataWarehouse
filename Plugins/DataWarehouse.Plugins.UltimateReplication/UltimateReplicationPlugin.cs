@@ -832,8 +832,62 @@ namespace DataWarehouse.Plugins.UltimateReplication
 
         private async Task HandleSyncMessageAsync(PluginMessage message)
         {
-            // Handle sync operations
-            var response = new Dictionary<string, object> { ["success"] = true };
+            var response = new Dictionary<string, object>();
+
+            try
+            {
+                if (_activeStrategy == null)
+                {
+                    response["success"] = false;
+                    response["error"] = "No active replication strategy configured";
+                }
+                else
+                {
+                    var sourceNode = message.Payload.GetValueOrDefault("sourceNode")?.ToString() ?? _nodeId;
+                    var targetNodes = message.Payload.GetValueOrDefault("targetNodes") as IEnumerable<object>;
+                    var dataBase64 = message.Payload.GetValueOrDefault("data")?.ToString();
+
+                    if (targetNodes == null)
+                    {
+                        response["success"] = false;
+                        response["error"] = "Target nodes required for sync";
+                    }
+                    else
+                    {
+                        var data = !string.IsNullOrEmpty(dataBase64)
+                            ? Convert.FromBase64String(dataBase64)
+                            : Array.Empty<byte>();
+
+                        var targets = targetNodes.Select(t => t.ToString()!).ToArray();
+                        var startTime = DateTime.UtcNow;
+
+                        await _activeStrategy.ReplicateAsync(
+                            sourceNode,
+                            targets,
+                            data,
+                            message.Payload.Where(kv => kv.Key.StartsWith("meta."))
+                                   .ToDictionary(kv => kv.Key[5..], kv => kv.Value?.ToString() ?? ""),
+                            _cts?.Token ?? default);
+
+                        var elapsed = DateTime.UtcNow - startTime;
+                        Interlocked.Increment(ref _totalReplications);
+                        Interlocked.Add(ref _totalBytesReplicated, data.Length);
+
+                        response["success"] = true;
+                        response["sourceNode"] = sourceNode;
+                        response["targetNodes"] = targets;
+                        response["bytesSync"] = data.Length;
+                        response["elapsedMs"] = elapsed.TotalMilliseconds;
+                        response["strategy"] = _activeStrategy.Characteristics.StrategyName;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                response["success"] = false;
+                response["error"] = $"Sync failed: {ex.Message}";
+            }
+
             if (MessageBus != null)
             {
                 await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage

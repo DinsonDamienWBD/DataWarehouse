@@ -12,6 +12,16 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     /// In single-node mode there are no peers, so discovery returns empty and
     /// send operations throw because there are no peers to communicate with.
     /// </summary>
+    /// <remarks>
+    /// <para><b>DEV-ONLY / SINGLE-NODE:</b> This implementation is intended for development,
+    /// testing, and single-node deployments only. It does NOT provide real peer-to-peer
+    /// networking or gossip protocol functionality across multiple nodes.</para>
+    /// <para>For production multi-node deployments, replace with an implementation backed by
+    /// a real transport (e.g., gRPC, TCP, or QUIC) with actual peer discovery and gossip
+    /// protocol support (e.g., SWIM-based failure detection).</para>
+    /// <para><b>TODO (v6.0):</b> Provide a production IP2PNetwork implementation
+    /// backed by gRPC transport for real distributed communication.</para>
+    /// </remarks>
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryP2PNetwork : IP2PNetwork, IGossipProtocol
     {

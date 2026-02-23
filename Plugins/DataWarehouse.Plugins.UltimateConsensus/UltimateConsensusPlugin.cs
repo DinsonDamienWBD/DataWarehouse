@@ -111,9 +111,15 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
         _nodeId = $"consensus-{Guid.NewGuid():N}"[..24];
         _groupHash = new ConsistentHash(groupCount);
 
-        // SDK in-memory infrastructure for local/single-node mode.
+        // DEV-ONLY / SINGLE-NODE: InMemoryClusterMembership and InMemoryP2PNetwork are
+        // in-memory implementations suitable for development, testing, and single-node deployments.
         // InMemoryClusterMembership reports only the local node, so RaftConsensusEngine
-        // immediately wins elections (no peers to contact).
+        // immediately wins elections (no peers to contact). InMemoryP2PNetwork has no real
+        // transport — sends to peers will throw InvalidOperationException.
+        //
+        // TODO (v6.0): For production multi-node consensus, inject real IClusterMembership
+        // (e.g., etcd/Consul-backed) and IP2PNetwork (e.g., gRPC transport) implementations
+        // via constructor parameters or a service locator pattern.
         _membership = new InMemoryClusterMembership(_nodeId);
         _network = new InMemoryP2PNetwork();
 

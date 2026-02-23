@@ -12,6 +12,16 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     /// Always reports self as the only cluster member with Leader role.
     /// Suitable for single-node deployments with zero configuration.
     /// </summary>
+    /// <remarks>
+    /// <para><b>DEV-ONLY / SINGLE-NODE:</b> This implementation is intended for development,
+    /// testing, and single-node deployments only. It does NOT provide real cluster membership
+    /// discovery, failure detection, or multi-node coordination.</para>
+    /// <para>For production multi-node deployments, replace with an implementation backed by
+    /// a real membership protocol (e.g., SWIM, Serf, etcd, Consul, or Kubernetes endpoints).
+    /// See AD-05 for guidance on plugging in production infrastructure.</para>
+    /// <para><b>TODO (v6.0):</b> Provide a production IClusterMembership implementation
+    /// backed by etcd/Consul for real distributed cluster membership.</para>
+    /// </remarks>
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryClusterMembership : IClusterMembership
     {
