@@ -4,6 +4,7 @@
 - **Phase:** 86-adaptive-index-engine
 - **Plan:** 2/16
 - **Status:** IN PROGRESS
+- **Last Completed:** 86-01-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -157,6 +158,7 @@
 - [Phase 85]: Per-table SemaphoreSlim for serialized version increments; sorted lock acquisition for multi-table deadlock prevention; binary search for timestamp-to-version resolution; schema evolution validates backward compatibility
 - [Phase 86-02]: Be-tree Level 3 with epsilon=0.5; buffer capacity sqrt(maxEntries); timestamp-based message resolution; flush cascade partitions by child range; BoundedDictionary LRU node cache (2000); WAL-protected splits and flushes
 - [Phase 86]: BwTree generic TKey:IComparable<TKey> for reusability; epoch-based GC with per-thread tracking; Masstree big-endian 8-byte ulong slices for lexicographic order
+- [Phase 86-01]: IAdaptiveIndex extends IBTreeIndex with MorphToAsync/RecommendLevelAsync/LevelChanged; MorphLevel byte enum 7 values with [Description]; Node16 SSE2 SIMD; ART shrink thresholds 36/12/3; AdaptiveIndexEngine auto-morphs UP before insert, DOWN after delete; WAL morph markers via Checkpoint entry type
 
 ## Performance Metrics
 
@@ -281,7 +283,8 @@
 | Phase 85 P08 | 5min | 2 tasks | 3 files |
 | 86    | 02   | 5min     | 2     | 5     |
 | Phase 86 P09 | 9min | 2 tasks | 6 files |
+| 86    | 01   | 10min    | 2     | 8     |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T20:10:00Z
-- **Stopped At:** Completed 86-09-PLAN.md (Bw-Tree + Masstree)
+- **Timestamp:** 2026-02-24T20:15:00Z
+- **Stopped At:** Completed 86-01-PLAN.md (IAdaptiveIndex + Levels 0-2 + ART + Engine)
