@@ -66,6 +66,7 @@
 - [Phase 70-06]: GDPR parameter checks use empty-string value match (key existence only) for retention_policy and export_format; weighted scoring sum(passed.Weight)/sum(all.Weight)*100; grade A=90+ B=80+ C=70+ D=60+ F<60
 - [Phase 70]: Override store uses composite featureId:level keys with well-known __cascade_override__ persistence convention; resolution order: Enforce > user override > explicit > category default
 - [Phase 70-04]: Double-buffered VersionedPolicyCache with ImmutableDictionary+Interlocked.Exchange (CASC-06); CircularReferenceDetector walks redirect/inherit_from chains up to 20 hops (CASC-07); MergeConflictResolver per-tag-key MostRestrictive/Closest/Union with Closest default (CASC-08)
+- [Phase 70]: [Phase 70-05]: 63 xUnit tests verify all CASC-01 through CASC-08; InMemoryPolicyStore+InMemoryPolicyPersistence pattern for zero-mock testing
 
 ## Performance Metrics
 
@@ -117,7 +118,8 @@
 | 70    | 06   | 4min     | 2     | 2     |
 | Phase 70 P03 | 4min | 2 tasks | 2 files |
 | 70    | 04   | 4min     | 2     | 4     |
+| Phase 70 P05 | 11min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T11:07:51Z
-- **Stopped At:** Completed 70-04-PLAN.md (Safety mechanisms: cache, circular detection, merge conflict)
+- **Stopped At:** Completed 70-05-PLAN.md (cascade engine test suite)
