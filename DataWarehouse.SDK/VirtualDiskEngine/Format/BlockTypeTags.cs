@@ -111,13 +111,22 @@ public static class BlockTypeTags
     /// <summary>Extent tree node ("EXTN").</summary>
     public const uint EXTN = 0x4558544E;
 
+    // ── SQL / Analytics ─────────────────────────────────────────────────
+
+    /// <summary>Columnar region ("COLR").</summary>
+    public const uint COLR = 0x434F4C52;
+
+    /// <summary>Zone map index ("ZMAP").</summary>
+    public const uint ZMAP = 0x5A4D4150;
+
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
     {
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
-        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV, EXTN
+        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
+        COLR, ZMAP
     }.ToFrozenSet();
 
     /// <summary>
