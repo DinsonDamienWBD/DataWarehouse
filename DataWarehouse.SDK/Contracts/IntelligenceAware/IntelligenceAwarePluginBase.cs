@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts.Policy;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
@@ -53,7 +54,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// }
     /// </code>
     /// </example>
-    public abstract class IntelligenceAwarePluginBase : PluginBase, IIntelligenceAware, IIntelligenceAwareNotifiable, IFeaturePlugin
+    public abstract class IntelligenceAwarePluginBase : PluginBase, IIntelligenceAware, IIntelligenceAwareNotifiable, IFeaturePlugin, IAiHook
     {
         /// <summary>
         /// Default timeout for Intelligence discovery requests.
@@ -114,6 +115,35 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Subscriptions created for typed handlers (disposed on cleanup).
         /// </summary>
         private readonly List<IDisposable> _typedHandlerSubscriptions = new();
+
+        // ========================================
+        // IAiHook Implementation (SDKF-11)
+        // ========================================
+
+        /// <summary>
+        /// Observation emitter for this plugin. Sends metrics and anomalies to the AI pipeline.
+        /// Initialized during StartAsync when MessageBus is available.
+        /// </summary>
+        public ObservationEmitter Observations { get; private set; } = null!;
+
+        /// <summary>
+        /// Recommendation receiver for this plugin. Subscribes to AI policy recommendations.
+        /// Initialized eagerly — does not depend on MessageBus.
+        /// </summary>
+        public RecommendationReceiver Recommendations { get; private set; } = null!;
+
+        /// <summary>
+        /// Called when the AI pipeline has a recommendation for this plugin.
+        /// Override in derived classes to act on recommendations.
+        /// Default implementation is a no-op.
+        /// </summary>
+        /// <param name="recommendation">The policy recommendation from the AI pipeline.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A task representing the async operation.</returns>
+        public virtual Task OnRecommendationReceivedAsync(PolicyRecommendation recommendation, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
 
         /// <summary>
         /// Gets whether Universal Intelligence (T90) is currently available.
@@ -265,6 +295,10 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <param name="ct">Cancellation token.</param>
         public virtual async Task StartAsync(CancellationToken ct)
         {
+            // Initialize IAiHook members (SDKF-11)
+            Observations = new ObservationEmitter(Id, MessageBus);
+            Recommendations = new RecommendationReceiver(Id);
+
             // Subscribe to Intelligence topics first
             SubscribeToIntelligenceTopics();
 

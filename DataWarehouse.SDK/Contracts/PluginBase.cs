@@ -2,6 +2,7 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Contracts.Persistence;
+using DataWarehouse.SDK.Contracts.Policy;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Security;
@@ -85,6 +86,23 @@ namespace DataWarehouse.SDK.Contracts
         /// Override <see cref="CreateCustomStateStore"/> to supply a custom backend.
         /// </summary>
         protected IPluginStateStore? StateStore { get; private set; }
+
+        /// <summary>
+        /// Policy context providing access to the v6.0 Policy Engine.
+        /// Automatically available to all plugins. Null-safe — check <see cref="PolicyContext.IsAvailable"/>
+        /// before using. Set during kernel initialization; plugins do not set this themselves.
+        /// </summary>
+        protected PolicyContext PolicyContext { get; private set; } = PolicyContext.Empty;
+
+        /// <summary>
+        /// Called by the kernel to inject the policy context into this plugin.
+        /// Plugins should NOT call this directly.
+        /// </summary>
+        /// <param name="context">The policy context to inject, or null for empty context.</param>
+        public void SetPolicyContext(PolicyContext context)
+        {
+            PolicyContext = context ?? PolicyContext.Empty;
+        }
 
         /// <summary>
         /// Tracked bounded collections for automatic disposal when this plugin is disposed.
