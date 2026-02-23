@@ -88,6 +88,8 @@
 - [Phase 73]: ComputeCodeCache hex-encoded SHA-256 Dictionary keys for O(1) lookup; Snapshot tombstone deletion preserves parent-child chains; GetSnapshotChain cycle detection via HashSet
 - [Phase 73-03]: AuditLogEntry 86B fixed + variable Details; SHA-256 chain via serialized previous entry; ConsensusGroupState 89B fixed; no truncation API on AuditLogRegion
 - [Phase 73-04]: CompressionDictEntry 68B fixed; flat array[256] for O(1) DictId lookup; MetricsLogRegion auto-compacts raw samples into 1-min average windows; AnonymizationTableRegion EraseSubject zeros PiiHash+AnonymizedToken; MTRK tag shared with IntegrityTreeRegion
+- [Phase 73]: VdeSeparationManager: role-based VDE assignment with priority routing; IsSeparated checks multi-VDE multi-role; GenerateCrossReferences maps VdeRole to VdeReference.ReferenceType
+- [Phase 73]: VdeFederationRegion: Haversine geo-routing (6371km Earth radius); bidirectional prefix namespace match; ResolveNamespace orders by local-region, latency, status
 
 ## Performance Metrics
 
@@ -155,7 +157,8 @@
 | Phase 73 P02 | 3min | 2 tasks | 2 files |
 | 73    | 03   | 4min     | 2     | 2     |
 | 73    | 04   | 4min     | 2     | 3     |
+| Phase 73 P05 | 4min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T13:00:14Z
-- **Stopped At:** Completed 73-04-PLAN.md (Compression Dictionary + Metrics Log + Anonymization Table)
+- **Stopped At:** Completed 73-05-PLAN.md (VDE Separation Manager + Federation Region)
