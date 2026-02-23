@@ -147,6 +147,7 @@
 - [Phase 84-03]: GUI mode-selection page (Connect/Live/Install) with topology sub-selection; VDE Composer 4-step wizard (19 modules grouped by category); TopologyPreview ASCII diagrams; manual query string parsing for MAUI compatibility
 - [Phase 84]: [Phase 84-04]: Non-fatal shell registration for VDE topologies; PowerShell EncodedCommand for Windows HKCU; direct File.WriteAllText for Linux/macOS
 - [Phase 84-06]: 51 integration tests (24 topology + 17 VDE composer + 10 shell registration); source analysis for CLI stub verification; VDE create/inspect round-trip; all 3 topologies and 19 modules covered
+- [Phase 85]: ZeroCopyBlockReader uses managed byte[] from MemoryMappedViewAccessor (no direct Memory<byte> API); VdeBlockExportPath auto-fallback for encrypted regions
 
 ## Performance Metrics
 
@@ -262,7 +263,8 @@
 | Phase 84 P04 | 5min | 2 tasks | 2 files |
 | 84    | 03   | 5min     | 2     | 3     |
 | 84    | 06   | 8min     | 2     | 3     |
+| Phase 85 P01 | 5min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T19:02:00Z
-- **Stopped At:** Completed 84-06-PLAN.md (deployment mode integration tests) - Phase 84 COMPLETE
+- **Stopped At:** Completed 85-01-PLAN.md (VDE-native block export)
