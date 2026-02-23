@@ -183,6 +183,7 @@
 - [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
 - [Phase 87]: Bitmap-based free extent merging; WAL crash recovery replays uncommitted BlockWrite entries; Background priority throttles near budget limit
 - [Phase 87]: Leaf hashes use SHA256(XxHash64 bytes) for consistent 32-byte Merkle nodes; 48-byte node format; BFS serialization
+- [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
 
 ## Performance Metrics
 
@@ -332,7 +333,8 @@
 | Phase 87 P12 | 7min | 1 tasks | 2 files |
 | Phase 87 P15 | 4min | 1 tasks | 2 files |
 | Phase 87 P13 | 6min | 2 tasks | 2 files |
+| Phase 87 P14 | 7min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 87-13-PLAN.md
+- **Stopped At:** Completed 87-14-PLAN.md
