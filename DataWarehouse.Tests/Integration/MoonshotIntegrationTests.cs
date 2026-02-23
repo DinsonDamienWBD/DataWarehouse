@@ -67,7 +67,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void PluginExistsAndCompiles(string pluginDirName)
@@ -89,7 +89,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void PluginRegistersCapabilities(string pluginDirName)
@@ -115,7 +115,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void PluginSubscribesToBus(string pluginDirName)
@@ -143,7 +143,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void PluginPublishesToBus(string pluginDirName)
@@ -168,7 +168,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void PluginReferencesOnlySDK(string pluginDirName)
@@ -340,7 +340,7 @@ public class MoonshotIntegrationTests
     [InlineData("DataWarehouse.Plugins.UltimateCompliance")]
     [InlineData("DataWarehouse.Plugins.TamperProof")]
     [InlineData("DataWarehouse.Plugins.SemanticSync")]
-    [InlineData("DataWarehouse.Plugins.ChaosVaccination")]
+    [InlineData("DataWarehouse.Plugins.UltimateResilience")]  // ChaosVaccination consolidated (Phase 65.5-12)
     [InlineData("DataWarehouse.Plugins.UltimateSustainability")]
     [InlineData("DataWarehouse.Plugins.UniversalFabric")]
     public void AllMoonshotsHaveHealthCheck(string pluginDirName)

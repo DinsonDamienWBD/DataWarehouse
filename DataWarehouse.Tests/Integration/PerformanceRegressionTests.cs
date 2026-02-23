@@ -72,8 +72,8 @@ public class PerformanceRegressionTests
             "solution project discovery should complete within 10 seconds (actual: {0:F2}s for {1} projects)",
             sw.Elapsed.TotalSeconds, projectPaths.Count);
 
-        existingProjects.Count.Should().BeGreaterThanOrEqualTo(70,
-            "solution should contain at least 70 discoverable projects");
+        existingProjects.Count.Should().BeGreaterThanOrEqualTo(55,
+            "solution should contain at least 55 discoverable projects (post-consolidation)");
     }
 
     /// <summary>
@@ -264,9 +264,9 @@ public class PerformanceRegressionTests
             "Exceeding this threshold suggests uncontrolled project growth.",
             projectCount);
 
-        // Also verify we haven't lost projects -- should still have at least 70
-        projectCount.Should().BeGreaterThanOrEqualTo(70,
-            "solution should contain at least 70 projects (actual: {0}). " +
+        // Also verify we haven't lost projects -- should still have at least 55 (post-consolidation: 65→53 plugins)
+        projectCount.Should().BeGreaterThanOrEqualTo(55,
+            "solution should contain at least 55 projects (actual: {0}). " +
             "Fewer suggests accidental project removal.",
             projectCount);
     }
@@ -286,12 +286,12 @@ public class PerformanceRegressionTests
         var pluginDirs = Directory.GetDirectories(pluginsDir, "DataWarehouse.Plugins.*");
         var pluginCount = pluginDirs.Length;
 
-        // Lower bound: at least 60 plugins (we know we have 66)
-        pluginCount.Should().BeGreaterThanOrEqualTo(60,
-            "should have at least 60 plugins (actual: {0})", pluginCount);
+        // Lower bound: at least 50 plugins (post-consolidation: 65→53 plugins)
+        pluginCount.Should().BeGreaterThanOrEqualTo(50,
+            "should have at least 50 plugins (actual: {0})", pluginCount);
 
         // Upper bound: fewer than 150 plugins
-        // Current: 66. This catches uncontrolled plugin proliferation.
+        // Current: 53. This catches uncontrolled plugin proliferation.
         pluginCount.Should().BeLessThan(150,
             "should have fewer than 150 plugins (actual: {0}). " +
             "Exceeding this suggests uncontrolled plugin growth.",

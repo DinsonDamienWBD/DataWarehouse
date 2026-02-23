@@ -146,7 +146,7 @@ public class BuildHealthTests
     }
 
     [Fact]
-    public void SlnxFile_ShouldContainAtLeast70Projects()
+    public void SlnxFile_ShouldContainAtLeast53Projects()
     {
         // Arrange
         var slnxPath = Path.Combine(SolutionRoot, "DataWarehouse.slnx");
@@ -155,9 +155,9 @@ public class BuildHealthTests
         // Act: count all Project elements
         var projectCount = slnxContent.Descendants("Project").Count();
 
-        // Assert
-        projectCount.Should().BeGreaterThanOrEqualTo(70,
-            $"solution should contain at least 70 projects but found {projectCount}. " +
+        // Assert — 65→53 plugins after Phase 65.5 consolidation (12 plugins merged)
+        projectCount.Should().BeGreaterThanOrEqualTo(53,
+            $"solution should contain at least 53 projects but found {projectCount}. " +
             "Ensure all plugin and infrastructure projects are included in DataWarehouse.slnx.");
     }
 }

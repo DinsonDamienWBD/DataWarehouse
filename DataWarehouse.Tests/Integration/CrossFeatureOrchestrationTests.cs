@@ -237,7 +237,7 @@ public class CrossFeatureOrchestrationTests
     public void ChaosInjectionDoesNotBypassTimeLocks()
     {
         // Chaos vaccination should not directly modify time-locked storage
-        var chaosDir = RequirePluginDir("UltimateResilience");  // ChaosVaccination consolidated (Phase 65.5-12)
+        var chaosDir = RequirePluginDir("ChaosVaccination");  // Maps to UltimateResilience (Phase 65.5-12)
 
         var sourceFiles = GetCsFiles(chaosDir);
         var allContent = CombineFileContents(sourceFiles);
