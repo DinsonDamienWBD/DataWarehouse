@@ -98,7 +98,7 @@ public class PluginSmokeTests : IDisposable
         new object[] { "UltimateInterface", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateInterface.UltimateInterfacePlugin()), "interface" },
         // FuseDriver consolidated into UltimateFilesystem (Phase 65.5-11)
         // KubernetesCsi consolidated into UltimateStorage (Phase 65.5-11)
-        new object[] { "UniversalDashboards", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalDashboards.UniversalDashboardsPlugin()), "dashboard" },
+        // UniversalDashboards consolidated into UltimateInterface (Phase 82-02)
 
         // === Orchestration Plugins ===
         new object[] { "UltimateWorkflow", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateWorkflow.UltimateWorkflowPlugin()), "workflow" },

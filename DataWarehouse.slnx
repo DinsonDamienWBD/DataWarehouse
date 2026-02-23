@@ -69,7 +69,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStreamingData/DataWarehouse.Plugins.UltimateStreamingData.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateSustainability/DataWarehouse.Plugins.UltimateSustainability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateWorkflow/DataWarehouse.Plugins.UltimateWorkflow.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.UniversalDashboards/DataWarehouse.Plugins.UniversalDashboards.csproj" />
+    <!-- UniversalDashboards merged into UltimateInterface (Phase 82-02) -->
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalFabric/DataWarehouse.Plugins.UniversalFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
   </Folder>

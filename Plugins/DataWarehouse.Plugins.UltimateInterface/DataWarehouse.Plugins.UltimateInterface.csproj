@@ -7,4 +7,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Dashboard export capabilities (migrated from UniversalDashboards, Phase 82-02) -->
+    <PackageReference Include="QuestPDF" Version="2025.12.4" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+  </ItemGroup>
 </Project>

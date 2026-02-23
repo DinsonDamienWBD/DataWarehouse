@@ -1093,8 +1093,8 @@
       },
       "LiteDB": {
         "type": "Transitive",
-        "resolved": "5.0.21",
-        "contentHash": "ykJ7ffFl7P9YQKR/PLci6zupiLrsSCNkOTiw6OtzntH7d2kCYp5L1+3a/pksKgTEHcJBoPXFtg7VZSGVBseN9w=="
+        "resolved": "5.0.20",
+        "contentHash": "/tUhRpJvx1sXJni7cbXPpctFHH1vifoJlg/QB+Cw22IYWqzbC3MAMOy/11limMHmZSPk6NU6JRA+lwqLy2f1Xw=="
       },
       "LiteDB.Async": {
         "type": "Transitive",
@@ -2216,11 +2216,6 @@
         "resolved": "3.27.3",
         "contentHash": "iWTlBj1RPY6cOJqFUX7W1vwZOTjpUWEpTsddniIoOy2vqAL8UnGI56q28eHPwGwAPyERctbG4no1P+fblPQHHg=="
       },
-      "QRCoder": {
-        "type": "Transitive",
-        "resolved": "1.6.0",
-        "contentHash": "XmPA81eo+oRxBuyVdswsSkTGTE1d3thfF11Z1PdD7oB56A6HU4G4AAOdySmGRMb/cljwlFTMWUtosGEnwpS6GA=="
-      },
       "QuestPDF": {
         "type": "Transitive",
         "resolved": "2025.12.4",
@@ -2736,12 +2731,6 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )"
         }
       },
-      "datawarehouse.plugins.adaptivetransport": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
       "datawarehouse.plugins.aedscore": {
         "type": "Project",
         "dependencies": {
@@ -2751,64 +2740,7 @@
           "MQTTnet": "[5.1.0.1559, )"
         }
       },
-      "datawarehouse.plugins.airgapbridge": {
-        "type": "Project",
-        "dependencies": {
-          "BouncyCastle.Cryptography": "[2.6.2, )",
-          "DataWarehouse.SDK": "[1.0.0, )",
-          "LiteDB": "[5.0.21, )",
-          "QRCoder": "[1.6.0, )"
-        }
-      },
-      "datawarehouse.plugins.appplatform": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.chaosvaccination": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.compute.wasm": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.datamarketplace": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.fusedriver": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.kubernetescsi": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
       "datawarehouse.plugins.pluginmarketplace": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.raft": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
-      "datawarehouse.plugins.selfemulatingobjects": {
         "type": "Project",
         "dependencies": {
           "DataWarehouse.SDK": "[1.0.0, )"
@@ -2978,12 +2910,6 @@
           "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
-      "datawarehouse.plugins.ultimatedatafabric": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
-        }
-      },
       "datawarehouse.plugins.ultimatedataformat": {
         "type": "Project",
         "dependencies": {
@@ -3117,7 +3043,9 @@
       "datawarehouse.plugins.ultimateinterface": {
         "type": "Project",
         "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
+          "DataWarehouse.SDK": "[1.0.0, )",
+          "QuestPDF": "[2025.12.4, )",
+          "SkiaSharp": "[3.119.2, )"
         }
       },
       "datawarehouse.plugins.ultimateiotintegration": {
@@ -3280,14 +3208,6 @@
           "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
-      "datawarehouse.plugins.universaldashboards": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )",
-          "QuestPDF": "[2025.12.4, )",
-          "SkiaSharp": "[3.119.2, )"
-        }
-      },
       "datawarehouse.plugins.universalfabric": {
         "type": "Project",
         "dependencies": {
@@ -3309,12 +3229,6 @@
           "Prometheus-net": "[8.2.1, )",
           "Serilog": "[4.3.1, )",
           "StatsdClient": "[3.0.86, )"
-        }
-      },
-      "datawarehouse.plugins.virtualization.sqloverobject": {
-        "type": "Project",
-        "dependencies": {
-          "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
       "datawarehouse.sdk": {
