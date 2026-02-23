@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 72-vde-regions-foundation
-- **Plan:** 2/5 (72-02 complete)
+- **Plan:** 3/5 (72-03 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -12,7 +12,7 @@
 - Phase 69: COMPLETE (5/5 plans, policy persistence + marketplace)
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
 - Phase 71: COMPLETE (6/6 plans, 23 format files, VDE v2.0 creator operational)
-- Phase 72: 2/5 plans complete (72-01, 72-02)
+- Phase 72: 3/5 plans complete (72-01, 72-02, 72-03)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -80,6 +80,7 @@
 - [Phase 71-06]: Module region default size 64 blocks; WalHeader 82 bytes with alignment padding; Metadata WAL 0.5%/min 64, Data WAL 1%/min 128
 - [Phase 72-01]: PolicyDefinition is class (variable-length Data); KeySlot zero-pads WrappedKey/KeySalt for deterministic layout; FixedTimeEquals for HMAC comparison; rotation log keeps most recent N events from remaining block 1 space
 - [Phase 72]: [Phase 72-02]: 1-indexed heap Merkle tree; stackalloc hoisted for CA2014; ZeroChildrenHash pre-computed; VerifyProof static for lightweight clients
+- [Phase 72]: Bloom filter 8192-bit/5-hash XxHash64; NOT updated on Remove (rebuilt on Serialize); compound keys use 0x00 separator; BFS one-block-per-node serialization
 
 ## Performance Metrics
 
@@ -140,7 +141,8 @@
 | 71    | 06   | 5min     | 2     | 4     |
 | 72    | 01   | 4min     | 2     | 2     |
 | Phase 72 P02 | 3min | 1 tasks | 1 files |
+| Phase 72 P03 | 4min | 1 tasks | 1 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T12:19:21Z
-- **Stopped At:** Completed 72-02-PLAN.md (Integrity Tree Region)
+- **Stopped At:** Completed 72-03-PLAN.md (Tag Index Region)
