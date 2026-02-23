@@ -1,86 +1,73 @@
-using DataWarehouse.Plugins.Compute.Wasm;
-using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.UltimateCompute;
+using DataWarehouse.SDK.Contracts.Compute;
 using Xunit;
 
 namespace DataWarehouse.Tests.Plugins;
 
 /// <summary>
-/// Tests for WASM Compute plugin.
-/// Validates plugin identity, supported features, and WASM module structure.
+/// Tests for WasmInterpreterStrategy (consolidated from Compute.Wasm plugin).
+/// Validates strategy identity, capabilities, and runtime type.
 /// </summary>
 [Trait("Category", "Unit")]
-[Trait("Plugin", "ComputeWasm")]
+[Trait("Plugin", "UltimateCompute")]
 public class ComputeWasmTests
 {
     [Fact]
-    public void WasmComputePlugin_CanBeConstructed()
+    public void WasmInterpreterStrategy_IsDiscoveredByRegistry()
     {
+        // Arrange
+        var registry = new ComputeRuntimeStrategyRegistry();
+
         // Act
-        var plugin = new WasmComputePlugin();
+        var count = registry.DiscoverStrategies(typeof(UltimateComputePlugin).Assembly);
 
         // Assert
-        Assert.NotNull(plugin);
+        Assert.True(count > 0);
+        var strategy = registry.GetStrategy("compute.wasm.interpreter");
+        Assert.NotNull(strategy);
     }
 
     [Fact]
-    public void WasmComputePlugin_HasCorrectIdentity()
+    public void WasmInterpreterStrategy_HasCorrectIdentity()
     {
         // Arrange
-        var plugin = new WasmComputePlugin();
+        var registry = new ComputeRuntimeStrategyRegistry();
+        registry.DiscoverStrategies(typeof(UltimateComputePlugin).Assembly);
 
-        // Assert
-        Assert.Equal("com.datawarehouse.compute.wasm", plugin.Id);
-        Assert.Equal("WASM Compute-on-Storage", plugin.Name);
-        Assert.Equal("1.0.0", plugin.Version);
-    }
-
-    [Fact]
-    public void WasmComputePlugin_CategoryIsDataTransformationProvider()
-    {
-        // Arrange
-        var plugin = new WasmComputePlugin();
-
-        // Assert
-        Assert.Equal(PluginCategory.DataTransformationProvider, plugin.Category);
-    }
-
-    [Fact]
-    public void WasmComputePlugin_SupportedFeatures_ContainsExpectedCapabilities()
-    {
-        // Arrange
-        var plugin = new WasmComputePlugin();
-
-        // Assert
-        Assert.NotNull(plugin.SupportedFeatures);
-        Assert.Contains("bulk-memory", plugin.SupportedFeatures);
-        Assert.Contains("simd", plugin.SupportedFeatures);
-        Assert.Contains("multi-value", plugin.SupportedFeatures);
-    }
-
-    [Fact]
-    public void WasmComputePlugin_MaxConcurrentExecutions_IsPositive()
-    {
-        // Arrange
-        var plugin = new WasmComputePlugin();
-
-        // Assert
-        Assert.True(plugin.MaxConcurrentExecutions > 0);
-        Assert.Equal(100, plugin.MaxConcurrentExecutions);
-    }
-
-    [Fact]
-    public void WasmModule_CanBeCreated_WithDefaults()
-    {
         // Act
-        var module = new WasmModule();
+        var strategy = registry.GetStrategy("compute.wasm.interpreter");
 
         // Assert
-        Assert.NotNull(module);
-        Assert.Equal(string.Empty, module.FunctionId);
-        Assert.Empty(module.RawBytes);
-        Assert.Empty(module.Types);
-        Assert.Empty(module.Imports);
-        Assert.Empty(module.Exports);
-        Assert.Empty(module.Code);
+        Assert.NotNull(strategy);
+        Assert.Equal(ComputeRuntime.WASM, strategy!.Runtime);
+    }
+
+    [Fact]
+    public void WasmInterpreterStrategy_HasSandboxingCapability()
+    {
+        // Arrange
+        var registry = new ComputeRuntimeStrategyRegistry();
+        registry.DiscoverStrategies(typeof(UltimateComputePlugin).Assembly);
+
+        // Act
+        var strategy = registry.GetStrategy("compute.wasm.interpreter");
+
+        // Assert
+        Assert.NotNull(strategy);
+        Assert.True(strategy!.Capabilities.SupportsSandboxing);
+    }
+
+    [Fact]
+    public void WasmInterpreterStrategy_RuntimeIsWasm()
+    {
+        // Arrange
+        var registry = new ComputeRuntimeStrategyRegistry();
+        registry.DiscoverStrategies(typeof(UltimateComputePlugin).Assembly);
+
+        // Act
+        var strategies = registry.GetStrategiesByRuntime(ComputeRuntime.WASM);
+
+        // Assert - should include interpreter among WASM strategies
+        Assert.Contains(strategies, s => s is ComputeRuntimeStrategyBase b && b.StrategyId == "compute.wasm.interpreter");
     }
 }

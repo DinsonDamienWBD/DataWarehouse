@@ -20,10 +20,7 @@
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
     <Project Path="Plugins/DataWarehouse.Plugins.AedsCore/DataWarehouse.Plugins.AedsCore.csproj" />
-
-
     <Project Path="Plugins/DataWarehouse.Plugins.PluginMarketplace/DataWarehouse.Plugins.PluginMarketplace.csproj" />
-
     <Project Path="Plugins/DataWarehouse.Plugins.SemanticSync/DataWarehouse.Plugins.SemanticSync.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
@@ -75,7 +72,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalDashboards/DataWarehouse.Plugins.UniversalDashboards.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalFabric/DataWarehouse.Plugins.UniversalFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
-
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />

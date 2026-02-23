@@ -142,17 +142,13 @@ public class StrategyRegistryTests
     /// </summary>
     private static readonly HashSet<string> InfrastructurePlugins = new(StringComparer.OrdinalIgnoreCase)
     {
-        "AdaptiveTransport",
+        // AdaptiveTransport consolidated into UltimateStreamingData (Phase 65.5-12)
         "AedsCore",
-        "AirGapBridge",
+        // AirGapBridge consolidated into UltimateDataTransit (Phase 65.5-12)
         "AppPlatform",
-        "Compute.Wasm",
-        "DataMarketplace",
-        "FuseDriver",
         "KubernetesCsi",
         "PluginMarketplace",
         "Raft",
-        "SelfEmulatingObjects",
         "TamperProof",
         "UltimateBlockchain",
         "UltimateConsensus",
@@ -161,7 +157,6 @@ public class StrategyRegistryTests
         "UltimateInterface",
         "UniversalFabric",
         "Virtualization.SqlOverObject",
-        "WinFspDriver",
         // Transcoding.Media uses self-contained codec strategies instantiated directly by the
         // transcoding execution engine, not via the standard DiscoverAndRegister pattern.
         "Transcoding.Media",

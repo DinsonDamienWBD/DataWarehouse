@@ -1,131 +1,81 @@
-using System.Reflection;
+using DataWarehouse.Plugins.UltimateFilesystem;
+using DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 using Xunit;
 
 namespace DataWarehouse.Tests.Plugins;
 
 /// <summary>
-/// Tests for WinFspDriver plugin via reflection since it targets net10.0-windows
-/// and cannot be directly referenced from the cross-platform test project.
+/// Tests for WindowsWinFspFilesystemStrategy (consolidated from WinFspDriver plugin).
+/// Validates strategy identity, capabilities, and detection behavior.
 /// </summary>
 [Trait("Category", "Unit")]
+[Trait("Plugin", "UltimateFilesystem")]
 public class WinFspDriverTests
 {
-    private static Assembly? LoadWinFspAssembly()
+    [Fact]
+    public void WindowsWinFspFilesystemStrategy_CanBeConstructed()
     {
-        try
-        {
-            return Assembly.Load("DataWarehouse.Plugins.WinFspDriver");
-        }
-        catch
-        {
-            return null;
-        }
+        // Act
+        var strategy = new WindowsWinFspFilesystemStrategy();
+
+        // Assert
+        Assert.NotNull(strategy);
     }
 
     [Fact]
-    public void WinFspDriverPlugin_AssemblyExists()
+    public void WindowsWinFspFilesystemStrategy_HasCorrectIdentity()
     {
-        // Verify the WinFspDriver plugin assembly is built and contains expected types
-        var assemblyPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "..",
-            "Plugins", "DataWarehouse.Plugins.WinFspDriver");
-        var csprojPath = Path.Combine(assemblyPath, "DataWarehouse.Plugins.WinFspDriver.csproj");
+        // Arrange
+        var strategy = new WindowsWinFspFilesystemStrategy();
 
-        // The csproj must exist even if we can't load the assembly cross-platform
-        Assert.True(File.Exists(csprojPath) || true,
-            "WinFspDriver csproj should exist in plugin directory");
+        // Assert
+        Assert.Equal("driver-windows-winfsp", strategy.StrategyId);
+        Assert.Equal("Windows WinFSP Driver", strategy.DisplayName);
     }
 
     [Fact]
-    public void WinFspDriverPlugin_SourceContainsPluginClass()
+    public void WindowsWinFspFilesystemStrategy_CategoryIsVirtual()
     {
-        // Verify via source file presence that the plugin class exists
-        var assemblyPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "..",
-            "Plugins", "DataWarehouse.Plugins.WinFspDriver",
-            "WinFspDriverPlugin.cs");
+        // Arrange
+        var strategy = new WindowsWinFspFilesystemStrategy();
 
-        // If we can find the source, verify it has the expected class structure
-        if (File.Exists(assemblyPath))
-        {
-            var content = File.ReadAllText(assemblyPath);
-            Assert.Contains("class WinFspDriverPlugin", content);
-            Assert.Contains("com.datawarehouse.filesystem.winfsp", content);
-            Assert.Contains("WinFSP Filesystem Driver", content);
-        }
-        else
-        {
-            // In CI/deployed environments, verify via reflection if available
-            var assembly = LoadWinFspAssembly();
-            if (assembly != null)
-            {
-                var pluginType = assembly.GetType("DataWarehouse.Plugins.WinFspDriver.WinFspDriverPlugin");
-                Assert.NotNull(pluginType);
-            }
-        }
+        // Assert
+        Assert.Equal(FilesystemStrategyCategory.Virtual, strategy.Category);
     }
 
     [Fact]
-    public void WinFspDriverPlugin_HasExpectedComponents()
+    public void WindowsWinFspFilesystemStrategy_HasCorrectCapabilities()
     {
-        var basePath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "..",
-            "Plugins", "DataWarehouse.Plugins.WinFspDriver");
+        // Arrange
+        var strategy = new WindowsWinFspFilesystemStrategy();
 
-        // Verify key source files exist for the plugin
-        var expectedFiles = new[]
-        {
-            "WinFspDriverPlugin.cs",
-            "WinFspConfig.cs",
-            "OfflineFilesManager.cs",
-            "ThumbnailProvider.cs",
-            "VssProvider.cs"
-        };
-
-        foreach (var file in expectedFiles)
-        {
-            var filePath = Path.Combine(basePath, file);
-            if (File.Exists(filePath))
-            {
-                var content = File.ReadAllText(filePath);
-                Assert.False(string.IsNullOrWhiteSpace(content),
-                    $"{file} should not be empty");
-            }
-        }
-
-        // At minimum, confirm this is not a placeholder test
-        Assert.NotEqual("placeholder", "real test");
+        // Assert
+        Assert.True(strategy.Capabilities.SupportsDirectIo);
+        Assert.True(strategy.Capabilities.SupportsAsyncIo);
+        Assert.True(strategy.Capabilities.SupportsMmap);
+        Assert.True(strategy.Capabilities.SupportsAutoDetect);
     }
 
     [Fact]
-    public void WinFspConfig_HasDefaultFactory()
+    public void WindowsWinFspFilesystemStrategy_HasSemanticDescription()
     {
-        var basePath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "..",
-            "Plugins", "DataWarehouse.Plugins.WinFspDriver",
-            "WinFspConfig.cs");
+        // Arrange
+        var strategy = new WindowsWinFspFilesystemStrategy();
 
-        if (File.Exists(basePath))
-        {
-            var content = File.ReadAllText(basePath);
-            Assert.Contains("Default", content);
-            Assert.Contains("WinFspConfig", content);
-        }
-        else
-        {
-            // In deployed environments, verify via reflection
-            var assembly = LoadWinFspAssembly();
-            if (assembly != null)
-            {
-                var configType = assembly.GetType("DataWarehouse.Plugins.WinFspDriver.WinFspConfig");
-                Assert.NotNull(configType);
-                var defaultProp = configType!.GetProperty("Default", BindingFlags.Public | BindingFlags.Static);
-                Assert.NotNull(defaultProp);
-            }
-        }
+        // Assert
+        Assert.Contains("WinFSP", strategy.SemanticDescription);
+        Assert.Contains("Windows", strategy.SemanticDescription);
+    }
+
+    [Fact]
+    public void WindowsWinFspFilesystemStrategy_HasTags()
+    {
+        // Arrange
+        var strategy = new WindowsWinFspFilesystemStrategy();
+
+        // Assert
+        Assert.Contains("winfsp", strategy.Tags);
+        Assert.Contains("windows", strategy.Tags);
+        Assert.Contains("ntfs", strategy.Tags);
     }
 }
