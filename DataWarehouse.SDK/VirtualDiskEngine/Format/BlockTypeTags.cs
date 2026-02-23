@@ -103,13 +103,18 @@ public static class BlockTypeTags
     /// <summary>Module log ("MLOG").</summary>
     public const uint MLOG = 0x4D4C4F47;
 
+    // ── Identity & Recovery ─────────────────────────────────────────────
+
+    /// <summary>Emergency Recovery ("ERCV").</summary>
+    public const uint ERCV = 0x45524356;
+
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
     {
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
-        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG
+        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV
     }.ToFrozenSet();
 
     /// <summary>
