@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 88-dynamic-subsystem-scaling
-- **Plan:** 3/14
+- **Plan:** 5/14
 - **Status:** IN PROGRESS
-- **Last Completed:** 88-03-PLAN.md
+- **Last Completed:** 88-05-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -187,6 +187,8 @@
 - [Phase 88]: BoundedCache uses ReaderWriterLockSlim; ARC ghost lists key-only capped at MaxEntries; 256B/entry auto-size heuristic; TTL cleanup at max(TTL/4, 1s)
 - [Phase 88-03]: Using alias for ambiguous CircuitBreakerOpenException (Contracts vs InMemory); BackpressureState Normal/Warning/Critical at 50%/80% bulkhead utilization; Lamport CAS for distributed CB state; EMA alpha=0.3 for adaptive thresholds
 - [Phase 88]: InternalBlock shadow index retained for fast audit chain traversal; SegmentedBlockStore is authoritative persistence
+- [Phase 88]: FNV-1a hash for stable partition routing; ring buffer fallback to ConcurrentQueue for no-data-loss; WAL length-prefix binary format; backpressure 70%/85%/95% thresholds
+- [Phase 88-05]: Length-prefix binary format for segment entries; ConsensusScalingManager independent of MultiRaftManager to avoid coupling; BoundedCache TTL for connection pool idle timeout; P99 RTT sliding window for adaptive election timeouts
 
 ## Performance Metrics
 
@@ -340,7 +342,8 @@
 | Phase 88 P01 | 4min | 2 tasks | 4 files |
 | Phase 88 P03 | 8min | 2 tasks | 2 files |
 | Phase 88 P04 | 6min | 2 tasks | 3 files |
+| Phase 88 P06 | 6min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T22:24:40Z
-- **Stopped At:** Completed 88-03-PLAN.md
+- **Stopped At:** Completed 88-06-PLAN.md
