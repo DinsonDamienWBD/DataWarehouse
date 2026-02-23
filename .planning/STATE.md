@@ -2,8 +2,8 @@
 
 ## Current Position
 - **Phase:** 79-file-extension-os-integration
-- **Plan:** 3/4 (79-01, 79-02, 79-03 complete)
-- **Status:** IN PROGRESS
+- **Plan:** 4/4 (79-01, 79-02, 79-03, 79-04 complete)
+- **Status:** COMPLETE
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -19,7 +19,7 @@
 - Phase 76: COMPLETE (5/5 plans, materialized cache + bloom filter + delegate compiler + fast-path engine + simulation sandbox)
 - Phase 77: COMPLETE (5/5 plans, hybrid autonomy + self-mod guard + factory)
 - Phase 78: COMPLETE (5/5 plans, online module addition with WAL, defrag, indirection)
-- Phase 79: 3/4 plans complete (79-01, 79-02, 79-03)
+- Phase 79: COMPLETE (4/4 plans, MIME type + content detection + OS integration + import engine)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -122,6 +122,7 @@
 - [Phase 79-01]: DWVD MIME type application/vnd.datawarehouse.dwvd; 5-step content detection (magic->version->namespace->flags->seal) with ~0.2 cumulative confidence per step; 4 secondary extensions (.snap/.delta/.meta/.lock); MagicSignature.Validate() structurally guarantees namespace step
 - [Phase 79-03]: freedesktop shared-mime-info XML via XDocument; file(1) uses ubyte vs /etc/magic byte for version sub-rules; macOS secondary UTIs conform to PrimaryUti+public.data (not public.disk-image); all install scripts idempotent user-local
 - [Phase 79]: Secondary ProgIDs follow DataWarehouse.Dwvd{Kind} naming; PowerShell targets HKCU for non-admin registration; shell verbs use dw open/inspect/verify "%1" pattern
+- [Phase 79-04]: Priority-ordered magic detection DWVD>VHDX>QCOW2>VMDK>VDI>VHD; Raw/Img by extension+sector-aligned size; VDI via 0xBEDA107F at offset 64; VHDX logical size via metadata region GUID lookup at 1MB; byte-level data copy (sparse-aware deferred)
 
 ## Performance Metrics
 
@@ -216,7 +217,8 @@
 | 79    | 01   | 3min     | 2     | 4     |
 | 79    | 03   | 4min     | 2     | 3     |
 | Phase 79 P02 | 3min | 2 tasks | 3 files |
+| 79    | 04   | 5min     | 2     | 5     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T15:54:00Z
-- **Stopped At:** Completed 79-03-PLAN.md (Linux shared-mime-info + /etc/magic + macOS UTI)
+- **Timestamp:** 2026-02-23T16:13:00Z
+- **Stopped At:** Completed 79-04-PLAN.md (import engine for 7 foreign formats + import suggestions)
