@@ -164,6 +164,7 @@
 - [Phase 86]: ALEX uses 2-level RMI with linear CDF models, hit-rate-driven retrain, auto-deactivation
 - [Phase 86-11]: ExtendibleHashTable: lowest-bits directory indexing; bucket split reuses old block for low; MigrateFromLinearArray pre-allocates per directory slot; CA1512 ThrowIfLessThan pattern
 - [Phase 86]: MorphWalMarker fixed 64-byte for predictable WAL serialization; ConcurrentQueue dual-write for zero-downtime; SemaphoreSlim(1,1) single-morph guard
+- [Phase 86]: ALEX beneficial when R/W > 0.7 and entropy < 3.0; 2x threshold self-tuning on P99 regression; 3-revert permanent transition disable
 
 ## Performance Metrics
 
@@ -294,7 +295,8 @@
 | Phase 86 P03 | 5min | 2 tasks | 2 files |
 | 86    | 11   | 3min     | 1     | 2     |
 | Phase 86 P07 | 7min | 2 tasks | 2 files |
+| Phase 86 P06 | 8min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T20:27:00Z
-- **Stopped At:** Completed 86-07-PLAN.md (Morph transition engine)
+- **Stopped At:** Completed 86-06-PLAN.md (IndexMorphAdvisor autonomous decision engine)
