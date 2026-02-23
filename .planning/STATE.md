@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 86-adaptive-index-engine
-- **Plan:** 12/16
+- **Plan:** 15/16
 - **Status:** IN PROGRESS
-- **Last Completed:** 86-12-PLAN.md
+- **Last Completed:** 86-15-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -168,6 +168,7 @@
 - [Phase 86]: ClockSiTimestamp readonly struct with PhysicalTime ticks + LogicalCounter; Bloofi leaf removal requires periodic rebuild; CRUSH Straw2 XxHash64 composite input
 - [Phase 86]: XxHash64 for deterministic stripe routing; CAS count-min sketch decay; SortedSet merge-sort for multi-stripe range queries; Timer-based tier management 30s/60s
 - [Phase 86-12]: DllImport over LibraryImport for opaque struct refs; ConcurrentDictionary thread-ring indexing over ThreadStatic (S2696); O_DIRECT for all io_uring file access; IoUring struct 216 bytes opaque for x86-64
+- [Phase 86-15]: Vector256.Create element extraction for bloom probe (no unsafe pointers); extract-and-re-insert snapshot for ExtentTree serialization; single delta block per incremental checkpoint with overflow triggering full checkpoint
 - [Phase 86]: Hilbert 2D/16-bit default for shard routing; volatile CdfModel swap for lock-free readers; per-shard AdaptiveIndexEngine for independent morph; auto-split samples 1000 keys for median
 
 ## Performance Metrics
@@ -304,7 +305,8 @@
 | Phase 86 P08 | 4min | 2 tasks | 4 files |
 | 86    | 12   | 6min     | 2     | 2     |
 | Phase 86 P14 | 7min | 2 tasks | 2 files |
+| 86    | 15   | 4min     | 2     | 2     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T20:51:00Z
-- **Stopped At:** Completed 86-14-PLAN.md (Hilbert Curve + Trained Zstd)
+- **Timestamp:** 2026-02-23T20:57:55Z
+- **Stopped At:** Completed 86-15-PLAN.md (SIMD Operations + Persistent Extent Tree)
