@@ -181,6 +181,7 @@
 - [Phase 87]: Embedded roaring bitmap with three container types (Array/Bitmap/Run) for zero external dependencies; XxHash64 golden ratio seeds for bloom filter
 - [Phase 87]: Vector256<long> accumulators for SumInt32 overflow prevention; Kahan summation for float scalar fallback; 64 hash partitions for spill; OR predicates forced to PostFilter
 - [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
+- [Phase 87]: Bitmap-based free extent merging; WAL crash recovery replays uncommitted BlockWrite entries; Background priority throttles near budget limit
 
 ## Performance Metrics
 
@@ -328,7 +329,8 @@
 | Phase 87 P11 | 5min | 2 tasks | 2 files |
 | Phase 87 P10 | 7min | 2 tasks | 3 files |
 | Phase 87 P12 | 7min | 1 tasks | 2 files |
+| Phase 87 P15 | 4min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 87-12-PLAN.md
+- **Stopped At:** Completed 87-15-PLAN.md
