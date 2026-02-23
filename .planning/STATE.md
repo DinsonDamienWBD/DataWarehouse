@@ -2,8 +2,8 @@
 
 ## Current Position
 - **Phase:** 85-competitive-edge
-- **Plan:** 7/8
-- **Status:** IN PROGRESS
+- **Plan:** 8/8
+- **Status:** COMPLETE
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -138,7 +138,7 @@
 - [Phase 82]: 3,036 strategies post-merge exceeds 2,968 baseline; 52 plugins verified; Phase 82 COMPLETE
 - Phase 83: COMPLETE (5/5 plans, 201+280+35 integration tests for policy/cascade/performance/VDE format)
 - Phase 84: COMPLETE (6/6 plans, topology+VDE composer+GUI+shell registration+CLI fixes+51 integration tests)
-- Phase 85: 7/8 plans (85-01, 85-02, 85-03, 85-04, 85-05, 85-06, 85-07)
+- Phase 85: COMPLETE (8/8 plans, lakehouse transaction log + time-travel engine)
 - [Phase 83-01]: 201 new Policy tests (70 contract + 61 persistence + 70 edge case); 490 total Policy tests passing; all 5 CascadeStrategy, 5 PolicyLevel, 6 OperationalProfilePreset values covered; all 5 persistence backends round-trip verified
 - [Phase 83-02]: 280 per-feature multi-level tests; 7 feature categories x 5 levels x 5 cascades; 94-feature classification table verified; bloom filter + skip optimizer + deployment tier tested; MostRestrictive picks lowest intensity (most restrictive)
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
@@ -154,6 +154,7 @@
 - [Phase 85-06]: Deterministic I/O: PreAllocatedBufferPool with GC.AllocateArray(pinned:true) + ConcurrentQueue free-list; EDF DeadlineScheduler on dedicated AboveNormal thread; WcetAnnotation for DO-178C/IEC 61508; configurable DeadlineMissAction (Log/Throw/CircuitBreak)
 - [Phase 85-05]: Streaming SQL engine with 4 window types (tumbling/hopping/session/sliding); bounded Channel backpressure; watermark = max(eventTime) - interval; MaterializedView with Interlocked versioning; stream-table joins via RegisterTableAsync
 - [Phase 85-07]: UInt128-backed WideBlockAddress (32/48/64/128-bit on-disk widths); AddressWidthPromotionEngine 75% threshold with 4x headroom; VdeFeatureStore with monotonic model versioning, lineage tracking, inference caching
+- [Phase 85]: Per-table SemaphoreSlim for serialized version increments; sorted lock acquisition for multi-table deadlock prevention; binary search for timestamp-to-version resolution; schema evolution validates backward compatibility
 
 ## Performance Metrics
 
@@ -275,7 +276,8 @@
 | 85    | 06   | 4min     | 2     | 3     |
 | 85    | 05   | 5min     | 2     | 3     |
 | 85    | 07   | 5min     | 2     | 3     |
+| Phase 85 P08 | 5min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T19:40:00Z
-- **Stopped At:** Completed 85-07-PLAN.md (128-bit block addressing + ML pipeline)
+- **Stopped At:** Completed 85-08-PLAN.md (lakehouse transaction log + time-travel)
