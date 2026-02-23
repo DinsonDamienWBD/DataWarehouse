@@ -30,7 +30,7 @@ public class MoonshotIntegrationTests
         ["ZeroGravityStorage"] = "DataWarehouse.Plugins.UltimateStorage",
         ["CryptoTimeLocks"] = "DataWarehouse.Plugins.TamperProof",
         ["SemanticSync"] = "DataWarehouse.Plugins.SemanticSync",
-        ["ChaosVaccination"] = "DataWarehouse.Plugins.ChaosVaccination",
+        ["ChaosVaccination"] = "DataWarehouse.Plugins.UltimateResilience",  // Consolidated (Phase 65.5-12)
         ["CarbonAwareLifecycle"] = "DataWarehouse.Plugins.UltimateSustainability",
         ["UniversalFabric"] = "DataWarehouse.Plugins.UniversalFabric",
     };

@@ -28,7 +28,7 @@ public class CrossFeatureOrchestrationTests
         ["ZeroGravityStorage"] = "DataWarehouse.Plugins.UltimateStorage",
         ["CryptoTimeLocks"] = "DataWarehouse.Plugins.TamperProof",
         ["SemanticSync"] = "DataWarehouse.Plugins.SemanticSync",
-        ["ChaosVaccination"] = "DataWarehouse.Plugins.ChaosVaccination",
+        ["ChaosVaccination"] = "DataWarehouse.Plugins.UltimateResilience",  // Consolidated (Phase 65.5-12)
         ["CarbonAwareLifecycle"] = "DataWarehouse.Plugins.UltimateSustainability",
         ["UniversalFabric"] = "DataWarehouse.Plugins.UniversalFabric",
     };
@@ -237,7 +237,7 @@ public class CrossFeatureOrchestrationTests
     public void ChaosInjectionDoesNotBypassTimeLocks()
     {
         // Chaos vaccination should not directly modify time-locked storage
-        var chaosDir = RequirePluginDir("ChaosVaccination");
+        var chaosDir = RequirePluginDir("UltimateResilience");  // ChaosVaccination consolidated (Phase 65.5-12)
 
         var sourceFiles = GetCsFiles(chaosDir);
         var allContent = CombineFileContents(sourceFiles);

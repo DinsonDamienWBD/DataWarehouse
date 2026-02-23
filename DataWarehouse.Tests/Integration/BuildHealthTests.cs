@@ -101,7 +101,7 @@ public class BuildHealthTests
         // v5.0 plugins added by phases 55-65
         var expectedV50Plugins = new[]
         {
-            "ChaosVaccination",
+            // ChaosVaccination consolidated into UltimateResilience (Phase 65.5-12)
             "SemanticSync",
             "UniversalFabric"
         };

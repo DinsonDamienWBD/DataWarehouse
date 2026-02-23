@@ -90,14 +90,14 @@ public class PluginSmokeTests : IDisposable
         new object[] { "UltimateMicroservices", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateMicroservices.UltimateMicroservicesPlugin()), "microservices" },
         new object[] { "UltimateSDKPorts", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateSDKPorts.UltimateSDKPortsPlugin()), "sdk" },
         new object[] { "UltimateDocGen", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDocGen.UltimateDocGenPlugin()), "docgen" },
-        new object[] { "AppPlatform", new Func<PluginBase>(() => new DataWarehouse.Plugins.AppPlatform.AppPlatformPlugin()), "platform" },
+        // AppPlatform consolidated into UltimateCompute (Phase 65.5-11)
         new object[] { "PluginMarketplace", new Func<PluginBase>(() => new DataWarehouse.Plugins.PluginMarketplace.PluginMarketplacePlugin()), "marketplace" },
 
         // === Interface Plugins ===
         new object[] { "UltimateConnector", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateConnector.UltimateConnectorPlugin()), "connector" },
         new object[] { "UltimateInterface", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateInterface.UltimateInterfacePlugin()), "interface" },
         // FuseDriver consolidated into UltimateFilesystem (Phase 65.5-11)
-        new object[] { "KubernetesCsi", new Func<PluginBase>(() => new DataWarehouse.Plugins.KubernetesCsi.KubernetesCsiPlugin()), "csi" },
+        // KubernetesCsi consolidated into UltimateStorage (Phase 65.5-11)
         new object[] { "UniversalDashboards", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalDashboards.UniversalDashboardsPlugin()), "dashboard" },
 
         // === Orchestration Plugins ===
@@ -119,7 +119,7 @@ public class PluginSmokeTests : IDisposable
         new object[] { "MediaTranscoding", new Func<PluginBase>(() => new DataWarehouse.Plugins.Transcoding.Media.MediaTranscodingPlugin()), "transcoding" },
 
         // === Data Format / Virtualization ===
-        new object[] { "SqlOverObject", new Func<PluginBase>(() => new DataWarehouse.Plugins.Virtualization.SqlOverObject.SqlOverObjectPlugin()), "sql" },
+        // SqlOverObject consolidated into UltimateDatabaseProtocol (Phase 65.5-11)
 
         // === Storage Fabric ===
         new object[] { "UniversalFabric", new Func<PluginBase>(() => new DataWarehouse.Plugins.UniversalFabric.UniversalFabricPlugin()), "fabric" },

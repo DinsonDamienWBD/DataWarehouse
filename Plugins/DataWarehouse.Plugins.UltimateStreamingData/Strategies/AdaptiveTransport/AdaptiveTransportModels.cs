@@ -1,8 +1,11 @@
-namespace DataWarehouse.Plugins.AdaptiveTransport.BandwidthMonitor;
+namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.AdaptiveTransport;
 
 /// <summary>
 /// Classification of network link types based on performance characteristics.
 /// </summary>
+/// <remarks>
+/// Merged from DataWarehouse.Plugins.AdaptiveTransport.BandwidthMonitor (Phase 65.5-12 consolidation).
+/// </remarks>
 public enum LinkClass
 {
     /// <summary>Fiber optic connection: &gt;100 Mbps, &lt;5ms latency.</summary>
