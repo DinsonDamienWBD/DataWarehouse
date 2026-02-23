@@ -1,10 +1,10 @@
 # Execution State
 
 ## Current Position
-- **Phase:** 87-vde-scalable-internals
-- **Plan:** 8/15
+- **Phase:** 88-dynamic-subsystem-scaling
+- **Plan:** 3/14
 - **Status:** IN PROGRESS
-- **Last Completed:** 87-08-PLAN.md
+- **Last Completed:** 88-03-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -185,6 +185,7 @@
 - [Phase 87]: Leaf hashes use SHA256(XxHash64 bytes) for consistent 32-byte Merkle nodes; 48-byte node format; BFS serialization
 - [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
 - [Phase 88]: BoundedCache uses ReaderWriterLockSlim; ARC ghost lists key-only capped at MaxEntries; 256B/entry auto-size heuristic; TTL cleanup at max(TTL/4, 1s)
+- [Phase 88-03]: Using alias for ambiguous CircuitBreakerOpenException (Contracts vs InMemory); BackpressureState Normal/Warning/Critical at 50%/80% bulkhead utilization; Lamport CAS for distributed CB state; EMA alpha=0.3 for adaptive thresholds
 - [Phase 88]: InternalBlock shadow index retained for fast audit chain traversal; SegmentedBlockStore is authoritative persistence
 
 ## Performance Metrics
@@ -337,8 +338,9 @@
 | Phase 87 P13 | 6min | 2 tasks | 2 files |
 | Phase 87 P14 | 7min | 2 tasks | 2 files |
 | Phase 88 P01 | 4min | 2 tasks | 4 files |
+| Phase 88 P03 | 8min | 2 tasks | 2 files |
 | Phase 88 P04 | 6min | 2 tasks | 3 files |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 88-04-PLAN.md
+- **Timestamp:** 2026-02-23T22:24:40Z
+- **Stopped At:** Completed 88-03-PLAN.md
