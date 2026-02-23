@@ -149,11 +149,11 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
     }
 
     /// <summary>Shuts down the edge computing strategy.</summary>
-    public new async Task ShutdownAsync(CancellationToken ct = default)
+    public override async Task ShutdownAsync(CancellationToken ct = default)
     {
         _initialized = false;
         _strategies.Clear();
-        await Task.CompletedTask;
+        await base.ShutdownAsync(ct);
     }
 
     private void RegisterStrategies(
@@ -175,6 +175,23 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
         _strategies["automotive"] = new AutomotiveEdgeStrategy(MessageBus);
         _strategies["smart-city"] = new SmartCityEdgeStrategy(MessageBus);
         _strategies["energy"] = new EnergyGridEdgeStrategy(MessageBus);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
+    {
+        if (!_initialized)
+        {
+            await InitializeAsync(_config, ct);
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStopCoreAsync()
+    {
+        _initialized = false;
+        _strategies.Clear();
+        return Task.CompletedTask;
     }
 
     /// <summary>Gets a specific edge computing strategy.</summary>

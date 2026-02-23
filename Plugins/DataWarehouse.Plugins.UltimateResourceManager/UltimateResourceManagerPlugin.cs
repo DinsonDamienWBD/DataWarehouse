@@ -63,12 +63,6 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 
-    /// <inheritdoc/>
-    public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-
-    /// <inheritdoc/>
-    public override Task StopAsync() => Task.CompletedTask;
-
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
     /// </summary>

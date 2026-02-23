@@ -158,17 +158,37 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         }
 
         /// <inheritdoc/>
-        public override async Task StartAsync(CancellationToken ct)
+        protected override async Task OnStartCoreAsync(CancellationToken ct)
         {
-            // Call base to set up Intelligence awareness
-            await base.StartAsync(ct);
-
             if (_initialized)
                 return;
 
             await DiscoverAndRegisterStrategiesAsync(ct);
             InitializeServices();
             RegisterMessageBusHandlers();
+
+            // Register typed message handler for compliance check requests (KS3 pattern)
+            RegisterHandler<ComplianceCheckRequest, ComplianceCheckResponse>(
+                async (request, cancellationToken) =>
+                {
+                    var context = new ComplianceContext
+                    {
+                        OperationType = "ComplianceCheck",
+                        DataClassification = "Standard",
+                        ResourceId = request.DataId
+                    };
+                    var result = await CheckComplianceAsync(context, request.Framework, cancellationToken);
+                    return new ComplianceCheckResponse
+                    {
+                        DataId = request.DataId,
+                        Framework = result.Framework,
+                        OverallCompliant = result.IsCompliant,
+                        OverallStatus = result.Status.ToString(),
+                        TotalViolations = result.Violations.Count,
+                        CheckedAt = DateTime.UtcNow
+                    };
+                });
+
             _initialized = true;
         }
 
@@ -397,35 +417,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         }
 
         /// <inheritdoc/>
-        protected override Task OnStartCoreAsync(CancellationToken ct)
-        {
-            // Register typed message handler for compliance check requests (KS3 pattern)
-            RegisterHandler<ComplianceCheckRequest, ComplianceCheckResponse>(
-                async (request, cancellationToken) =>
-                {
-                    var context = new ComplianceContext
-                    {
-                        OperationType = "ComplianceCheck",
-                        DataClassification = "Standard",
-                        ResourceId = request.DataId
-                    };
-                    var result = await CheckComplianceAsync(context, request.Framework, cancellationToken);
-                    return new ComplianceCheckResponse
-                    {
-                        DataId = request.DataId,
-                        Framework = result.Framework,
-                        OverallCompliant = result.IsCompliant,
-                        OverallStatus = result.Status.ToString(),
-                        TotalViolations = result.Violations.Count,
-                        CheckedAt = DateTime.UtcNow
-                    };
-                });
-
-            return Task.CompletedTask;
-        }
-
-        /// <inheritdoc/>
-        public override Task StopAsync()
+        protected override Task OnStopCoreAsync()
         {
             _initialized = false;
             return Task.CompletedTask;

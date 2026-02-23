@@ -103,7 +103,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
     #region Lifecycle
 
     /// <inheritdoc />
-    public override Task StartAsync(CancellationToken ct)
+    protected override Task OnStartCoreAsync(CancellationToken ct)
     {
         // Start the scheduler timer for scheduled functions
         _schedulerTimer = new Timer(
@@ -117,7 +117,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
     }
 
     /// <inheritdoc />
-    public override async Task StopAsync()
+    protected override async Task OnStopCoreAsync()
     {
         if (_schedulerTimer != null)
         {
