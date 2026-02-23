@@ -1,9 +1,9 @@
 # Execution State
 
 ## Current Position
-- **Phase:** 83-integration-testing
-- **Plan:** 5/5
-- **Status:** COMPLETE
+- **Phase:** 84-deployment-topology-cli-modes
+- **Plan:** 1/6
+- **Status:** IN PROGRESS
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -141,6 +141,7 @@
 - [Phase 83-02]: 280 per-feature multi-level tests; 7 feature categories x 5 levels x 5 cascades; 94-feature classification table verified; bloom filter + skip optimizer + deployment tier tested; MostRestrictive picks lowest intensity (most restrictive)
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
 - [Phase 83-05]: 201 VDE format tests: 120 module/profile/superblock/trailer/inode/region tests + 40 tamper detection (5 levels, policy serialization) + 41 migration (format detection, v1 compat, 10 configs, progress tracking)
+- [Phase 84-01]: DeploymentTopology enum (DwPlusVde/DwOnly/VdeOnly) + descriptor helpers; InstallConfiguration Topology/RemoteVdeUrl/VdeListenPort; CLI --topology/--remote-vde/--vde-port flags
 
 ## Performance Metrics
 
@@ -250,7 +251,8 @@
 | 83    | 02   | 28min    | 2     | 3     |
 | 83    | 04   | 18min    | 1     | 1     |
 | 83    | 05   | 25min    | 2     | 4     |
+| 84    | 01   | 4min     | 2     | 4     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T18:27:36Z
-- **Stopped At:** Completed 83-05-PLAN.md (201 VDE format/tamper/migration tests; Phase 83 COMPLETE 5/5)
+- **Timestamp:** 2026-02-23T18:40:46Z
+- **Stopped At:** Completed 84-01-PLAN.md (DeploymentTopology enum + CLI --topology flag)
