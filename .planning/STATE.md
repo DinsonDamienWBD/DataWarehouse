@@ -1,9 +1,9 @@
 # Execution State
 
 ## Current Position
-- **Phase:** 72-vde-regions-foundation
-- **Plan:** 5/5 (72-05 complete)
-- **Status:** PHASE COMPLETE
+- **Phase:** 73-vde-regions-operations
+- **Plan:** 1/5 (73-01 complete)
+- **Status:** IN PROGRESS
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -13,6 +13,7 @@
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
 - Phase 71: COMPLETE (6/6 plans, 23 format files, VDE v2.0 creator operational)
 - Phase 72: COMPLETE (5/5 plans, 9 region files, streaming/WORM/compliance)
+- Phase 73: 1/5 plans complete (73-01)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -83,6 +84,7 @@
 - [Phase 72]: Bloom filter 8192-bit/5-hash XxHash64; NOT updated on Remove (rebuilt on Serialize); compound keys use 0x00 separator; BFS one-block-per-node serialization
 - [Phase 72]: Dirty bitmap uses variable-length multi-block serialization for VDEs larger than 32K blocks; RAID parity at fixed offset in block 1; ReplicationWatermark includes PendingBlockCount for lag estimation
 - [Phase 72-05]: ECDSA P-256 for compliance signatures (64-byte r||s); streaming region tracks metadata only; WORM write log overflows across blocks
+- [Phase 73-01]: Swap-with-last removal for O(1) Remove on dictionary-indexed regions; IntelligenceCacheEntry 43B fixed, VdeReference 74B fixed; DetectBrokenLinks accepts IReadOnlySet<Guid>
 
 ## Performance Metrics
 
@@ -146,7 +148,8 @@
 | Phase 72 P03 | 4min | 1 tasks | 1 files |
 | Phase 72 P04 | 4min | 2 tasks | 2 files |
 | 72    | 05   | 5min     | 2     | 3     |
+| 73    | 01   | 3min     | 2     | 2     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T12:37:14Z
-- **Stopped At:** Completed 72-05-PLAN.md (Streaming Append + WORM + Compliance Vault Regions) -- Phase 72 COMPLETE
+- **Timestamp:** 2026-02-23T12:48:36Z
+- **Stopped At:** Completed 73-01-PLAN.md (Intelligence Cache + Cross-VDE Reference Table)
