@@ -2,7 +2,7 @@
 
 ## Current Position
 - **Phase:** 77-ai-policy-intelligence
-- **Plan:** 1/5 (77-01 complete)
+- **Plan:** 2/5 (77-01, 77-02 complete)
 - **Status:** IN PROGRESS
 
 ## Progress
@@ -17,7 +17,7 @@
 - Phase 74: COMPLETE (4/4 plans, emergency recovery + health metadata + nesting validator)
 - Phase 75: COMPLETE (4/4 plans, authority chain + escalation + quorum + hardware tokens + dead man's switch)
 - Phase 76: COMPLETE (5/5 plans, materialized cache + bloom filter + delegate compiler + fast-path engine + simulation sandbox)
-- Phase 77: 1/5 plans complete (77-01)
+- Phase 77: 2/5 plans complete (77-01, 77-02)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -108,6 +108,7 @@
 - [Phase 76-04]: FrozenDictionary for 94-feature classification table (zero-allocation O(1)); inline static init via BuildEntries pattern (S3963); bloom filter false positives safe (classify to higher tier); unknown features default to PerOperation
 - [Phase 76]: Security feature IDs (encryption, access_control, auth_model, key_management, fips_mode) hardcoded for Critical severity classification in PolicySimulationSandbox
 - [Phase 77-01]: Power-of-two CAS ring buffer (8192 default) with Interlocked.CompareExchange; CPU hysteresis throttle at 80% lower bound; ObservationEmitter.AttachRingBuffer internal wiring; OverheadThrottle uses Process.TotalProcessorTime delta / wall-clock / ProcessorCount
+- [Phase 77-02]: HardwareProbe detects x86+ARM SIMD, RAM pressure via GC, thermal from p99/p50 latency ratio; WorkloadAnalyzer 1440-bucket minute tracker, 28-day seasonal trend, 3x burst detection; StorageSpeedClass from env var only
 
 ## Performance Metrics
 
@@ -190,7 +191,8 @@
 | 76    | 04   | 6min     | 2     | 3     |
 | Phase 76 P05 | 6min | 2 tasks | 2 files |
 | 77    | 01   | 4min     | 2     | 4     |
+| 77    | 02   | 3min     | 2     | 2     |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T14:54:17Z
-- **Stopped At:** Completed 77-01-PLAN.md (AiObservationRingBuffer + AiObservationPipeline + OverheadThrottle)
+- **Stopped At:** Completed 77-02-PLAN.md (HardwareProbe + WorkloadAnalyzer advisors)
