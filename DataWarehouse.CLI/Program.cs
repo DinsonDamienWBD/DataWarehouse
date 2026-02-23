@@ -53,7 +53,7 @@ public static class Program
         }
 
         // Auto-discover local live instances
-        var liveInstanceUrl = PortableMediaDetector.FindLocalLiveInstance();
+        var liveInstanceUrl = await PortableMediaDetector.FindLocalLiveInstanceAsync();
         if (liveInstanceUrl != null && !_instanceManager.IsConnected)
         {
             var parts = new Uri(liveInstanceUrl);
@@ -689,6 +689,9 @@ public static class Program
         var adminPasswordOption = new Option<string?>("--admin-password") { Description = "Admin password (generated if not provided)" };
         var fromUsbOption = new Option<string?>("--from-usb") { Description = "Source path for USB installation" };
         var copyDataOption = new Option<bool>("--copy-data") { Description = "Copy data files from USB source", DefaultValueFactory = _ => true };
+        var topologyOption = new Option<string>("--topology") { Description = "Deployment topology: dw-only, vde-only, dw+vde (default)", DefaultValueFactory = _ => "dw+vde" };
+        var remoteVdeOption = new Option<string?>("--remote-vde") { Description = "Remote VDE URL (for dw-only topology)" };
+        var vdePortOption = new Option<int>("--vde-port") { Description = "VDE listen port (for vde-only topology)", DefaultValueFactory = _ => 9443 };
 
         command.Options.Add(pathOption);
         command.Options.Add(serviceOption);
@@ -696,17 +699,26 @@ public static class Program
         command.Options.Add(adminPasswordOption);
         command.Options.Add(fromUsbOption);
         command.Options.Add(copyDataOption);
+        command.Options.Add(topologyOption);
+        command.Options.Add(remoteVdeOption);
+        command.Options.Add(vdePortOption);
 
         command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
         {
             var path = parseResult.GetValue(pathOption);
             var fromUsb = parseResult.GetValue(fromUsbOption);
+            var topologyValue = parseResult.GetValue(topologyOption) ?? "dw+vde";
+            var remoteVdeValue = parseResult.GetValue(remoteVdeOption);
+            var vdePortValue = parseResult.GetValue(vdePortOption);
             var parameters = new Dictionary<string, object?>
             {
                 ["path"] = path,
                 ["service"] = parseResult.GetValue(serviceOption),
                 ["autostart"] = parseResult.GetValue(autostartOption),
-                ["adminPassword"] = parseResult.GetValue(adminPasswordOption)
+                ["adminPassword"] = parseResult.GetValue(adminPasswordOption),
+                ["topology"] = topologyValue,
+                ["remoteVde"] = remoteVdeValue,
+                ["vdePort"] = vdePortValue,
             };
 
             string commandName;
