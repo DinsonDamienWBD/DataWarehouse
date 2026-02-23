@@ -166,6 +166,7 @@
 - [Phase 86]: MorphWalMarker fixed 64-byte for predictable WAL serialization; ConcurrentQueue dual-write for zero-downtime; SemaphoreSlim(1,1) single-morph guard
 - [Phase 86]: ALEX beneficial when R/W > 0.7 and entropy < 3.0; 2x threshold self-tuning on P99 regression; 3-revert permanent transition disable
 - [Phase 86]: ClockSiTimestamp readonly struct with PhysicalTime ticks + LogicalCounter; Bloofi leaf removal requires periodic rebuild; CRUSH Straw2 XxHash64 composite input
+- [Phase 86]: XxHash64 for deterministic stripe routing; CAS count-min sketch decay; SortedSet merge-sort for multi-stripe range queries; Timer-based tier management 30s/60s
 
 ## Performance Metrics
 
@@ -298,7 +299,8 @@
 | Phase 86 P07 | 7min | 2 tasks | 2 files |
 | Phase 86 P06 | 8min | 2 tasks | 3 files |
 | Phase 86 P05 | 10min | 2 tasks | 4 files |
+| Phase 86 P08 | 4min | 2 tasks | 4 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T20:27:00Z
-- **Stopped At:** Completed 86-05-PLAN.md (Distributed probabilistic routing)
+- **Stopped At:** Completed 86-08-PLAN.md (Index RAID)
