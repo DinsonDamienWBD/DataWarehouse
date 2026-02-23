@@ -184,6 +184,7 @@
 - [Phase 87]: Bitmap-based free extent merging; WAL crash recovery replays uncommitted BlockWrite entries; Background priority throttles near budget limit
 - [Phase 87]: Leaf hashes use SHA256(XxHash64 bytes) for consistent 32-byte Merkle nodes; 48-byte node format; BFS serialization
 - [Phase 87]: HKDF-SHA256 deterministic nonce from extent position; Brotli over Zstd (BCL built-in); 95% threshold skip-compression
+- [Phase 88]: BoundedCache uses ReaderWriterLockSlim; ARC ghost lists key-only capped at MaxEntries; 256B/entry auto-size heuristic; TTL cleanup at max(TTL/4, 1s)
 
 ## Performance Metrics
 
@@ -334,7 +335,8 @@
 | Phase 87 P15 | 4min | 1 tasks | 2 files |
 | Phase 87 P13 | 6min | 2 tasks | 2 files |
 | Phase 87 P14 | 7min | 2 tasks | 2 files |
+| Phase 88 P01 | 4min | 2 tasks | 4 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T21:36:26Z
-- **Stopped At:** Completed 87-14-PLAN.md
+- **Stopped At:** Completed 88-01-PLAN.md
