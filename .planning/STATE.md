@@ -2,8 +2,8 @@
 
 ## Current Position
 - **Phase:** 72-vde-regions-foundation
-- **Plan:** 4/5 (72-04 complete)
-- **Status:** IN PROGRESS
+- **Plan:** 5/5 (72-05 complete)
+- **Status:** PHASE COMPLETE
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -12,7 +12,7 @@
 - Phase 69: COMPLETE (5/5 plans, policy persistence + marketplace)
 - Phase 70: COMPLETE (6/6 plans, cascade engine)
 - Phase 71: COMPLETE (6/6 plans, 23 format files, VDE v2.0 creator operational)
-- Phase 72: 4/5 plans complete (72-01, 72-02, 72-03, 72-04)
+- Phase 72: COMPLETE (5/5 plans, 9 region files, streaming/WORM/compliance)
 
 ## Decisions
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
@@ -82,6 +82,7 @@
 - [Phase 72]: [Phase 72-02]: 1-indexed heap Merkle tree; stackalloc hoisted for CA2014; ZeroChildrenHash pre-computed; VerifyProof static for lightweight clients
 - [Phase 72]: Bloom filter 8192-bit/5-hash XxHash64; NOT updated on Remove (rebuilt on Serialize); compound keys use 0x00 separator; BFS one-block-per-node serialization
 - [Phase 72]: Dirty bitmap uses variable-length multi-block serialization for VDEs larger than 32K blocks; RAID parity at fixed offset in block 1; ReplicationWatermark includes PendingBlockCount for lag estimation
+- [Phase 72-05]: ECDSA P-256 for compliance signatures (64-byte r||s); streaming region tracks metadata only; WORM write log overflows across blocks
 
 ## Performance Metrics
 
@@ -144,7 +145,8 @@
 | Phase 72 P02 | 3min | 1 tasks | 1 files |
 | Phase 72 P03 | 4min | 1 tasks | 1 files |
 | Phase 72 P04 | 4min | 2 tasks | 2 files |
+| 72    | 05   | 5min     | 2     | 3     |
 
 ## Last Session
-- **Timestamp:** 2026-02-23T12:19:21Z
-- **Stopped At:** Completed 72-04-PLAN.md (Replication State + RAID Metadata Regions)
+- **Timestamp:** 2026-02-23T12:37:14Z
+- **Stopped At:** Completed 72-05-PLAN.md (Streaming Append + WORM + Compliance Vault Regions) -- Phase 72 COMPLETE
