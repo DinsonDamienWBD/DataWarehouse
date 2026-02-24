@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 90-device-discovery-physical-block
-- **Plan:** 2/6
+- **Plan:** 5/6
 - **Status:** IN_PROGRESS
-- **Last Completed:** 90-02-PLAN.md
+- **Last Completed:** 90-05-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -208,6 +208,7 @@
 - [Phase 90-01]: WMI accessed via reflection to avoid compile-time System.Management dependency; NVMe-oF detected via sysfs transport field; Windows SSD TRIM assumed true for NVMe/SSD media types
 - [Phase 90-02]: Action callbacks (not C# events) for device health/prediction/status notifications; EWMA alpha=0.3 with configurable thresholds; ATA SMART 12-byte attribute parsing; PeriodicTimer for health (5min) and discovery (30min) loops; BoundedDictionary<string, ManagedDevice>(500) for state
 - [Phase 90]: SupportedOSPlatform attribute for Windows-only ProcessorAffinity; NVMe namespace grouping under NvmeSubsystem node; BoundedDictionary(500) NUMA cache
+- [Phase 90-05]: Fixed 256-byte journal entries with CRC32 integrity; circular buffer (128 entries, 32KB) on reserved sectors; intent/commit/rollback lifecycle; StorageTier using alias for namespace disambiguation; BoundedDictionary(100) for rebuild state; proactive rebuild for Failing devices
 
 ## Performance Metrics
 
@@ -383,7 +384,8 @@
 | Phase 90 P01 | 4min | 2 tasks | 3 files |
 | Phase 90 P02 | 5min | 2 tasks | 3 files |
 | Phase 90 P04 | 5min | 2 tasks | 3 files |
+| Phase 90 P05 | 5min | 2 tasks | 3 files |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T00:27:24Z
-- **Stopped At:** Completed 90-04-PLAN.md
+- **Timestamp:** 2026-02-24T00:34:53Z
+- **Stopped At:** Completed 90-05-PLAN.md
