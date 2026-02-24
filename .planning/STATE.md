@@ -207,6 +207,7 @@
 - [Phase 89]: Added Tags and ClusterConfig to JepsenTestPlan; heuristic fault-active detection via 2x failure threshold
 - [Phase 90-01]: WMI accessed via reflection to avoid compile-time System.Management dependency; NVMe-oF detected via sysfs transport field; Windows SSD TRIM assumed true for NVMe/SSD media types
 - [Phase 90-02]: Action callbacks (not C# events) for device health/prediction/status notifications; EWMA alpha=0.3 with configurable thresholds; ATA SMART 12-byte attribute parsing; PeriodicTimer for health (5min) and discovery (30min) loops; BoundedDictionary<string, ManagedDevice>(500) for state
+- [Phase 90]: SupportedOSPlatform attribute for Windows-only ProcessorAffinity; NVMe namespace grouping under NvmeSubsystem node; BoundedDictionary(500) NUMA cache
 
 ## Performance Metrics
 
@@ -381,7 +382,8 @@
 | Phase 89 P10 | 4min | 2 tasks | 3 files |
 | Phase 90 P01 | 4min | 2 tasks | 3 files |
 | Phase 90 P02 | 5min | 2 tasks | 3 files |
+| Phase 90 P04 | 5min | 2 tasks | 3 files |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T00:21:10Z
-- **Stopped At:** Completed 90-01-PLAN.md
+- **Timestamp:** 2026-02-24T00:27:24Z
+- **Stopped At:** Completed 90-04-PLAN.md
