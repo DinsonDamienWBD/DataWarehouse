@@ -304,6 +304,12 @@ public sealed record JepsenTestPlan
 
     /// <summary>Expected consistency model to verify.</summary>
     public ConsistencyModel ExpectedConsistency { get; init; } = ConsistencyModel.Linearizable;
+
+    /// <summary>Cluster configuration for this test plan.</summary>
+    public JepsenClusterConfig? ClusterConfig { get; init; }
+
+    /// <summary>Tags for categorization (e.g., "raft", "partition", "recovery", "isolation").</summary>
+    public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
 }
 
 #endregion
