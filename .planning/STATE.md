@@ -204,6 +204,7 @@
 - [Phase 89]: SdkApiSurface maps 10 canonical operations from 6 proto services; FrozenDictionary for O(1) template dispatch; StringBuilder code generation for safety
 - [Phase 89]: Terraform provider uses terraform-plugin-sdk/v2 with Go code generation; Pulumi bridges via pulumi-terraform-bridge; Helm StatefulSet with VolumeClaimTemplates, headless service for clustering
 - [Phase 89]: Knossos-style linearizability check using real-time ordering constraints on per-key operation graphs; IAsyncEnumerable for workload generators; disk corruption healing deferred to DW self-healing
+- [Phase 89]: Added Tags and ClusterConfig to JepsenTestPlan; heuristic fault-active detection via 2x failure threshold
 
 ## Performance Metrics
 
@@ -375,7 +376,8 @@
 | Phase 89 P07 | 7min | 2 tasks | 3 files |
 | Phase 89 P08 | 6min | 2 tasks | 3 files |
 | Phase 89 P09 | 6min | 2 tasks | 3 files |
+| Phase 89 P10 | 4min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T23:50:10Z
-- **Stopped At:** Completed 89-09-PLAN.md
+- **Stopped At:** Completed 89-10-PLAN.md
