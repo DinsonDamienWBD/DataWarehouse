@@ -203,6 +203,7 @@
 - [Phase 89]: MemoryMarshal.AsBytes for zero-copy Arrow primitive conversion; Arrow string columns use offset+data encoding; zone map entries per-column keyed
 - [Phase 89]: SdkApiSurface maps 10 canonical operations from 6 proto services; FrozenDictionary for O(1) template dispatch; StringBuilder code generation for safety
 - [Phase 89]: Terraform provider uses terraform-plugin-sdk/v2 with Go code generation; Pulumi bridges via pulumi-terraform-bridge; Helm StatefulSet with VolumeClaimTemplates, headless service for clustering
+- [Phase 89]: Knossos-style linearizability check using real-time ordering constraints on per-key operation graphs; IAsyncEnumerable for workload generators; disk corruption healing deferred to DW self-healing
 
 ## Performance Metrics
 
@@ -373,7 +374,8 @@
 | Phase 89 P06 | 6min | 2 tasks | 3 files |
 | Phase 89 P07 | 7min | 2 tasks | 3 files |
 | Phase 89 P08 | 6min | 2 tasks | 3 files |
+| Phase 89 P09 | 6min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-23T23:50:10Z
-- **Stopped At:** Completed 89-08-PLAN.md
+- **Stopped At:** Completed 89-09-PLAN.md
