@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -339,6 +340,7 @@ public sealed class HuggingFaceEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in HuggingFaceEmbeddingProvider.cs");
             return false;
         }
     }

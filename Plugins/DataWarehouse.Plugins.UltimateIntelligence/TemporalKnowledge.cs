@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -2794,6 +2795,7 @@ public sealed class TemporalTiering
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in TemporalKnowledge.cs");
             return null;
         }
     }

@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -47,7 +48,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
 {
     private readonly VectorStoreRegistry _registry;
     private readonly HttpClient _httpClient;
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     private readonly Dictionary<string, IProductionVectorStore> _instances = new();
     private readonly object _lock = new();
 
@@ -417,6 +418,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in VectorStoreFactory.cs");
                 // Ignore disposal errors
             }
         }

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -343,6 +344,7 @@ public sealed class VectorStoreRegistry
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in VectorStoreRegistry.cs");
                 // Skip unhealthy stores
             }
         }
@@ -406,6 +408,7 @@ public sealed class VectorStoreRegistry
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in VectorStoreRegistry.cs");
                 // Skip stores that fail to return statistics
             }
         }

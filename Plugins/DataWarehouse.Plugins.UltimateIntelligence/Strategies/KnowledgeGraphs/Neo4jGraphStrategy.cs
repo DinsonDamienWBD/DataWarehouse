@@ -40,7 +40,7 @@ public sealed class Neo4jGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "neo4j", "graph-db", "cypher", "native-graph", "production" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
     public Neo4jGraphStrategy() : this(SharedHttpClient) { }
 

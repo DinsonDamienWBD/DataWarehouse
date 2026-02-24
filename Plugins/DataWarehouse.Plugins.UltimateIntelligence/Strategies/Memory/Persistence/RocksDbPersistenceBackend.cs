@@ -865,6 +865,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in RocksDbPersistenceBackend.cs");
             return Task.FromResult(false);
         }
     }

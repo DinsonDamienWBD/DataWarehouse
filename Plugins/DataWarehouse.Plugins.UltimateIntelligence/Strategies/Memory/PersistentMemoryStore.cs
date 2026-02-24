@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
 
@@ -1049,7 +1051,7 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
             return Math.Abs(hash) % _shards.Count;
         }
 
-        // Round-robin fallback
-        return Math.Abs(entryId.GetHashCode()) % _shards.Count;
+        // Round-robin fallback — deterministic across processes via SHA256
+        return Math.Abs(BitConverter.ToInt32(SHA256.HashData(Encoding.UTF8.GetBytes(entryId)), 0)) % _shards.Count;
     }
 }

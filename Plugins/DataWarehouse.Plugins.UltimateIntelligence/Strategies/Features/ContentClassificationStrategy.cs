@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.AI;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -263,6 +264,7 @@ Return your classification as JSON with format:
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in ContentClassificationStrategy.cs");
             // If parsing fails, return empty list
         }
 

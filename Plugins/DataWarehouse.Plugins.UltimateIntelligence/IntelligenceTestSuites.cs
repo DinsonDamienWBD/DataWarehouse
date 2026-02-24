@@ -74,6 +74,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             _results.Add(new TestResult
             {
                 TestName = testName,
@@ -107,6 +108,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -136,6 +138,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -165,6 +168,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -200,6 +204,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -229,6 +234,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -258,6 +264,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -281,12 +288,14 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in IntelligenceTestSuites.cs");
             result.Passed = true;
             result.Message = "Correctly handles cancellation";
             result.DurationMs = sw.ElapsedMilliseconds;
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -319,6 +328,7 @@ public sealed class EndToEndKnowledgeFlowTests : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -386,6 +396,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             _results.Add(new TestResult
             {
                 TestName = testName,
@@ -410,6 +421,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -441,6 +453,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -463,6 +476,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -488,6 +502,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -515,6 +530,7 @@ public sealed class PluginKnowledgeTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -573,6 +589,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             _results.Add(new TestResult
             {
                 TestName = testName,
@@ -606,6 +623,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -639,6 +657,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -672,6 +691,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -713,6 +733,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -754,6 +775,7 @@ public sealed class TemporalQueryTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -821,6 +843,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             _results.Add(new TestResult
             {
                 TestName = testName,
@@ -863,6 +886,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -902,6 +926,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -954,6 +979,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -996,6 +1022,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1036,6 +1063,7 @@ public sealed class PerformanceBenchmarkSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1094,6 +1122,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             _results.Add(new TestResult
             {
                 TestName = testName,
@@ -1132,6 +1161,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1161,6 +1191,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1186,6 +1217,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1211,6 +1243,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }
@@ -1242,6 +1275,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in IntelligenceTestSuites.cs: {ex.Message}");
             result.Passed = false;
             result.ErrorMessage = ex.Message;
         }

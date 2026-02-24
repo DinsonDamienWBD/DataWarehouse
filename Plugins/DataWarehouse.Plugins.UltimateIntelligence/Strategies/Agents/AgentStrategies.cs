@@ -2,6 +2,7 @@ using DataWarehouse.SDK.AI;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Agents;
 
@@ -351,6 +352,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
@@ -519,6 +521,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
@@ -689,6 +692,7 @@ public sealed class CrewAiAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
@@ -843,6 +847,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
@@ -1039,6 +1044,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
@@ -1245,6 +1251,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {

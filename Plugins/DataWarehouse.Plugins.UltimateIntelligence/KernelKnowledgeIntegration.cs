@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 using SdkKnowledgeQuery = DataWarehouse.SDK.Contracts.KnowledgeQuery;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -97,6 +98,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in KernelKnowledgeIntegration.cs: {ex.Message}");
             await SendErrorResponseAsync(
                 message.SourcePluginId,
                 message.Payload.TryGetValue("requestId", out var reqId) ? reqId?.ToString() ?? "" : "",
@@ -128,6 +130,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in KernelKnowledgeIntegration.cs: {ex.Message}");
             await SendErrorResponseAsync(
                 message.SourcePluginId,
                 message.Payload.TryGetValue("commandId", out var cmdId) ? cmdId?.ToString() ?? "" : "",
@@ -164,6 +167,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in KernelKnowledgeIntegration.cs");
             // Log error but don't fail the message
         }
     }
@@ -639,6 +643,7 @@ public static class KernelKnowledgeExtensions
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in KernelKnowledgeIntegration.cs");
             return Array.Empty<KnowledgeObject>();
         }
     }

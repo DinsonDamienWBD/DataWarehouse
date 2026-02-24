@@ -267,6 +267,7 @@ public abstract class EmbeddingProviderBase : IEmbeddingProviderExtended
     private readonly EmbeddingProviderMetrics _metrics = new();
     private readonly SemaphoreSlim _rateLimitSemaphore;
     private readonly object _metricsLock = new();
+    private readonly bool _ownsHttpClient;
     private bool _disposed;
 
     /// <summary>
@@ -308,6 +309,7 @@ public abstract class EmbeddingProviderBase : IEmbeddingProviderExtended
     protected EmbeddingProviderBase(EmbeddingProviderConfig config, HttpClient? httpClient = null)
     {
         Config = config ?? throw new ArgumentNullException(nameof(config));
+        _ownsHttpClient = httpClient == null;
         HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds) };
         _rateLimitSemaphore = new SemaphoreSlim(10, 10); // Default 10 concurrent requests
     }
@@ -603,7 +605,10 @@ public abstract class EmbeddingProviderBase : IEmbeddingProviderExtended
             if (disposing)
             {
                 _rateLimitSemaphore.Dispose();
-                // Note: Don't dispose HttpClient if it was passed in
+                if (_ownsHttpClient)
+                {
+                    HttpClient.Dispose();
+                }
             }
             _disposed = true;
         }

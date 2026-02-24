@@ -230,6 +230,7 @@ public sealed class KnowledgeAggregator : IDisposable
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
                     // Source failed, skip but continue with others
                 }
             }
@@ -1468,6 +1469,7 @@ public sealed class StateAggregator : IDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
                 // Topic may not exist, continue
             }
         }
@@ -2052,10 +2054,12 @@ public sealed class QueryExecutor
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in KnowledgeSystem.cs");
             return KnowledgeQueryResponse.Fail(request.RequestId, "Query was cancelled", "CANCELLED", sw.Elapsed);
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in KnowledgeSystem.cs: {ex.Message}");
             return KnowledgeQueryResponse.Fail(request.RequestId, ex.Message, "INTERNAL_ERROR", sw.Elapsed);
         }
     }
@@ -2367,6 +2371,7 @@ public sealed class CommandExecutor
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
                     // Rollback failed
                 }
             }
@@ -2375,6 +2380,7 @@ public sealed class CommandExecutor
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in KnowledgeSystem.cs: {ex.Message}");
             auditEntry.Error = ex.Message;
             auditEntry.Duration = sw.Elapsed;
             await LogAuditAsync(auditEntry).ConfigureAwait(false);
@@ -2451,6 +2457,7 @@ public sealed class CommandExecutor
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
                 // Audit publish failed, ignore
             }
         }
@@ -2798,6 +2805,7 @@ public sealed class ResultFormatter
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
             return data.ToString() ?? string.Empty;
         }
     }

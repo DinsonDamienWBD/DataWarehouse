@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -102,6 +103,7 @@ public sealed class SemanticVectorEncoder : IAIContextEncoder
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AIContextEncoder.cs");
             // Fallback to raw data if decoding fails
             return encoded.EncodedData;
         }
@@ -367,8 +369,7 @@ public sealed class SemanticVectorEncoder : IAIContextEncoder
 
     private static byte[] ComputeTokenHash(string token)
     {
-        using var md5 = MD5.Create();
-        return md5.ComputeHash(Encoding.UTF8.GetBytes(token));
+        return SHA256.HashData(Encoding.UTF8.GetBytes(token));
     }
 
     private static float[][] GenerateRandomProjections(int count, int dimensions)
@@ -695,8 +696,7 @@ public sealed class DifferentialContextEncoder : IAIContextEncoder
 
     private static string ComputeSimHash(string text)
     {
-        using var md5 = MD5.Create();
-        var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(text));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(text));
         return Convert.ToHexString(bytes).Substring(0, 16);
     }
 

@@ -674,6 +674,7 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in PostgresPersistenceBackend.cs");
             return false;
         }
     }

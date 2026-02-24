@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
@@ -725,8 +727,9 @@ internal sealed class BloomFilter
 
     private IEnumerable<int> GetHashes(string item)
     {
-        var hash1 = item.GetHashCode();
-        var hash2 = item.Reverse().ToString()?.GetHashCode() ?? 0;
+        var sha = SHA256.HashData(Encoding.UTF8.GetBytes(item));
+        var hash1 = BitConverter.ToInt32(sha, 0);
+        var hash2 = BitConverter.ToInt32(sha, 4);
 
         for (int i = 0; i < _hashCount; i++)
         {
@@ -751,7 +754,7 @@ internal sealed class HyperLogLog
 
     public void Add(string item)
     {
-        var hash = (ulong)item.GetHashCode();
+        var hash = BitConverter.ToUInt64(SHA256.HashData(Encoding.UTF8.GetBytes(item)), 0);
         var index = (int)(hash >> (64 - _precision));
         var value = hash << _precision;
         var rank = LeadingZeros(value) + 1;

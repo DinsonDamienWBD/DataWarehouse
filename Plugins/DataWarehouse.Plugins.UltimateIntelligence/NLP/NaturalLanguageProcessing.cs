@@ -328,6 +328,7 @@ public sealed class QueryParser
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 // Fall back to rule-based parsing
                 entities = ExtractEntitiesRuleBased(query);
                 intent = DetectIntentRuleBased(query);
@@ -669,6 +670,7 @@ public sealed class IntentDetector
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 result = DetectWithRules(query, context);
             }
         }
@@ -998,6 +1000,7 @@ public sealed class EntityExtractor
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 // Fall back to rule-based extraction
                 entities.AddRange(ExtractWithRules(text, entityTypes));
             }
@@ -1183,6 +1186,7 @@ public sealed class ResponseGenerator
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 return GenerateWithTemplates(context);
             }
         }
@@ -1536,6 +1540,7 @@ public sealed class UnifiedVectorStore : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 return Enumerable.Empty<VectorSearchResult>();
             }
         });
@@ -2420,6 +2425,7 @@ public sealed class RelationshipDiscovery
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 // Continue with rule-based relationships only
             }
         }
@@ -2583,6 +2589,7 @@ public sealed class GraphQuery
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in NaturalLanguageProcessing.cs");
                 // Fall back to keyword-based search
             }
         }

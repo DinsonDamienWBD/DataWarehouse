@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -1006,17 +1007,27 @@ public sealed class TrainingScheduler
                 // synchronization-context-bound threads.
                 if (_messageBus != null)
                 {
-                    Task.Run(() => _messageBus.PublishAsync("intelligence.instance.training.triggered", new PluginMessage
+                    _ = Task.Run(async () =>
                     {
-                        Type = "intelligence.instance.training.triggered",
-                        Source = "UltimateIntelligence",
-                        Payload = new Dictionary<string, object>
+                        try
                         {
-                            ["ScheduleId"] = schedule.ScheduleId,
-                            ["ModelId"] = schedule.ModelId,
-                            ["Timestamp"] = DateTimeOffset.UtcNow
+                            await _messageBus.PublishAsync("intelligence.instance.training.triggered", new PluginMessage
+                            {
+                                Type = "intelligence.instance.training.triggered",
+                                Source = "UltimateIntelligence",
+                                Payload = new Dictionary<string, object>
+                                {
+                                    ["ScheduleId"] = schedule.ScheduleId,
+                                    ["ModelId"] = schedule.ModelId,
+                                    ["Timestamp"] = DateTimeOffset.UtcNow
+                                }
+                            });
                         }
-                    })).ConfigureAwait(false).GetAwaiter().GetResult();
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Training trigger failed for schedule {schedule.ScheduleId}: {ex.Message}");
+                        }
+                    });
                 }
 
                 // Update schedule if recurring

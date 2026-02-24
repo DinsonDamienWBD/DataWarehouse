@@ -875,19 +875,17 @@ public sealed class TopicModelIndex : ContextIndexBase
             .ToArray();
     }
 
-    private static bool IsStopWord(string word)
+    private static readonly HashSet<string> StopWords = new()
     {
-        var stopWords = new HashSet<string>
-        {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-            "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
-            "be", "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "must", "can", "this", "that", "these", "those",
-            "it", "its", "they", "their", "them", "we", "our", "you", "your", "he",
-            "she", "his", "her", "who", "which", "what", "where", "when", "why", "how"
-        };
-        return stopWords.Contains(word);
-    }
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+        "be", "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "must", "can", "this", "that", "these", "those",
+        "it", "its", "they", "their", "them", "we", "our", "you", "your", "he",
+        "she", "his", "her", "who", "which", "what", "where", "when", "why", "how"
+    };
+
+    private static bool IsStopWord(string word) => StopWords.Contains(word);
 
     private static string GenerateSummary(string text)
     {

@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -437,6 +438,7 @@ public sealed class RedisVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in RedisVectorStore.cs");
             return false;
         }
     }
@@ -496,6 +498,7 @@ public sealed class RedisVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in RedisVectorStore.cs");
             return false;
         }
     }

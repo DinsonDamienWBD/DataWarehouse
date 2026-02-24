@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -352,6 +353,7 @@ public sealed class PineconeVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in PineconeVectorStore.cs");
             return false;
         }
     }

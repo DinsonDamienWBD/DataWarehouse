@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 /// - "What changed since X" queries
 /// - Time-based summarization (daily/weekly/monthly digests)
 /// </summary>
-public sealed class TemporalContextIndex : ContextIndexBase
+public sealed class TemporalContextIndex : ContextIndexBase, IDisposable
 {
     private readonly BoundedDictionary<string, TemporalEntry> _entries = new BoundedDictionary<string, TemporalEntry>(1000);
     private readonly SortedDictionary<DateTimeOffset, HashSet<string>> _creationIndex = new();
@@ -874,6 +874,14 @@ public sealed class TemporalContextIndex : ContextIndexBase
     }
 
     #endregion
+
+    /// <summary>
+    /// Releases the ReaderWriterLockSlim held by this index.
+    /// </summary>
+    public void Dispose()
+    {
+        _indexLock.Dispose();
+    }
 }
 
 #region Temporal Types

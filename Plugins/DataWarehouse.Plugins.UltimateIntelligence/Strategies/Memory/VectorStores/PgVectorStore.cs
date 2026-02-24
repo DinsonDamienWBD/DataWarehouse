@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -455,6 +456,7 @@ public sealed class PgVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in PgVectorStore.cs");
             return false;
         }
     }

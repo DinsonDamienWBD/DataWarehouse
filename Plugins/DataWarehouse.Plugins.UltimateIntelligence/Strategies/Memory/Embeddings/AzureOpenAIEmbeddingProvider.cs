@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -276,6 +277,7 @@ public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AzureOpenAIEmbeddingProvider.cs");
             return false;
         }
     }

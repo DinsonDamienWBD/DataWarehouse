@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -211,6 +212,7 @@ public sealed class RegenerationStrategyRegistry
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in RegenerationStrategyRegistry.cs");
                 return (Strategy: strategy, Capability: new RegenerationCapability { CanRegenerate = false });
             }
         });

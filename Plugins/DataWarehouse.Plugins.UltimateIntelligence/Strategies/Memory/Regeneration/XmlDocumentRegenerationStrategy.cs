@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -54,6 +55,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
             }
             catch (XmlException ex)
             {
+                Debug.WriteLine($"Caught exception in XmlDocumentRegenerationStrategy.cs: {ex.Message}");
                 warnings.Add($"Initial parse failed: {ex.Message}");
                 xmlContent = RepairXml(xmlContent);
                 doc = XDocument.Parse(xmlContent);
@@ -117,6 +119,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in XmlDocumentRegenerationStrategy.cs: {ex.Message}");
             var duration = DateTime.UtcNow - startTime;
             RecordRegeneration(false, 0, "xml");
 
@@ -200,6 +203,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in XmlDocumentRegenerationStrategy.cs");
             // Fallback to string comparison
             return CalculateStringSimilarity(original, regenerated);
         }
@@ -359,6 +363,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in XmlDocumentRegenerationStrategy.cs");
                 return true; // Can't parse schema, skip validation
             }
 
@@ -376,6 +381,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in XmlDocumentRegenerationStrategy.cs");
             return false;
         }
     }

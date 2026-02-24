@@ -166,6 +166,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs");
                 return false;
             }
         }
@@ -273,6 +274,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "Error handling before-request observation");
             }
         }
@@ -293,6 +295,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "Error handling after-response observation");
             }
         }
@@ -312,6 +315,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "Error handling schema discovery observation");
             }
         }
@@ -331,6 +335,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "Error handling error observation");
             }
         }
@@ -351,6 +356,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "Error handling connection established observation");
             }
         }
@@ -435,6 +441,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error transforming request");
                 RecordFailure();
 
@@ -475,6 +482,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error optimizing query");
                 RecordFailure();
 
@@ -513,6 +521,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error enriching schema");
                 RecordFailure();
 
@@ -553,6 +562,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error detecting anomalies");
                 RecordFailure();
 
@@ -593,6 +603,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error predicting failure");
                 RecordFailure();
 
@@ -663,6 +674,7 @@ Provide only the optimized JSON payload in your response, no explanations.";
                 }
                 catch (JsonException ex)
                 {
+                    Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                     _logger?.LogWarning(ex, "Failed to parse AI transformation response, using original payload");
                 }
 
@@ -670,6 +682,7 @@ Provide only the optimized JSON payload in your response, no explanations.";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "AI transformation failed, returning original payload");
                 return new Dictionary<string, object>(request.RequestPayload);
             }
@@ -749,6 +762,7 @@ Return ONLY the optimized query text. Do not include explanations or markdown fo
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "AI query optimization failed, returning original query");
                 return request.QueryText;
             }
@@ -831,6 +845,7 @@ Return only valid JSON, no explanations.";
                     }
                     catch (JsonException ex)
                     {
+                        Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                         _logger?.LogWarning(ex, "Failed to parse AI schema enrichment response");
                     }
                 }
@@ -839,6 +854,7 @@ Return only valid JSON, no explanations.";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "AI schema enrichment failed, returning basic metadata");
                 return enrichedMetadata;
             }
@@ -954,6 +970,7 @@ Return only the JSON array, or [] if no anomalies detected.";
                     }
                     catch (JsonException ex)
                     {
+                        Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                         _logger?.LogWarning(ex, "Failed to parse AI anomaly detection response");
                     }
                 }
@@ -962,6 +979,7 @@ Return only the JSON array, or [] if no anomalies detected.";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "AI anomaly detection failed, returning statistical results only");
                 return anomalies;
             }
@@ -1071,6 +1089,7 @@ Return only valid JSON.";
                     }
                     catch (JsonException ex)
                     {
+                        Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                         _logger?.LogWarning(ex, "Failed to parse AI failure prediction response");
                     }
                 }
@@ -1079,6 +1098,7 @@ Return only valid JSON.";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogWarning(ex, "AI failure prediction failed, returning heuristic probability");
                 return baseProbability;
             }
@@ -1097,6 +1117,7 @@ Return only valid JSON.";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConnectorIntegrationStrategy.cs: {ex.Message}");
                 _logger?.LogError(ex, "Error deserializing payload to {Type}", typeof(T).Name);
                 return null;
             }

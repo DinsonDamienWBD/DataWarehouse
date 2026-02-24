@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -235,6 +236,7 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in OllamaEmbeddingProvider.cs");
             return false;
         }
     }
@@ -255,6 +257,7 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in OllamaEmbeddingProvider.cs");
             return new List<string>();
         }
     }

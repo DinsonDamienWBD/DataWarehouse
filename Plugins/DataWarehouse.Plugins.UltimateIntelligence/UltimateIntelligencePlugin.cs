@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -335,6 +336,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
                 // Strategy failed to instantiate, skip
             }
         }
@@ -645,6 +647,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -673,6 +676,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -708,6 +712,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -730,6 +735,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -755,6 +761,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -769,6 +776,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -784,6 +792,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -799,6 +808,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
 
@@ -823,6 +833,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -843,6 +854,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -857,6 +869,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -874,6 +887,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -897,6 +911,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -920,6 +935,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }
@@ -935,6 +951,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
             // Log error
         }
     }

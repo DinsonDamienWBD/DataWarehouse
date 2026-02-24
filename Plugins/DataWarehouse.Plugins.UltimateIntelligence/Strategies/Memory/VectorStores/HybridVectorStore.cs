@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -154,6 +155,7 @@ public sealed class HybridVectorStore : IProductionVectorStore
                         }
                         catch
                         {
+                            Debug.WriteLine($"Caught exception in HybridVectorStore.cs");
                             // Log replication failure
                         }
                     });
@@ -202,6 +204,7 @@ public sealed class HybridVectorStore : IProductionVectorStore
                         }
                         catch
                         {
+                            Debug.WriteLine($"Caught exception in HybridVectorStore.cs");
                             // Log replication failure
                         }
                     });

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.DomainModels;
 
@@ -376,6 +377,7 @@ public sealed class GenericModelConnector
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs");
             return false;
         }
     }
@@ -488,6 +490,7 @@ public sealed class ModelCapabilityDiscovery
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             capabilities.IsAvailable = false;
             capabilities.ErrorMessage = ex.Message;
         }
@@ -725,6 +728,7 @@ public sealed class MathematicsModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Error($"Mathematics inference failed: {ex.Message}", DateTime.UtcNow - startTime);
         }
     }
@@ -829,6 +833,7 @@ public sealed class PhysicsModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Physics inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -899,6 +904,7 @@ public sealed class FinanceModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Finance inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -966,6 +972,7 @@ public sealed class EconomicsModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Economics inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1032,6 +1039,7 @@ public sealed class HealthcareModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Healthcare inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1098,6 +1106,7 @@ public sealed class LegalModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Legal inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1164,6 +1173,7 @@ public sealed class EngineeringModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Engineering inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1230,6 +1240,7 @@ public sealed class BioinformaticsModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Bioinformatics inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1296,6 +1307,7 @@ public sealed class GeospatialModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Geospatial inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }
@@ -1362,6 +1374,7 @@ public sealed class LogisticsModelStrategy : DomainModelStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in DomainModelRegistry.cs: {ex.Message}");
             return Task.FromResult(Error($"Logistics inference failed: {ex.Message}", DateTime.UtcNow - startTime));
         }
     }

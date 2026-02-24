@@ -128,6 +128,7 @@ public sealed class RegenerationPipeline
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in RegenerationPipeline.cs: {ex.Message}");
             stopwatch.Stop();
             execution.Status = PipelineStatus.Failed;
             execution.ErrorMessage = ex.Message;
@@ -172,6 +173,7 @@ public sealed class RegenerationPipeline
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in RegenerationPipeline.cs");
                 // Strategy failed, continue with others
             }
         });
@@ -266,6 +268,7 @@ public sealed class RegenerationPipeline
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in RegenerationPipeline.cs: {ex.Message}");
                 failedChunks.Add(i);
                 regeneratedChunks.Add(new ChunkResult
                 {
@@ -363,6 +366,7 @@ public sealed class RegenerationPipeline
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in RegenerationPipeline.cs: {ex.Message}");
                 results.Add(new RegenerationResult
                 {
                     Success = false,
@@ -457,6 +461,7 @@ public sealed class RegenerationPipeline
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in RegenerationPipeline.cs");
             // Refinement failed, return original
         }
 

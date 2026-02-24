@@ -296,6 +296,7 @@ public sealed class IndexManager : IAsyncDisposable
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in IndexManager.cs: {ex.Message}");
                 results.Add(new ConsistencyCheckResult
                 {
                     IndexId = indexId,
@@ -335,6 +336,7 @@ public sealed class IndexManager : IAsyncDisposable
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in IndexManager.cs");
             return false;
         }
     }
@@ -459,6 +461,7 @@ public sealed class IndexManager : IAsyncDisposable
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in IndexManager.cs: {ex.Message}");
                 Interlocked.Decrement(ref _pendingTasks);
                 Interlocked.Increment(ref _failedTasks);
 
@@ -488,6 +491,7 @@ public sealed class IndexManager : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in IndexManager.cs");
             // Expected
         }
 

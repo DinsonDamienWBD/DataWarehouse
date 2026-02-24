@@ -310,6 +310,7 @@ public sealed class EmbeddingCache : IDisposable
     {
         lock (_lruLock)
         {
+            // TODO: LinkedList.Find is O(n); consider Dictionary<string, LinkedListNode<string>> for O(1) LRU updates
             var node = _lruList.Find(key);
             if (node != null)
             {

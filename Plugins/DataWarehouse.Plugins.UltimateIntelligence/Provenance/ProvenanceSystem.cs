@@ -1663,6 +1663,7 @@ public sealed class SignatureVerifier : IDisposable
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in ProvenanceSystem.cs: {ex.Message}");
             return new SignatureVerificationResult
             {
                 IsValid = false,

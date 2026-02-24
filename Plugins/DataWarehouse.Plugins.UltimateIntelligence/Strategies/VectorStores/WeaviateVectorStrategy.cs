@@ -40,7 +40,7 @@ public sealed class WeaviateVectorStrategy : VectorStoreStrategyBase
         Tags = new[] { "weaviate", "vector-db", "open-source", "graphql", "self-hosted" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public WeaviateVectorStrategy() : this(SharedHttpClient) { }
 
     public WeaviateVectorStrategy(HttpClient httpClient)

@@ -675,6 +675,7 @@ public sealed class RuleEngine
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in InferenceEngine.cs");
                 return 0;
             }
         }
@@ -733,6 +734,7 @@ public sealed class RuleEngine
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in InferenceEngine.cs");
                 return false;
             }
         }

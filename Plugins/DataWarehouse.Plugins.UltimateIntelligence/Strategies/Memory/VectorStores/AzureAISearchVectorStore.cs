@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -476,6 +477,7 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AzureAISearchVectorStore.cs");
             return false;
         }
     }
@@ -525,6 +527,7 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AzureAISearchVectorStore.cs");
             return false;
         }
     }

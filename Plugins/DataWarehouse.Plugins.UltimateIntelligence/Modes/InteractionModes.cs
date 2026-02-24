@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Modes;
 
@@ -1176,6 +1177,7 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
             try { await _processorTask; }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in InteractionModes.cs");
                 /* Cancellation is expected during shutdown */
             }
         }
@@ -1262,10 +1264,12 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in InteractionModes.cs");
                 break;
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in InteractionModes.cs");
                 // Log and continue
             }
         }
@@ -1287,12 +1291,14 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in InteractionModes.cs");
             task.Status = taskCts.IsCancellationRequested && !ct.IsCancellationRequested
                 ? BackgroundTaskStatus.TimedOut
                 : BackgroundTaskStatus.Cancelled;
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs: {ex.Message}");
             task.Error = ex.Message;
 
             // Retry logic
@@ -1427,6 +1433,7 @@ public sealed class ScheduledTasks : FeatureStrategyBase
             try { await _schedulerTask; }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in InteractionModes.cs");
                 /* Cancellation is expected during shutdown */
             }
         }
@@ -1521,10 +1528,12 @@ public sealed class ScheduledTasks : FeatureStrategyBase
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in InteractionModes.cs");
                 break;
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in InteractionModes.cs");
                 // Log and continue
             }
         }
@@ -1544,6 +1553,7 @@ public sealed class ScheduledTasks : FeatureStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs: {ex.Message}");
             task.LastError = ex.Message;
         }
         finally
@@ -1593,6 +1603,7 @@ public sealed class ScheduledTasks : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs");
             return from.AddHours(1);
         }
     }
@@ -1724,6 +1735,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in InteractionModes.cs: {ex.Message}");
                 report.Sections.Add(new ReportSection
                 {
                     Title = source.Name,
@@ -1742,6 +1754,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in InteractionModes.cs");
                 report.Summary = "AI summary unavailable";
             }
         }
@@ -2067,6 +2080,7 @@ public sealed class EventListener : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs");
             // Log error but don't propagate
         }
     }
@@ -2292,6 +2306,7 @@ public sealed class TriggerEngine : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs");
             // Log error but don't propagate
         }
     }
@@ -2426,6 +2441,7 @@ public sealed class AnomalyResponder : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in InteractionModes.cs");
             // Log error but don't propagate
         }
     }

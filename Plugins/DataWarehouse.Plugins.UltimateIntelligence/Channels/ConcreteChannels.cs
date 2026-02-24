@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Channels;
 
@@ -203,6 +204,7 @@ public sealed class ChannelRegistry : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in ConcreteChannels.cs");
                 // Channel failed, continue with others
             }
         });
@@ -225,6 +227,7 @@ public sealed class ChannelRegistry : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in ConcreteChannels.cs");
                 // Ignore disposal errors
             }
         }
@@ -343,6 +346,7 @@ public sealed class CLIChannel : IntelligenceChannelBase
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in ConcreteChannels.cs");
                 // Expected
             }
         }
@@ -452,10 +456,12 @@ public sealed class CLIChannel : IntelligenceChannelBase
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in ConcreteChannels.cs");
                 break;
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in ConcreteChannels.cs: {ex.Message}");
                 await WriteErrorAsync(ex.Message, ct).ConfigureAwait(false);
             }
         }
@@ -664,6 +670,7 @@ public sealed class RESTChannel : IntelligenceChannelBase
         }
         catch (HttpRequestException ex)
         {
+            Debug.WriteLine($"Caught exception in ConcreteChannels.cs: {ex.Message}");
             return IntelligenceResponse.CreateFailure(request.RequestId, ex.Message, "HTTP_ERROR");
         }
         finally
@@ -1179,6 +1186,7 @@ public sealed class WebSocketChannel : IntelligenceChannelBase
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in ConcreteChannels.cs");
                     // Ignore close errors
                 }
             }
@@ -1361,6 +1369,7 @@ public sealed class WebSocketChannel : IntelligenceChannelBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in ConcreteChannels.cs");
                 // Continue to next attempt
             }
         }
@@ -1695,6 +1704,7 @@ public sealed class PluginChannel : IntelligenceChannelBase
                     }
                     catch (Exception ex)
                     {
+                        Debug.WriteLine($"Caught exception in ConcreteChannels.cs: {ex.Message}");
                         if (!msg.FireAndForget && _pendingRequests.TryRemove(msg.Request.RequestId, out var tcs))
                         {
                             tcs.TrySetResult(IntelligenceResponse.CreateFailure(msg.Request.RequestId, ex.Message, "PROCESSING_ERROR"));
@@ -1704,6 +1714,7 @@ public sealed class PluginChannel : IntelligenceChannelBase
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in ConcreteChannels.cs");
                 break;
             }
         }

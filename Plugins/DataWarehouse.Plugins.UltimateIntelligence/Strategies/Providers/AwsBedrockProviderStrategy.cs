@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 
@@ -57,7 +58,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "aws", "bedrock", "claude", "titan", "llama", "enterprise" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public AwsBedrockProviderStrategy() : this(SharedHttpClient) { }
 
     public AwsBedrockProviderStrategy(HttpClient httpClient)

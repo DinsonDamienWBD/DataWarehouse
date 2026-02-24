@@ -54,7 +54,7 @@ public sealed class AzureOpenAiProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "azure", "openai", "enterprise", "compliant", "gpt", "embeddings" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public AzureOpenAiProviderStrategy() : this(SharedHttpClient) { }
 
     public AzureOpenAiProviderStrategy(HttpClient httpClient)

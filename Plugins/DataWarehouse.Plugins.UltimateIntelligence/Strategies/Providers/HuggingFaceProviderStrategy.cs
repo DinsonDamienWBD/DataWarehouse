@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 
@@ -56,7 +57,7 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "huggingface", "open-source", "mistral", "llama", "embeddings", "transformers" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public HuggingFaceProviderStrategy() : this(SharedHttpClient) { }
 
     public HuggingFaceProviderStrategy(HttpClient httpClient)

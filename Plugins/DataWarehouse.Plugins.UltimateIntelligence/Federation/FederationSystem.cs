@@ -526,6 +526,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in FederationSystem.cs");
                     // Ignore JSON parsing errors
                 }
 
@@ -554,6 +555,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
             sw.Stop();
             result = new HealthCheckResult
             {
@@ -1019,6 +1021,7 @@ public sealed class FederationProtocol : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in FederationSystem.cs");
                 // Log but continue broadcasting to other instances
             }
         });
@@ -1070,6 +1073,7 @@ public sealed class FederationProtocol : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
             // Log error
             Console.Error.WriteLine($"Error handling incoming message: {ex.Message}");
         }
@@ -1399,6 +1403,7 @@ public sealed class QueryFanOut
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
                 instanceErrors[instance.Configuration.InstanceId] = ex.Message;
             }
         });
@@ -1470,6 +1475,7 @@ public sealed class QueryFanOut
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in FederationSystem.cs");
                 // Log but continue
             }
         }).ToList();
@@ -2210,6 +2216,7 @@ public sealed class InstanceAuthentication
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
             return new AuthenticationResult
             {
                 IsAuthenticated = false,

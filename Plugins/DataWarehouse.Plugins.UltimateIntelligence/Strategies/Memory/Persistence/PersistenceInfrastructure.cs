@@ -785,6 +785,7 @@ public sealed class TieredPersistenceManager : IProductionPersistenceBackend
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in PersistenceInfrastructure.cs");
                 // Log error
             }
         }
@@ -886,6 +887,7 @@ public sealed class WriteAheadLog : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in PersistenceInfrastructure.cs");
                 // Corrupted WAL file - skip
             }
         }
@@ -1236,17 +1238,20 @@ public sealed class PersistenceEncryption : IProductionPersistenceBackend
 
     private MemoryRecord EncryptRecord(MemoryRecord record)
     {
-        using var aes = Aes.Create();
-        aes.Key = _masterKey;
-        aes.GenerateIV();
+        // AES-GCM: authenticated encryption — layout: [nonce(12)][tag(16)][ciphertext(N)]
+        var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // 12 bytes
+        RandomNumberGenerator.Fill(nonce);
 
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(record.Content, 0, record.Content.Length);
+        var ciphertext = new byte[record.Content.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // 16 bytes
 
-        // Prepend IV to encrypted data
-        var result = new byte[aes.IV.Length + encrypted.Length];
-        aes.IV.CopyTo(result, 0);
-        encrypted.CopyTo(result, aes.IV.Length);
+        using var aesGcm = new AesGcm(_masterKey, AesGcm.TagByteSizes.MaxSize);
+        aesGcm.Encrypt(nonce, record.Content, ciphertext, tag);
+
+        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        nonce.CopyTo(result, 0);
+        tag.CopyTo(result, nonce.Length);
+        ciphertext.CopyTo(result, nonce.Length + tag.Length);
 
         return record with
         {
@@ -1257,21 +1262,23 @@ public sealed class PersistenceEncryption : IProductionPersistenceBackend
 
     private MemoryRecord DecryptRecord(MemoryRecord record)
     {
-        using var aes = Aes.Create();
-        aes.Key = _masterKey;
+        // AES-GCM: layout: [nonce(12)][tag(16)][ciphertext(N)]
+        const int nonceSize = 12;
+        const int tagSize = 16;
 
-        // Extract IV from content
-        var iv = new byte[16];
-        var encrypted = new byte[record.Content.Length - 16];
-        Array.Copy(record.Content, 0, iv, 0, 16);
-        Array.Copy(record.Content, 16, encrypted, 0, encrypted.Length);
+        var nonce = new byte[nonceSize];
+        var tag = new byte[tagSize];
+        var ciphertext = new byte[record.Content.Length - nonceSize - tagSize];
 
-        aes.IV = iv;
+        Array.Copy(record.Content, 0, nonce, 0, nonceSize);
+        Array.Copy(record.Content, nonceSize, tag, 0, tagSize);
+        Array.Copy(record.Content, nonceSize + tagSize, ciphertext, 0, ciphertext.Length);
 
-        using var decryptor = aes.CreateDecryptor();
-        var decrypted = decryptor.TransformFinalBlock(encrypted, 0, encrypted.Length);
+        var plaintext = new byte[ciphertext.Length];
+        using var aesGcm = new AesGcm(_masterKey, AesGcm.TagByteSizes.MaxSize);
+        aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
 
-        return record with { Content = decrypted };
+        return record with { Content = plaintext };
     }
 
     #endregion

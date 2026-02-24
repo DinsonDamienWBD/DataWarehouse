@@ -455,10 +455,10 @@ public sealed class SemanticClusterIndex : ContextIndexBase
         {
             var targetCluster = candidates[0].Cluster;
 
-            // Check if cluster is full
+            // Check if cluster is full — trigger split
             if (targetCluster.EntryCount >= MaxClusterSize)
             {
-                // Would split cluster - for now just add to it
+                await SplitLargeClusters(ct);
             }
 
             // Update cluster
@@ -866,44 +866,121 @@ public sealed class SemanticClusterIndex : ContextIndexBase
 
         foreach (var large in largeClusters)
         {
-            // K-means style split into 2 clusters
             var entries = GetEntriesInCluster(large.ClusterId).ToList();
             if (entries.Count < 2) continue;
 
-            // Simple split by first half / second half (would use proper k-means)
-            var half = entries.Count / 2;
+            // Cosine-distance bisection: pick two seeds (most distant pair)
+            var withEmbeddings = entries.Where(e => e.Embedding != null).ToList();
+            List<ClusteredEntry> groupA, groupB;
+
+            if (withEmbeddings.Count >= 2)
+            {
+                // Find two most distant entries as seeds
+                var seedA = withEmbeddings[0];
+                var seedB = withEmbeddings[1];
+                double maxDist = 0;
+
+                for (int i = 0; i < Math.Min(withEmbeddings.Count, 50); i++)
+                {
+                    for (int j = i + 1; j < Math.Min(withEmbeddings.Count, 50); j++)
+                    {
+                        var dist = CosineDist(withEmbeddings[i].Embedding!, withEmbeddings[j].Embedding!);
+                        if (dist > maxDist)
+                        {
+                            maxDist = dist;
+                            seedA = withEmbeddings[i];
+                            seedB = withEmbeddings[j];
+                        }
+                    }
+                }
+
+                // Assign each entry to the closest seed
+                groupA = new List<ClusteredEntry>();
+                groupB = new List<ClusteredEntry>();
+
+                foreach (var entry in entries)
+                {
+                    if (entry.Embedding == null)
+                    {
+                        // No embedding — assign to smaller group for balance
+                        (groupA.Count <= groupB.Count ? groupA : groupB).Add(entry);
+                    }
+                    else
+                    {
+                        var distA = CosineDist(entry.Embedding, seedA.Embedding!);
+                        var distB = CosineDist(entry.Embedding, seedB.Embedding!);
+                        (distA <= distB ? groupA : groupB).Add(entry);
+                    }
+                }
+            }
+            else
+            {
+                // No embeddings — fall back to balanced split
+                var half = entries.Count / 2;
+                groupA = entries.Take(half).ToList();
+                groupB = entries.Skip(half).ToList();
+            }
+
+            if (groupA.Count == 0 || groupB.Count == 0) continue;
+
             var newClusterId = $"cluster:{Guid.NewGuid():N}";
 
-            // Create new cluster
+            // Compute centroid for group B
+            var bEmbeddings = groupB.Where(e => e.Embedding != null).Select(e => e.Embedding!).ToList();
+            float[]? newCentroid = bEmbeddings.Count > 0 ? ComputeCentroid(bEmbeddings) : null;
+
+            // Create new cluster for group B
             _clusters[newClusterId] = new ClusterNode
             {
                 ClusterId = newClusterId,
                 ParentId = large.ParentId,
                 Level = large.Level,
-                Centroid = entries[half].Embedding,
-                EntryCount = entries.Count - half,
+                Centroid = newCentroid,
+                EntryCount = groupB.Count,
                 ChildClusterCount = 0,
                 RepresentativeSummary = $"Split from {GetClusterDisplayName(large)}",
-                TopTerms = entries.Skip(half).SelectMany(e => e.Tags).Distinct().Take(5).ToArray(),
+                TopTerms = groupB.SelectMany(e => e.Tags).Distinct().Take(5).ToArray(),
                 CreatedAt = DateTimeOffset.UtcNow,
                 LastUpdated = DateTimeOffset.UtcNow
             };
 
-            // Move entries
-            foreach (var entry in entries.Skip(half))
+            // Move group B entries
+            foreach (var entry in groupB)
             {
                 _entryToCluster[entry.ContentId] = newClusterId;
             }
 
-            // Update original
+            // Update original cluster for group A
             _clusters[large.ClusterId] = large with
             {
-                EntryCount = half,
+                EntryCount = groupA.Count,
                 LastUpdated = DateTimeOffset.UtcNow
             };
 
             TrackClusterChange(large.ClusterId, "split", $"Split into {large.ClusterId} and {newClusterId}");
         }
+
+        await Task.CompletedTask;
+    }
+
+    private static float CosineDist(float[] a, float[] b)
+    {
+        return 1.0f - CosineSimilarity(a, b);
+    }
+
+    private static float[] ComputeCentroid(List<float[]> embeddings)
+    {
+        if (embeddings.Count == 0) return Array.Empty<float>();
+        var dim = embeddings[0].Length;
+        var centroid = new float[dim];
+        foreach (var emb in embeddings)
+        {
+            for (int i = 0; i < dim && i < emb.Length; i++)
+                centroid[i] += emb[i];
+        }
+        for (int i = 0; i < dim; i++)
+            centroid[i] /= embeddings.Count;
+        return centroid;
     }
 
     private void RecalculateCentroids()

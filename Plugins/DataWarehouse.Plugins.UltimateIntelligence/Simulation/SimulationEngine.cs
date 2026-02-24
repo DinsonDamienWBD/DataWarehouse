@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Simulation;
 
@@ -927,6 +928,7 @@ public sealed class ChangeSimulator
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in SimulationEngine.cs: {ex.Message}");
                 results.Add(new ChangeResult
                 {
                     ChangeId = change.ChangeId,
@@ -1155,6 +1157,7 @@ public sealed class ImpactAnalyzer
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in SimulationEngine.cs");
                 warnings.Add("AI-enhanced analysis unavailable");
             }
         }

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -1359,6 +1360,7 @@ public abstract class IntelligenceGatewayBase : IIntelligenceGateway, IProviderR
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in IntelligenceGateway.cs");
                 // Ignore disposal errors
             }
         }
@@ -1707,6 +1709,7 @@ public abstract class IntelligenceChannelBase : IIntelligenceChannel
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine($"Caught OperationCanceledException in IntelligenceGateway.cs");
                 // Expected
             }
         }
@@ -1809,6 +1812,7 @@ public abstract class IntelligenceChannelBase : IIntelligenceChannel
                 }
                 catch (OperationCanceledException)
                 {
+                    Debug.WriteLine($"Caught OperationCanceledException in IntelligenceGateway.cs");
                     break;
                 }
             }

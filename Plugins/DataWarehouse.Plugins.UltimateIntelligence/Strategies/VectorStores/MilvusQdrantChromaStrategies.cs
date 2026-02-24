@@ -41,7 +41,7 @@ public sealed class MilvusVectorStrategy : VectorStoreStrategyBase
         Tags = new[] { "milvus", "vector-db", "cloud-native", "billion-scale", "self-hosted" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public MilvusVectorStrategy() : this(SharedHttpClient) { }
     public MilvusVectorStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 
@@ -201,7 +201,7 @@ public sealed class QdrantVectorStrategy : VectorStoreStrategyBase
         Tags = new[] { "qdrant", "vector-db", "rust", "filtering", "self-hosted" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public QdrantVectorStrategy() : this(SharedHttpClient) { }
     public QdrantVectorStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 
@@ -345,7 +345,7 @@ public sealed class ChromaVectorStrategy : VectorStoreStrategyBase
         Tags = new[] { "chroma", "vector-db", "python", "ai-native", "simple" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public ChromaVectorStrategy() : this(SharedHttpClient) { }
     public ChromaVectorStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 

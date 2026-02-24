@@ -57,7 +57,7 @@ public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "openai", "gpt", "gpt-4", "chatgpt", "embeddings", "dalle" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public OpenAiProviderStrategy() : this(SharedHttpClient) { }
 
     public OpenAiProviderStrategy(HttpClient httpClient)

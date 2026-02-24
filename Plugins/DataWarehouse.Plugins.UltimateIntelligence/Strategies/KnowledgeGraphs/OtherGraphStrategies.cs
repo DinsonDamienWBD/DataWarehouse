@@ -43,7 +43,7 @@ public sealed class ArangoGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "arangodb", "multi-model", "aql", "graph-db", "document-db" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public ArangoGraphStrategy() : this(SharedHttpClient) { }
     public ArangoGraphStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 
@@ -384,7 +384,7 @@ public sealed class TigerGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "tigergraph", "gsql", "analytics", "high-performance" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public TigerGraphStrategy() : this(SharedHttpClient) { }
     public TigerGraphStrategy(HttpClient httpClient) { _httpClient = httpClient; }
 

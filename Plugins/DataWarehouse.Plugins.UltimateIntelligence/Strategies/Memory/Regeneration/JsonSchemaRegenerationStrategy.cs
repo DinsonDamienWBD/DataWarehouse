@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -49,6 +50,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs");
                     warnings.Add("Failed to parse provided schema");
                 }
             }
@@ -68,6 +70,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             }
             catch (JsonException ex)
             {
+                Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs: {ex.Message}");
                 warnings.Add($"Initial parse failed: {ex.Message}");
                 jsonContent = RepairJson(jsonContent);
                 doc = JsonDocument.Parse(jsonContent);
@@ -126,6 +129,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs: {ex.Message}");
             var duration = DateTime.UtcNow - startTime;
             RecordRegeneration(false, 0, "json");
 
@@ -210,6 +214,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs");
             // Fallback to string comparison
             return CalculateStringSimilarity(original, regenerated);
         }
@@ -455,6 +460,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs");
             return false;
         }
     }
@@ -480,6 +486,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs");
             return 0.0;
         }
     }
@@ -587,6 +594,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs");
             return 0;
         }
     }

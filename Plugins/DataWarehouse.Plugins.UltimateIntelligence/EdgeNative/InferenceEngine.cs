@@ -433,6 +433,7 @@ public class WasiNnGpuBridge
             }
             catch (Exception)
             {
+                Debug.WriteLine($"Caught Exception in InferenceEngine.cs");
                 _gpuFailureCount++;
 
                 if (_gpuFailureCount >= MaxGpuFailures)
@@ -776,6 +777,7 @@ public class OnnxInferenceStrategy : IInferenceStrategy
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in InferenceEngine.cs: {ex.Message}");
             return new InferenceResult
             {
                 OutputData = Array.Empty<byte>(),
@@ -875,6 +877,7 @@ public class GgufInferenceStrategy : IInferenceStrategy
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in InferenceEngine.cs: {ex.Message}");
             return new InferenceResult
             {
                 OutputData = Array.Empty<byte>(),

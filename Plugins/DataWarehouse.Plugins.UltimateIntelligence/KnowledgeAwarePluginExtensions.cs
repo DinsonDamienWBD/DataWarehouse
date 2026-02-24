@@ -2,6 +2,7 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -215,6 +216,7 @@ public static class KnowledgeAwarePluginExtensions
                     }
                     catch
                     {
+                        Debug.WriteLine($"Caught exception in KnowledgeAwarePluginExtensions.cs");
                         // Custom handler not implemented or failed
                     }
                     break;
@@ -544,6 +546,7 @@ public static class KnowledgeAwarePluginExtensions
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in KnowledgeAwarePluginExtensions.cs");
             return null;
         }
     }
@@ -579,6 +582,7 @@ public static class KnowledgeAwarePluginExtensions
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in KnowledgeAwarePluginExtensions.cs");
             return null;
         }
     }

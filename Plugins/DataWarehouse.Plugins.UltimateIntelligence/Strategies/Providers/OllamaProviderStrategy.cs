@@ -54,7 +54,7 @@ public sealed class OllamaProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "ollama", "local", "llama", "mistral", "codellama", "offline", "self-hosted" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public OllamaProviderStrategy() : this(SharedHttpClient) { }
 
     public OllamaProviderStrategy(HttpClient httpClient)

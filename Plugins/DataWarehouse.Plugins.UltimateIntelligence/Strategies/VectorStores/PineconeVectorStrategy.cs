@@ -38,7 +38,7 @@ public sealed class PineconeVectorStrategy : VectorStoreStrategyBase
         Tags = new[] { "pinecone", "vector-db", "managed", "hybrid-search", "production" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     public PineconeVectorStrategy() : this(SharedHttpClient) { }
 
     public PineconeVectorStrategy(HttpClient httpClient)

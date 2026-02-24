@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -68,6 +69,7 @@ public sealed class ProtobufRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in BinaryFormatRegenerationStrategies.cs: {ex.Message}");
             return new RegenerationResult
             {
                 Success = false,
@@ -304,6 +306,7 @@ public sealed class AvroRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in BinaryFormatRegenerationStrategies.cs: {ex.Message}");
             return new RegenerationResult
             {
                 Success = false,
@@ -514,6 +517,7 @@ public sealed class ParquetRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in BinaryFormatRegenerationStrategies.cs: {ex.Message}");
             return new RegenerationResult
             {
                 Success = false,

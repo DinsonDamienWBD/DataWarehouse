@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -126,6 +127,7 @@ public sealed class CodeRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in CodeRegenerationStrategy.cs: {ex.Message}");
             var duration = DateTime.UtcNow - startTime;
             RecordRegeneration(false, 0, "code");
 

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
@@ -259,6 +260,7 @@ public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in ContextRegenerator.cs: {ex.Message}");
             return new AdvancedRegenerationResult
             {
                 Success = false,
@@ -345,13 +347,18 @@ public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
             ? $"Add: {string.Join(", ", missingElements)}"
             : "Context is sufficient for high-accuracy regeneration";
 
+        // Compute confidence from data: fewer missing elements and longer content yield higher confidence
+        var missingPenalty = Math.Min(missingElements.Count * 0.1, 0.5);
+        var lengthBonus = Math.Min(contextStr.Length / 10000.0, 0.15);
+        var assessmentConfidence = Math.Clamp(0.95 - missingPenalty + lengthBonus, 0.1, 1.0);
+
         return new RegenerationCapability
         {
             CanRegenerate = expectedAccuracy > 0.9,
             ExpectedAccuracy = Math.Max(0, expectedAccuracy),
             MissingElements = missingElements,
             RecommendedEnrichment = recommendedEnrichment,
-            AssessmentConfidence = 0.85,
+            AssessmentConfidence = assessmentConfidence,
             DetectedContentType = detectedType,
             EstimatedDuration = estimatedDuration,
             EstimatedMemoryBytes = estimatedMemory

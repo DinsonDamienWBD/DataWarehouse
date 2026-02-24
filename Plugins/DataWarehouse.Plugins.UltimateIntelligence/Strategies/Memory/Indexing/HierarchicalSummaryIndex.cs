@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 ///
 /// Each node has an AI-generated summary, embedding, and child pointers.
 /// </summary>
-public sealed class HierarchicalSummaryIndex : ContextIndexBase
+public sealed class HierarchicalSummaryIndex : ContextIndexBase, IDisposable
 {
     private readonly BoundedDictionary<string, SummaryNode> _nodes = new BoundedDictionary<string, SummaryNode>(1000);
     private readonly BoundedDictionary<string, IndexedEntry> _entries = new BoundedDictionary<string, IndexedEntry>(1000);
@@ -714,6 +714,7 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in HierarchicalSummaryIndex.cs");
             return $"Binary content ({content.Length} bytes)";
         }
     }
@@ -781,14 +782,70 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase
 
     private Task RebalanceTree(CancellationToken ct)
     {
-        // Find nodes with too many children
-        foreach (var kvp in _childIndex)
+        // Find nodes with too many children and split them
+        var overflowNodes = _childIndex
+            .Where(kvp => kvp.Value.Count > MaxChildrenPerNode && _nodes.ContainsKey(kvp.Key))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var parentId in overflowNodes)
         {
-            if (kvp.Value.Count > MaxChildrenPerNode && _nodes.TryGetValue(kvp.Key, out var parent))
+            if (!_childIndex.TryGetValue(parentId, out var children) || !_nodes.TryGetValue(parentId, out var parent))
+                continue;
+
+            var childList = children.ToList();
+            var groupSize = MaxChildrenPerNode / 2;
+            var groups = new List<List<string>>();
+
+            for (int i = 0; i < childList.Count; i += groupSize)
             {
-                // Would split the node - simplified for this implementation
+                groups.Add(childList.Skip(i).Take(groupSize).ToList());
             }
+
+            if (groups.Count <= 1) continue;
+
+            // Clear existing children
+            children.Clear();
+
+            // Create intermediate nodes for each group
+            foreach (var group in groups)
+            {
+                var intermediateId = $"node:intermediate:{Guid.NewGuid():N}";
+                var intermediateNode = new SummaryNode
+                {
+                    NodeId = intermediateId,
+                    ParentId = parentId,
+                    Name = $"Group ({group.Count} children)",
+                    Summary = $"Intermediate node grouping {group.Count} child nodes",
+                    Level = parent.Level + 1,
+                    ChildCount = group.Count,
+                    TotalEntryCount = group.Sum(c => _nodes.TryGetValue(c, out var n) ? n.TotalEntryCount : 0),
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    LastUpdated = DateTimeOffset.UtcNow
+                };
+
+                _nodes[intermediateId] = intermediateNode;
+                children.Add(intermediateId);
+                _childIndex[intermediateId] = new HashSet<string>(group);
+
+                // Re-parent children
+                foreach (var childId in group)
+                {
+                    if (_nodes.TryGetValue(childId, out var child))
+                    {
+                        _nodes[childId] = child with { ParentId = intermediateId };
+                    }
+                }
+            }
+
+            // Update parent child count
+            _nodes[parentId] = parent with
+            {
+                ChildCount = children.Count,
+                LastUpdated = DateTimeOffset.UtcNow
+            };
         }
+
         return Task.CompletedTask;
     }
 
@@ -867,6 +924,14 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase
     }
 
     #endregion
+
+    /// <summary>
+    /// Releases the ReaderWriterLockSlim held by this index.
+    /// </summary>
+    public void Dispose()
+    {
+        _treeLock.Dispose();
+    }
 }
 
 #region Navigation Result Types

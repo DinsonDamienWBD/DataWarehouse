@@ -328,6 +328,7 @@ public sealed record FunctionCall
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in ChatCapabilities.cs");
                 return null;
             }
         }
@@ -942,6 +943,7 @@ public sealed class FunctionCallingHandler
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in ChatCapabilities.cs: {ex.Message}");
             return $"Error executing {toolCall.Function.Name}: {ex.Message}";
         }
     }

@@ -101,6 +101,7 @@ public sealed class CompositeContextIndex : ContextIndexBase
                     }
                     catch (Exception ex)
                     {
+                        Debug.WriteLine($"Caught exception in CompositeContextIndex.cs: {ex.Message}");
                         UpdateIndexHealth(index.IndexId, false, TimeSpan.Zero, ex.Message);
                         return (IndexId: index.IndexId, Result: ContextQueryResult.Empty, Success: false);
                     }
@@ -156,6 +157,7 @@ public sealed class CompositeContextIndex : ContextIndexBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in CompositeContextIndex.cs");
                 // Ignore errors from individual indexes
             }
         }
@@ -177,6 +179,7 @@ public sealed class CompositeContextIndex : ContextIndexBase
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in CompositeContextIndex.cs: {ex.Message}");
                 return (IndexId: index.IndexId, Success: false, Error: ex.Message);
             }
         });
@@ -224,6 +227,7 @@ public sealed class CompositeContextIndex : ContextIndexBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in CompositeContextIndex.cs");
                 return null;
             }
         });
@@ -300,6 +304,7 @@ public sealed class CompositeContextIndex : ContextIndexBase
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Caught exception in CompositeContextIndex.cs: {ex.Message}");
                 UpdateIndexHealth(kvp.Key, false, TimeSpan.Zero, ex.Message);
                 return (IndexId: kvp.Key, Available: false, Stats: (IndexStatistics?)null);
             }

@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.AI;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 

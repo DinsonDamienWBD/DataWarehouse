@@ -1,5 +1,6 @@
 using System.Reflection;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -202,6 +203,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in EmbeddingProviderRegistry.cs");
                     results[kvp.Key] = false;
                 }
             }, ct));
@@ -279,6 +281,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in EmbeddingProviderRegistry.cs");
                 // Skip types that can't be instantiated
             }
         }
@@ -399,6 +402,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in EmbeddingProviderRegistry.cs");
             // Ignore
         }
 
@@ -419,6 +423,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in EmbeddingProviderRegistry.cs");
                 // Ignore disposal errors
             }
         }

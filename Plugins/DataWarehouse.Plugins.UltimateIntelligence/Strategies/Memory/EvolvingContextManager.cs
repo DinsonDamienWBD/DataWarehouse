@@ -256,43 +256,48 @@ public sealed class AdvancedEvolvingContextManager : IAsyncDisposable
         // Analyze recent access patterns
         if (_scopeMetrics.TryGetValue(scope, out var metrics))
         {
-            // Predict based on access frequency trends
-            if (metrics.AccessRate > 10) // High access rate
+            // Predict based on access frequency trends — scale probability from access rate
+            if (metrics.AccessRate > 10)
             {
+                var promotionProb = Math.Clamp(0.5 + metrics.AccessRate / 100.0, 0.5, 0.99);
                 predictions.Add(new ContextPrediction
                 {
                     PredictedNeed = "cache_promotion",
-                    Probability = 0.85,
+                    Probability = promotionProb,
                     RecommendedAction = "Promote frequently accessed entries to hot tier",
                     EstimatedImpact = ContextImpact.High,
                     TimeHorizon = TimeSpan.FromMinutes(5)
                 });
             }
 
-            // Predict consolidation needs
+            // Predict consolidation needs — higher entry density raises probability
             if (metrics.EntryCount > 100 && metrics.ConsolidationCount < 1)
             {
+                var densityFactor = Math.Clamp(metrics.EntryCount / 1000.0, 0.0, 0.3);
+                var consolidationProb = Math.Clamp(0.5 + densityFactor, 0.5, 0.95);
                 predictions.Add(new ContextPrediction
                 {
                     PredictedNeed = "consolidation",
-                    Probability = 0.75,
+                    Probability = consolidationProb,
                     RecommendedAction = "Consolidate similar entries to reduce redundancy",
                     EstimatedImpact = ContextImpact.Medium,
                     TimeHorizon = TimeSpan.FromHours(1)
                 });
             }
 
-            // Predict refinement needs
+            // Predict refinement needs — longer time since refinement raises urgency
             var hoursSinceRefinement = metrics.LastRefinement.HasValue
                 ? (DateTimeOffset.UtcNow - metrics.LastRefinement.Value).TotalHours
                 : double.MaxValue;
 
             if (hoursSinceRefinement > 24)
             {
+                var timeFactor = Math.Clamp(hoursSinceRefinement / 168.0, 0.0, 0.35); // 168h = 1 week
+                var refinementProb = Math.Clamp(0.5 + timeFactor, 0.5, 0.95);
                 predictions.Add(new ContextPrediction
                 {
                     PredictedNeed = "refinement",
-                    Probability = 0.7,
+                    Probability = refinementProb,
                     RecommendedAction = "Perform AI-driven refinement to enhance context quality",
                     EstimatedImpact = ContextImpact.Medium,
                     TimeHorizon = TimeSpan.FromHours(6)
@@ -300,13 +305,14 @@ public sealed class AdvancedEvolvingContextManager : IAsyncDisposable
             }
         }
 
-        // Predict based on domain expertise gaps
+        // Predict based on domain expertise gaps — lower expertise = higher probability
         foreach (var (domain, expertise) in _domainExpertise.Where(d => d.Value < 0.3))
         {
+            var expertiseProb = Math.Clamp(1.0 - expertise * 2.0, 0.4, 0.9);
             predictions.Add(new ContextPrediction
             {
                 PredictedNeed = $"domain_expertise_{domain}",
-                Probability = 0.6,
+                Probability = expertiseProb,
                 RecommendedAction = $"Acquire more context about {domain} domain",
                 EstimatedImpact = ContextImpact.Low,
                 TimeHorizon = TimeSpan.FromDays(1)

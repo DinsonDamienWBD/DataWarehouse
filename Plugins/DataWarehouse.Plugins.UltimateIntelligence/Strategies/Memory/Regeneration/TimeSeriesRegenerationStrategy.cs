@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Regeneration;
 
@@ -99,6 +100,7 @@ public sealed class TimeSeriesRegenerationStrategy : RegenerationStrategyBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Caught exception in TimeSeriesRegenerationStrategy.cs: {ex.Message}");
             var duration = DateTime.UtcNow - startTime;
             RecordRegeneration(false, 0, "timeseries");
 

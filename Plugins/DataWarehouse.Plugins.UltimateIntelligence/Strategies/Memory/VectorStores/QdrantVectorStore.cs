@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.VectorStores;
 
@@ -314,6 +315,7 @@ public sealed class QdrantVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in QdrantVectorStore.cs");
             return false;
         }
     }
@@ -365,6 +367,7 @@ public sealed class QdrantVectorStore : ProductionVectorStoreBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in QdrantVectorStore.cs");
             return false;
         }
     }

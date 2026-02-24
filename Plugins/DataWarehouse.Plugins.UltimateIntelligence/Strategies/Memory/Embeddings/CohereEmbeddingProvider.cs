@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embeddings;
 
@@ -228,6 +229,7 @@ public sealed class CohereEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in CohereEmbeddingProvider.cs");
             return false;
         }
     }

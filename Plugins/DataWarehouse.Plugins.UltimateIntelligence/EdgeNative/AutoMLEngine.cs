@@ -687,6 +687,7 @@ public sealed class TrainingCheckpointManager
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
             return null;
         }
     }
@@ -982,6 +983,7 @@ public sealed class EdgeResourceAwareTrainer
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
             // Process may have exited
         }
     }
@@ -994,6 +996,7 @@ public sealed class EdgeResourceAwareTrainer
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
             // Process may have exited
         }
     }

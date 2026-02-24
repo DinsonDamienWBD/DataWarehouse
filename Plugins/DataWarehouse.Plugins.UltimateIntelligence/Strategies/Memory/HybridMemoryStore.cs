@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
@@ -526,6 +527,7 @@ public sealed class HybridMemoryStore : IPersistentMemoryStore
         }
         catch (OperationCanceledException)
         {
+            Debug.WriteLine($"Caught OperationCanceledException in HybridMemoryStore.cs");
             // Expected during shutdown
         }
         finally
@@ -721,12 +723,45 @@ public sealed class WriteAheadLog : IAsyncDisposable
         await _writeLock.WaitAsync(ct);
         try
         {
-            // In a real implementation, this would compact the log
-            // For now, we just reset if all entries are committed
-            if (upToSequence >= _sequenceNumber && _logStream != null)
+            if (_logStream == null) return;
+
+            if (upToSequence >= _sequenceNumber)
             {
+                // All entries committed — clear entire log
                 _logStream.SetLength(0);
+                return;
             }
+
+            // Partial truncation: read retained entries, rewrite log
+            _logStream.Seek(0, SeekOrigin.Begin);
+            using var reader = new StreamReader(_logStream, System.Text.Encoding.UTF8, leaveOpen: true);
+            var retained = new List<string>();
+
+            while (await reader.ReadLineAsync(ct) is { } line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var record = JsonSerializer.Deserialize<WalRecord>(line);
+                    if (record != null && record.SequenceNumber > upToSequence)
+                        retained.Add(line);
+                }
+                catch (JsonException)
+                {
+                    // Skip malformed entries during compaction
+                    Debug.WriteLine($"WAL: skipping malformed entry during truncation");
+                }
+            }
+
+            // Rewrite log with only retained entries
+            _logStream.SetLength(0);
+            _logStream.Seek(0, SeekOrigin.Begin);
+            foreach (var entry in retained)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(entry + "\n");
+                await _logStream.WriteAsync(bytes, ct);
+            }
+            await _logStream.FlushAsync(ct);
         }
         finally
         {
@@ -758,6 +793,7 @@ public sealed class WriteAheadLog : IAsyncDisposable
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in HybridMemoryStore.cs");
                 continue;
             }
 

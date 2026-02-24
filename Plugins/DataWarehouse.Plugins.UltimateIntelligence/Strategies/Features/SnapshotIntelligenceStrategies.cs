@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
+using System.Diagnostics;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
@@ -660,6 +661,7 @@ public sealed class SnapshotFederationStrategy : FeatureStrategyBase
                 }
                 catch
                 {
+                    Debug.WriteLine($"Caught exception in SnapshotIntelligenceStrategies.cs");
                     // Log but continue with other sources
                 }
             }

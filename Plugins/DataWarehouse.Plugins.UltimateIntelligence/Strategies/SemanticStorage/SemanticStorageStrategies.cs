@@ -2316,6 +2316,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             }
             catch
             {
+                Debug.WriteLine($"Caught exception in SemanticStorageStrategies.cs");
                 // Treat as plain text
                 var escapedContent = content.Replace("\"", "\\\"").Replace("\n", "\\n");
                 var jsonLd = $"{{\n  {context},\n  \"@type\": \"CreativeWork\",\n  \"text\": \"{escapedContent}\"\n}}";
@@ -2394,6 +2395,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in SemanticStorageStrategies.cs");
             // Fallback to simple key-value extraction
             var matches = Regex.Matches(content, @"(\w+)\s*[:=]\s*(.+?)(?:\n|$)");
             foreach (Match match in matches)

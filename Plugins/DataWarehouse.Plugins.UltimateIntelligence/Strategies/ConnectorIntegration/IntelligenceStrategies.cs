@@ -180,7 +180,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
         Tags = new[] { "connector", "generation", "openapi", "swagger", "codegen", "hot-swap" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
     /// Initializes a new instance of <see cref="ZeroDayConnectorGeneratorStrategy"/>.
@@ -427,6 +427,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
         }
         catch (JsonException)
         {
+            Debug.WriteLine($"Caught JsonException in IntelligenceStrategies.cs");
             // May be YAML - attempt basic parsing
             endpoints = ParseOpenApiYaml(content);
         }
@@ -622,6 +623,7 @@ Return ONLY the JSON array, no other text.";
         }
         catch (JsonException)
         {
+            Debug.WriteLine($"Caught JsonException in IntelligenceStrategies.cs");
             // Failed to parse AI response
         }
 
@@ -1229,6 +1231,7 @@ Return JSON array:
         }
         catch (JsonException)
         {
+            Debug.WriteLine($"Caught JsonException in IntelligenceStrategies.cs");
             // Failed to parse
         }
 
@@ -1331,6 +1334,7 @@ Return JSON:
         }
         catch (JsonException)
         {
+            Debug.WriteLine($"Caught JsonException in IntelligenceStrategies.cs");
             // Failed to parse
         }
 
@@ -2680,7 +2684,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
         Tags = new[] { "api", "discovery", "fuzzing", "undocumented", "hidden", "archaeology" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
     /// Initializes a new instance of <see cref="ApiArchaeologistStrategy"/>.
@@ -2798,6 +2802,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
         }
         catch
         {
+            Debug.WriteLine($"Caught exception in IntelligenceStrategies.cs");
             return null;
         }
     }
