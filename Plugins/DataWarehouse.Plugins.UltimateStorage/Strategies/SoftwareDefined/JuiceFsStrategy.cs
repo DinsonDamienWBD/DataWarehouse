@@ -387,7 +387,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task<StorageObjectMetadata> StoreViaMountPointAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
-            var filePath = Path.Combine(_mountPath, key);
+            var filePath = GetFullPath(key);
             var directory = Path.GetDirectoryName(filePath);
 
             // Create directory if it doesn't exist
@@ -523,7 +523,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task<Stream> RetrieveViaMountPointAsync(string key, CancellationToken ct)
         {
-            var filePath = Path.Combine(_mountPath, key);
+            var filePath = GetFullPath(key);
 
             if (!File.Exists(filePath))
             {
@@ -580,8 +580,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.DeleteViaS3GatewayAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -608,8 +609,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.DeleteViaWebDavAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore
             }
 
@@ -642,8 +644,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.DeleteViaGatewayAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore
             }
 
@@ -668,7 +671,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task DeleteViaMountPointAsync(string key, CancellationToken ct)
         {
-            var filePath = Path.Combine(_mountPath, key);
+            var filePath = GetFullPath(key);
 
             if (!File.Exists(filePath))
             {
@@ -753,7 +756,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 }
                 else if (!string.IsNullOrWhiteSpace(_mountPath))
                 {
-                    var filePath = Path.Combine(_mountPath, key);
+                    var filePath = GetFullPath(key);
                     var exists = File.Exists(filePath);
 
                     IncrementOperationCounter(StorageOperationType.Exists);
@@ -764,8 +767,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     return false;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -882,8 +886,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 response = await SendWithRetryAsync(request, ct);
                 xml = await response.Content.ReadAsStringAsync(ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.ListViaWebDavAsync] {ex.GetType().Name}: {ex.Message}");
                 yield break;
             }
 
@@ -953,8 +958,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 response = await SendWithRetryAsync(request, ct);
                 json = await response.Content.ReadAsStringAsync(ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.ListViaGatewayAsync] {ex.GetType().Name}: {ex.Message}");
                 yield break;
             }
 
@@ -1023,8 +1029,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                         metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.ListViaMountPointAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore metadata read errors
                     }
                 }
@@ -1171,7 +1178,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task<StorageObjectMetadata> GetMetadataViaMountPointAsync(string key, CancellationToken ct)
         {
-            var filePath = Path.Combine(_mountPath, key);
+            var filePath = GetFullPath(key);
 
             if (!File.Exists(filePath))
             {
@@ -1190,8 +1197,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                     metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.GetMetadataViaMountPointAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
             }
@@ -1322,8 +1330,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     var available = _capacityQuotaBytes - usage.UsedBytes;
                     return available > 0 ? available : 0;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[JuiceFsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     return null;
                 }
             }
@@ -1444,7 +1453,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     throw new FileNotFoundException($"File not found in trash: {key}");
                 }
 
-                var targetPath = Path.Combine(_mountPath, key);
+                var targetPath = GetFullPath(key);
                 var targetDir = Path.GetDirectoryName(targetPath);
                 if (!string.IsNullOrWhiteSpace(targetDir) && !Directory.Exists(targetDir))
                 {
@@ -1518,13 +1527,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>
         /// Validates metadata engine connection.
         /// </summary>
-        private async Task ValidateMetadataConnectionAsync(CancellationToken ct)
+        private Task ValidateMetadataConnectionAsync(CancellationToken ct)
         {
-            // This is a placeholder - actual implementation would depend on metadata engine type
-            // For Redis: ping command
-            // For SQL databases: test query
-            // For etcd/TiKV: API health check
-            await Task.CompletedTask;
+            // Metadata engine validation depends on engine type (Redis, TiKV, MySQL, etc.)
+            // Skip validation at init; failures will surface on first operation
+            System.Diagnostics.Debug.WriteLine(
+                "[JuiceFsStrategy.ValidateMetadataConnection] Metadata connection validation " +
+                "deferred to first operation (engine-specific client required)");
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -1621,6 +1631,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
         }
 
+        private static HttpRequestMessage CloneRequest(HttpRequestMessage original)
+        {
+            var clone = new HttpRequestMessage(original.Method, original.RequestUri);
+            if (original.Content != null)
+            {
+                var ms = new MemoryStream();
+                original.Content.CopyTo(ms, null, default);
+                ms.Position = 0;
+                clone.Content = new StreamContent(ms);
+                foreach (var header in original.Content.Headers)
+                    clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+            foreach (var header in original.Headers)
+                clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            clone.Version = original.Version;
+            return clone;
+        }
+
         private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, CancellationToken ct)
         {
             HttpResponseMessage? response = null;
@@ -1628,9 +1656,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {
+                var attemptRequest = attempt == 0 ? request : CloneRequest(request);
                 try
                 {
-                    response = await _httpClient!.SendAsync(request, ct);
+                    response = await _httpClient!.SendAsync(attemptRequest, ct);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -1713,6 +1742,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         }
 
         protected override int GetMaxKeyLength() => 4096; // JuiceFS supports long paths
+
+        private string GetFullPath(string key)
+        {
+            var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
+                                   .Replace('\\', Path.DirectorySeparatorChar);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
+        }
 
         #endregion
 

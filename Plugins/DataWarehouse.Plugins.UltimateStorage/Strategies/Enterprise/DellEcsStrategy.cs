@@ -369,8 +369,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[DellEcsStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -436,8 +437,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellEcsStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -484,8 +486,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellEcsStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -690,8 +693,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                             totalCapacity = capacityInfo.total;
                             usedCapacity = capacityInfo.used;
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[DellEcsStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                             // Ignore capacity retrieval failures
                         }
                     }
@@ -747,8 +751,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var capacityInfo = await GetCapacityInfoAsync(ct);
                 return capacityInfo.available;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellEcsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Return null if capacity information cannot be retrieved
                 return null;
             }

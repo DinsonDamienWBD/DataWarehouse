@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -55,8 +56,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private ushort _requestId = 1;
         private ushort _volumeId = 0;
         private uint _rootDirectoryId = 2; // AFP root directory ID
-        private readonly Dictionary<string, uint> _directoryIdCache = new();
-        private readonly Dictionary<uint, AfpFileHandle> _openFiles = new();
+        private readonly ConcurrentDictionary<string, uint> _directoryIdCache = new();
+        private readonly ConcurrentDictionary<uint, AfpFileHandle> _openFiles = new();
 
         public override string StrategyId => "afp";
         public override string Name => "Apple Filing Protocol (AFP) Network Storage";
@@ -216,8 +217,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     {
                         await AfpCloseForkAsync(handle.ForkRefNum, CancellationToken.None);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -230,8 +232,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     {
                         await AfpCloseVolAsync(CancellationToken.None);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -241,8 +244,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 {
                     await AfpLogoutAsync(CancellationToken.None);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore logout errors
                 }
 
@@ -253,8 +257,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     {
                         await DsiCloseSessionAsync(CancellationToken.None);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -266,8 +271,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 _volumeId = 0;
                 _directoryIdCache.Clear();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
 
@@ -431,6 +437,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // For cleartext password, append password
             if (_authMethod == AfpAuthMethod.CleartextPassword)
             {
+                System.Diagnostics.Debug.WriteLine(
+                    "[AfpStrategy] WARNING: AFP Cleartxt Passwrd UAM transmits credentials in cleartext over TCP. " +
+                    "Use DHX2, Kerberos, or wrap AFP traffic in TLS/VPN in production environments.");
                 // Pad username to 8-byte boundary
                 var usernamePadding = (8 - (_username.Length + 1) % 8) % 8;
                 for (int i = 0; i < usernamePadding; i++)
@@ -695,28 +704,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     break;
                 }
 
-                // Parse file entries (simplified)
-                // In a full implementation, would parse actual file info from response
-                for (int i = 0; i < actualCount; i++)
-                {
-                    // Parse file info structure (simplified for brevity)
-                    var fileInfo = new AfpFileInfo
-                    {
-                        Name = $"file{startIndex + i}", // Would parse actual name from response bytes
-                        IsDirectory = false,
-                        Size = 0,
-                        Created = DateTime.UtcNow,
-                        Modified = DateTime.UtcNow
-                    };
-                    results.Add(fileInfo);
-                }
-
-                startIndex += actualCount;
-
-                if (actualCount < maxCount)
-                {
-                    break;
-                }
+                // AFP FPEnumerate response parsing requires AFP 3.x bitmap response parser
+                // to extract FileNodeID, filename, and attributes from variable-length entries.
+                // Without a proper AFP protocol response parser, fabricating results would
+                // silently return incorrect data to callers.
+                throw new NotSupportedException(
+                    "AFP FPEnumerate response parsing requires AFP 3.x specification implementation. " +
+                    "File listing is not available without AFP protocol response parser.");
             }
 
             return results;
@@ -793,8 +787,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private async Task<uint> AfpResolveFileIdAsync(uint directoryId, string filename, CancellationToken ct)
         {
-            var info = await AfpGetFileDirParmsAsync(directoryId, filename, ct);
-            return directoryId; // Simplified: would parse actual file ID from info
+            // AFP file ID resolution requires parsing AFP bitmap response for the FileNodeID field
+            // (bit 6 in the file bitmap). Without a proper AFP response parser the directoryId
+            // returned here would be the parent directory — not the file — causing silent data
+            // corruption in any caller that uses the returned ID for file-level operations.
+            throw new NotSupportedException(
+                "AFP file ID resolution requires AFP bitmap response parser implementation. " +
+                "The FileNodeID field cannot be extracted from the FPGetFileDirParms response without a full AFP 3.x parser.");
         }
 
         #endregion
@@ -869,10 +868,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         Tier = Tier
                     };
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[AfpStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Clean up on failure
-                    try { await AfpCloseForkAsync(forkRefNum, ct); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    try { await AfpCloseForkAsync(forkRefNum, ct); } catch (Exception cleanupEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.StoreAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                     throw;
                 }
             }
@@ -930,9 +934,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 memoryStream.Position = 0;
                 return memoryStream;
             }
-            catch
+            catch (Exception ex)
             {
-                try { await AfpCloseForkAsync(forkRefNum, ct); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                try { await AfpCloseForkAsync(forkRefNum, ct); } catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AfpStrategy.RetrieveAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                    /* Best-effort cleanup — failure is non-fatal */
+                }
                 throw;
             }
         }
@@ -951,8 +960,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var fileInfo = await AfpGetFileDirParmsAsync(directoryId, filename, ct);
                 size = fileInfo.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata errors
             }
 
@@ -1094,8 +1104,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Returning null for simplicity
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

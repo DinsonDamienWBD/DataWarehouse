@@ -346,8 +346,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Wrap stream to release lock on disposal
                 return new WebDavLockReleaseStream(memoryStream, lockToken, this, resourceUrl);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 if (lockToken != null)
                 {
                     await ReleaseLockAsync(resourceUrl, lockToken, ct);
@@ -369,8 +370,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var properties = await GetPropertiesAsync(resourceUrl, ct);
                 size = properties.ContentLength ?? 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -431,8 +433,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -570,8 +573,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -741,8 +745,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return customProps.Count > 0 ? customProps : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.GetCustomPropertiesAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -933,8 +938,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return webDavLock;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.AcquireLockAsync] {ex.GetType().Name}: {ex.Message}");
                 // Lock acquisition failed, but continue without locking
                 return null;
             }
@@ -963,8 +969,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var lockKey = resourceUrl.ToLowerInvariant();
                 _activeLocks.Remove(lockKey);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WebDavStrategy.ReleaseLockAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore unlock errors
             }
             finally

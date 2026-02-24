@@ -332,8 +332,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadataResult = await GetMetadataAsyncCore(key, ct);
                 size = metadataResult.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellPowerScaleStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -376,8 +377,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellPowerScaleStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -612,8 +614,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var health = await GetHealthAsyncCore(ct);
                 return health.AvailableCapacity;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellPowerScaleStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -650,8 +653,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                 await _httpClient!.SendAsync(request, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DellPowerScaleStrategy.CreateSnapshotAsync] {ex.GetType().Name}: {ex.Message}");
                 // Snapshot creation is best-effort, don't fail the main operation
             }
         }

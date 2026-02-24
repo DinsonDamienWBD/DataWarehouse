@@ -486,8 +486,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[management.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -527,8 +528,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -596,8 +598,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[management.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Capacity information not available
                 }
 
@@ -654,8 +657,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -846,8 +850,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                             usedBytes += fileInfo.Length;
                             usedInodes++;
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[management.GetQuotaUsageAsync] {ex.GetType().Name}: {ex.Message}");
                             // Skip files that can't be accessed
                         }
                     }
@@ -1036,8 +1041,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1051,11 +1057,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private string GetFullPath(string key)
         {
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(_mountPath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1120,8 +1130,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }

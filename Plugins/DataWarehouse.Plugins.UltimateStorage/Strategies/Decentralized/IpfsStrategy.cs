@@ -317,8 +317,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     var stat = await _client!.FileSystem.ListFileAsync(cid.ToString());
                     size = stat.Size;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore stat errors
                 }
             }
@@ -507,8 +508,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 customMetadata = await LoadMetadataAsync(key, cid, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // No custom metadata stored
             }
 
@@ -614,8 +616,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }, ct);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.PinContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -648,8 +651,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }, ct);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.UnpinContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -714,8 +718,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     await _client!.Name.ResolveAsync(ipnsName), ct);
                 return result;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.ResolveIpnsAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -757,8 +762,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var stats = await _client!.Stats.RepositoryAsync();
                 return ((long)stats.RepoSize, (long)stats.StorageMax, (int)stats.NumObjects);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.RunGarbageCollectionAsync] {ex.GetType().Name}: {ex.Message}");
                 return (0, 0, 0);
             }
         }
@@ -782,15 +788,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 await _client!.FileSystem.ListFileAsync(path);
                 // Directory exists
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.EnsureMfsDirectoryAsync] {ex.GetType().Name}: {ex.Message}");
                 // Directory doesn't exist, create it
                 try
                 {
                     await _client!.FileSystem.AddDirectoryAsync(path, false);
                 }
-                catch
+                catch (Exception innerEx)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.EnsureMfsDirectoryAsync] {innerEx.GetType().Name}: {innerEx.Message}");
                     // Might already exist or parent doesn't exist - ensure parent first
                     var parentPath = Path.GetDirectoryName(path.Replace('/', Path.DirectorySeparatorChar))?.Replace(Path.DirectorySeparatorChar, '/');
                     if (!string.IsNullOrEmpty(parentPath) && parentPath != "/")
@@ -842,8 +850,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
                 await Task.CompletedTask;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.RemoveMfsFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // File might not exist, ignore
             }
         }
@@ -862,8 +871,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     return _keyToCidMap.ContainsKey(key);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.MfsFileExistsAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -886,8 +896,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.ResolveMfsPathAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -991,8 +1002,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var metadata = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                 return metadata;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1011,8 +1023,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var stat = await _client!.FileSystem.ListFileAsync(cid.ToString());
                 return stat.Size == expectedSize;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IpfsStrategy.VerifyContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

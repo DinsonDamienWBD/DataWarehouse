@@ -48,6 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         private string _availabilityZone = string.Empty;
         private bool _enableReplication = false;
         private int _replicaCount = 0;
+        private string? _allowedCidr;
 
         // Authentication and share state
         private string? _authToken;
@@ -61,6 +62,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         public override string StrategyId => "openstack-manila";
         public override string Name => "OpenStack Manila Shared Filesystem";
         public override StorageTier Tier => StorageTier.Warm;
+
+        // Manila share I/O requires NFS/CIFS mount integration for real data path.
+        // The current implementation tracks file metadata via Manila API but does not write data to the share.
+        public override bool IsProductionReady => false;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -103,6 +108,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
             _availabilityZone = GetConfiguration("AvailabilityZone", string.Empty);
             _enableReplication = GetConfiguration("EnableReplication", false);
             _replicaCount = GetConfiguration("ReplicaCount", 0);
+            _allowedCidr = GetConfiguration<string?>("AllowedCidr", null);
 
             // Initialize HTTP client
             _httpClient = new HttpClient
@@ -250,8 +256,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
                 return fileMetadata.HasValue;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -449,8 +456,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 // Return total capacity (usage tracking would require mounting the share)
                 return totalBytes;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -464,125 +472,130 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         /// </summary>
         private async Task AuthenticateAsync(CancellationToken ct)
         {
-            await _authLock.WaitAsync(ct);
-            try
+            // _authLock is held by the caller (EnsureAuthenticatedAsync); do not re-acquire here.
+            var authRequest = new
             {
-                var authRequest = new
+                auth = new
                 {
-                    auth = new
+                    identity = new
                     {
-                        identity = new
+                        methods = new[] { "password" },
+                        password = new
                         {
-                            methods = new[] { "password" },
-                            password = new
+                            user = new
                             {
-                                user = new
-                                {
-                                    name = _username,
-                                    domain = new { name = _domainName },
-                                    password = _password
-                                }
-                            }
-                        },
-                        scope = new
-                        {
-                            project = new
-                            {
-                                name = _projectName,
-                                domain = new { name = _domainName }
+                                name = _username,
+                                domain = new { name = _domainName },
+                                password = _password
                             }
                         }
-                    }
-                };
-
-                var authJson = JsonSerializer.Serialize(authRequest);
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_authUrl}/v3/auth/tokens");
-                request.Content = new StringContent(authJson, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient!.SendAsync(request, ct);
-                response.EnsureSuccessStatusCode();
-
-                // Extract token from X-Subject-Token header
-                if (response.Headers.TryGetValues("X-Subject-Token", out var tokenValues))
-                {
-                    _authToken = tokenValues.FirstOrDefault();
-                }
-
-                if (string.IsNullOrEmpty(_authToken))
-                {
-                    throw new InvalidOperationException("Failed to obtain authentication token from Keystone");
-                }
-
-                // Parse response to get Manila URL and token expiry
-                var responseJson = await response.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(responseJson);
-                var root = doc.RootElement;
-
-                // Extract token expiry
-                if (root.TryGetProperty("token", out var token) && token.TryGetProperty("expires_at", out var expiresAt))
-                {
-                    _tokenExpiry = DateTime.Parse(expiresAt.GetString() ?? DateTime.UtcNow.AddHours(1).ToString("o"));
-                }
-                else
-                {
-                    _tokenExpiry = DateTime.UtcNow.AddHours(1); // Default 1 hour
-                }
-
-                // Extract Manila URL from service catalog
-                if (token.TryGetProperty("catalog", out var catalog))
-                {
-                    foreach (var service in catalog.EnumerateArray())
+                    },
+                    scope = new
                     {
-                        if (service.TryGetProperty("type", out var serviceType) &&
-                            (serviceType.GetString() == "sharev2" || serviceType.GetString() == "shared-file-system"))
+                        project = new
                         {
-                            if (service.TryGetProperty("endpoints", out var endpoints))
+                            name = _projectName,
+                            domain = new { name = _domainName }
+                        }
+                    }
+                }
+            };
+
+            var authJson = JsonSerializer.Serialize(authRequest);
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{_authUrl}/v3/auth/tokens");
+            request.Content = new StringContent(authJson, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient!.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
+            // Extract token from X-Subject-Token header
+            if (response.Headers.TryGetValues("X-Subject-Token", out var tokenValues))
+            {
+                _authToken = tokenValues.FirstOrDefault();
+            }
+
+            if (string.IsNullOrEmpty(_authToken))
+            {
+                throw new InvalidOperationException("Failed to obtain authentication token from Keystone");
+            }
+
+            // Parse response to get Manila URL and token expiry
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(responseJson);
+            var root = doc.RootElement;
+
+            // Extract token expiry
+            if (root.TryGetProperty("token", out var token) && token.TryGetProperty("expires_at", out var expiresAt))
+            {
+                _tokenExpiry = DateTime.Parse(expiresAt.GetString() ?? DateTime.UtcNow.AddHours(1).ToString("o"));
+            }
+            else
+            {
+                _tokenExpiry = DateTime.UtcNow.AddHours(1); // Default 1 hour
+            }
+
+            // Extract Manila URL from service catalog
+            if (token.TryGetProperty("catalog", out var catalog))
+            {
+                foreach (var service in catalog.EnumerateArray())
+                {
+                    if (service.TryGetProperty("type", out var serviceType) &&
+                        (serviceType.GetString() == "sharev2" || serviceType.GetString() == "shared-file-system"))
+                    {
+                        if (service.TryGetProperty("endpoints", out var endpoints))
+                        {
+                            foreach (var endpoint in endpoints.EnumerateArray())
                             {
-                                foreach (var endpoint in endpoints.EnumerateArray())
+                                if (endpoint.TryGetProperty("interface", out var iface) && iface.GetString() == "public")
                                 {
-                                    if (endpoint.TryGetProperty("interface", out var iface) && iface.GetString() == "public")
+                                    // Check region if specified
+                                    if (!string.IsNullOrEmpty(_region))
                                     {
-                                        // Check region if specified
-                                        if (!string.IsNullOrEmpty(_region))
-                                        {
-                                            if (endpoint.TryGetProperty("region", out var region) && region.GetString() == _region)
-                                            {
-                                                _manilaUrl = endpoint.GetProperty("url").GetString();
-                                                break;
-                                            }
-                                        }
-                                        else if (_manilaUrl == null)
+                                        if (endpoint.TryGetProperty("region", out var region) && region.GetString() == _region)
                                         {
                                             _manilaUrl = endpoint.GetProperty("url").GetString();
+                                            break;
                                         }
+                                    }
+                                    else if (_manilaUrl == null)
+                                    {
+                                        _manilaUrl = endpoint.GetProperty("url").GetString();
                                     }
                                 }
                             }
-                            break;
                         }
+                        break;
                     }
                 }
-
-                if (string.IsNullOrEmpty(_manilaUrl))
-                {
-                    throw new InvalidOperationException("Failed to obtain Manila URL from Keystone service catalog");
-                }
             }
-            finally
+
+            if (string.IsNullOrEmpty(_manilaUrl))
             {
-                _authLock.Release();
+                throw new InvalidOperationException("Failed to obtain Manila URL from Keystone service catalog");
             }
         }
 
         /// <summary>
         /// Ensures that the authentication token is valid, refreshing if necessary.
+        /// Uses double-checked locking to avoid TOCTOU race on token expiry.
         /// </summary>
         private async Task EnsureAuthenticatedAsync(CancellationToken ct)
         {
-            // Check if token needs refresh (5 minutes before expiry)
             if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
             {
-                await AuthenticateAsync(ct);
+                await _authLock.WaitAsync(ct);
+                try
+                {
+                    // Double-check after acquiring lock
+                    if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
+                    {
+                        await AuthenticateAsync(ct);
+                    }
+                }
+                finally
+                {
+                    _authLock.Release();
+                }
             }
         }
 
@@ -732,13 +745,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         /// </summary>
         private async Task CreateShareAccessRulesAsync(CancellationToken ct)
         {
-            // Create IP-based access rule (allow all for demonstration)
+            // Create IP-based access rule using the configured CIDR range.
+            // AllowedCidr must be explicitly set — a wildcard 0.0.0.0/0 would expose the share
+            // to the entire internet and is not acceptable in production deployments.
+            var cidr = _allowedCidr ?? throw new InvalidOperationException(
+                "AllowedCidr must be configured before creating share access rules. " +
+                "Set the 'AllowedCidr' configuration option to restrict NFS access to trusted IP ranges " +
+                "(e.g., '10.0.0.0/8' for internal networks).");
+
             var accessRequest = new
             {
                 allow_access = new
                 {
                     access_type = "ip",
-                    access_to = "0.0.0.0/0",
+                    access_to = cidr,
                     access_level = "rw"
                 }
             };
@@ -778,8 +798,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                     await _httpClient!.SendAsync(request, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.SetupShareReplicationAsync] {ex.GetType().Name}: {ex.Message}");
                 // Replication setup is optional, failures are acceptable
             }
         }
@@ -809,8 +830,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.UpdateShareAccessPathAsync] {ex.GetType().Name}: {ex.Message}");
                 // Access path retrieval is optional
             }
         }
@@ -977,8 +999,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.GetShareFileMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1031,8 +1054,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ManilaStrategy.ListShareFilesAsync] {ex.GetType().Name}: {ex.Message}");
                 // Return empty list on error
             }
 

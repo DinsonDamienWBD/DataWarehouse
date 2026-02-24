@@ -54,6 +54,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         public override string StrategyId => "grpc";
         public override string Name => "gRPC Remote Storage";
         public override StorageTier Tier => StorageTier.Warm; // Network storage is warm tier
+        public override bool IsProductionReady => false; // Uses JSON marshallers over gRPC wire instead of protobuf; requires proper protobuf schema and generated stubs
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -437,8 +438,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GrpcStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -602,8 +604,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 var health = await GetHealthAsyncCore(ct);
                 return health.AvailableCapacity;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GrpcStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

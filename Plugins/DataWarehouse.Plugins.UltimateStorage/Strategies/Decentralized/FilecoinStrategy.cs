@@ -305,8 +305,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 {
                     contentStream = await RetrieveViaIpfsGatewayAsync(dealInfo.Cid, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FilecoinStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Fallback to Filecoin retrieval
                     contentStream = await RetrieveViaFilecoinAsync(dealInfo, ct);
                 }
@@ -682,8 +683,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     await Task.Delay(TimeSpan.FromSeconds(_dealStatusCheckIntervalSeconds), ct);
                     checksRemaining--;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FilecoinStrategy.MonitorDealStatusAsync] {ex.GetType().Name}: {ex.Message}");
                     // Continue monitoring despite errors
                     await Task.Delay(TimeSpan.FromSeconds(_dealStatusCheckIntervalSeconds), ct);
                     checksRemaining--;

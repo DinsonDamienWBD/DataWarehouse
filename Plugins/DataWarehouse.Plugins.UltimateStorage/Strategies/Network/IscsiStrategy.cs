@@ -302,8 +302,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     await SendLogoutAsync(CancellationToken.None);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IscsiStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore logout errors
             }
             finally
@@ -370,22 +371,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             writer.Write((byte)0); // TotalAHSLength
             writer.Write(new byte[3]); // DataSegmentLength (will be updated)
 
-            // ISID (Initiator Session ID) - 6 bytes
-            writer.Write((ushort)_initiatorSessionId);
+            // ISID (Initiator Session ID) - 6 bytes (RFC 7143 big-endian)
+            var isidSpan = new byte[2];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(isidSpan, (ushort)_initiatorSessionId);
+            writer.Write(isidSpan);
             writer.Write(new byte[4]);
 
-            // TSIH (Target Session ID) - 2 bytes
-            writer.Write(_targetSessionId);
+            // TSIH (Target Session ID) - 2 bytes (big-endian)
+            var tsihSpan = new byte[2];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(tsihSpan, _targetSessionId);
+            writer.Write(tsihSpan);
 
-            // Initiator Task Tag - 4 bytes
-            writer.Write(_commandSequenceNumber);
+            // Initiator Task Tag - 4 bytes (big-endian)
+            var ittSpan = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(ittSpan, _commandSequenceNumber);
+            writer.Write(ittSpan);
 
-            // CID (Connection ID) - 2 bytes
-            writer.Write(_connectionId);
+            // CID (Connection ID) - 2 bytes (big-endian)
+            var cidSpan = new byte[2];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(cidSpan, _connectionId);
+            writer.Write(cidSpan);
 
-            // CmdSN, ExpStatSN
-            writer.Write(_commandSequenceNumber);
-            writer.Write(_expectedStatusSequenceNumber);
+            // CmdSN, ExpStatSN (big-endian)
+            var cmdSnSpan = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(cmdSnSpan, _commandSequenceNumber);
+            writer.Write(cmdSnSpan);
+            var expStatSnSpan = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(expStatSnSpan, _expectedStatusSequenceNumber);
+            writer.Write(expStatSnSpan);
 
             // Reserved - 12 bytes
             writer.Write(new byte[12]);
@@ -490,7 +503,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 await ReadExactAsync(digest, 0, 4, ct);
             }
 
-            var status = (flags & 0x01) != 0 ? IscsiLoginStatus.Success : IscsiLoginStatus.Failure;
+            // RFC 7143 §11.13: Status-Class at byte offset 36, Status-Detail at byte offset 37.
+            // A Status-Class of 0 means success; any non-zero value indicates failure.
+            // The flags byte Transit/Continue bits are not a reliable success indicator.
+            var statusClass = header.Length > 36 ? header[36] : (byte)0xFF;
+            var status = statusClass == 0 ? IscsiLoginStatus.Success : IscsiLoginStatus.Failure;
 
             _commandSequenceNumber++;
 
@@ -1037,8 +1054,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return availableBlocks * BlockSize;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IscsiStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

@@ -158,8 +158,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 Directory.CreateDirectory(_basePath);
             }
 
-            // Detect SCM device characteristics
-            await DetectScmDeviceAsync(ct);
+            // Detect SCM device characteristics (result unused; detection is path-pattern-based only)
+            // await DetectScmDeviceAsync(ct); // Removed: detection result was unused
 
             // Initialize NUMA topology if enabled
             if (_enableNumaAware)
@@ -532,8 +532,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
                 return Task.FromResult<long?>(driveInfo.IsReady ? driveInfo.AvailableFreeSpace : null);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ScmStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }
@@ -656,8 +657,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     0,
                     MemoryMappedFileAccess.Read);
 
-                // Cache memory map for reuse
-                _memoryMaps.TryAdd(filePath, mmf);
+                // Cache memory map for reuse; dispose duplicate if key already exists
+                if (!_memoryMaps.TryAdd(filePath, mmf))
+                {
+                    mmf.Dispose();
+                    mmf = _memoryMaps[filePath];
+                }
 
                 using var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
 
@@ -732,8 +737,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         _pendingFlushes.Enqueue(filePath);
                         if (_pendingFlushes.Count >= _flushBatchSize)
                         {
-                            // Trigger batch flush
-                            _ = Task.Run(() => FlushBatchAsync(ct), ct);
+                            // Trigger batch flush - use CancellationToken.None so background task
+                            // is not cancelled when the calling request's token is cancelled
+                            _ = Task.Run(async () =>
+                            {
+                                try { await FlushBatchAsync(CancellationToken.None); }
+                                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[ScmStrategy.FlushBatch] {ex.GetType().Name}: {ex.Message}"); }
+                            }, CancellationToken.None);
                         }
                     }
                     break;
@@ -771,8 +781,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         Interlocked.Increment(ref _totalFlushOperations);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[ScmStrategy.FlushBatchAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore flush errors
                 }
             }
@@ -803,19 +814,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task InitializeNumaTopologyAsync(CancellationToken ct)
         {
-            // In real implementation, would query NUMA topology via:
-            // - Windows: GetNumaHighestNodeNumber, GetNumaNodeProcessorMask
-            // - Linux: /sys/devices/system/node/node* enumeration
-            // - libnuma APIs
-
-            // Simplified: assume single NUMA node
-            _numaTopology.TryAdd(0, new NumaNode
-            {
-                NodeId = 0,
-                AvailableMemoryBytes = 16L * 1024 * 1024 * 1024, // 16GB placeholder
-                ProcessorMask = 0xFF
-            });
-
+            // NUMA topology detection requires platform-specific APIs:
+            // Windows: GetLogicalProcessorInformationEx
+            // Linux: /sys/devices/system/node/
+            // The _numaTopology field is not consulted by any callers; no placeholder data is populated.
+            System.Diagnostics.Debug.WriteLine(
+                "[ScmStrategy.InitializeNumaTopology] NUMA-aware allocation requires platform-specific integration");
             return Task.CompletedTask;
         }
 
@@ -824,19 +828,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task InitializeCxlPoolsAsync(CancellationToken ct)
         {
-            // In real implementation, would enumerate CXL devices via:
+            // CXL memory pool detection requires CXL 2.0+ host bridge enumeration:
             // - PCIe enumeration for CXL.mem devices
             // - CXL.io discovery
             // - Memory region mapping
-
-            // Simplified: create placeholder pool
-            _cxlPools.TryAdd(0, new CxlMemoryPool
-            {
-                PoolId = 0,
-                DeviceCount = 1,
-                TotalCapacity = 64L * 1024 * 1024 * 1024 // 64GB placeholder
-            });
-
+            // The _cxlPools field is not consulted by any callers; no placeholder data is populated.
+            System.Diagnostics.Debug.WriteLine(
+                "[ScmStrategy.InitializeCxlPools] CXL pool management requires CXL host bridge integration");
             return Task.CompletedTask;
         }
 
@@ -1021,8 +1019,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var lines = metadata.Select(kvp => $"{kvp.Key}={kvp.Value}");
                 await File.WriteAllLinesAsync(metaPath, lines, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ScmStrategy.StoreMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -1054,8 +1053,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ScmStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

@@ -659,8 +659,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return lunMapping != null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[FcStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -774,8 +775,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return totalCapacity - usedCapacity;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[FcStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -908,9 +910,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             string key,
             CancellationToken ct)
         {
-            // Hash key to determine LUN and offset
-            var keyHash = key.GetHashCode();
-            var lunIndex = Math.Abs(keyHash) % _lunMappings.Count;
+            // Use SHA256 for deterministic key-to-LUN mapping across restarts
+            // (GetHashCode is non-deterministic across process boundaries and .NET versions)
+            // TODO: Replace hash-based addressing with proper block allocation table
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(key));
+            var keyHash = BitConverter.ToInt64(hashBytes, 0);
+            var lunIndex = (int)(Math.Abs(keyHash) % _lunMappings.Count);
             var lunMapping = _lunMappings.Values.ElementAt(lunIndex);
 
             // Calculate offset within LUN (simplified - would need allocation table)
@@ -1206,8 +1212,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     {
                         data = JsonSerializer.Deserialize<object>(responseBody);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[FcStrategy.ExecuteFabricApiAsync] {ex.GetType().Name}: {ex.Message}");
                         data = responseBody;
                     }
 

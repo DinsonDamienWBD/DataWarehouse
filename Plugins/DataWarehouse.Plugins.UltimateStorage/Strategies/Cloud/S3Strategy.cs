@@ -407,8 +407,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var meta = await GetMetadataAsyncCore(key, ct);
                 size = meta.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -457,8 +458,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     IncrementOperationCounter(StorageOperationType.Exists);
                     return false;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[management.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     return false;
                 }
             }
@@ -897,8 +899,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[management.StoreMultipartManualAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -945,8 +948,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[management.ExistsWithManualHttpAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

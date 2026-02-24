@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private const int DEFAULT_QUEUE_DEPTH = 64;
         private const int MAX_TRANSFER_SIZE = 1024 * 1024; // 1MB per transfer
 
-        private readonly SemaphoreSlim _ioLock;
+        private SemaphoreSlim _ioLock;
         private string _devicePath = string.Empty;
         private string _basePath = string.Empty;
         private uint _namespaceId = 1;
@@ -137,11 +137,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // Update semaphore for queue depth
             if (_queueDepth != DEFAULT_QUEUE_DEPTH)
             {
-                _ioLock.Dispose();
-                System.Reflection.FieldInfo field = typeof(NvmeDiskStrategy).GetField(
-                    "_ioLock",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-                field.SetValue(this, new SemaphoreSlim(_queueDepth, _queueDepth));
+                var oldLock = _ioLock;
+                _ioLock = new SemaphoreSlim(_queueDepth, _queueDepth);
+                oldLock.Dispose();
             }
 
             // Ensure base path exists
@@ -155,23 +153,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
             if (_isNvmeDevice && !string.IsNullOrEmpty(_devicePath))
             {
-                // Query NVMe controller information
-                _controllerInfo = await IdentifyControllerAsync(ct);
+                // Query NVMe controller information (requires native IOCTL; unavailable without platform integration)
+                try { _controllerInfo = await IdentifyControllerAsync(ct); }
+                catch (PlatformNotSupportedException) { /* Controller info unavailable without native IOCTL */ }
 
                 // Query NVMe namespace information
                 _namespaceInfo = await IdentifyNamespaceAsync(_namespaceId, ct);
 
-                // Set optimal power state
+                // Set optimal power state (requires native IOCTL; unavailable without platform integration)
                 if (_powerState > 0)
                 {
-                    await SetPowerStateAsync(_powerState, ct);
+                    try { await SetPowerStateAsync(_powerState, ct); }
+                    catch (PlatformNotSupportedException) { /* Power state management unavailable without native IOCTL */ }
                 }
 
-                // Retrieve initial SMART data
+                // Retrieve initial SMART data (requires native IOCTL; unavailable without platform integration)
                 if (_enableSMART)
                 {
-                    _cachedSmartData = await GetSmartLogAsync(ct);
-                    _lastHealthCheck = DateTime.UtcNow;
+                    try
+                    {
+                        _cachedSmartData = await GetSmartLogAsync(ct);
+                        _lastHealthCheck = DateTime.UtcNow;
+                    }
+                    catch (PlatformNotSupportedException) { /* SMART log unavailable without native IOCTL */ }
                 }
             }
         }
@@ -444,8 +448,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 if (_enableSMART && _isNvmeDevice &&
                     (DateTime.UtcNow - _lastHealthCheck).TotalSeconds > 60)
                 {
-                    _cachedSmartData = await GetSmartLogAsync(ct);
-                    _lastHealthCheck = DateTime.UtcNow;
+                    try
+                    {
+                        _cachedSmartData = await GetSmartLogAsync(ct);
+                        _lastHealthCheck = DateTime.UtcNow;
+                    }
+                    catch (PlatformNotSupportedException) { /* SMART log unavailable without native IOCTL */ }
                 }
 
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
@@ -512,8 +520,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         driveInfo.IsReady ? driveInfo.AvailableFreeSpace : null);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }
@@ -559,6 +568,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         totalBytesWritten += bytesRead;
                     }
 
+                    // Truncate to actual data size (removes padding from last block)
+                    fs.SetLength(totalBytesWritten);
                     await fs.FlushAsync(ct);
                 }
                 finally
@@ -571,10 +582,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return totalBytesWritten;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.WriteAlignedAsync] {ex.GetType().Name}: {ex.Message}");
                 // Clean up temp file on failure
-                try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }
+                try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.WriteAlignedAsync] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                    /* Ignore cleanup errors */
+                }
                 throw;
             }
         }
@@ -633,9 +649,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return bytesWritten;
             }
-            catch
+            catch (Exception ex)
             {
-                try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.WriteStandardAsync] {ex.GetType().Name}: {ex.Message}");
+                try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.WriteStandardAsync] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                    /* Ignore cleanup errors */
+                }
                 throw;
             }
         }
@@ -646,12 +667,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private void WriteZeroesRange(string filePath, long offset, long length)
         {
-            // Note: Actual NVMe Write Zeroes command would require OS-specific IOCTL
-            // This is a placeholder that demonstrates the concept
-            // Real implementation would use:
+            // NVMe Write Zeroes requires platform-specific IOCTL:
             // - Windows: IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES with DeviceDsmAction_Allocation
             // - Linux: NVME_IOCTL_IO_CMD with nvme_write_zeroes
-            // For now, this is a no-op as the file deletion handles cleanup
+            // This path is guarded by SupportsWriteZeroes == false (see IdentifyNamespaceAsync),
+            // so this method should never be reached in production.
+            throw new PlatformNotSupportedException(
+                "NVMe Write Zeroes requires native IOCTL integration. " +
+                "Disable SupportsWriteZeroes or provide a platform-specific driver.");
         }
 
         #endregion
@@ -689,8 +712,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 // For now, conservative detection to avoid false positives
                 return Task.FromResult(false);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.DetectNvmeDeviceAsync] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult(false);
             }
         }
@@ -701,24 +725,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task<NvmeControllerInfo> IdentifyControllerAsync(CancellationToken ct)
         {
-            // Real implementation would use:
-            // - Windows: IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterProtocolSpecificProperty
-            // - Linux: NVME_IOCTL_ADMIN_CMD with nvme_identify
-            // - macOS: IOKit IOServiceMatching("IONVMeController")
-
-            // Placeholder implementation with simulated data
-            var info = new NvmeControllerInfo
-            {
-                VendorId = 0x8086, // Intel (example)
-                ModelNumber = "NVMe SSD Controller",
-                SerialNumber = "NVME" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant(),
-                FirmwareRevision = "1.0.0",
-                MaxDataTransferSize = MAX_TRANSFER_SIZE,
-                NumberOfNamespaces = 1,
-                PowerStates = 5
-            };
-
-            return Task.FromResult(info);
+            // NVMe Identify Controller requires platform-specific IOCTL:
+            // Windows: IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterProtocolSpecificProperty
+            // Linux: NVME_IOCTL_ADMIN_CMD with CNS=0x01
+            throw new PlatformNotSupportedException(
+                "NVMe Identify Controller requires native IOCTL integration. " +
+                "Use nvme-cli or platform-specific drivers for controller identification.");
         }
 
         /// <summary>
@@ -742,15 +754,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         ? driveInfo.TotalSize - driveInfo.AvailableFreeSpace
                         : 0,
                     BlockSize = (uint)_blockSize,
-                    SupportsWriteZeroes = true,
-                    SupportsTrim = true,
+                    SupportsWriteZeroes = false, // Requires NVMe Identify Namespace query (CNS=0x00)
+                    SupportsTrim = false,        // Requires NVMe Dataset Management command support check
                     SupportsReservation = false
                 };
 
                 return Task.FromResult(info);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.IdentifyNamespaceAsync] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult(new NvmeNamespaceInfo
                 {
                     NamespaceId = nsid,
@@ -765,33 +778,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task<NvmeSmartLog> GetSmartLogAsync(CancellationToken ct)
         {
-            // Real implementation would use:
-            // - Windows: IOCTL_STORAGE_QUERY_PROPERTY
-            // - Linux: NVME_IOCTL_ADMIN_CMD with NVME_LOG_SMART
-            // - macOS: IOKit SMARTLib
-
-            // Placeholder with simulated SMART data
-            var random = Random.Shared;
-            var smartLog = new NvmeSmartLog
-            {
-                Temperature = 45 + Random.Shared.Next(-5, 10), // 40-55°C typical
-                AvailableSpare = (byte)(95 + Random.Shared.Next(0, 5)), // 95-100%
-                AvailableSpareThreshold = 10,
-                PercentageUsed = (byte)Random.Shared.Next(5, 30), // 5-30% wear
-                DataUnitsRead = (ulong)(Random.Shared.NextInt64(1000000, 10000000)),
-                DataUnitsWritten = (ulong)(Random.Shared.NextInt64(500000, 5000000)),
-                HostReadCommands = (ulong)(Random.Shared.NextInt64(10000000, 100000000)),
-                HostWriteCommands = (ulong)(Random.Shared.NextInt64(5000000, 50000000)),
-                PowerCycles = (ulong)Random.Shared.Next(100, 1000),
-                PowerOnHours = (ulong)Random.Shared.Next(1000, 10000),
-                UnsafeShutdowns = (ulong)Random.Shared.Next(0, 10),
-                MediaErrors = 0,
-                ErrorLogEntries = 0,
-                WarningTemperatureTime = 0,
-                CriticalTemperatureTime = 0
-            };
-
-            return Task.FromResult(smartLog);
+            // NVMe SMART Log requires platform-specific IOCTL:
+            // Windows: IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterProtocolSpecificProperty, log page 0x02
+            // Linux: NVME_IOCTL_ADMIN_CMD with log page 0x02
+            throw new PlatformNotSupportedException(
+                "NVMe SMART log requires native IOCTL integration. " +
+                "Use nvme-cli or smartmontools for health monitoring.");
         }
 
         /// <summary>
@@ -800,10 +792,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task SetPowerStateAsync(byte powerState, CancellationToken ct)
         {
-            // Real implementation would use NVMe Set Features command
-            // Feature ID 0x02 (Power Management)
-            // This is a no-op placeholder
-            return Task.CompletedTask;
+            // NVMe power state management requires native IOCTL:
+            // Windows: IOCTL_STORAGE_SET_PROPERTY with NVMe Set Features (Feature ID 0x02)
+            // Linux: NVME_IOCTL_ADMIN_CMD with Set Features command
+            throw new PlatformNotSupportedException(
+                "NVMe power state management requires native IOCTL integration.");
         }
 
         /// <summary>
@@ -928,8 +921,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var lines = metadata.Select(kvp => $"{kvp.Key}={kvp.Value}");
                 await File.WriteAllLinesAsync(metaPath, lines, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -963,8 +957,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

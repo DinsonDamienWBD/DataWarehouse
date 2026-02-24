@@ -477,8 +477,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     };
                     await _s3Client!.AbortMultipartUploadAsync(abortRequest, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[VastDataStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -546,8 +547,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[VastDataStrategy.DeleteViaS3Async] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -743,8 +745,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                         totalCapacity = clusterHealth.TotalCapacity;
                         usedCapacity = clusterHealth.UsedCapacity;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[VastDataStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // VMS health check is optional
                     }
                 }
@@ -782,8 +785,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var health = await GetClusterHealthViaVmsAsync(ct);
                     return health.AvailableCapacity;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[VastDataStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // VMS not available
                 }
             }

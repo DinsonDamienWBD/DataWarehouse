@@ -337,8 +337,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     size = (long)sizeValue;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RedisStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata retrieval errors
             }
 
@@ -417,8 +418,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 {
                     meta = await GetMetadataAsyncCore(key, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[RedisStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Skip keys that no longer exist or have invalid metadata
                     continue;
                 }
@@ -565,8 +567,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RedisStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -684,7 +687,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
             // Reconstruct the data
             var ms = new MemoryStream(65536);
-            foreach (var entry in entries.OrderBy(e => e.Values.FirstOrDefault(v => v.Name == "chunk").Value))
+            // Sort numerically: RedisValue default comparison is lexicographic which orders
+            // "10" before "2". Explicitly cast to string to resolve TryParse overload ambiguity,
+            // then parse as int for correct chunk ordering.
+            foreach (var entry in entries.OrderBy(e => int.TryParse((string?)e.Values.FirstOrDefault(v => v.Name == "chunk").Value, out var idx) ? idx : 0))
             {
                 var dataValue = entry.Values.FirstOrDefault(v => v.Name == "data").Value;
                 if (!dataValue.IsNull)
@@ -899,10 +905,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         {
             using var inputStream = new MemoryStream(data);
             using var outputStream = new MemoryStream(65536);
-            using var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal);
-
-            await inputStream.CopyToAsync(gzipStream, 81920, ct);
-            await gzipStream.FlushAsync(ct);
+            // GZipStream must be disposed before ToArray() to flush the final block and GZIP trailer.
+            await using (var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+            {
+                await inputStream.CopyToAsync(gzipStream, 81920, ct);
+            }
 
             return outputStream.ToArray();
         }

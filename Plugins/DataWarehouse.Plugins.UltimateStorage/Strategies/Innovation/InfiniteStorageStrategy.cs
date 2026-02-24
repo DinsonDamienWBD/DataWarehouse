@@ -169,8 +169,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 {
                     await Task.WhenAll(storeTasks);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Log replication failures but don't fail the operation
                 }
             }, CancellationToken.None);
@@ -194,8 +195,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         UpdateProviderMetrics(cachedProviderId, 0, true);
                         return result;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         UpdateProviderMetrics(cachedProviderId, 0, false);
                     }
                 }
@@ -212,8 +214,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     UpdateProviderMetrics(provider.Id, 0, true);
                     return result;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     UpdateProviderMetrics(provider.Id, 0, false);
                     continue;
                 }
@@ -324,8 +327,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     {
                         return await GetMetadataFromProviderAsync(cachedProvider, key, ct);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Fall through to try other providers
                     }
                 }
@@ -341,8 +345,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     _keyToProvider[key] = provider.Id;
                     return metadata;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     continue;
                 }
             }
@@ -473,8 +478,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                     provider.IsHealthy = true;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy.MonitorProvidersHealthAsync] {ex.GetType().Name}: {ex.Message}");
                     provider.IsHealthy = false;
                 }
             }

@@ -240,8 +240,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                         return new MemoryStream(data);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         location.IsHealthy = false;
                         continue;
                     }
@@ -275,8 +276,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                         deletedCount++;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Continue deleting from other replicas
                     }
                 }
@@ -423,8 +425,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         maxCapacity = driveInfo.AvailableFreeSpace;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore errors for individual replicas
                 }
             }
@@ -458,8 +461,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         status.ReplicaCount++;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.ReplicateToLocationsAsync] {ex.GetType().Name}: {ex.Message}");
                     location.IsHealthy = false;
                 }
             }
@@ -484,8 +488,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     var exists = Directory.Exists(location.Path);
                     location.IsHealthy = exists;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.MonitorReplicaHealth] {ex.GetType().Name}: {ex.Message}");
                     location.IsHealthy = false;
                 }
             }
@@ -528,8 +533,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.RepairMissingReplicas] {ex.GetType().Name}: {ex.Message}");
                         // Repair failures are logged but non-critical
                     }
                 });

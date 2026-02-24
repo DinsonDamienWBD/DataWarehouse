@@ -252,8 +252,9 @@ public sealed class ZeroGravityMessageBusWiring : IDisposable
             // Cancellation is expected during shutdown; do not swallow
             throw;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ZeroGravityMessageBusWiring.PublishAsync] {ex.GetType().Name}: {ex.Message}");
             // Message bus failures must not break storage operations.
             // Observability events are best-effort.
         }

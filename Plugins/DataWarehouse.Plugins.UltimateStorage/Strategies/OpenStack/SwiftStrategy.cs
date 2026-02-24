@@ -326,8 +326,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 size = props.TryGetValue("Content-Length", out var sizeObj) && sizeObj is long l ? l : 0;
                 isLargeObject = props.ContainsKey("X-Static-Large-Object") || props.ContainsKey("X-Object-Manifest");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwiftStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting properties
             }
 
@@ -372,8 +373,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwiftStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -547,124 +549,129 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         /// </summary>
         private async Task AuthenticateAsync(CancellationToken ct)
         {
-            await _authLock.WaitAsync(ct);
-            try
+            // _authLock is held by the caller (EnsureAuthenticatedAsync); do not re-acquire here.
+            var authRequest = new
             {
-                var authRequest = new
+                auth = new
                 {
-                    auth = new
+                    identity = new
                     {
-                        identity = new
+                        methods = new[] { "password" },
+                        password = new
                         {
-                            methods = new[] { "password" },
-                            password = new
+                            user = new
                             {
-                                user = new
-                                {
-                                    name = _username,
-                                    domain = new { name = _domainName },
-                                    password = _password
-                                }
-                            }
-                        },
-                        scope = new
-                        {
-                            project = new
-                            {
-                                name = _projectName,
-                                domain = new { name = _domainName }
+                                name = _username,
+                                domain = new { name = _domainName },
+                                password = _password
                             }
                         }
-                    }
-                };
-
-                var authJson = JsonSerializer.Serialize(authRequest);
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_authUrl}/v3/auth/tokens");
-                request.Content = new StringContent(authJson, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient!.SendAsync(request, ct);
-                response.EnsureSuccessStatusCode();
-
-                // Extract token from X-Subject-Token header
-                if (response.Headers.TryGetValues("X-Subject-Token", out var tokenValues))
-                {
-                    _authToken = tokenValues.FirstOrDefault();
-                }
-
-                if (string.IsNullOrEmpty(_authToken))
-                {
-                    throw new InvalidOperationException("Failed to obtain authentication token from Keystone");
-                }
-
-                // Parse response to get storage URL and token expiry
-                var responseJson = await response.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(responseJson);
-                var root = doc.RootElement;
-
-                // Extract token expiry
-                if (root.TryGetProperty("token", out var token) && token.TryGetProperty("expires_at", out var expiresAt))
-                {
-                    _tokenExpiry = DateTime.Parse(expiresAt.GetString() ?? DateTime.UtcNow.AddHours(1).ToString("o"));
-                }
-                else
-                {
-                    _tokenExpiry = DateTime.UtcNow.AddHours(1); // Default 1 hour
-                }
-
-                // Extract storage URL from service catalog
-                if (token.TryGetProperty("catalog", out var catalog))
-                {
-                    foreach (var service in catalog.EnumerateArray())
+                    },
+                    scope = new
                     {
-                        if (service.TryGetProperty("type", out var serviceType) && serviceType.GetString() == "object-store")
+                        project = new
                         {
-                            if (service.TryGetProperty("endpoints", out var endpoints))
+                            name = _projectName,
+                            domain = new { name = _domainName }
+                        }
+                    }
+                }
+            };
+
+            var authJson = JsonSerializer.Serialize(authRequest);
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{_authUrl}/v3/auth/tokens");
+            request.Content = new StringContent(authJson, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient!.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
+            // Extract token from X-Subject-Token header
+            if (response.Headers.TryGetValues("X-Subject-Token", out var tokenValues))
+            {
+                _authToken = tokenValues.FirstOrDefault();
+            }
+
+            if (string.IsNullOrEmpty(_authToken))
+            {
+                throw new InvalidOperationException("Failed to obtain authentication token from Keystone");
+            }
+
+            // Parse response to get storage URL and token expiry
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(responseJson);
+            var root = doc.RootElement;
+
+            // Extract token expiry
+            if (root.TryGetProperty("token", out var token) && token.TryGetProperty("expires_at", out var expiresAt))
+            {
+                _tokenExpiry = DateTime.Parse(expiresAt.GetString() ?? DateTime.UtcNow.AddHours(1).ToString("o"));
+            }
+            else
+            {
+                _tokenExpiry = DateTime.UtcNow.AddHours(1); // Default 1 hour
+            }
+
+            // Extract storage URL from service catalog
+            if (token.TryGetProperty("catalog", out var catalog))
+            {
+                foreach (var service in catalog.EnumerateArray())
+                {
+                    if (service.TryGetProperty("type", out var serviceType) && serviceType.GetString() == "object-store")
+                    {
+                        if (service.TryGetProperty("endpoints", out var endpoints))
+                        {
+                            foreach (var endpoint in endpoints.EnumerateArray())
                             {
-                                foreach (var endpoint in endpoints.EnumerateArray())
+                                if (endpoint.TryGetProperty("interface", out var iface) && iface.GetString() == "public")
                                 {
-                                    if (endpoint.TryGetProperty("interface", out var iface) && iface.GetString() == "public")
+                                    // Check region if specified
+                                    if (!string.IsNullOrEmpty(_region))
                                     {
-                                        // Check region if specified
-                                        if (!string.IsNullOrEmpty(_region))
-                                        {
-                                            if (endpoint.TryGetProperty("region", out var region) && region.GetString() == _region)
-                                            {
-                                                _storageUrl = endpoint.GetProperty("url").GetString();
-                                                break;
-                                            }
-                                        }
-                                        else if (_storageUrl == null)
+                                        if (endpoint.TryGetProperty("region", out var region) && region.GetString() == _region)
                                         {
                                             _storageUrl = endpoint.GetProperty("url").GetString();
+                                            break;
                                         }
+                                    }
+                                    else if (_storageUrl == null)
+                                    {
+                                        _storageUrl = endpoint.GetProperty("url").GetString();
                                     }
                                 }
                             }
-                            break;
                         }
+                        break;
                     }
                 }
-
-                if (string.IsNullOrEmpty(_storageUrl))
-                {
-                    throw new InvalidOperationException("Failed to obtain storage URL from Keystone service catalog");
-                }
             }
-            finally
+
+            if (string.IsNullOrEmpty(_storageUrl))
             {
-                _authLock.Release();
+                throw new InvalidOperationException("Failed to obtain storage URL from Keystone service catalog");
             }
         }
 
         /// <summary>
         /// Ensures that the authentication token is valid, refreshing if necessary.
+        /// Uses double-checked locking to avoid TOCTOU race on token expiry.
         /// </summary>
         private async Task EnsureAuthenticatedAsync(CancellationToken ct)
         {
-            // Check if token needs refresh (5 minutes before expiry)
             if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
             {
-                await AuthenticateAsync(ct);
+                await _authLock.WaitAsync(ct);
+                try
+                {
+                    // Double-check after acquiring lock
+                    if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
+                    {
+                        await AuthenticateAsync(ct);
+                    }
+                }
+                finally
+                {
+                    _authLock.Release();
+                }
             }
         }
 
@@ -715,8 +722,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                     response.EnsureSuccessStatusCode();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwiftStrategy.EnsureContainerExistsAsync] {ex.GetType().Name}: {ex.Message}");
                 // Container might already exist, which is fine
             }
         }

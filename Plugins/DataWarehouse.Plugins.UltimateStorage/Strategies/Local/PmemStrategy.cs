@@ -219,8 +219,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 {
                     return await RetrievePmemOptimizedAsync(filePath, fileSize, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[PmemStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Fallback to standard I/O on error
                 }
             }
@@ -249,8 +250,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         // Flush any cached data to PMEM
                         await FlushPmemDataAsync(filePath, ct);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[PmemStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Ignore flush errors during deletion
                     }
                 }
@@ -478,8 +480,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
                 return Task.FromResult<long?>(driveInfo.IsReady ? driveInfo.AvailableFreeSpace : null);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }
@@ -526,9 +529,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     File.Move(tempPath, filePath, overwrite: true);
                     return fileSize;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    System.Diagnostics.Debug.WriteLine($"[PmemStrategy.StorePmemOptimizedAsync] {ex.GetType().Name}: {ex.Message}");
+                    try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[PmemStrategy.StorePmemOptimizedAsync] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                     throw;
                 }
             }
@@ -586,9 +594,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     File.Move(tempPath, filePath, overwrite: true);
                     return bytesWritten;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    System.Diagnostics.Debug.WriteLine($"[PmemStrategy.StoreStandardAsync] {ex.GetType().Name}: {ex.Message}");
+                    try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[PmemStrategy.StoreStandardAsync] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                     throw;
                 }
             }
@@ -643,15 +656,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task FlushWithStrategyAsync(MemoryMappedViewAccessor accessor, long offset, long length)
         {
-            // Note: In production code, this would use platform-specific APIs for:
+            // Platform-specific flush strategies (CLWB, CLFLUSHOPT, NT stores) require P/Invoke:
             // - CLWB (Cache Line Write Back) - Intel x86_64
             // - CLFLUSHOPT (optimized cache line flush)
             // - CLFLUSH (legacy cache line flush)
             // - Non-temporal stores (MOVNT instructions)
             // - SFENCE (store fence) for ordering guarantees
-
-            // For cross-platform compatibility, we use the .NET Flush() API
-            // which translates to appropriate platform-specific calls
+            // All strategies fall back to standard flush until native integration is available.
+            System.Diagnostics.Debug.WriteLine(
+                $"[PmemStrategy.FlushWithStrategy] Using standard flush (strategy '{_flushStrategy}' requires native P/Invoke integration)");
             accessor.Flush();
 
             return Task.CompletedTask;
@@ -666,11 +679,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // For now, use standard file sync
             try
             {
-                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
                 fs.Flush(flushToDisk: true);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.FlushPmemDataAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore flush errors
             }
 
@@ -730,8 +744,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return deviceInfo;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.DetectPmemDeviceAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -829,8 +844,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 await process.WaitForExitAsync(ct);
                 return process.ExitCode == 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.CheckForNdctlAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -840,8 +856,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private PmemMode DetectPmemMode(DriveInfo driveInfo)
         {
-            // In production, would query actual device mode via platform APIs
-            // For now, assume App Direct mode if PMEM is detected
+            // PMEM mode detection requires platform-specific queries:
+            // Linux: ndctl list / ipmctl show -dimm
+            // Windows: Get-PmemDisk PowerShell cmdlet
+            // Default to AppDirect as the most common PMEM configuration.
+            System.Diagnostics.Debug.WriteLine(
+                "[PmemStrategy.DetectPmemMode] PMEM mode detection requires ndctl/ipmctl; defaulting to AppDirect");
             return PmemMode.AppDirect;
         }
 
@@ -863,17 +883,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     }
                 }
 
-                // On Windows Server 2019+, DAX is enabled by default for PMEM volumes
+                // DAX mode requires persistent memory hardware; DriveInfo cannot detect it
+                // Return true only if path explicitly names a PMEM device on an NTFS volume
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
-                    return driveInfo.DriveFormat.Equals("NTFS", StringComparison.OrdinalIgnoreCase);
+                    return _basePath.Contains("pmem", StringComparison.OrdinalIgnoreCase) &&
+                           driveInfo.DriveFormat.Equals("NTFS", StringComparison.OrdinalIgnoreCase);
                 }
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.ValidateDaxModeAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -893,8 +916,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     mountInfo.AddRange(lines);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.ReadMountInfoAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors
             }
 
@@ -977,8 +1001,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var lines = metadata.Select(kvp => $"{kvp.Key}={kvp.Value}");
                 await File.WriteAllLinesAsync(metaPath, lines, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -1007,8 +1032,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PmemStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

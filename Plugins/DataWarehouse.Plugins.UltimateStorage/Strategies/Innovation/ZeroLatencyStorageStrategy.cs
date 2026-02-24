@@ -453,8 +453,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                             _l2CacheIndex[task.Key] = l2Path;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[ZeroLatencyStorageStrategy.ProcessPrefetchQueue] {ex.GetType().Name}: {ex.Message}");
                         // Prefetch failures are non-critical
                     }
                 });

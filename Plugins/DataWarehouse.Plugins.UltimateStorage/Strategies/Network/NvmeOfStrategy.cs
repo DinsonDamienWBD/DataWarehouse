@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -71,7 +72,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         // State tracking
         private bool _isConnected = false;
         private DateTime _lastKeepAlive = DateTime.MinValue;
-        private readonly Dictionary<string, BlockDeviceMapping> _blockMappings = new();
+        private readonly ConcurrentDictionary<string, BlockDeviceMapping> _blockMappings = new();
+        private CancellationTokenSource? _keepAliveCts;
         private readonly Dictionary<string, byte[]> _objectCache = new();
         private long _nextBlockOffset = 0;
 
@@ -136,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             _authenticationProtocol = GetConfiguration<string>("AuthenticationProtocol", "DH-HMAC-CHAP");
             _blockSize = GetConfiguration<int>("BlockSize", 4096);
             _basePath = GetConfiguration<string>("BasePath", "/nvmeof/storage");
-            _managementApiUrl = GetConfiguration<string>("ManagementApiUrl", $"http://{_targetAddress}:8080/api");
+            _managementApiUrl = GetConfiguration<string>("ManagementApiUrl", $"https://{_targetAddress}:8080/api");
             _useInBandAuth = GetConfiguration<bool>("UseInBandAuth", false);
             _numberOfQueues = GetConfiguration<int>("NumberOfQueues", 4);
             _timeoutSeconds = GetConfiguration<int>("TimeoutSeconds", 30);
@@ -241,8 +243,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 _isConnected = true;
                 _lastKeepAlive = DateTime.UtcNow;
 
-                // Start keep-alive task
-                _ = Task.Run(() => KeepAliveLoopAsync(CancellationToken.None), CancellationToken.None);
+                // Start keep-alive task with a cancellable token so it can be stopped on disconnect
+                _keepAliveCts = new CancellationTokenSource();
+                _ = Task.Run(() => KeepAliveLoopAsync(_keepAliveCts.Token), _keepAliveCts.Token);
             }
             finally
             {
@@ -290,12 +293,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                     // Ignore errors during disconnect
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.DisconnectAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore disconnect errors
                 }
 
                 _isConnected = false;
+
+                // Stop the keep-alive background task
+                _keepAliveCts?.Cancel();
+                _keepAliveCts?.Dispose();
+                _keepAliveCts = null;
             }
             finally
             {
@@ -346,8 +355,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         _lastKeepAlive = DateTime.UtcNow;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.KeepAliveLoopAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore keep-alive errors
                 }
             }
@@ -403,8 +413,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     // Process discovery log pages (implementation would parse and update subsystem information)
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.PerformDiscoveryAsync] {ex.GetType().Name}: {ex.Message}");
                 // Discovery is optional, continue without it
             }
         }
@@ -545,7 +556,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 await WriteBlocksAsync(mapping.BlockOffset, zeroData, ct);
 
                 // Remove mapping
-                _blockMappings.Remove(key);
+                _blockMappings.TryRemove(key, out _);
                 await SaveBlockMappingsAsync(ct);
 
                 // Update statistics
@@ -762,8 +773,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -896,8 +908,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.LoadBlockMappingsAsync] {ex.GetType().Name}: {ex.Message}");
                 // No existing mappings, start fresh
                 _nextBlockOffset = 1; // Reserve block 0 for metadata
             }
@@ -924,8 +937,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Write mappings to block 0 (metadata block)
                 await WriteBlocksAsync(0, metadataBytes, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.SaveBlockMappingsAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata save errors
             }
         }

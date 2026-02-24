@@ -817,8 +817,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var response = await _httpClient.GetAsync("/api/v1/system/health", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OdaStrategy.CheckOdaAccessibilityAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

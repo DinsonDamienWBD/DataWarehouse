@@ -67,7 +67,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     if (bundles != null) foreach (var bundle in bundles) _uploadQueue.Enqueue(bundle);
                 }
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SatelliteLinkStrategy.LoadQueueAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         private async Task SaveQueueAsync(CancellationToken ct)
@@ -79,7 +83,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(bundles);
                 await File.WriteAllTextAsync(queueFile, json, ct);
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SatelliteLinkStrategy.SaveQueueAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         protected override async ValueTask DisposeCoreAsync()
@@ -194,7 +202,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
         {
             try { return Task.FromResult<long?>(new DriveInfo(Path.GetPathRoot(_basePath)!).AvailableFreeSpace); }
-            catch { return Task.FromResult<long?>(null); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SatelliteLinkStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                return Task.FromResult<long?>(null);
+            }
         }
 
         private async Task SimulateOrbitalPassAsync(CancellationToken ct)
@@ -218,8 +230,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         meta.Transmitted = DateTime.UtcNow;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SatelliteLinkStrategy.SimulateOrbitalPassAsync] {ex.GetType().Name}: {ex.Message}");
                     // Retry on next pass
                     bundle.RetryCount++;
                     if (bundle.RetryCount < 5) _uploadQueue.Enqueue(bundle);

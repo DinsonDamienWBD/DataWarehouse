@@ -326,8 +326,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 stream.Dispose();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GraphQlConnectorStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

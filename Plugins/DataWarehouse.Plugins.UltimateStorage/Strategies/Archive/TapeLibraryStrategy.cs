@@ -1083,8 +1083,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 CloseHandle(handle);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TapeLibraryStrategy.CheckDriveAccessibilityAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -1096,8 +1097,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 await ExecuteCommandAsync("mtx", $"-f {_libraryDevice} status", ct, timeout: TimeSpan.FromSeconds(10));
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TapeLibraryStrategy.CheckLibraryAccessibilityAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -1239,7 +1241,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     process.Kill();
                 }
-                catch { /* Best-effort process termination — failure is non-fatal */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TapeLibraryStrategy.ExecuteCommandAsync] {ex.GetType().Name}: {ex.Message}");
+                    /* Best-effort process termination — failure is non-fatal */
+                }
                 throw new TimeoutException($"Command '{command} {arguments}' timed out after {timeout.Value.TotalSeconds} seconds");
             }
 

@@ -439,8 +439,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 {
                     meta = await GetMetadataAsyncCore(key, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FoundationDbStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Skip keys that no longer exist or have invalid metadata
                     continue;
                 }
@@ -811,10 +812,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         {
             using var inputStream = new MemoryStream(data);
             using var outputStream = new MemoryStream(65536);
-            using var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal);
-
-            await inputStream.CopyToAsync(gzipStream, 81920, ct);
-            await gzipStream.FlushAsync(ct);
+            // GZipStream must be disposed (not just flushed) before ToArray() so that the
+            // compressor writes its final block and the GZIP trailer to outputStream.
+            await using (var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+            {
+                await inputStream.CopyToAsync(gzipStream, 81920, ct);
+            }
 
             return outputStream.ToArray();
         }

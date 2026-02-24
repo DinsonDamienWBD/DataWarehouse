@@ -478,8 +478,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                         {
                             meta = await GetMetadataAsyncCore(decodedKey, ct);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[TikvStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                             // Skip keys that no longer exist or have invalid metadata
                             continue;
                         }
@@ -725,8 +726,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TikvStrategy.RawGetAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -815,8 +817,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 return pairs;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TikvStrategy.RawScanAsync] {ex.GetType().Name}: {ex.Message}");
                 return new List<KeyValuePair<string, byte[]>>();
             }
         }
@@ -981,10 +984,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         {
             using var inputStream = new MemoryStream(data);
             using var outputStream = new MemoryStream(65536);
-            using var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal);
-
-            await inputStream.CopyToAsync(gzipStream, 81920, ct);
-            await gzipStream.FlushAsync(ct);
+            // GZipStream must be disposed before ToArray() to flush the final block and GZIP trailer.
+            await using (var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+            {
+                await inputStream.CopyToAsync(gzipStream, 81920, ct);
+            }
 
             return outputStream.ToArray();
         }

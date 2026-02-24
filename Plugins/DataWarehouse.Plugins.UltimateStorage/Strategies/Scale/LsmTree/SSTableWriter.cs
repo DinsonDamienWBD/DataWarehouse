@@ -54,8 +54,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 bufferSize: 8192,
                 useAsync: true);
 
+            // Materialize once so we know the entry count before building the BloomFilter.
+            // This avoids the fixed capacity of 10000 which would over-allocate for small
+            // SSTables and under-allocate for large ones.
+            var entryList = sortedEntries.ToList();
+            var bloomExpectedItems = Math.Max(entryList.Count, 100); // at least 100 to avoid degenerate filter
+
             var indexEntries = new List<(byte[] firstKey, long offset)>();
-            var bloomFilter = new BloomFilter(expectedItems: 10000, falsePositiveRate: 0.01);
+            var bloomFilter = new BloomFilter(expectedItems: bloomExpectedItems, falsePositiveRate: 0.01);
             long entryCount = 0;
             byte[]? firstKey = null;
             byte[]? lastKey = null;
@@ -64,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             byte[]? currentBlockFirstKey = null;
             var currentBlockBuffer = new MemoryStream(BlockSize);
 
-            foreach (var kvp in sortedEntries)
+            foreach (var kvp in entryList)
             {
                 ct.ThrowIfCancellationRequested();
 

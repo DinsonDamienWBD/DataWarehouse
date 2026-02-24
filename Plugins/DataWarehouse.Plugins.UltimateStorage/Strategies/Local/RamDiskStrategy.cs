@@ -28,6 +28,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private readonly LinkedList<string> _lruList = new();
         private readonly SemaphoreSlim _lruLock = new(1, 1);
         private readonly SemaphoreSlim _snapshotLock = new(1, 1);
+        private readonly object _memoryLock = new();
         private Timer? _expirationTimer;
         private Timer? _memoryPressureTimer;
         private Timer? _autoSnapshotTimer;
@@ -93,7 +94,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var expirationInterval = TimeSpan.FromSeconds(30);
                 _expirationTimer = new Timer(
-                    _ => _ = Task.Run(async () => await CleanupExpiredEntriesAsync().ConfigureAwait(false)),
+                    _ => _ = Task.Run(async () =>
+                    {
+                        try { await CleanupExpiredEntriesAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RamDiskStrategy.CleanupExpired] {ex.GetType().Name}: {ex.Message}"); }
+                    }),
                     null,
                     expirationInterval,
                     expirationInterval);
@@ -104,7 +109,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var pressureInterval = TimeSpan.FromSeconds(10);
                 _memoryPressureTimer = new Timer(
-                    _ => _ = Task.Run(async () => await CheckMemoryPressureAsync().ConfigureAwait(false)),
+                    _ => _ = Task.Run(async () =>
+                    {
+                        try { await CheckMemoryPressureAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RamDiskStrategy.CheckMemoryPressure] {ex.GetType().Name}: {ex.Message}"); }
+                    }),
                     null,
                     pressureInterval,
                     pressureInterval);
@@ -181,15 +190,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 LastAccessed = now
             };
 
-            // Remove old entry memory if updating
-            if (_storage.TryGetValue(key, out var oldEntry))
+            // Atomically check-update-store to avoid non-atomic memory accounting
+            lock (_memoryLock)
             {
-                Interlocked.Add(ref _currentMemoryBytes, -oldEntry.Size);
-            }
+                if (_storage.TryGetValue(key, out var oldEntry))
+                {
+                    Interlocked.Add(ref _currentMemoryBytes, -oldEntry.Size);
+                }
 
-            // Store entry
-            _storage[key] = entry;
-            Interlocked.Add(ref _currentMemoryBytes, size);
+                // Store entry
+                _storage[key] = entry;
+                Interlocked.Add(ref _currentMemoryBytes, size);
+            }
 
             // Update LRU index
             await UpdateLruAsync(key, ct);
@@ -494,17 +506,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 writer.Write("RAMDISK_SNAPSHOT".ToCharArray());
                 writer.Write(1); // Version
 
-                // Write entry count
-                writer.Write(_storage.Count);
+                // Filter out expired entries before writing count to avoid count/data mismatch
+                var validEntries = _storage.Where(kvp => kvp.Value.ExpiresAt >= DateTime.UtcNow).ToList();
+
+                // Write entry count (only valid, non-expired entries)
+                writer.Write(validEntries.Count);
 
                 // Write entries
-                foreach (var kvp in _storage)
+                foreach (var kvp in validEntries)
                 {
                     var entry = kvp.Value;
 
-                    // Skip expired entries
-                    if (entry.ExpiresAt < DateTime.UtcNow)
-                        continue;
 
                     writer.Write(entry.Key);
                     writer.Write(entry.Size);
@@ -589,6 +601,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     var key = reader.ReadString();
                     var size = reader.ReadInt64();
                     var dataLength = reader.ReadInt32();
+                    if (dataLength < 0 || dataLength > 1_073_741_824) // 1GB max per entry
+                        throw new InvalidDataException($"Invalid data length in snapshot: {dataLength}");
                     var data = reader.ReadBytes(dataLength);
                     var created = DateTime.FromBinary(reader.ReadInt64());
                     var modified = DateTime.FromBinary(reader.ReadInt64());

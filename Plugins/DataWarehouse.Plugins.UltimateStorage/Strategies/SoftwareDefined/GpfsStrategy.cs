@@ -292,22 +292,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             _enableEncryption = GetConfiguration<bool>("EnableEncryption", false);
             _encryptionKeyFile = GetConfiguration<string>("EncryptionKeyFile", string.Empty);
 
-            // Apply fileset configuration if enabled
+            // Apply fileset configuration if enabled (NotSupportedException expected until CLI integration)
             if (_useFilesets && !string.IsNullOrWhiteSpace(_filesetName))
             {
-                await ApplyFilesetConfigurationAsync(_filesetName, ct);
+                try { await ApplyFilesetConfigurationAsync(_filesetName, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.Init] {ex.Message}"); }
             }
 
-            // Apply ILM policy if enabled
+            // Apply ILM policy if enabled (NotSupportedException expected until CLI integration)
             if (_enableIlm && !string.IsNullOrWhiteSpace(_ilmPolicyName))
             {
-                await ApplyIlmPolicyAsync(_ilmPolicyName, ct);
+                try { await ApplyIlmPolicyAsync(_ilmPolicyName, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.Init] {ex.Message}"); }
             }
 
-            // Apply file placement policy if enabled
+            // Apply file placement policy if enabled (NotSupportedException expected until CLI integration)
             if (_enableFilePlacement && !string.IsNullOrWhiteSpace(_placementRuleName))
             {
-                await ApplyFilePlacementPolicyAsync(_placementRuleName, ct);
+                try { await ApplyFilePlacementPolicyAsync(_placementRuleName, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.Init] {ex.Message}"); }
             }
 
             await Task.CompletedTask;
@@ -536,8 +539,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -577,8 +581,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -646,8 +651,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Capacity information not available
                 }
 
@@ -708,8 +714,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -722,91 +729,55 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Applies fileset configuration for independent directory tree with quotas.
         /// Filesets provide separate namespace and quota management.
         /// </summary>
-        private async Task ApplyFilesetConfigurationAsync(string filesetName, CancellationToken ct)
+        private Task ApplyFilesetConfigurationAsync(string filesetName, CancellationToken ct)
         {
-            // In production, this would use 'mmcrfileset' and 'mmlinkfileset' commands
-            // or Spectrum Scale Management API
-            var configMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.fileset.name"] = filesetName,
-                ["gpfs.fileset.path"] = _filesetPath,
-                ["gpfs.fileset.quota.bytes"] = _filesetQuotaBytes.ToString(),
-                ["gpfs.fileset.quota.files"] = _filesetQuotaFiles.ToString(),
-                ["gpfs.fileset.snapshots.enabled"] = _enableFilesetSnapshots.ToString()
-            };
-
-            var configFile = Path.Combine(_mountPath, ".gpfs_fileset_config");
-            await File.WriteAllTextAsync(configFile, JsonSerializer.Serialize(configMetadata), ct);
+            throw new NotSupportedException(
+                "GPFS fileset configuration requires 'mmcrfileset'/'mmchfileset' CLI integration.");
         }
 
         /// <summary>
         /// Applies ILM (Information Lifecycle Management) policy for automated data movement.
         /// ILM policies define rules for migrating data between storage tiers.
         /// </summary>
-        private async Task ApplyIlmPolicyAsync(string policyName, CancellationToken ct)
+        private Task ApplyIlmPolicyAsync(string policyName, CancellationToken ct)
         {
-            // In production, this would use 'mmapplypolicy' command or Management API
-            // Example: mmapplypolicy /gpfs/data -P /var/mmfs/etc/policy.txt
-            var ilmMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.ilm.policy.name"] = policyName,
-                ["gpfs.ilm.scan.interval.hours"] = _ilmScanIntervalHours.ToString(),
-                ["gpfs.ilm.enabled"] = "true"
-            };
-
-            var ilmFile = Path.Combine(_mountPath, ".gpfs_ilm_policy");
-            await File.WriteAllTextAsync(ilmFile, JsonSerializer.Serialize(ilmMetadata), ct);
+            throw new NotSupportedException(
+                "GPFS ILM policy requires 'mmapplypolicy' CLI integration.");
         }
 
         /// <summary>
         /// Applies file placement policy to control data distribution across storage pools.
         /// Placement rules determine which pool receives newly created files.
         /// </summary>
-        private async Task ApplyFilePlacementPolicyAsync(string ruleName, CancellationToken ct)
+        private Task ApplyFilePlacementPolicyAsync(string ruleName, CancellationToken ct)
         {
-            // In production, this would use 'mmchattr' with placement rules
-            var placementMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.placement.rule"] = ruleName,
-                ["gpfs.placement.pool"] = _defaultStoragePool
-            };
-
-            var placementFile = Path.Combine(_mountPath, ".gpfs_placement_rule");
-            await File.WriteAllTextAsync(placementFile, JsonSerializer.Serialize(placementMetadata), ct);
+            throw new NotSupportedException(
+                "GPFS file placement requires 'mmchattr' CLI integration.");
         }
 
         /// <summary>
         /// Applies storage pool placement to a directory.
         /// Files created in this directory will use the specified storage pool.
         /// </summary>
-        private async Task ApplyStoragePoolPlacementAsync(string directoryPath, CancellationToken ct)
+        private Task ApplyStoragePoolPlacementAsync(string directoryPath, CancellationToken ct)
         {
             if (!_enableFilePlacement)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // In production, use: mmchattr -P poolName directory
-            var poolFile = Path.Combine(directoryPath, ".gpfs_pool");
-            await File.WriteAllTextAsync(poolFile, _defaultStoragePool, ct);
+            throw new NotSupportedException(
+                "GPFS storage pool placement requires Spectrum Scale Management API integration.");
         }
 
         /// <summary>
         /// Applies immutability (WORM - Write Once Read Many) to a file.
         /// Immutable files cannot be modified or deleted for the retention period.
         /// </summary>
-        private async Task ApplyImmutabilityAsync(string filePath, int retentionDays, CancellationToken ct)
+        private Task ApplyImmutabilityAsync(string filePath, int retentionDays, CancellationToken ct)
         {
-            // In production, use: mmchattr --immutable=yes --retention-date=YYYY-MM-DD file
-            var immutableMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.immutable"] = "true",
-                ["gpfs.retention.days"] = retentionDays.ToString(),
-                ["gpfs.retention.expires"] = DateTime.UtcNow.AddDays(retentionDays).ToString("o")
-            };
-
-            var immutableFile = filePath + ".immutable";
-            await File.WriteAllTextAsync(immutableFile, JsonSerializer.Serialize(immutableMetadata), ct);
+            throw new NotSupportedException(
+                "GPFS WORM/immutability requires 'mmchattr -i yes' CLI integration.");
         }
 
         /// <summary>
@@ -833,8 +804,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.CheckImmutabilityAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors
             }
 
@@ -845,25 +817,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Applies compression to a file.
         /// GPFS supports LZ4 and zlib compression algorithms.
         /// </summary>
-        private async Task ApplyCompressionAsync(string filePath, CancellationToken ct)
+        private Task ApplyCompressionAsync(string filePath, CancellationToken ct)
         {
-            // In production, use: mmchattr --compression=yes file
-            // or set at fileset level: mmchfileset fs fileset --compression=yes
-            var compressionMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.compression.enabled"] = "true",
-                ["gpfs.compression.algorithm"] = _compressionAlgorithm
-            };
-
-            var compressionFile = filePath + ".compression";
-            await File.WriteAllTextAsync(compressionFile, JsonSerializer.Serialize(compressionMetadata), ct);
+            throw new NotSupportedException(
+                "GPFS compression requires 'mmchattr --compression' CLI integration.");
         }
 
         /// <summary>
         /// Creates a snapshot of the fileset.
         /// Snapshots provide point-in-time views for backup and recovery.
         /// </summary>
-        public async Task<string> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
+        public Task<string> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
         {
             EnsureInitialized();
 
@@ -877,27 +841,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new ArgumentException("Snapshot name cannot be empty", nameof(snapshotName));
             }
 
-            // In production, use: mmcrsnapshot filesystem snapshotName
-            var snapshotPath = Path.Combine(_mountPath, _snapshotDirectory, snapshotName);
-
-            if (Directory.Exists(snapshotPath))
-            {
-                throw new InvalidOperationException($"Snapshot '{snapshotName}' already exists.");
-            }
-
-            Directory.CreateDirectory(snapshotPath);
-
-            var snapshotMetadata = new Dictionary<string, string>
-            {
-                ["gpfs.snapshot.name"] = snapshotName,
-                ["gpfs.snapshot.created"] = DateTime.UtcNow.ToString("o"),
-                ["gpfs.snapshot.filesystem"] = _filesystemName
-            };
-
-            var metadataFile = Path.Combine(snapshotPath, ".snapshot_metadata");
-            await File.WriteAllTextAsync(metadataFile, JsonSerializer.Serialize(snapshotMetadata), ct);
-
-            return snapshotPath;
+            throw new NotSupportedException(
+                "GPFS snapshots require 'mmcrsnapshot' CLI integration.");
         }
 
         /// <summary>
@@ -988,8 +933,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f) && !IsSystemFile(f))
                         .LongCount();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.GetFilesystemUsageAsync] {ex.GetType().Name}: {ex.Message}");
                     // File count may fail if permissions insufficient
                 }
 
@@ -1126,8 +1072,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1141,11 +1088,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private string GetFullPath(string key)
         {
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(_mountPath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1227,8 +1178,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GpfsStrategy.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }

@@ -44,6 +44,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public override string StrategyId => "universal-api";
         public override string Name => "Universal API (Multi-Backend Adapter)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // S3/Azure/GCS adapters inherit filesystem adapter; requires actual cloud SDK calls
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -192,8 +193,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     data.Position = 0;
                     await _secondaryAdapter.StoreAsync(key, data, metadata, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[UniversalApiStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Best effort replication
                 }
             }
@@ -257,8 +259,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 {
                     await _primaryAdapter.DeleteAsync(key, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[UniversalApiStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Best effort delete
                 }
             }
@@ -269,8 +272,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 {
                     await _secondaryAdapter.DeleteAsync(key, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[UniversalApiStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Best effort delete
                 }
             }
@@ -551,8 +555,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     var driveInfo = new DriveInfo(Path.GetPathRoot(BasePath)!);
                     return Task.FromResult<long?>(driveInfo.AvailableFreeSpace);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[UniversalApiStrategy.GetAvailableCapacityAsync] {ex.GetType().Name}: {ex.Message}");
                     return Task.FromResult<long?>(null);
                 }
             }

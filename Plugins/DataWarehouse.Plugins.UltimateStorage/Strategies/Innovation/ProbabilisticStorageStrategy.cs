@@ -1029,8 +1029,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath)!);
                 return Task.FromResult<long?>(driveInfo.AvailableFreeSpace);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProbabilisticStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }

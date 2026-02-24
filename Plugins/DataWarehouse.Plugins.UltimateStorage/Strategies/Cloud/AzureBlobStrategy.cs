@@ -313,8 +313,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     size = props.TryGetValue("ContentLength", out var sizeObj) && sizeObj is long l ? l : 0;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureBlobStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting properties
             }
 
@@ -346,8 +347,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     IncrementOperationCounter(StorageOperationType.Exists);
                     return response.Value;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[AzureBlobStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     IncrementOperationCounter(StorageOperationType.Exists);
                     return false;
                 }
@@ -652,8 +654,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     await SetAccessTierAsync(key, "Archive", ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureBlobStrategy.AutoTransitionTierAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore transition errors
             }
         }
@@ -771,8 +774,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureBlobStrategy.ExistsWithManualHttpAsync] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -969,8 +973,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     response.EnsureSuccessStatusCode();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureBlobStrategy.EnsureContainerExistsManualAsync] {ex.GetType().Name}: {ex.Message}");
                 // Container might already exist
             }
         }

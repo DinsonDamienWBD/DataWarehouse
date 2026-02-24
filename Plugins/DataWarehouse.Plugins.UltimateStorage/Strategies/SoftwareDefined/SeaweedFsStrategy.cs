@@ -474,8 +474,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     await DeleteFromVolumeServerAsync(lookup.FileId, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SeaweedFsStrategy.DeleteViaNativeApiAsync] {ex.GetType().Name}: {ex.Message}");
                 // Continue with filer deletion even if volume deletion fails
             }
 
@@ -501,8 +502,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SeaweedFsStrategy.DeleteViaS3GatewayAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -551,8 +553,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     return response.IsSuccessStatusCode;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SeaweedFsStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -1029,8 +1032,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var request = new HttpRequestMessage(HttpMethod.Delete, deleteUrl);
                 await _httpClient!.SendAsync(request, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SeaweedFsStrategy.DeleteFromVolumeServerAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore deletion errors (file might already be deleted or TTL expired)
             }
         }

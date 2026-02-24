@@ -195,8 +195,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     Tier = Tier
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OdbcConnectorStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 transaction?.Rollback();
                 throw;
             }
@@ -263,8 +264,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
                 return resultStream;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OdbcConnectorStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 transaction?.Rollback();
                 throw;
             }
@@ -309,8 +311,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
                 IncrementOperationCounter(StorageOperationType.Delete);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OdbcConnectorStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 transaction?.Rollback();
                 throw;
             }
@@ -349,8 +352,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
                 return count > 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OdbcConnectorStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

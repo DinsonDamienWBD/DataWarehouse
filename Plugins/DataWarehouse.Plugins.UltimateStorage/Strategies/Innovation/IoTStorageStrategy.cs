@@ -158,12 +158,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
         {
             try { return Task.FromResult<long?>(new DriveInfo(Path.GetPathRoot(_basePath)!).AvailableFreeSpace); }
-            catch { return Task.FromResult<long?>(null); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[IoTStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                return Task.FromResult<long?>(null);
+            }
         }
 
         private DeviceShard GetShardForDevice(string deviceId)
         {
-            var hash = deviceId.GetHashCode();
+            // Use SHA256 for deterministic (non-GetHashCode) persistent sharding across runtimes
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(deviceId));
+            var hash = BitConverter.ToInt32(hashBytes, 0);
             var shardIndex = Math.Abs(hash % _shardCount);
             return _deviceShards[$"shard-{shardIndex:D3}"];
         }

@@ -36,6 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public override string StrategyId => "protocol-morphing";
         public override string Name => "Protocol Morphing (Multi-Protocol Adapter)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // S3/Azure/GCS adapters are filesystem stubs; requires actual cloud SDK protocol translation
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -87,7 +88,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProtocolMorphingStrategy.LoadProtocolMetadataAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         private async Task SaveProtocolMetadataAsync(CancellationToken ct)
@@ -98,7 +103,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_objectProtocols.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(metaPath, json, ct);
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProtocolMorphingStrategy.SaveProtocolMetadataAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         protected override async ValueTask DisposeCoreAsync()
@@ -152,7 +161,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             foreach (var adapter in _protocolAdapters.Values)
             {
-                try { await adapter.DeleteAsync(key, ct); } catch { /* Best-effort deletion across all protocols */ }
+                try { await adapter.DeleteAsync(key, ct); } catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ProtocolMorphingStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                    /* Best-effort deletion across all protocols */
+                }
             }
 
             _objectProtocols.TryRemove(key, out _);
@@ -216,7 +229,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var drive = new DriveInfo(Path.GetPathRoot(_basePath)!);
                 return Task.FromResult<long?>(drive.AvailableFreeSpace);
             }
-            catch { return Task.FromResult<long?>(null); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProtocolMorphingStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                return Task.FromResult<long?>(null);
+            }
         }
 
         private StorageProtocol DetectProtocol(IDictionary<string, string>? metadata)

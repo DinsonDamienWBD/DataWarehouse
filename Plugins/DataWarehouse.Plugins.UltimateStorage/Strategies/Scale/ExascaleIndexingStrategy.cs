@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
         public override string StrategyId => "exascale-indexing";
         public override string Name => "Exascale Indexing Strategy";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // BoundedDictionary in-memory stub; requires real distributed B-tree and bloom filter index layer
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, SupportsMultipart = true, MaxObjects = 1000000000000L, ConsistencyModel = ConsistencyModel.Strong };
 

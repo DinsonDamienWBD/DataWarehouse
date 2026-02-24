@@ -314,8 +314,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     {
                         await AbortMultipartUploadAsync(key, uploadId, ct);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[AlibabaOssStrategy.UploadMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore abort failures
                     }
                 }
@@ -362,8 +363,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var objMeta = await Task.Run(() => _client!.GetObjectMetadata(_bucketName, key), ct);
                 size = objMeta?.ContentLength ?? 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AlibabaOssStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting object metadata
             }
 
@@ -397,8 +399,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AlibabaOssStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -703,8 +706,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var abortRequest = new AbortMultipartUploadRequest(_bucketName, key, uploadId);
                 await Task.Run(() => _client!.AbortMultipartUpload(abortRequest), ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AlibabaOssStrategy.AbortMultipartUploadAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore abort failures
             }
         }

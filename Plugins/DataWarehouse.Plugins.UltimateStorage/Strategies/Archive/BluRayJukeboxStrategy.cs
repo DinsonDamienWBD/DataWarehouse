@@ -967,8 +967,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
                 return File.Exists(_driveDevice);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BluRayJukeboxStrategy.CheckDriveAccessibilityAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -992,8 +993,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BluRayJukeboxStrategy.CheckJukeboxAccessibilityAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

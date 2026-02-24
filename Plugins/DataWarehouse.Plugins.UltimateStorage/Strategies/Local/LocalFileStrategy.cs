@@ -108,10 +108,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                         // Atomic rename
                         File.Move(tempPath, filePath, overwrite: true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Clean up temp file on failure
-                        try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }
+                        try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.StoreAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                            /* Ignore cleanup errors */
+                        }
                         throw;
                     }
                 }
@@ -185,8 +190,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     ms.Position = 0;
                     return ms;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     await ms.DisposeAsync();
                     await fs.DisposeAsync();
                     throw;
@@ -364,8 +370,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
                 return Task.FromResult<long?>(driveInfo.IsReady ? driveInfo.AvailableFreeSpace : null);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }
@@ -378,20 +385,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         {
             var relativePath = key.Replace('/', Path.DirectorySeparatorChar);
 
-            // Handle Windows absolute paths (e.g., C:/path)
+            // Reject absolute Windows path keys (e.g., C:/secret) — they are never valid storage keys
             if (OperatingSystem.IsWindows() && key.Length >= 3 &&
                 char.IsLetter(key[0]) && key[1] == ':')
             {
-                var windowsPath = relativePath;
-                var normalizedBase = Path.GetFullPath(_basePath);
-                var normalizedTarget = Path.GetFullPath(windowsPath);
-
-                if (!normalizedTarget.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new UnauthorizedAccessException(
-                        $"Security violation: Path traversal attempt detected. Access denied to: {key}");
-                }
-                return windowsPath;
+                throw new ArgumentException($"Absolute path keys are not allowed: {key}");
             }
 
             var fullPath = Path.GetFullPath(Path.Combine(_basePath, relativePath));
@@ -488,8 +486,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return MediaType.Unknown;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.DetectMediaType] {ex.GetType().Name}: {ex.Message}");
                 return MediaType.Unknown;
             }
         }
@@ -530,8 +529,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 var lines = metadata.Select(kvp => $"{kvp.Key}={kvp.Value}");
                 await File.WriteAllLinesAsync(metaPath, lines, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -560,8 +560,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LocalFileStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

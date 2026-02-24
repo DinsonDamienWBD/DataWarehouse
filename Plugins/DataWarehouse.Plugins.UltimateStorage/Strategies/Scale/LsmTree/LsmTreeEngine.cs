@@ -94,8 +94,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                     var reader = await SSTableReader.OpenAsync(filePath, ct);
                     _sstables.Add(reader);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.LoadExistingSSTables] {ex.GetType().Name}: {ex.Message}");
                     // Skip corrupted SSTables
                 }
             }
@@ -128,8 +129,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 // Check if MemTable is full and needs flushing
                 if (_memTable.IsFull)
                 {
-                    // Trigger flush in background
-                    _ = Task.Run(() => FlushMemTableAsync(ct), ct);
+                    // Trigger flush in background using CancellationToken.None so the caller's
+                    // token cancellation does not abort an in-progress flush and leave the engine
+                    // in an inconsistent state.
+                    _ = Task.Run(async () =>
+                    {
+                        try { await FlushMemTableAsync(CancellationToken.None); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.PutAsync] background flush: {ex.GetType().Name}: {ex.Message}"); }
+                    });
                 }
             }
             finally
@@ -160,8 +167,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 return memValue;
             }
 
+            // Take a snapshot of the current SSTable list under lock to avoid races with
+            // background flush/compaction threads that mutate _sstables.
+            List<SSTableReader> sstableSnapshot;
+            await _writeLock.WaitAsync(ct);
+            try { sstableSnapshot = new List<SSTableReader>(_sstables); }
+            finally { _writeLock.Release(); }
+
             // Check SSTables from newest to oldest
-            foreach (var sstable in _sstables)
+            foreach (var sstable in sstableSnapshot)
             {
                 ct.ThrowIfCancellationRequested();
                 var value = await sstable.GetAsync(key, ct);
@@ -201,7 +215,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 // Check if MemTable is full
                 if (_memTable.IsFull)
                 {
-                    _ = Task.Run(() => FlushMemTableAsync(ct), ct);
+                    _ = Task.Run(async () =>
+                    {
+                        try { await FlushMemTableAsync(CancellationToken.None); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.DeleteAsync] background flush: {ex.GetType().Name}: {ex.Message}"); }
+                    });
                 }
             }
             finally
@@ -237,8 +255,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 results[kvp.Key] = kvp.Value;
             }
 
+            // Take a snapshot of the current SSTable list under lock (same reason as GetAsync).
+            List<SSTableReader> scanSnapshot;
+            await _writeLock.WaitAsync(ct);
+            try { scanSnapshot = new List<SSTableReader>(_sstables); }
+            finally { _writeLock.Release(); }
+
             // Scan SSTables from newest to oldest
-            foreach (var sstable in _sstables)
+            foreach (var sstable in scanSnapshot)
             {
                 await foreach (var kvp in sstable.ScanAsync(prefix, ct))
                 {
@@ -310,7 +334,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
 
                     if (_compactionManager.NeedsCompaction(0, level0Size))
                     {
-                        _ = Task.Run(() => CompactLevel0Async(ct), ct);
+                        _ = Task.Run(async () =>
+                        {
+                            try { await CompactLevel0Async(CancellationToken.None); }
+                            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.FlushMemTableAsync] background compaction: {ex.GetType().Name}: {ex.Message}"); }
+                        });
                     }
                 }
             }
@@ -361,8 +389,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                         {
                             File.Delete(oldTable.Metadata!.FilePath);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.CompactLevel0Async] {ex.GetType().Name}: {ex.Message}");
                             // Ignore deletion errors
                         }
                     }
@@ -374,8 +403,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                     _writeLock.Release();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.CompactLevel0Async] {ex.GetType().Name}: {ex.Message}");
                 // Ignore compaction errors
             }
         }

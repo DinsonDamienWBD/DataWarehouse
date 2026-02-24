@@ -47,23 +47,118 @@ All 9 US groups (82 findings) from scanned files are now resolved:
 
 ---
 
-# REMAINING: UltimateStorage Scans 3-4 (94 files not yet scanned)
+# ULTIMATESTORAGE SCANS 3-4: 95 FILES SCANNED — ~266 FINDINGS
 
-The following directories have NOT been audited yet due to rate limit agent kills:
+All 95 previously-unscanned UltimateStorage files have now been audited across 9 batches.
 
-| Directory | Files | Status |
-|-----------|-------|--------|
-| Innovation/ | 30 | NOT SCANNED |
-| Local/ | 5 | NOT SCANNED |
-| Network/ | 9 | NOT SCANNED |
-| OpenStack/ | 3 | NOT SCANNED |
-| S3Compatible/ | 8 | NOT SCANNED |
-| Kubernetes/ | 1 | NOT SCANNED |
-| Scale/ | 5 | NOT SCANNED |
-| LsmTree/ | 11 | NOT SCANNED |
-| SoftwareDefined/ | 11 | NOT SCANNED |
-| Specialized/ | 6 | NOT SCANNED |
-| ZeroGravity/ | 3 | NOT SCANNED |
-| **Total** | **94** | **PENDING** |
+## Scan Coverage
 
-These need to be scanned in a future session (split into 2-3 small batches of ~30 files each to avoid context overflow).
+| Batch | Directory | Files | Findings |
+|-------|-----------|-------|----------|
+| 1 | Innovation/ | 32 | 28 |
+| 2a | Local/ | 5 | 27 |
+| 2b | Network/ | 9 | 35 |
+| 2c | OpenStack/ + S3Compatible/ + Kubernetes/ | 12 | 45 |
+| 3a | Scale/ + LsmTree/ | 17 | 22 |
+| 3b-A | SoftwareDefined/ (BeeGfs,CephFs,CephRados,CephRgw) | 4 | 27 |
+| 3b-B | SoftwareDefined/ (Gluster,Gpfs,JuiceFs,LizardFs) | 4 | 32 |
+| 3b-C | SoftwareDefined/ (Lustre,MooseFs,SeaweedFs) | 3 | 22 |
+| 3c | Specialized/ + ZeroGravity/ | 9 | 28 |
+| **Total** | **All 11 directories** | **95** | **~266** |
+
+## Finding Categories (grouped by fix pattern)
+
+### GROUP-US3-1: Rule 13 Stubs & Simulations (~60 findings)
+- NVMe: WriteZeroesRange no-op, IdentifyController/GetSmartLog/IdentifyNamespace fabricated data, SetPowerState no-op
+- PMEM: FlushWithStrategy ignores strategy, DetectPmemMode hardcoded
+- SCM: DetectScmDevice unused, NUMA/CXL topology placeholder data never read
+- Scale: 4 exascale strategies are BoundedDictionary(1000) in-memory stubs
+- Innovation: CarbonNeutral simulation, CryptoEconomic fake erasure coding, ProtocolMorphing/UniversalApi empty cloud adapters, ZeroWaste BitPack no-op
+- GlusterFs: 6 marker-file stubs (quota, self-heal, bitrot, sharding, rebalance, quorum)
+- GPFS: 6 marker-file stubs (fileset, ILM, placement, WORM, compression, snapshot)
+- LizardFs: 3 marker-file stubs (goal, quota, master health) + snapshot is plain directory
+- JuiceFs: ValidateMetadataConnectionAsync placeholder
+- MooseFs: 6 simulation stubs (goals, storage classes, quotas, snapshots, checksums, labels)
+- OpenStack Cinder: WriteDataToVolumeAsync/ReadDataFromVolumeAsync are simulation stubs
+- OpenStack Manila: Store discards data, Retrieve returns empty stream
+- Linode ACL: SetBucketAcl/SetObjectAcl silently ignore acl parameter
+- K8s CSI: All data in RAM-only BoundedDictionary
+- AFP: Enumerate returns fabricated filenames, ResolveFileId returns parent dir ID, timestamps stub
+- ZeroGravity: BoundedDictionary in-memory stub
+
+### GROUP-US3-2: Security Vulnerabilities (~25 findings)
+- Path traversal in GetFullPath: GlusterFs, GPFS, JuiceFs, LizardFs, Lustre, MooseFs, SeaweedFs, LocalFile, BeeGfs, CephFs, CephRados, CephRgw
+- Cleartext credentials: CephRados auth token, SeaweedFs S3 creds, JuiceFs S3/WebDAV keys, GPFS management API password, AfpStrategy password over TCP, NvmeOf auth secret over HTTP
+- Shell injection: Lustre CLI args not sanitized
+- Manila: Hardcoded 0.0.0.0/0 NFS/CIFS access rule
+- GlusterFs: glusterd2 HTTP client with no authentication
+
+### GROUP-US3-3: Thread Safety (~15 findings)
+- NVMe: _ioLock disposed/rebuilt via reflection (race window)
+- RamDisk: Non-atomic check-update-store for _currentMemoryBytes
+- SCM: FlushBatchAsync uses request CancellationToken in background task
+- FcStrategy: Hash-based LUN addressing causes data collisions (GetHashCode)
+- NvmeOf: _blockMappings Dictionary not thread-safe (should be ConcurrentDictionary)
+- AFP: _directoryIdCache and _openFiles not thread-safe
+- OpenStack (all 3): Auth token read outside lock (TOCTOU race)
+- K8s CSI: SemaphoreSlim.WaitAsync without CancellationToken
+
+### GROUP-US3-4: Silent Catches (~40 findings)
+- All file strategies: metadata write failures silently swallowed
+- PMEM: DAX retrieve failures silently swallowed
+- GlusterFs/GPFS/LizardFs/JuiceFs: ListAsyncCore, GetMetadataAsyncCore bare catches
+- LizardFs: Init silently discards malformed JSON config
+- JuiceFs: ExistsAsyncCore, ValidateCapacityQuotaAsync, List operations swallow errors
+- OpenStack Cinder: volume size, quota, backup delete catches
+- OpenStack Manila: replication, access path, metadata, listing catches
+- OpenStack Swift: EnsureContainerExistsAsync catch
+- Innovation: Multiple silent catches across 32 files
+
+### GROUP-US3-5: Resource Leaks (~15 findings)
+- S3Compatible (7 strategies): GetObjectResponse not disposed (connection pool leak)
+- CloudflareR2: HttpResponseMessage not disposed
+- SCM: MemoryMappedFile leaked on repeated retrieval
+- WebDav: HttpRequestMessage clones not disposed
+- NFS: Busy-wait holds semaphore causing deadlock
+- K8s CSI: SemaphoreSlim _operationLock never disposed
+
+### GROUP-US3-6: Logic Bugs & Data Integrity (~30 findings)
+- NVMe: Block-aligned writes pad final block with zeroes (trailing corruption)
+- RamDisk: Snapshot count includes expired entries → restore crashes
+- iSCSI: Login success from wrong bit (C-bit vs T-bit), PDU host-endian instead of big-endian
+- FTP: 550 matched by message substring, swallows permission errors
+- WebDav: GetCustomPropertiesAsync XNamespace query never matches
+- JuiceFs: SendWithRetryAsync reuses consumed HttpRequestMessage (retries always throw)
+- LizardFs: DeleteSnapshotAsync recursive:false fails on non-empty dirs
+- GPFS: WriteThrough flag applied on read path
+- CloudflareR2: HttpRequestMessage reused across retries
+- S3Compatible (7): Size calculation bug after retry reset
+- Cinder: Size=0 for non-seekable streams
+- PMEM: ValidateDaxMode returns true for any NTFS drive
+- AFP: AfpResolveFileIdAsync returns parent directory ID
+- SSTableReader: Wrong last-block bound
+- LsmTree: CompactionManager SortedDictionary key collision, WAL Delete vs Put ambiguity
+- Redis: Chunk lexicographic sort
+- TiKV: Raw API sent to PD not TiKV nodes
+
+### GROUP-US3-7: Fire-and-Forget (~10 findings)
+- SCM: FlushBatchAsync fire-and-forget discards exceptions
+- RamDisk: Timer callbacks discard exceptions
+- NvmeOf: Keep-alive task spawned with no cancellation
+- LsmTree: Fire-and-forget with caller CancellationToken
+- Innovation: Multiple fire-and-forget patterns
+
+### GROUP-US3-8: Performance & Validation (~20 findings)
+- SoftwareDefined (all): Directory.GetFiles with AllDirectories loads entire tree
+- JuiceFs: Entire file buffered into byte[] before HTTP upload
+- SCM: Double copy in MMF read path
+- IscsiStrategy: Entire stream buffered before write
+- Innovation: Non-deterministic hash routing (GetHashCode for persistent purposes)
+- Multiple: Missing boundary validation, naming lies
+
+## Fix Status: PENDING
+
+All ~266 findings need to be fixed. Priority order:
+1. P0/CRITICAL: Simulation stubs, security vulnerabilities, data corruption bugs
+2. P1/HIGH: Thread safety, silent catches, resource leaks, logic bugs
+3. P2/MEDIUM: Performance, validation, naming

@@ -281,8 +281,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -297,7 +298,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
             await SignRequestAsync(request, null, ct);
-            var response = await SendWithRetryAsync(request, ct);
+            using var response = await SendWithRetryAsync(request, ct);
 
             var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
@@ -321,8 +322,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -356,8 +358,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -963,6 +966,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
         }
 
+        private static HttpRequestMessage CloneRequest(HttpRequestMessage original)
+        {
+            var clone = new HttpRequestMessage(original.Method, original.RequestUri);
+            if (original.Content != null)
+            {
+                var ms = new MemoryStream();
+                original.Content.CopyTo(ms, null, default);
+                ms.Position = 0;
+                clone.Content = new StreamContent(ms);
+                foreach (var header in original.Content.Headers)
+                    clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+            foreach (var header in original.Headers)
+                clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            clone.Version = original.Version;
+            return clone;
+        }
+
         private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, CancellationToken ct)
         {
             HttpResponseMessage? response = null;
@@ -970,9 +991,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {
+                var attemptRequest = attempt == 0 ? request : CloneRequest(request);
                 try
                 {
-                    response = await _httpClient!.SendAsync(request, ct);
+                    response = await _httpClient!.SendAsync(attemptRequest, ct);
 
                     if (response.IsSuccessStatusCode)
                     {

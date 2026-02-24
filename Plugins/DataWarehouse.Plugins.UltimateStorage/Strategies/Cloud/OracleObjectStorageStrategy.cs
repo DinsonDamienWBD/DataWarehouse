@@ -294,8 +294,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[OracleObjectStorageStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -340,8 +341,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OracleObjectStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 

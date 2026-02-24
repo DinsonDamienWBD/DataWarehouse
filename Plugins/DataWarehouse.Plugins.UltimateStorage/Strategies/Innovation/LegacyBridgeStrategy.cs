@@ -53,7 +53,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     if (records != null) foreach (var kvp in records) _records[kvp.Key] = kvp.Value;
                 }
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LegacyBridgeStrategy.LoadRecordsAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         private async Task SaveRecordsAsync(CancellationToken ct)
@@ -64,7 +68,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_records.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(path, json, ct);
             }
-            catch { /* Persistence failure is non-fatal */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LegacyBridgeStrategy.SaveRecordsAsync] {ex.GetType().Name}: {ex.Message}");
+                /* Persistence failure is non-fatal */
+            }
         }
 
         protected override async ValueTask DisposeCoreAsync()
@@ -166,7 +174,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
         {
             try { return Task.FromResult<long?>(new DriveInfo(Path.GetPathRoot(_basePath)!).AvailableFreeSpace); }
-            catch { return Task.FromResult<long?>(null); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LegacyBridgeStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                return Task.FromResult<long?>(null);
+            }
         }
 
         private byte[] ConvertToEBCDIC(byte[] ascii)

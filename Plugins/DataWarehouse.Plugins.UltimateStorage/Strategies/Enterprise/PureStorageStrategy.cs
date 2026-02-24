@@ -398,8 +398,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PureStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -462,8 +463,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     return await ExistsViaRestApiAsync(key, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PureStorageStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -785,8 +787,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var capacityInfo = await GetArrayCapacityAsync(ct);
                 return capacityInfo.Available;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[PureStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

@@ -235,8 +235,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _client = null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
 
@@ -340,10 +341,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         Tier = Tier
                     };
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SmbStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Clean up on failure
-                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    try { _fileStore.CloseFile(fileHandle); } catch (Exception cleanupEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SmbStrategy.StoreAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                     throw;
                 }
             }
@@ -429,10 +435,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 memoryStream.Position = 0;
                 return memoryStream;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Clean up on failure
-                try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                try { _fileStore.CloseFile(fileHandle); } catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SmbStrategy.RetrieveAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                    /* Best-effort cleanup — failure is non-fatal */
+                }
                 throw;
             }
         }
@@ -451,8 +462,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var fileInfo = await GetFileInfoAsync(filePath, ct);
                 size = fileInfo?.StandardInformation?.EndOfFile ?? 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -504,8 +516,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _fileStore.CloseFile(metaHandle);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata deletion failures
             }
 
@@ -532,8 +545,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return fileInfo != null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -696,13 +710,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 finally
                 {
-                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    try { _fileStore.CloseFile(fileHandle); } catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SmbStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                 }
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -742,17 +761,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 return ipAddress.ToString();
             }
 
-            // Resolve DNS
+            // Resolve DNS asynchronously via sync-over-async bridge (ConnectAsync context is already async)
+            // Task.GetAwaiter().GetResult() is safe here because ConnectAsync holds no locks at this call site.
             try
             {
-                var addresses = Dns.GetHostAddresses(hostname);
+                var addresses = Dns.GetHostAddressesAsync(hostname).GetAwaiter().GetResult();
                 if (addresses.Length > 0)
                 {
                     return addresses[0].ToString();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.ResolveHostname] {ex.GetType().Name}: {ex.Message}");
                 // If resolution fails, return as-is
             }
 
@@ -871,8 +892,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.GetFileInfoAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -948,8 +970,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.EnumerateFilesRecursiveAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore directory enumeration errors
             }
         }
@@ -1034,8 +1057,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _fileStore.CloseFile(fileHandle);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
 
@@ -1092,15 +1116,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         return metadata.Count > 0 ? metadata : null;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    System.Diagnostics.Debug.WriteLine($"[SmbStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
+                    try { _fileStore.CloseFile(fileHandle); } catch (Exception cleanupEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SmbStrategy.LoadMetadataFileAsync] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                 }
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SmbStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

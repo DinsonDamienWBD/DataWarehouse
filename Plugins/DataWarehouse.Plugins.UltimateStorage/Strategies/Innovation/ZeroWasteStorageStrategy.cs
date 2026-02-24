@@ -51,6 +51,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public override string StrategyId => "zero-waste-storage";
         public override string Name => "Zero-Waste Storage (Perfect Space Efficiency)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // BitPackData/BitUnpackData are no-ops; actual bit-level packing not implemented
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -645,8 +646,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var metadataJson = System.Text.Encoding.UTF8.GetString(metadataBytes);
                 metadata = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ZeroWasteStorageStrategy.ExtractMetadataInline] {ex.GetType().Name}: {ex.Message}");
                 // Failed to parse metadata
             }
 

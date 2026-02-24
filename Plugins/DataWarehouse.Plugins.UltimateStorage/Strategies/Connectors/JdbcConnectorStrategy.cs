@@ -167,8 +167,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     Tier = Tier
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JdbcConnectorStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 transaction?.Rollback();
                 throw;
             }
@@ -248,8 +249,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 transaction?.Commit();
                 IncrementOperationCounter(StorageOperationType.Delete);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JdbcConnectorStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 transaction?.Rollback();
                 throw;
             }
@@ -277,8 +279,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return count > 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[JdbcConnectorStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

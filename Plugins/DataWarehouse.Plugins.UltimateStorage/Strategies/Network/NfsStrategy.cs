@@ -370,8 +370,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.IsMountedAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -404,8 +405,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 _isMounted = false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.UnmountAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore unmount errors during cleanup
             }
         }
@@ -485,10 +487,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         // Atomic rename
                         File.Move(tempPath, filePath, overwrite: true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[NfsStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Clean up temp file on failure
-                        try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                        try { File.Delete(tempPath); } catch (Exception cleanupEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[NfsStrategy.StoreAsyncCore] {cleanupEx.GetType().Name}: {cleanupEx.Message}");
+                            /* Best-effort cleanup — failure is non-fatal */
+                        }
                         throw;
                     }
 
@@ -567,8 +574,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Wrap stream to release lock on disposal
                 return new LockReleaseStream(fs, lockHandle, this);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 if (lockHandle != null)
                 {
                     await ReleaseFileLockAsync(lockHandle, ct);
@@ -777,8 +785,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var driveInfo = new DriveInfo(Path.GetPathRoot(_mountPoint) ?? _mountPoint);
                 return driveInfo.IsReady ? driveInfo.AvailableFreeSpace : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -797,44 +806,40 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 return null;
             }
 
-            await _lockManager.WaitAsync(ct);
-            try
+            var lockKey = filePath.ToLowerInvariant();
+            var maxWaitTime = TimeSpan.FromSeconds(_timeoutSeconds);
+            var startTime = DateTime.UtcNow;
+
+            while (true)
             {
-                var lockKey = filePath.ToLowerInvariant();
-
-                // Check if already locked
-                if (_activeLocks.ContainsKey(lockKey))
+                await _lockManager.WaitAsync(ct);
+                try
                 {
-                    // Wait for existing lock to be released
-                    var maxWaitTime = TimeSpan.FromSeconds(_timeoutSeconds);
-                    var startTime = DateTime.UtcNow;
-
-                    while (_activeLocks.ContainsKey(lockKey) && (DateTime.UtcNow - startTime) < maxWaitTime)
+                    if (!_activeLocks.ContainsKey(lockKey))
                     {
-                        await Task.Delay(100, ct);
-                    }
-
-                    if (_activeLocks.ContainsKey(lockKey))
-                    {
-                        throw new IOException($"Failed to acquire file lock for {filePath}: timeout waiting for existing lock");
+                        // Lock is free — acquire it
+                        var lockHandle = new FileLock
+                        {
+                            FilePath = filePath,
+                            Mode = mode,
+                            AcquiredAt = DateTime.UtcNow
+                        };
+                        _activeLocks[lockKey] = lockHandle;
+                        return lockHandle;
                     }
                 }
-
-                // Create lock handle
-                var lockHandle = new FileLock
+                finally
                 {
-                    FilePath = filePath,
-                    Mode = mode,
-                    AcquiredAt = DateTime.UtcNow
-                };
+                    _lockManager.Release();
+                }
 
-                _activeLocks[lockKey] = lockHandle;
+                // Lock is held by another caller — wait outside the semaphore to avoid deadlock
+                if ((DateTime.UtcNow - startTime) >= maxWaitTime)
+                {
+                    throw new IOException($"Failed to acquire file lock for {filePath}: timeout waiting for existing lock");
+                }
 
-                return lockHandle;
-            }
-            finally
-            {
-                _lockManager.Release();
+                await Task.Delay(100, ct);
             }
         }
 
@@ -1035,8 +1040,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var lines = metadata.Select(kvp => $"{kvp.Key}={kvp.Value}");
                 await File.WriteAllLinesAsync(metaPath, lines, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -1065,8 +1071,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NfsStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

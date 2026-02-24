@@ -349,8 +349,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var obj = await GetObjectInternalAsync(key, ct);
                 size = (long)(obj?.Size ?? 0UL);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GcsArchiveStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting object metadata
             }
 
@@ -384,8 +385,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GcsArchiveStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }

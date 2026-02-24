@@ -153,8 +153,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                             var dhtData = await File.ReadAllBytesAsync(dhtPath, ct);
                             await _dhtEngine.StartAsync(dhtData);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.InitializeCoreAsync] {ex.GetType().Name}: {ex.Message}");
                             await _dhtEngine.StartAsync();
                         }
                     }
@@ -242,8 +243,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         await manager.StartAsync();
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.LoadExistingTorrentsAsync] {ex.GetType().Name}: {ex.Message}");
                     // Skip invalid torrent files
                 }
             }
@@ -463,8 +465,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     // Remove from engine
                     await _engine!.RemoveAsync(manager);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore errors during removal
                 }
             }
@@ -555,8 +558,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         Tier = Tier
                     };
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Skip invalid torrents
                 }
 
@@ -662,8 +666,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var drive = new DriveInfo(Path.GetPathRoot(_downloadDirectory)!);
                 return Task.FromResult<long?>(drive.AvailableFreeSpace);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return Task.FromResult<long?>(null);
             }
         }
@@ -900,8 +905,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
                 await File.WriteAllTextAsync(metadataPath, metadataJson, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.StoreMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage errors
             }
         }
@@ -923,8 +929,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var metadata = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                 return metadata;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -942,8 +949,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     File.Delete(metadataPath);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BitTorrentStrategy.DeleteMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore deletion errors
             }
 

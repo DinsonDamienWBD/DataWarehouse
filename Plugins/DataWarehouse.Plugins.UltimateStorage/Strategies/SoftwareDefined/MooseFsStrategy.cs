@@ -209,16 +209,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             _sessionId = Guid.NewGuid().ToString("N");
             _sessionStartTime = DateTime.UtcNow;
 
-            // Apply default goal to mount path if specified
+            // Apply default goal to mount path if specified (NotSupportedException expected until CLI integration)
             if (_defaultGoal > 0)
             {
-                await ApplyGoalAsync(_mountPath, _defaultGoal, ct);
+                try { await ApplyGoalAsync(_mountPath, _defaultGoal, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.Init] {ex.Message}"); }
             }
 
-            // Apply quotas if configured
+            // Apply quotas if configured (NotSupportedException expected until CLI integration)
             if (_enableQuotas && (_quotaHardLimitBytes > 0 || _quotaHardLimitInodes > 0))
             {
-                await ApplyQuotaAsync(_mountPath, ct);
+                try { await ApplyQuotaAsync(_mountPath, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.Init] {ex.Message}"); }
             }
 
             await Task.CompletedTask;
@@ -453,8 +455,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -494,8 +497,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -563,8 +567,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Capacity information not available
                 }
 
@@ -611,8 +616,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -628,82 +634,39 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <param name="path">Path to file or directory.</param>
         /// <param name="goal">Goal value (1-20 for standard replication, or EC goal name).</param>
         /// <param name="ct">Cancellation token.</param>
-        private async Task ApplyGoalAsync(string path, int goal, CancellationToken ct)
+        private Task ApplyGoalAsync(string path, int goal, CancellationToken ct)
         {
             if (goal < 1 || goal > 20)
             {
                 throw new ArgumentException("Goal must be between 1 and 20", nameof(goal));
             }
 
-            // In production, this would execute: mfssetgoal goal path
-            // For simulation, store as metadata marker
-            var goalFile = Path.Combine(
-                Path.GetDirectoryName(path) ?? _mountPath,
-                $".mfs_goal_{Path.GetFileName(path)}"
-            );
-
-            var goalInfo = new Dictionary<string, string>
-            {
-                ["goal"] = goal.ToString(),
-                ["path"] = path,
-                ["applied_at"] = DateTime.UtcNow.ToString("O")
-            };
-
-            await File.WriteAllTextAsync(goalFile, JsonSerializer.Serialize(goalInfo), ct);
+            throw new NotSupportedException(
+                "MooseFS goal requires 'mfssetgoal' CLI integration.");
         }
 
         /// <summary>
         /// Applies a storage class to a file or directory.
         /// Storage classes use labels to specify which chunk servers should store the data.
         /// </summary>
-        private async Task ApplyStorageClassAsync(string path, string storageClass, CancellationToken ct)
+        private Task ApplyStorageClassAsync(string path, string storageClass, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(storageClass))
             {
                 throw new ArgumentException("Storage class cannot be empty", nameof(storageClass));
             }
 
-            // In production, this would execute: mfssetsclass class path
-            // For simulation, store as metadata marker
-            var classFile = Path.Combine(
-                Path.GetDirectoryName(path) ?? _mountPath,
-                $".mfs_sclass_{Path.GetFileName(path)}"
-            );
-
-            var classInfo = new Dictionary<string, string>
-            {
-                ["storage_class"] = storageClass,
-                ["path"] = path,
-                ["applied_at"] = DateTime.UtcNow.ToString("O")
-            };
-
-            if (_storageClassLabels.TryGetValue(storageClass, out var label))
-            {
-                classInfo["label"] = label;
-            }
-
-            await File.WriteAllTextAsync(classFile, JsonSerializer.Serialize(classInfo), ct);
+            throw new NotSupportedException(
+                "MooseFS storage class requires 'mfssetclass' CLI integration.");
         }
 
         /// <summary>
         /// Applies quota to the filesystem or directory.
         /// </summary>
-        private async Task ApplyQuotaAsync(string path, CancellationToken ct)
+        private Task ApplyQuotaAsync(string path, CancellationToken ct)
         {
-            // In production, this would execute: mfssetquota -h hardlimit -s softlimit path
-            // For simulation, store as metadata marker
-            var quotaFile = Path.Combine(path, ".mfs_quota");
-
-            var quotaInfo = new Dictionary<string, string>
-            {
-                ["soft_limit_bytes"] = _quotaSoftLimitBytes.ToString(),
-                ["hard_limit_bytes"] = _quotaHardLimitBytes.ToString(),
-                ["soft_limit_inodes"] = _quotaSoftLimitInodes.ToString(),
-                ["hard_limit_inodes"] = _quotaHardLimitInodes.ToString(),
-                ["applied_at"] = DateTime.UtcNow.ToString("O")
-            };
-
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaInfo), ct);
+            throw new NotSupportedException(
+                "MooseFS quota requires 'mfssetquota' CLI integration.");
         }
 
         /// <summary>
@@ -802,8 +765,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.CleanTrashAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore errors for individual files
                 }
             }
@@ -873,8 +837,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.RestoreFromTrashAsync] {ex.GetType().Name}: {ex.Message}");
                     // Continue searching
                 }
             }
@@ -886,7 +851,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Creates a snapshot of a directory or file.
         /// MooseFS snapshots are metadata-only and created instantly.
         /// </summary>
-        public async Task<MooseFsSnapshot> CreateSnapshotAsync(string path, string? snapshotName = null, CancellationToken ct = default)
+        public Task<MooseFsSnapshot> CreateSnapshotAsync(string path, string? snapshotName = null, CancellationToken ct = default)
         {
             EnsureInitialized();
 
@@ -895,36 +860,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new InvalidOperationException("Snapshots are not enabled");
             }
 
-            var fullPath = string.IsNullOrWhiteSpace(path) ? _mountPath : GetFullPath(path);
-
-            if (!Directory.Exists(fullPath) && !File.Exists(fullPath))
-            {
-                throw new InvalidOperationException($"Path not found: {path}");
-            }
-
-            snapshotName ??= $"snapshot_{DateTime.UtcNow:yyyyMMddHHmmss}";
-
-            // In production, this would execute: mfsmakesnapshot source destination
-            // For simulation, create snapshot marker
-            var snapshotsDir = Path.Combine(_mountPath, ".snapshots");
-            if (!Directory.Exists(snapshotsDir))
-            {
-                Directory.CreateDirectory(snapshotsDir);
-            }
-
-            var snapshotPath = Path.Combine(snapshotsDir, snapshotName);
-            var snapshotInfo = new MooseFsSnapshot
-            {
-                Name = snapshotName,
-                SourcePath = fullPath,
-                SnapshotPath = snapshotPath,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            var snapshotInfoPath = snapshotPath + ".snapshotinfo";
-            await File.WriteAllTextAsync(snapshotInfoPath, JsonSerializer.Serialize(snapshotInfo), ct);
-
-            return snapshotInfo;
+            throw new NotSupportedException(
+                "MooseFS snapshot requires 'mfsmakesnapshot' CLI integration.");
         }
 
         /// <summary>
@@ -979,8 +916,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         snapshots.Add(snapshot);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.ListSnapshotsAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore invalid snapshot files
                 }
             }
@@ -1011,8 +949,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f) && !IsTrashPath(f))
                         .Count();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.GetFilesystemUsageAsync] {ex.GetType().Name}: {ex.Message}");
                     // File count may fail if permissions insufficient
                 }
 
@@ -1038,21 +977,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>
         /// Verifies file checksum integrity.
         /// </summary>
-        private async Task VerifyFileChecksumAsync(string filePath, CancellationToken ct)
+        private Task VerifyFileChecksumAsync(string filePath, CancellationToken ct)
         {
-            // In production, this would execute: mfsfileinfo path to get chunk checksums
-            // For simulation, just mark that verification was attempted
-            await Task.CompletedTask;
+            throw new NotSupportedException(
+                "MooseFS checksum verification requires 'mfscheckfile' CLI integration.");
         }
 
         /// <summary>
         /// Verifies stream checksum against stored file checksum.
         /// </summary>
-        private async Task VerifyStreamChecksumAsync(string filePath, Stream stream, CancellationToken ct)
+        private Task VerifyStreamChecksumAsync(string filePath, Stream stream, CancellationToken ct)
         {
-            // In production, compare stream checksum with MooseFS chunk checksums
-            // For simulation, just mark that verification was attempted
-            await Task.CompletedTask;
+            throw new NotSupportedException(
+                "MooseFS checksum verification requires 'mfscheckfile' CLI integration.");
         }
 
         #endregion
@@ -1092,8 +1029,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1107,11 +1045,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private string GetFullPath(string key)
         {
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(_mountPath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1194,8 +1136,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MooseFsStrategy.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }

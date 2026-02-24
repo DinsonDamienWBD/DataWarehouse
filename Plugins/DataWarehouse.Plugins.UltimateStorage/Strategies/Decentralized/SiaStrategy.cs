@@ -200,8 +200,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 await CallRenterdApiAsync<object>(
                     HttpMethod.Get, $"/api/bus/bucket/{_bucket}", null, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.EnsureBucketExistsAsync] {ex.GetType().Name}: {ex.Message}");
                 // Bucket doesn't exist, create it
                 var createRequest = new { policy = new { publicReadAccess = false } };
                 await CallRenterdApiAsync<object>(
@@ -243,8 +244,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         HttpMethod.Put, "/api/autopilot/config", allowanceConfig, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.EnsureAllowanceConfiguredAsync] {ex.GetType().Name}: {ex.Message}");
                 // If autopilot is not available, silently continue
                 // User may be managing contracts manually
             }
@@ -374,8 +376,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -417,8 +420,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -534,8 +538,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         var metadataJson = Encoding.UTF8.GetString(metadataBytes);
                         customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[SiaStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Ignore metadata parsing errors
                     }
                 }
@@ -624,8 +629,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 // If we can't determine capacity, return null (unlimited)
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // If we can't determine capacity, return null
                 return null;
             }
@@ -668,8 +674,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     };
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.GetObjectHealthAsync] {ex.GetType().Name}: {ex.Message}");
                 // Object health endpoint may not be available on all renterd versions
             }
 
@@ -696,8 +703,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     HttpMethod.Post, repairUrl, null, ct);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.RepairObjectAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -767,8 +775,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         HttpMethod.Post, repairUrl, null, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SiaStrategy.MonitorObjectHealthAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore monitoring errors
             }
         }

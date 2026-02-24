@@ -160,7 +160,11 @@ public sealed class QuorumConsistencyManager
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(_defaultTimeout);
         try { return await readFn(replicaId); }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QuorumConsistencyManager.ReadWithTimeoutAsync] {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
     }
 
     private async Task<bool> WriteWithTimeoutAsync(string replicaId, byte[] value, long version,
@@ -169,7 +173,11 @@ public sealed class QuorumConsistencyManager
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(_defaultTimeout);
         try { return await writeFn(replicaId, value, version); }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QuorumConsistencyManager.WriteWithTimeoutAsync] {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
     }
 }
 

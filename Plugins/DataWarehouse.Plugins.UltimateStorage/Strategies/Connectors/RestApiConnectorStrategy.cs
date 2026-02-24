@@ -258,8 +258,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     _httpLock.Release();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RestApiConnectorStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

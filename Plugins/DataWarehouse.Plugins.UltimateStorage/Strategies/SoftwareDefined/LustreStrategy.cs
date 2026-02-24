@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -33,6 +34,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
     /// </summary>
     public class LustreStrategy : UltimateStorageStrategyBase
     {
+        private static readonly SearchValues<char> s_shellInjectionChars =
+            SearchValues.Create(";|&$`\n\r");
+
         private string _mountPath = string.Empty;
         private string _filesystemName = "lustre";
 
@@ -496,8 +500,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[differentiation.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -537,8 +542,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -606,8 +612,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[differentiation.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Try using lfs df command
                     var dfInfo = await GetLustreDfInfoAsync(ct);
                     if (dfInfo != null)
@@ -669,8 +676,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         return driveInfo.AvailableFreeSpace;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[differentiation.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Fall through to lfs df
                 }
 
@@ -678,8 +686,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var dfInfo = await GetLustreDfInfoAsync(ct);
                 return dfInfo?.AvailableBytes;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -699,8 +708,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var result = await ExecuteLustreCommandAsync(_lfsPath, "--version", ct);
                 // lfs is available
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.VerifyLustreCliToolsAsync] {ex.GetType().Name}: {ex.Message}");
                 // lfs not found - operations will be limited to basic POSIX
             }
 
@@ -863,8 +873,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetFileFidAsync] {ex.GetType().Name}: {ex.Message}");
                 // FID retrieval failed
             }
 
@@ -948,8 +959,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetQuotaUsageAsync] {ex.GetType().Name}: {ex.Message}");
                 // Quota query failed
             }
 
@@ -974,8 +986,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     // For now, return null to fall back to DriveInfo or other methods
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetLustreDfInfoAsync] {ex.GetType().Name}: {ex.Message}");
                 // lfs df failed
             }
 
@@ -995,8 +1008,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 // If command succeeds and returns data, OSTs are accessible
                 return !string.IsNullOrWhiteSpace(result);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.CheckOstHealthAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -1080,8 +1094,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         return HsmState.Exists;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.GetHsmStateAsync] {ex.GetType().Name}: {ex.Message}");
                 // HSM state query failed
             }
 
@@ -1145,8 +1160,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1165,11 +1181,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 ? _filesetPath
                 : _mountPath;
 
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(basePath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(basePath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(basePath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1229,8 +1249,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[differentiation.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }
@@ -1238,8 +1259,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>
         /// Executes a Lustre command-line utility and returns output.
         /// </summary>
+        private static void ValidateLustreArgument(string argument, string paramName)
+        {
+            if (argument.AsSpan().IndexOfAny(s_shellInjectionChars) >= 0)
+                throw new ArgumentException($"Invalid characters in Lustre CLI argument '{paramName}': {argument}");
+        }
+
         private async Task<string> ExecuteLustreCommandAsync(string command, string arguments, CancellationToken ct)
         {
+            ValidateLustreArgument(command, nameof(command));
+            ValidateLustreArgument(arguments, nameof(arguments));
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = command,

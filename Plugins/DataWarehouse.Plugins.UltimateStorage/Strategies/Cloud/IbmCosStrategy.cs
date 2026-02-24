@@ -382,8 +382,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     var metadata = await GetMetadataAsyncCore(key, ct);
                     size = metadata.Size;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[IbmCosStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore errors getting metadata
                 }
 

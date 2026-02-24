@@ -491,8 +491,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var manifestJson = await response.Content.ReadAsStringAsync(ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(manifestJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CephRadosStrategy.TryReadManifestAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -534,8 +535,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     var metadata = await GetMetadataAsyncCore(key, ct);
                     totalSize = metadata.Size;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[CephRadosStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore if metadata retrieval fails
                 }
 
@@ -588,8 +590,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CephRadosStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -810,8 +813,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CephRadosStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // If we can't get pool stats, return null (unknown)
                 return null;
             }

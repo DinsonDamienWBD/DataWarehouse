@@ -46,6 +46,8 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     public override string StrategyId => "kubernetes-csi";
     public override string Name => "Kubernetes CSI Driver Storage";
     public override StorageTier Tier => StorageTier.Hot;
+    // CSI data persistence requires real volume backend integration
+    public override bool IsProductionReady => false;
 
     public override StorageCapabilities Capabilities => new StorageCapabilities
     {
@@ -274,7 +276,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     /// <summary>Creates a CSI volume with the given parameters.</summary>
     public async Task<Dictionary<string, object?>> CreateVolumeAsync(Dictionary<string, object> payload)
     {
-        await _operationLock.WaitAsync();
+        await _operationLock.WaitAsync(CancellationToken.None);
         try
         {
             var name = (payload.TryGetValue("name", out var nameVal) ? nameVal : null)?.ToString();
@@ -365,7 +367,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     /// <summary>Deletes a CSI volume.</summary>
     public async Task<Dictionary<string, object?>> DeleteVolumeAsync(Dictionary<string, object> payload)
     {
-        await _operationLock.WaitAsync();
+        await _operationLock.WaitAsync(CancellationToken.None);
         try
         {
             var volumeId = (payload.TryGetValue("volume_id", out var volIdVal) ? volIdVal : null)?.ToString();
@@ -397,7 +399,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     /// <summary>Expands a CSI volume.</summary>
     public async Task<Dictionary<string, object?>> ExpandVolumeAsync(Dictionary<string, object> payload)
     {
-        await _operationLock.WaitAsync();
+        await _operationLock.WaitAsync(CancellationToken.None);
         try
         {
             var volumeId = (payload.TryGetValue("volume_id", out var volIdVal) ? volIdVal : null)?.ToString();
@@ -441,7 +443,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     /// <summary>Creates a CSI snapshot.</summary>
     public async Task<Dictionary<string, object?>> CreateSnapshotAsync(Dictionary<string, object> payload)
     {
-        await _operationLock.WaitAsync();
+        await _operationLock.WaitAsync(CancellationToken.None);
         try
         {
             var sourceVolumeId = (payload.TryGetValue("source_volume_id", out var srcVolVal) ? srcVolVal : null)?.ToString();
@@ -842,4 +844,10 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     }
 
     #endregion
+
+    protected override ValueTask DisposeCoreAsync()
+    {
+        _operationLock.Dispose();
+        return base.DisposeCoreAsync();
+    }
 }

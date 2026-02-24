@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
         public override string StrategyId => "exascale-sharding";
         public override string Name => "Exascale Sharding Strategy";
         public override StorageTier Tier => StorageTier.Warm;
+        public override bool IsProductionReady => false; // BoundedDictionary in-memory stub; requires real distributed consistent-hashing sharding layer
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, SupportsMultipart = true, ConsistencyModel = ConsistencyModel.Eventual };
 

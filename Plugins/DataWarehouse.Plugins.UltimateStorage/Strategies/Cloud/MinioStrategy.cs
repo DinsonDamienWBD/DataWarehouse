@@ -298,8 +298,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MinioStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting metadata
             }
 
@@ -347,8 +348,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MinioStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }

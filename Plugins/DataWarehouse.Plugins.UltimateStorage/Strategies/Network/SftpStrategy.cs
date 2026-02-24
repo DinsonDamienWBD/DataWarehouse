@@ -458,8 +458,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _sftpClient = null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SftpStrategy.DisconnectInternal] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
         }
@@ -573,8 +574,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                             var mode = Convert.ToInt32(_filePermissions, 8);
                             _sftpClient!.ChangePermissions(remotePath, (short)mode);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[SftpStrategy.StoreAsyncCore] {ex.GetType().Name}: {ex.Message}");
                             // Ignore permission errors
                         }
                     }, ct);
@@ -672,8 +674,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var fileInfo = await Task.Run(() => _sftpClient!.GetAttributes(remotePath), ct);
                 size = fileInfo.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SftpStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore
             }
 
@@ -691,8 +694,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         _sftpClient.DeleteFile(metaPath);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SftpStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata deletion failures
                 }
             }, ct);
@@ -816,8 +820,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     {
                         return _sftpClient!.GetStatus(_basePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[SftpStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         return null;
                     }
                 }, ct);
@@ -826,8 +831,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // indicating capacity information is not available
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SftpStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -916,8 +922,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                             var mode = Convert.ToInt32(_directoryPermissions, 8);
                             _sftpClient.ChangePermissions(remotePath, (short)mode);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"[SftpStrategy.EnsureDirectoryExistsAsync] {ex.GetType().Name}: {ex.Message}");
                             // Ignore permission errors
                         }
                     }
@@ -926,8 +933,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 {
                     throw;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SftpStrategy.EnsureDirectoryExistsAsync] {ex.GetType().Name}: {ex.Message}");
                     // Directory might already exist (race condition)
                     if (!_sftpClient.Exists(remotePath))
                     {
@@ -1004,8 +1012,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SftpStrategy.EnumerateFilesRecursiveAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore directory enumeration errors
                 }
             }, ct);
@@ -1071,8 +1080,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     await metaStream.FlushAsync(ct);
                 }, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SftpStrategy.StoreMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata storage failures
             }
         }
@@ -1113,8 +1123,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 return metadata.Count > 0 ? metadata : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SftpStrategy.LoadMetadataFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

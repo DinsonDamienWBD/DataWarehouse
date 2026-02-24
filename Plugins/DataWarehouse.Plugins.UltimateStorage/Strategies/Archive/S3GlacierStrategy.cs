@@ -331,8 +331,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                     };
                     await _s3Client!.AbortMultipartUploadAsync(abortRequest, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[S3GlacierStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -385,8 +386,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[S3GlacierStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 

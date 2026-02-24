@@ -337,8 +337,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -379,8 +380,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -612,8 +614,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var storeMetadata = await GetStoreMetadataAsync(ct);
                 return storeMetadata?.AvailableCapacity;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -792,8 +795,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                 await _httpClient!.SendAsync(request, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy.ReplicateObjectAsync] {ex.GetType().Name}: {ex.Message}");
                 // Replication is best-effort, don't fail the main operation
             }
         }

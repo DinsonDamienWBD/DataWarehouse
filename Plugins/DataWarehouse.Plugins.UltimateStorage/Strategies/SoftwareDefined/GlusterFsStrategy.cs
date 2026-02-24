@@ -306,22 +306,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 _quorumCount = (_replicaCount / 2) + 1; // Majority quorum
             }
 
-            // Apply quota if enabled
+            // Apply quota if enabled (NotSupportedException expected until CLI integration is complete)
             if (_enableQuota && _quotaLimitBytes > 0)
             {
-                await ApplyQuotaAsync(_mountPath, _quotaLimitBytes, ct);
+                try { await ApplyQuotaAsync(_mountPath, _quotaLimitBytes, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.Init] {ex.Message}"); }
             }
 
-            // Enable self-heal if configured
+            // Enable self-heal if configured (NotSupportedException expected until CLI integration is complete)
             if (_enableSelfHeal)
             {
-                await ConfigureSelfHealAsync(ct);
+                try { await ConfigureSelfHealAsync(ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.Init] {ex.Message}"); }
             }
 
-            // Enable bitrot detection if configured
+            // Enable bitrot detection if configured (NotSupportedException expected until CLI integration is complete)
             if (_enableBitrot)
             {
-                await ConfigureBitrotAsync(ct);
+                try { await ConfigureBitrotAsync(ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.Init] {ex.Message}"); }
             }
 
             await Task.CompletedTask;
@@ -377,11 +380,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 await fileStream.FlushAsync(ct);
             }
 
-            // Apply sharding if enabled and file is large
+            // Apply sharding if enabled and file is large (throws NotSupportedException until CLI integration)
             if (_enableSharding && bytesWritten >= _shardFileSizeThresholdBytes)
             {
                 await ApplyShardingAsync(filePath, ct);
             }
+            // Note: ApplyShardingAsync throws NotSupportedException — callers should disable sharding or implement CLI integration
 
             // Store metadata as sidecar file
             if (metadata != null && metadata.Count > 0)
@@ -528,8 +532,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -569,8 +574,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -638,8 +644,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Capacity information not available
                 }
 
@@ -705,8 +712,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -719,110 +727,64 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Applies quota to the GlusterFS volume.
         /// Uses gluster volume quota commands or REST API.
         /// </summary>
-        private async Task ApplyQuotaAsync(string path, long limitBytes, CancellationToken ct)
+        private Task ApplyQuotaAsync(string path, long limitBytes, CancellationToken ct)
         {
             if (!_enableQuota || limitBytes <= 0)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // In production, this would execute:
-            // gluster volume quota <volume-name> limit-usage <path> <size>
-            // For now, store quota configuration as marker
-            var quotaMetadata = new Dictionary<string, string>
-            {
-                ["glusterfs.quota.limit_bytes"] = limitBytes.ToString(),
-                ["glusterfs.quota.soft_limit_percent"] = _quotaSoftLimitPercent.ToString(),
-                ["glusterfs.quota.hard_limit_bytes"] = _quotaHardLimitBytes.ToString()
-            };
-
-            var quotaFile = Path.Combine(path, ".glusterfs_quota");
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaMetadata), ct);
+            throw new NotSupportedException(
+                "GlusterFS quota enforcement requires 'gluster volume quota' CLI integration. " +
+                "Configure quotas via gluster CLI directly.");
         }
 
         /// <summary>
         /// Configures self-heal daemon settings.
         /// </summary>
-        private async Task ConfigureSelfHealAsync(CancellationToken ct)
+        private Task ConfigureSelfHealAsync(CancellationToken ct)
         {
             if (!_enableSelfHeal)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // In production, this would configure via:
-            // gluster volume set <volume-name> cluster.self-heal-daemon on
-            // gluster volume set <volume-name> cluster.heal-timeout <seconds>
-            // gluster volume heal <volume-name> enable
-
-            var selfHealConfig = new Dictionary<string, string>
-            {
-                ["glusterfs.selfheal.enabled"] = _enableSelfHeal.ToString(),
-                ["glusterfs.selfheal.algorithm"] = _selfHealAlgorithm.ToString(),
-                ["glusterfs.selfheal.window_start"] = _selfHealWindowStart.ToString(),
-                ["glusterfs.selfheal.window_end"] = _selfHealWindowEnd.ToString()
-            };
-
-            var configFile = Path.Combine(_mountPath, ".glusterfs_selfheal");
-            await File.WriteAllTextAsync(configFile, JsonSerializer.Serialize(selfHealConfig), ct);
+            throw new NotSupportedException(
+                "GlusterFS self-heal configuration requires 'gluster volume heal' CLI integration.");
         }
 
         /// <summary>
         /// Configures bitrot detection settings.
         /// </summary>
-        private async Task ConfigureBitrotAsync(CancellationToken ct)
+        private Task ConfigureBitrotAsync(CancellationToken ct)
         {
             if (!_enableBitrot)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // In production, this would configure via:
-            // gluster volume bitrot <volume-name> enable
-            // gluster volume bitrot <volume-name> scrub-throttle <rate>
-            // gluster volume bitrot <volume-name> scrub-frequency <frequency>
-
-            var bitrotConfig = new Dictionary<string, string>
-            {
-                ["glusterfs.bitrot.enabled"] = _enableBitrot.ToString(),
-                ["glusterfs.bitrot.mode"] = _bitrotMode.ToString(),
-                ["glusterfs.bitrot.scrub_throttle_rate"] = _bitrotScrubThrottleRate.ToString(),
-                ["glusterfs.bitrot.scrub_frequency_days"] = _bitrotScrubFrequency.ToString()
-            };
-
-            var configFile = Path.Combine(_mountPath, ".glusterfs_bitrot");
-            await File.WriteAllTextAsync(configFile, JsonSerializer.Serialize(bitrotConfig), ct);
+            throw new NotSupportedException(
+                "GlusterFS bitrot detection requires 'gluster volume bitrot' CLI integration.");
         }
 
         /// <summary>
         /// Applies sharding to a large file.
         /// </summary>
-        private async Task ApplyShardingAsync(string filePath, CancellationToken ct)
+        private Task ApplyShardingAsync(string filePath, CancellationToken ct)
         {
             if (!_enableSharding)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // In production, sharding is transparent when enabled on volume:
-            // gluster volume set <volume-name> features.shard on
-            // gluster volume set <volume-name> features.shard-block-size <size>
-
-            var shardMetadata = new Dictionary<string, string>
-            {
-                ["glusterfs.shard.enabled"] = "true",
-                ["glusterfs.shard.block_size_bytes"] = _shardBlockSizeBytes.ToString(),
-                ["glusterfs.shard.file_size_bytes"] = new FileInfo(filePath).Length.ToString()
-            };
-
-            var shardMarker = filePath + ".shard";
-            await File.WriteAllTextAsync(shardMarker, JsonSerializer.Serialize(shardMetadata), ct);
+            throw new NotSupportedException(
+                "GlusterFS sharding requires 'gluster volume set' with features.shard CLI integration.");
         }
 
         /// <summary>
         /// Creates a snapshot of the GlusterFS volume.
         /// </summary>
-        public async Task<GlusterSnapshot> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
+        public Task<GlusterSnapshot> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
         {
             EnsureInitialized();
 
@@ -836,28 +798,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new ArgumentException("Snapshot name cannot be empty", nameof(snapshotName));
             }
 
-            // In production, this would execute:
-            // gluster snapshot create <snap-name> <volume-name>
-
-            var snapshot = new GlusterSnapshot
-            {
-                Name = snapshotName,
-                VolumeName = _volumeName,
-                CreatedAt = DateTime.UtcNow,
-                Status = SnapshotStatus.Created
-            };
-
-            // Store snapshot metadata
-            var snapshotDir = Path.Combine(_mountPath, ".glusterfs_snapshots");
-            if (!Directory.Exists(snapshotDir))
-            {
-                Directory.CreateDirectory(snapshotDir);
-            }
-
-            var snapshotFile = Path.Combine(snapshotDir, $"{snapshotName}.json");
-            await File.WriteAllTextAsync(snapshotFile, JsonSerializer.Serialize(snapshot), ct);
-
-            return snapshot;
+            throw new NotSupportedException(
+                "GlusterFS snapshots require 'gluster snapshot create' CLI integration. " +
+                "Configure snapshots via gluster CLI directly.");
         }
 
         /// <summary>
@@ -918,8 +861,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         snapshots.Add(snapshot);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.ListSnapshotsAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore invalid snapshot files
                 }
             }
@@ -950,8 +894,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f))
                         .Count();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.GetVolumeUsageAsync] {ex.GetType().Name}: {ex.Message}");
                     // File count may fail if permissions insufficient
                 }
 
@@ -975,33 +920,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>
         /// Triggers volume rebalancing after brick addition/removal.
         /// </summary>
-        public async Task RebalanceVolumeAsync(CancellationToken ct = default)
+        public Task RebalanceVolumeAsync(CancellationToken ct = default)
         {
             EnsureInitialized();
 
-            // In production, this would execute:
-            // gluster volume rebalance <volume-name> start
-
-            var rebalanceMarker = Path.Combine(_mountPath, ".glusterfs_rebalance_requested");
-            await File.WriteAllTextAsync(rebalanceMarker, DateTime.UtcNow.ToString("O"), ct);
+            throw new NotSupportedException(
+                "GlusterFS rebalance requires 'gluster volume rebalance' CLI integration.");
         }
 
         /// <summary>
         /// Checks quorum status for the volume.
         /// </summary>
-        private async Task<bool> CheckQuorumStatusAsync(CancellationToken ct)
+        private Task<bool> CheckQuorumStatusAsync(CancellationToken ct)
         {
             if (!_enforceQuorum)
             {
-                return true;
+                return Task.FromResult(true);
             }
 
-            // In production, this would query via:
-            // gluster volume status <volume-name>
-            // and check brick connectivity vs quorum requirements
-
-            // For now, assume quorum is met if mount is accessible
-            return Directory.Exists(_mountPath);
+            System.Diagnostics.Debug.WriteLine(
+                "[GlusterFsStrategy.CheckQuorumStatus] Basic mount connectivity check only; " +
+                "real quorum status requires 'gluster volume status' CLI integration");
+            return Task.FromResult(Directory.Exists(_mountPath));
         }
 
         /// <summary>
@@ -1078,8 +1018,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1093,11 +1034,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private string GetFullPath(string key)
         {
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(_mountPath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1169,8 +1114,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GlusterFsStrategy.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }

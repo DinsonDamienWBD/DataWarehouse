@@ -177,8 +177,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     _customGoals = JsonSerializer.Deserialize<Dictionary<string, string>>(customGoalsJson)
                         ?? new Dictionary<string, string>();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.InitializeCoreAsync] {ex.GetType().Name}: {ex.Message}");
                     _customGoals = new Dictionary<string, string>();
                 }
             }
@@ -211,8 +212,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 _scheduledTasks = JsonSerializer.Deserialize<List<string>>(scheduledTasksJson) ?? new List<string>();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.InitializeCoreAsync] {ex.GetType().Name}: {ex.Message}");
                 _scheduledTasks = new List<string>();
             }
 
@@ -227,8 +229,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 _chunkserverLabels = JsonSerializer.Deserialize<Dictionary<string, string>>(chunkserverLabelsJson)
                     ?? new Dictionary<string, string>();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.InitializeCoreAsync] {ex.GetType().Name}: {ex.Message}");
                 _chunkserverLabels = new Dictionary<string, string>();
             }
 
@@ -244,8 +247,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 _shadowMasterHosts = JsonSerializer.Deserialize<List<string>>(shadowMastersJson) ?? new List<string>();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.InitializeCoreAsync] {ex.GetType().Name}: {ex.Message}");
                 _shadowMasterHosts = new List<string>();
             }
             _masterFailoverTimeoutSeconds = GetConfiguration<int>("MasterFailoverTimeoutSeconds", 30);
@@ -285,16 +289,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new InvalidOperationException("At least one of AllowReads or AllowWrites must be true.");
             }
 
-            // Apply quota if configured
+            // Apply quota if configured (NotSupportedException expected until CLI integration)
             if (_enableQuotas && (_quotaMaxBytes > 0 || _quotaMaxInodes > 0))
             {
-                await ApplyQuotaAsync(_mountPath, _quotaMaxBytes, _quotaMaxInodes, ct);
+                try { await ApplyQuotaAsync(_mountPath, _quotaMaxBytes, _quotaMaxInodes, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.Init] {ex.Message}"); }
             }
 
-            // Apply default goal to root if specified
+            // Apply default goal to root if specified (NotSupportedException expected until CLI integration)
             if (!string.IsNullOrWhiteSpace(_defaultGoal))
             {
-                await ApplyGoalAsync(_mountPath, _defaultGoal, ct);
+                try { await ApplyGoalAsync(_mountPath, _defaultGoal, ct); }
+                catch (NotSupportedException ex) { System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.Init] {ex.Message}"); }
             }
 
             await Task.CompletedTask;
@@ -521,8 +527,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 {
                     metadata = await LoadMetadataAsync(filePath, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Ignore metadata read errors
                 }
 
@@ -562,8 +569,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             {
                 metadata = await LoadMetadataAsync(filePath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore metadata read errors
             }
 
@@ -631,8 +639,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         usedCapacity = totalCapacity - availableCapacity;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Capacity information not available
                 }
 
@@ -686,8 +695,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -703,20 +713,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <param name="path">File or directory path.</param>
         /// <param name="goal">Goal name or ID (e.g., "2", "xor3", "ec(3,2)").</param>
         /// <param name="ct">Cancellation token.</param>
-        private async Task ApplyGoalAsync(string path, string goal, CancellationToken ct)
+        private Task ApplyGoalAsync(string path, string goal, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(goal))
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            // Store goal as metadata marker
-            var goalFile = Path.Combine(path, ".lizardfs_goal");
-            await File.WriteAllTextAsync(goalFile, goal, ct);
-
-            // In production, this would use lizardfs-admin or xattr:
-            // lizardfs-admin set-goal <goal> <path>
-            // Or: setfattr -n user.lizardfs_goal -v <goal> <path>
+            throw new NotSupportedException(
+                "LizardFS goal assignment requires 'lizardfs-admin set-goal' or 'mfssetgoal' CLI integration.");
         }
 
         /// <summary>
@@ -726,20 +731,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <param name="maxBytes">Maximum bytes (-1 for unlimited).</param>
         /// <param name="maxInodes">Maximum inodes/files (-1 for unlimited).</param>
         /// <param name="ct">Cancellation token.</param>
-        private async Task ApplyQuotaAsync(string targetPath, long maxBytes, long maxInodes, CancellationToken ct)
+        private Task ApplyQuotaAsync(string targetPath, long maxBytes, long maxInodes, CancellationToken ct)
         {
-            var quotaMetadata = new Dictionary<string, string>
-            {
-                ["lizardfs.quota.max_bytes"] = maxBytes.ToString(),
-                ["lizardfs.quota.max_inodes"] = maxInodes.ToString(),
-                ["lizardfs.quota.soft"] = _softQuota.ToString(),
-                ["lizardfs.quota.type"] = _quotaType.ToString()
-            };
-
-            var quotaFile = Path.Combine(targetPath, ".lizardfs_quota");
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaMetadata), ct);
-
-            // In production: lizardfs-admin set-quota <maxBytes> <maxInodes> <target>
+            throw new NotSupportedException(
+                "LizardFS quota enforcement requires 'lizardfs-admin set-quota' CLI integration.");
         }
 
         /// <summary>
@@ -861,8 +856,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.CleanupTrashAsync] {ex.GetType().Name}: {ex.Message}");
                     // Skip files that can't be deleted
                 }
             }
@@ -876,7 +872,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <param name="snapshotName">Name for the snapshot.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Snapshot information.</returns>
-        public async Task<LizardFsSnapshot> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
+        public Task<LizardFsSnapshot> CreateSnapshotAsync(string snapshotName, CancellationToken ct = default)
         {
             EnsureInitialized();
 
@@ -890,25 +886,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new ArgumentException("Snapshot name cannot be empty", nameof(snapshotName));
             }
 
-            var snapshotPath = Path.Combine(_mountPath, _snapshotDirectory, snapshotName);
-
-            if (Directory.Exists(snapshotPath))
-            {
-                throw new InvalidOperationException($"Snapshot '{snapshotName}' already exists.");
-            }
-
-            // Create snapshot directory (LizardFS automatically creates snapshot)
-            Directory.CreateDirectory(snapshotPath);
-
-            var snapshot = new LizardFsSnapshot
-            {
-                Name = snapshotName,
-                Path = snapshotPath,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await Task.CompletedTask;
-            return snapshot;
+            throw new NotSupportedException(
+                "LizardFS snapshots require 'mfsmakesnapshot' or 'lizardfs makesnapshot' CLI integration.");
         }
 
         /// <summary>
@@ -932,8 +911,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new InvalidOperationException($"Snapshot '{snapshotName}' does not exist.");
             }
 
-            // Delete snapshot directory
-            Directory.Delete(snapshotPath, recursive: false);
+            // Delete snapshot directory (recursive to remove all snapshot contents)
+            Directory.Delete(snapshotPath, recursive: true);
 
             await Task.CompletedTask;
         }
@@ -1004,8 +983,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                         .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f) && !IsTrashPath(f))
                         .Count();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.GetFilesystemUsageAsync] {ex.GetType().Name}: {ex.Message}");
                     // File count may fail if permissions insufficient
                 }
 
@@ -1089,32 +1069,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>True if master is healthy, false otherwise.</returns>
-        private async Task<bool> CheckMasterHealthAsync(CancellationToken ct)
+        private Task<bool> CheckMasterHealthAsync(CancellationToken ct)
         {
             if (!_useLizardfsAdmin || !_enableHighAvailability)
             {
-                return true; // Assume healthy if not checking
+                System.Diagnostics.Debug.WriteLine(
+                    "[LizardFsStrategy.CheckMasterHealth] Health check requires lizardfs-admin CLI; " +
+                    "returning basic mount connectivity check");
+                return Task.FromResult(Directory.Exists(_mountPath));
             }
 
-            try
-            {
-                // In production: lizardfs-admin list-masters
-                // For now, check if mount is responsive
-                var testFile = Path.Combine(_mountPath, ".health_check");
-                await File.WriteAllTextAsync(testFile, "health", ct);
-
-                if (File.Exists(testFile))
-                {
-                    File.Delete(testFile);
-                    return true;
-                }
-
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            // Real health check would use: lizardfs-admin list-masters
+            System.Diagnostics.Debug.WriteLine(
+                "[LizardFsStrategy.CheckMasterHealth] Health check requires lizardfs-admin CLI; " +
+                "returning basic mount connectivity check");
+            return Task.FromResult(Directory.Exists(_mountPath));
         }
 
         #endregion
@@ -1162,8 +1131,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.LoadMetadataAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -1177,11 +1147,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private string GetFullPath(string key)
         {
-            // Normalize key to use OS-specific path separators
             var normalizedKey = key.Replace('/', Path.DirectorySeparatorChar)
                                    .Replace('\\', Path.DirectorySeparatorChar);
-
-            return Path.Combine(_mountPath, normalizedKey);
+            var fullPath = Path.GetFullPath(Path.Combine(_mountPath, normalizedKey));
+            var normalizedBase = Path.GetFullPath(_mountPath);
+            if (!normalizedBase.EndsWith(Path.DirectorySeparatorChar))
+                normalizedBase += Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Key resolves outside base path: {key}");
+            return fullPath;
         }
 
         /// <summary>
@@ -1263,8 +1237,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 var fileInfo = new FileInfo(filePath);
                 return HashCode.Combine(fileInfo.Length, fileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LizardFsStrategy.ComputeFileETag] {ex.GetType().Name}: {ex.Message}");
                 return Guid.NewGuid().ToString("N")[..8];
             }
         }

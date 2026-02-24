@@ -312,18 +312,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 request.ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256;
             }
 
+            // Capture start position before retry resets it
+            var startPosition = data.CanSeek ? data.Position : 0L;
+
             // Execute upload with retry
             var response = await ExecuteWithRetryAsync(async () =>
             {
                 if (data.CanSeek)
                 {
-                    data.Position = 0;
+                    data.Position = startPosition;
                 }
                 return await _s3Client!.PutObjectAsync(request, ct);
             }, ct);
 
-            // Get actual size
-            var size = data.CanSeek ? data.Length : response.ContentLength;
+            // Get actual size relative to start position (not start of stream)
+            var size = data.CanSeek ? (data.Length - startPosition) : response.ContentLength;
             IncrementBytesStored(size);
 
             return new StorageObjectMetadata
@@ -456,8 +459,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                     };
                     await _s3Client!.AbortMultipartUploadAsync(abortRequest, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[VultrObjectStorageStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -498,7 +502,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 Key = key
             };
 
-            var response = await ExecuteWithRetryAsync(async () =>
+            using var response = await ExecuteWithRetryAsync(async () =>
                 await _s3Client!.GetObjectAsync(request, ct), ct);
 
             var ms = new MemoryStream(65536);
@@ -524,8 +528,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[VultrObjectStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors
             }
 
@@ -568,8 +573,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[VultrObjectStorageStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -1047,8 +1053,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
                 return response.VersioningConfig?.Status;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[VultrObjectStorageStrategy.GetVersioningStatusAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

@@ -347,8 +347,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     var txResponse = await _httpClient!.SendAsync(txRequest, ct);
                     return txResponse.IsSuccessStatusCode;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     return false;
                 }
             }
@@ -432,8 +433,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Use cached metadata if fetch fails
             }
 
@@ -712,8 +714,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     await Task.Delay(checkInterval, ct);
                     checksRemaining--;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.WaitForConfirmationAsync] {ex.GetType().Name}: {ex.Message}");
                     await Task.Delay(checkInterval, ct);
                     checksRemaining--;
                 }
@@ -735,8 +738,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var response = await _httpClient!.SendAsync(request, ct);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.VerifyTransactionAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -814,8 +818,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var balanceWinston = long.Parse(balanceWinstonStr);
                 return balanceWinston / 1_000_000_000_000m; // Convert Winston to AR
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.GetWalletBalanceAsync] {ex.GetType().Name}: {ex.Message}");
                 return 0;
             }
         }
@@ -837,8 +842,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var priceWinston = long.Parse(priceWinstonStr);
                 return priceWinston / 1_000_000_000_000m; // Convert Winston to AR
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ArweaveStrategy.GetStorageCostAsync] {ex.GetType().Name}: {ex.Message}");
                 return 0;
             }
         }

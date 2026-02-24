@@ -48,6 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public override string StrategyId => "carbon-neutral-storage";
         public override string Name => "Carbon-Neutral Storage (Green Cloud)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // Simulates carbon offset API calls (Task.Delay); requires real carbon offset provider integration
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {

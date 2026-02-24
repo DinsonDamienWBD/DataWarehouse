@@ -60,6 +60,9 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
     public override StorageTier Tier => StorageTier.Hot;
 
     /// <inheritdoc />
+    public override bool IsProductionReady => false; // BoundedDictionary in-memory object store; requires orbital/deep-space storage node integration
+
+    /// <inheritdoc />
     public override StorageCapabilities Capabilities => new()
     {
         SupportsMetadata = true,

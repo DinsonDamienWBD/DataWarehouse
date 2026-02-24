@@ -339,8 +339,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 {
                     await AbortMultipartUploadAsync(key, uploadId, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[StorjStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore abort failures
                 }
                 throw;
@@ -400,8 +401,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[StorjStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -436,8 +438,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[StorjStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

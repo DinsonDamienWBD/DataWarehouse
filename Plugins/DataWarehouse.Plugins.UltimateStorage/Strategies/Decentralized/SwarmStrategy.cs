@@ -370,8 +370,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                         return true;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Feed doesn't exist or error occurred
                 }
             }
@@ -452,8 +453,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 customMetadata = await LoadMetadataAsync(key, reference, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // No custom metadata stored
             }
 
@@ -653,8 +655,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
                 return reference;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.ResolveFeedAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -708,8 +711,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 debugClient.Dispose();
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.GetOrCreatePostageBatchAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -833,8 +837,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
                 return metadata;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -853,8 +858,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 var size = await GetContentSizeAsync(reference, ct);
                 return size == expectedSize;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.VerifyContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -943,8 +949,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }, ct);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.PinContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -977,8 +984,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }, ct);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy.UnpinContentAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

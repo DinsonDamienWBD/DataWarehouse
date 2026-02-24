@@ -247,8 +247,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     _ftpClient = null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[FtpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
         }
@@ -369,8 +370,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var fileInfo = await _ftpClient!.GetObjectInfo(remotePath, token: ct);
                 size = fileInfo?.Size ?? 0;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[FtpStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -542,8 +544,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Some servers support SITE commands, but it's not universal
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[FtpStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

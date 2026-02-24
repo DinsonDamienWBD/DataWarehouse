@@ -275,8 +275,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var properties = await blobClient.GetPropertiesAsync(cancellationToken: ct);
                 size = properties.Value.ContentLength;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureArchiveStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting properties
             }
 
@@ -308,8 +309,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return exists.Value;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AzureArchiveStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }

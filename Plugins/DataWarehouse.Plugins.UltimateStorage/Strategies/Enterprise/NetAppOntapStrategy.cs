@@ -366,8 +366,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NetAppOntapStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -430,8 +431,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     return await ExistsViaRestApiAsync(key, ct);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NetAppOntapStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -726,8 +728,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var capacityInfo = await GetVolumeCapacityAsync(volumeUuid, ct);
                 return capacityInfo.Available;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[NetAppOntapStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

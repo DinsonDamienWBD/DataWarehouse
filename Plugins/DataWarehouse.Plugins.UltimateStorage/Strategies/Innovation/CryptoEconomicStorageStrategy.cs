@@ -48,6 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public override string StrategyId => "crypto-economic-storage";
         public override string Name => "Crypto-Economic Incentivized Storage";
         public override StorageTier Tier => StorageTier.Warm; // Distributed storage with moderate latency
+        public override bool IsProductionReady => false; // Erasure coding is a simple data split (not Reed-Solomon); provider network is simulated in-process
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {

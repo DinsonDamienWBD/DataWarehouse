@@ -65,6 +65,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         public override string Name => "OpenStack Cinder Block Storage";
         public override StorageTier Tier => StorageTier.Hot; // Block storage is typically hot tier
 
+        // Cinder block device I/O requires iSCSI/NVMe-oF target integration for real data path.
+        // The current implementation stores only a hash of data in volume metadata — not the data itself.
+        public override bool IsProductionReady => false;
+
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
             SupportsMetadata = true,
@@ -163,8 +167,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
             // Wait for volume to become available
             await WaitForVolumeStatusAsync(volumeId, "available", ct);
 
-            // Write data to volume (simulated - in production, would attach volume and write via block device)
-            await WriteDataToVolumeAsync(volumeId, data, ct);
+            // Write data to volume; get actual bytes written for non-seekable streams
+            var actualBytesWritten = await WriteDataToVolumeAsync(volumeId, data, ct);
+            if (dataSize == 0)
+            {
+                dataSize = actualBytesWritten;
+            }
 
             // Optionally create backup
             if (_enableBackups)
@@ -268,8 +276,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 var details = await GetVolumeDetailsAsync(volumeId, ct);
                 size = details.SizeGb * 1024L * 1024L * 1024L;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CinderStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors getting size
             }
 
@@ -337,8 +346,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
                 return !string.IsNullOrEmpty(volumeId);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CinderStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -493,8 +503,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                         usedCapacity = quotaInfo.UsedGigabytes * 1024L * 1024L * 1024L;
                         availableCapacity = totalCapacity - usedCapacity;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[CinderStrategy.GetHealthAsyncCore] {ex.GetType().Name}: {ex.Message}");
                         // Quota info not available
                     }
 
@@ -547,8 +558,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 var availableGb = quotaInfo.TotalGigabytes - quotaInfo.UsedGigabytes;
                 return availableGb * 1024L * 1024L * 1024L;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CinderStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Quota information not available
                 return null;
             }
@@ -565,10 +577,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         /// <param name="ct">Cancellation token.</param>
         private async Task AuthenticateAsync(CancellationToken ct)
         {
-            await _authLock.WaitAsync(ct);
-            try
-            {
-                var authRequest = new
+            // _authLock is held by the caller (EnsureAuthenticatedAsync); do not re-acquire here.
+            var authRequest = new
                 {
                     auth = new
                     {
@@ -674,23 +684,30 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 {
                     throw new InvalidOperationException("Failed to obtain Cinder URL from Keystone service catalog");
                 }
-            }
-            finally
-            {
-                _authLock.Release();
-            }
         }
 
         /// <summary>
         /// Ensures that the authentication token is valid, refreshing if necessary.
+        /// Uses double-checked locking to avoid TOCTOU race on token expiry.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         private async Task EnsureAuthenticatedAsync(CancellationToken ct)
         {
-            // Check if token needs refresh (5 minutes before expiry)
             if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
             {
-                await AuthenticateAsync(ct);
+                await _authLock.WaitAsync(ct);
+                try
+                {
+                    // Double-check after acquiring lock
+                    if (string.IsNullOrEmpty(_authToken) || DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
+                    {
+                        await AuthenticateAsync(ct);
+                    }
+                }
+                finally
+                {
+                    _authLock.Release();
+                }
             }
         }
 
@@ -902,7 +919,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         /// <param name="volumeId">Volume ID.</param>
         /// <param name="data">Data to write.</param>
         /// <param name="ct">Cancellation token.</param>
-        private async Task WriteDataToVolumeAsync(string volumeId, Stream data, CancellationToken ct)
+        private async Task<long> WriteDataToVolumeAsync(string volumeId, Stream data, CancellationToken ct)
         {
             // In a real implementation, this would:
             // 1. Attach volume to a compute instance
@@ -939,6 +956,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
             var response = await _httpClient!.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
+
+            return dataBytes.Length;
         }
 
         /// <summary>
@@ -1042,8 +1061,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CinderStrategy.DeleteVolumeBackupsAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors deleting backups
             }
         }
@@ -1070,8 +1090,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
                 await _httpClient!.SendAsync(request, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CinderStrategy.ForceDetachVolumeAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore errors - volume might not be attached
             }
         }

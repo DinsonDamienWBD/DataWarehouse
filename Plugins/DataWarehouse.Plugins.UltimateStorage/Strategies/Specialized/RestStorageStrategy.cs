@@ -371,8 +371,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 }
                 else
                 {
-                    // Send raw binary data
-                    request.Content = new StreamContent(data);
+                    // Buffer the stream to bytes before setting as content.
+                    // StreamContent wraps the raw stream and once sent the stream position is at end,
+                    // causing stream exhaustion on any retry attempt. ByteArrayContent is idempotent.
+                    using var bufferMs = new MemoryStream(65536);
+                    await data.CopyToAsync(bufferMs, 81920, ct);
+                    var dataBytes = bufferMs.ToArray();
+                    request.Content = new ByteArrayContent(dataBytes);
                     request.Content.Headers.ContentType = new MediaTypeHeaderValue(_contentType);
                 }
 
@@ -479,8 +484,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 var metadata = await GetMetadataAsyncCore(key, ct);
                 size = metadata.Size;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RestStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata retrieval fails
             }
 
@@ -517,8 +523,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RestStorageStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -660,8 +667,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 var health = await GetHealthAsyncCore(ct);
                 return health.AvailableCapacity;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RestStorageStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -926,8 +934,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     Tier = Tier
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RestStorageStrategy.ParseStorageObjectFromJson] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

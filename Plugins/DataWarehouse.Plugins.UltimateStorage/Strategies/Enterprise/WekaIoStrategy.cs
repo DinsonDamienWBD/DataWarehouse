@@ -470,8 +470,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             {
                 customMetadata = await RetrieveMetadataFromXattrAsync(fullPath, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WekaIoStrategy.GetMetadataAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if xattr not available
             }
 
@@ -567,8 +568,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var capacityInfo = await GetFilesystemCapacityAsync(ct);
                 return capacityInfo.Available;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WekaIoStrategy.GetAvailableCapacityAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -918,8 +920,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             {
                 customMetadata = await RetrieveMetadataFromXattrAsync(fileInfo.FullName, ct);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[WekaIoStrategy.CreateMetadataFromFileInfoAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore if metadata not available
             }
 

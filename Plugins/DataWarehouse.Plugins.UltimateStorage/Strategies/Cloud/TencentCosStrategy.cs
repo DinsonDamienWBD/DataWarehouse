@@ -259,7 +259,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.UploadSimpleAsync] {ex.GetType().Name}: {ex.Message}");
+                    /* Best-effort cleanup — failure is non-fatal */
+                }
             }
         }
 
@@ -305,7 +309,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.UploadLargeFileAsync] {ex.GetType().Name}: {ex.Message}");
+                    /* Best-effort cleanup — failure is non-fatal */
+                }
             }
         }
 
@@ -329,7 +337,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 if (!result.IsSuccessful())
                 {
-                    try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                    try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                        /* Best-effort cleanup — failure is non-fatal */
+                    }
                     throw new FileNotFoundException($"Object '{key}' not found");
                 }
 
@@ -341,7 +353,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
                 ms.Position = 0;
 
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.RetrieveAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                    /* Best-effort cleanup — failure is non-fatal */
+                }
 
                 IncrementBytesRetrieved(ms.Length);
                 IncrementOperationCounter(StorageOperationType.Retrieve);
@@ -361,7 +377,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var meta = await GetMetadataAsyncCore(key, ct);
                 size = meta.Size;
             }
-            catch { /* Metadata fetch failure — delete anyway */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                /* Metadata fetch failure — delete anyway */
+            }
 
             await ExecuteWithRetryAsync(async () =>
             {
@@ -399,8 +419,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return result.IsSuccessful();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -647,7 +668,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                         versioningRequest.IsEnableVersionConfig(true);
                         _cosClient.PutBucketVersioning(versioningRequest);
                     }
-                    catch { /* Versioning setup failure is non-fatal */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[TencentCosStrategy.EnsureBucketExists] {ex.GetType().Name}: {ex.Message}");
+                        /* Versioning setup failure is non-fatal */
+                    }
                 }
 
                 // Global acceleration needs to be configured separately via console or API
