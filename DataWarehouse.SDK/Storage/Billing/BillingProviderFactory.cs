@@ -77,9 +77,9 @@ public static class BillingProviderFactory
                 if (await provider.ValidateCredentialsAsync(ct).ConfigureAwait(false))
                     providers.Add(provider);
             }
-            catch
+            catch (Exception ex)
             {
-                // Skip providers without credentials
+                System.Diagnostics.Debug.WriteLine($"[BillingProviderFactory.CreateAllAvailableAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
         return providers;

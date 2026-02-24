@@ -140,9 +140,9 @@ namespace DataWarehouse.SDK.Hardware
                 _devWatcher.Created += OnDeviceFileChanged;
                 _devWatcher.Deleted += OnDeviceFileChanged;
             }
-            catch
+            catch (Exception ex)
             {
-                // FileSystemWatcher initialization failed - continue without events
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.InitializeDevWatcher] {ex.GetType().Name}: {ex.Message}");
                 _devWatcher = null;
             }
         }
@@ -207,9 +207,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverPciDevicesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -252,9 +252,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverUsbDevicesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -309,9 +309,9 @@ namespace DataWarehouse.SDK.Hardware
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverNvmeDevicesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -350,9 +350,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverBlockDevicesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -385,9 +385,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverGpioControllersAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -420,9 +420,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverI2cBusesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -453,9 +453,9 @@ namespace DataWarehouse.SDK.Hardware
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Sysfs read error - continue with partial results
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverSpiBusesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;
@@ -471,8 +471,9 @@ namespace DataWarehouse.SDK.Hardware
                 var content = await File.ReadAllTextAsync(path, ct);
                 return content.Trim();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.ReadSysfsFileAsync] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

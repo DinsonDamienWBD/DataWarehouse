@@ -668,9 +668,9 @@ public sealed class BatchEventProcessor<T> : IDisposable where T : struct
                 Sequence = availableSequence;
                 _ringBuffer.UpdateGatingSequence(_gatingIndex, availableSequence);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Continue processing on transient errors
+                System.Diagnostics.Debug.WriteLine($"[BatchEventProcessor.ProcessEvents] {ex.GetType().Name}: {ex.Message}");
                 if (!_running) break;
             }
         }

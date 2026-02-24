@@ -147,8 +147,9 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                 var response = await _httpClient!.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GcpKmsProvider.HealthCheckAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -332,8 +333,9 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                 var response = await client.SendAsync(request, ct).ConfigureAwait(false);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[GcpKmsProvider.CheckMetadataServerAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -656,8 +658,9 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                     .ConfigureAwait(false);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AwsKmsProvider.HealthCheckAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -818,8 +821,9 @@ namespace DataWarehouse.SDK.Security.KeyManagement
 
                 return !string.IsNullOrEmpty(_accessKeyId) && !string.IsNullOrEmpty(_secretAccessKey);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AwsKmsProvider.TryLoadCredentialsFile] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -869,9 +873,9 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                 if (doc.RootElement.TryGetProperty("Expiration", out var exp))
                     _credentialExpiry = DateTime.Parse(exp.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
             }
-            catch
+            catch (Exception ex)
             {
-                // IMDS not available — not running on EC2
+                System.Diagnostics.Debug.WriteLine($"[AwsKmsProvider.TryLoadImdsCredentialsAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 

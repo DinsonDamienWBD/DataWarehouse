@@ -279,9 +279,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Probe failure should not crash the loop
+                    System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.RunProbeLoopAsync] {ex.GetType().Name}: {ex.Message}");
                 }
             }
         }
@@ -311,9 +311,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Check failure should not crash the loop
+                    System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.RunSuspicionCheckAsync] {ex.GetType().Name}: {ex.Message}");
                 }
             }
         }
@@ -351,9 +351,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             {
                 // Ping timeout -- not the overall cancellation
             }
-            catch
+            catch (Exception ex)
             {
-                // Network error
+                System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.TryDirectPingAsync] {ex.GetType().Name}: {ex.Message}");
             }
             return false;
         }
@@ -395,9 +395,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             {
                 // Indirect ping timeout
             }
-            catch
+            catch (Exception ex)
             {
-                // Network error
+                System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.TryIndirectPingAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return false;
@@ -415,8 +415,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 var ackMessage = SwimMessage.Deserialize(response, _config.ClusterSecret);
                 return ackMessage?.Type == SwimMessageType.Ack;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.TrySendPingReqAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -557,9 +558,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 }
                 // null return means HMAC verification failed or invalid message -- silently reject
             }
-            catch
+            catch (Exception ex)
             {
-                // Gossip may carry non-SWIM messages; ignore parse errors
+                System.Diagnostics.Debug.WriteLine($"[SwimClusterMembership.HandleGossipReceived] {ex.GetType().Name}: {ex.Message}");
             }
         }
 

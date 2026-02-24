@@ -152,9 +152,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
-                // CUDA initialization failed (library load error, API error, etc.)
+                System.Diagnostics.Debug.WriteLine($"[GpuAccelerator.TryInitializeCuda] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -189,9 +189,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
-                // ROCm initialization failed
+                System.Diagnostics.Debug.WriteLine($"[GpuAccelerator.TryInitializeRocm] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

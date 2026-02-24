@@ -352,9 +352,9 @@ namespace DataWarehouse.SDK.Contracts
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
-                // Best effort during shutdown
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.ShutdownAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -752,10 +752,9 @@ namespace DataWarehouse.SDK.Contracts
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Graceful degradation: capability registration failed
-                // Plugin can still function without registry
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.RegisterCapabilitiesAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -798,9 +797,9 @@ namespace DataWarehouse.SDK.Contracts
                 if (_knowledgeCache != null)
                     _knowledgeCache[knowledge.Topic] = knowledge;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Graceful degradation: Universal Intelligence not available
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.RegisterKnowledgeAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -868,9 +867,9 @@ namespace DataWarehouse.SDK.Contracts
                 });
                 _knowledgeSubscriptions.Add(broadcastSub);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Graceful degradation: Unable to subscribe
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.SubscribeToKnowledgeRequests] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -1004,9 +1003,9 @@ namespace DataWarehouse.SDK.Contracts
                     _registeredKnowledgeIds.Add(k.Id);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Graceful degradation
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.RegisterStaticKnowledgeAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -1044,9 +1043,9 @@ namespace DataWarehouse.SDK.Contracts
                 });
                 _knowledgeSubscriptions.Add(sub);
             }
-            catch
+            catch (Exception ex)
             {
-                // Graceful degradation
+                System.Diagnostics.Debug.WriteLine($"[PluginBase.SubscribeToKnowledgeQueries] {ex.GetType().Name}: {ex.Message}");
             }
         }
 

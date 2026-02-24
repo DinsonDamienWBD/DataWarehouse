@@ -1292,9 +1292,9 @@ namespace DataWarehouse.SDK.Security
 
                 await _messageBus.PublishAsync(eventTopic, message).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // Best-effort event publishing - don't fail key operations if event fails
+                System.Diagnostics.Debug.WriteLine($"[KeyStoreStrategyBase.PublishKeyEventAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
 

@@ -387,7 +387,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                         sigKeyId = sigs[0].GetProperty("keyid").GetString();
                     }
                 }
-                catch { /* not a DSSE envelope */ }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifyLevel2Async] {ex.GetType().Name}: {ex.Message}"); }
 
                 if (string.IsNullOrEmpty(sigKeyId))
                 {
@@ -438,7 +438,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 rsa.ImportRSAPublicKey(keyBytes, out _);
                 return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
             }
-            catch { /* not an RSA public key */ }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] {ex.GetType().Name}: {ex.Message}"); }
 
             // Try RSA private key (extract public)
             try
@@ -447,7 +447,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 rsa.ImportRSAPrivateKey(keyBytes, out _);
                 return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
             }
-            catch { /* not an RSA private key */ }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] RSA private key: {ex.GetType().Name}: {ex.Message}"); }
 
             // Fallback: HMAC-SHA256 verification
             try
@@ -456,8 +456,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 var expected = hmac.ComputeHash(payload);
                 return CryptographicOperations.FixedTimeEquals(expected, signature);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] HMAC fallback: {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -651,9 +652,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 await _messageBus.PublishAsync("security.supply-chain.provenance.verify", message, ct)
                     .ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // Best-effort
+                System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.PublishVerificationEventAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

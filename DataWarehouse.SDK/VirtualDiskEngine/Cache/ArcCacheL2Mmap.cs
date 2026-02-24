@@ -156,9 +156,9 @@ public sealed class ArcCacheL2Mmap : IArcCache, IDisposable
 
                 _initialized = true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // If mmap fails (e.g., file not found), remain in uninitialized state
+                System.Diagnostics.Debug.WriteLine($"[ArcCacheL2Mmap.EnsureInitialized] {ex.GetType().Name}: {ex.Message}");
                 _mmf?.Dispose();
                 _mmf = null;
                 _accessor = null;

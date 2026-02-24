@@ -446,8 +446,9 @@ public sealed class ConfigurationHierarchy
         {
             return ConvertValue<T>(value) ?? defaultValue;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ConfigurationHierarchy.GetEffectiveValueOrDefault] {ex.GetType().Name}: {ex.Message}");
             return defaultValue;
         }
     }
@@ -581,8 +582,9 @@ public sealed class ConfigurationHierarchy
         {
             return (T)Convert.ChangeType(value, typeof(T));
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ConfigurationHierarchy.ConvertValue] {ex.GetType().Name}: {ex.Message}");
             return default;
         }
     }
@@ -593,8 +595,9 @@ public sealed class ConfigurationHierarchy
         {
             return JsonSerializer.Deserialize<T>(element.GetRawText());
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ConfigurationHierarchy.ConvertJsonElement] {ex.GetType().Name}: {ex.Message}");
             return default;
         }
     }

@@ -270,9 +270,9 @@ public sealed class DefaultTagPolicyEngine : ITagPolicyEngine
         {
             await _messageBus.PublishAsync(TagTopics.TagPolicyViolation, message, ct).ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Best-effort publish; policy evaluation result is still returned
+            System.Diagnostics.Debug.WriteLine($"[DefaultTagPolicyEngine.PublishViolationsAsync] {ex.GetType().Name}: {ex.Message}");
         }
     }
 

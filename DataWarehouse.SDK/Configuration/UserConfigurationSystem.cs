@@ -471,9 +471,9 @@ public sealed class UserConfigurationSystem
                         [parameterName] = value
                     });
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Best-effort notification; errors are logged but don't block configuration
+                    System.Diagnostics.Debug.WriteLine($"[UserConfigurationSystem.NotifyOverridable] {ex.GetType().Name}: {ex.Message}");
                 }
             }
         }

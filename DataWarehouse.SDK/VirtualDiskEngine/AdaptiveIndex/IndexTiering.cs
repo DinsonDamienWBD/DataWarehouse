@@ -273,9 +273,9 @@ public sealed class IndexTiering : IAdaptiveIndex, IAsyncDisposable
             await target.InsertAsync(key, value, ct).ConfigureAwait(false);
             await source.DeleteAsync(key, ct).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            // Promotion failure is non-fatal; entry remains in source tier
+            System.Diagnostics.Debug.WriteLine($"[IndexTiering.PromoteAsync] {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -308,7 +308,7 @@ public sealed class IndexTiering : IAdaptiveIndex, IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { /* shutting down */ }
-        catch { /* background task should not crash */ }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[IndexTiering.ManageTiersAsync] {ex.GetType().Name}: {ex.Message}"); }
     }
 
     private async Task DemoteTierAsync(IAdaptiveIndex source, IAdaptiveIndex target, long maxEntries, CancellationToken ct)

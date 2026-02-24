@@ -166,10 +166,9 @@ namespace DataWarehouse.SDK.Hardware
                     var fileResults = await ScanAsync(file, cancellationToken);
                     allResults.AddRange(fileResults);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip assemblies that fail to load
-                    // In production, this should log a warning
+                    System.Diagnostics.Debug.WriteLine($"[DriverLoader.ScanDirectoryAsync] {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -414,15 +413,15 @@ namespace DataWarehouse.SDK.Hardware
                     {
                         await LoadAsync(driverInfo.AssemblyPath, driverInfo.TypeName);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Log and continue - don't fail hot-plug on individual driver load failure
+                        System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnDriverFileCreated] LoadAsync: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue - don't fail hot-plug on scan failure
+                System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnDriverFileCreated] ScanAsync: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -444,15 +443,15 @@ namespace DataWarehouse.SDK.Hardware
                     {
                         await UnloadAsync(handle);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Log and continue - best-effort unload
+                        System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnDriverFileDeleted] UnloadAsync: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue - don't fail hot-plug on unload failure
+                System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnDriverFileDeleted] {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -490,15 +489,15 @@ namespace DataWarehouse.SDK.Hardware
                         {
                             await LoadAsync(matchingDriver.AssemblyPath, matchingDriver.TypeName);
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            // Log and continue - don't fail hardware change handling
+                            System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnHardwareChangedHandler] LoadAsync: {ex.GetType().Name}: {ex.Message}");
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Log and continue - don't fail hardware change handling
+                    System.Diagnostics.Debug.WriteLine($"[DriverLoader.OnHardwareChangedHandler] {ex.GetType().Name}: {ex.Message}");
                 }
             });
         }

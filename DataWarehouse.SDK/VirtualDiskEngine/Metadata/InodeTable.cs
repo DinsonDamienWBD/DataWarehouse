@@ -504,8 +504,9 @@ public sealed class InodeTable : IInodeTable, IDisposable
             await _device.ReadBlockAsync(blockNumber, blockBuffer, ct);
             return Inode.Deserialize(blockBuffer.AsSpan(offsetInBlock, Inode.InodeSize));
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[InodeTable.ReadInodeAsync] {ex.GetType().Name}: {ex.Message}");
             return null;
         }
         finally
@@ -571,8 +572,9 @@ public sealed class InodeTable : IInodeTable, IDisposable
                 entries.Add(entry);
                 offset += bytesRead;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[InodeTable.ParseDirectoryBlock] {ex.GetType().Name}: {ex.Message}");
                 break; // Malformed entry, stop parsing
             }
         }

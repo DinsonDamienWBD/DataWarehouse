@@ -154,9 +154,9 @@ public abstract class ConnectionPoolBase<TConnection> : IConnectionPool<TConnect
                 {
                     healthy = await _factory.ValidateAsync(entry.Connection, ct).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Validation threw - treat as unhealthy
+                    System.Diagnostics.Debug.WriteLine($"[ConnectionPool.AcquireAsync] Validation: {ex.GetType().Name}: {ex.Message}");
                 }
 
                 if (!healthy)
@@ -235,8 +235,9 @@ public abstract class ConnectionPoolBase<TConnection> : IConnectionPool<TConnect
             {
                 shouldDestroy = !await _factory.ValidateAsync(entry.Connection, ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ConnectionPool.ReleaseAsync] Validation: {ex.GetType().Name}: {ex.Message}");
                 shouldDestroy = true;
             }
         }
@@ -362,9 +363,9 @@ public abstract class ConnectionPoolBase<TConnection> : IConnectionPool<TConnect
         {
             await _factory.DestroyAsync(entry.Connection, CancellationToken.None).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best effort destruction
+            System.Diagnostics.Debug.WriteLine($"[ConnectionPool.DestroyEntryAsync] {ex.GetType().Name}: {ex.Message}");
         }
 
         Interlocked.Increment(ref _connectionsDestroyed);
@@ -533,8 +534,9 @@ public sealed class TcpConnectionPool : ConnectionPoolBase<TcpPooledStream>
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.ValidateAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -546,9 +548,9 @@ public sealed class TcpConnectionPool : ConnectionPoolBase<TcpPooledStream>
                 connection.Stream.Dispose();
                 connection.Socket.Shutdown(SocketShutdown.Both);
             }
-            catch
+            catch (Exception ex)
             {
-                // Best effort
+                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.DestroyAsync] {ex.GetType().Name}: {ex.Message}");
             }
             finally
             {
@@ -718,8 +720,9 @@ public sealed class Http2ConnectionPool : ConnectionPoolBase<Http2PooledConnecti
                 using var response = await connection.Client.SendAsync(request, ct).ConfigureAwait(false);
                 return true; // Any response means the connection is alive
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[Http2ConnectionFactory.ValidateAsync] {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

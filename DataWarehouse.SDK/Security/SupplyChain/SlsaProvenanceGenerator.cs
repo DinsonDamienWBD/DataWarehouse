@@ -346,8 +346,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                     // Zero the key material
                     CryptographicOperations.ZeroMemory(keyBytes);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[SlsaProvenanceGenerator.GenerateAsync] {ex.GetType().Name}: {ex.Message}");
                     // Signing failed — fall back to unsigned (Level 1)
                     serializedOutput = statementJson;
                 }
@@ -485,8 +486,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 rsa.ImportRSAPrivateKey(keyBytes, out _);
                 return rsa.SignData(payload, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[SlsaProvenanceGenerator.SignPayload] {ex.GetType().Name}: {ex.Message}");
                 // If not a valid RSA key, use HMAC-SHA256 as fallback
                 using var hmac = new HMACSHA256(keyBytes);
                 return hmac.ComputeHash(payload);
@@ -516,9 +518,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
 
                 await _messageBus.PublishAsync(topic, message, ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // Best-effort event publishing
+                System.Diagnostics.Debug.WriteLine($"[SlsaProvenanceGenerator.PublishProvenanceEventAsync] {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
