@@ -100,7 +100,10 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
         _jobs[jobId] = job;
 
         // Execute moves via migration engine in the background
-        _ = Task.Run(async () => await ExecuteRebalanceAsync(jobId, plan, ct).ConfigureAwait(false), ct);
+        _ = Task.Run(async () => await ExecuteRebalanceAsync(jobId, plan, ct).ConfigureAwait(false), ct)
+            .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                $"[AutonomousRebalancer] Rebalance job {jobId} failed: {t.Exception?.InnerException?.Message}"),
+                TaskContinuationOptions.OnlyOnFaulted);
 
         return job;
     }

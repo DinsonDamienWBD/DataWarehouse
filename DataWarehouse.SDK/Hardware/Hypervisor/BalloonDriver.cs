@@ -116,27 +116,12 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
 
         lock (_lock)
         {
-            // Inform hypervisor that memory has been released
-            // Production implementation would notify the hypervisor via driver-specific interfaces:
-            //
-            // VMware: Write to /sys/devices/virtual/misc/balloon/target or use vmballoon ioctl
-            //         to request balloon deflation.
-            //
-            // Hyper-V: On Windows, call SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1)
-            //          to trim the working set and return memory to the hypervisor. On Linux,
-            //          write to /sys/bus/vmbus/drivers/hv_balloon.
-            //
-            // KVM: Write to virtio-balloon control channel (/dev/vport* or via virtio driver).
-            //
-            // Xen: Write to /sys/devices/system/xen_memory/xen_memory0/target.
-            //
-            // Cross-platform alternative: Call GC.Collect() and GC.WaitForPendingFinalizers()
-            // to ensure memory is actually freed, then rely on OS memory manager to return
-            // pages to the hypervisor.
-            //
-            // Current implementation: API contract established. Actual notification requires
-            // hypervisor-specific testing. The method ensures the hypervisor is aware that
-            // the application has cooperated by releasing cache buffers.
+            // Trigger GC to ensure managed memory is actually freed, then OS memory manager
+            // returns pages to the hypervisor
+            System.Diagnostics.Debug.WriteLine(
+                $"[BalloonDriver] Reporting {bytesReleased} bytes released to hypervisor ({_hypervisorInfo.Type})");
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
         }
     }
 

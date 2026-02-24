@@ -636,7 +636,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             // If we are being suspected, refute
             if (string.Equals(targetNodeId, _self.NodeId, StringComparison.Ordinal))
             {
-                _ = RefuteSuspicionAsync(CancellationToken.None);
+                _ = RefuteSuspicionAsync(CancellationToken.None)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[SWIM] Suspicion refutation failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
                 return;
             }
 

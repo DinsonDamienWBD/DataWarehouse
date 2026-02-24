@@ -80,6 +80,9 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
     public bool IsAvailable => _isAvailable;
 
     /// <inheritdoc />
+    public bool IsCpuFallback => false;
+
+    /// <inheritdoc />
     public async Task InitializeAsync()
     {
         lock (_lock)
@@ -240,8 +243,15 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                     // Increment operation counter
                     Interlocked.Increment(ref _operationsCompleted);
 
-                    // For demo purposes, return the full output buffer
-                    // In production, read actual compressed size from results structure
+                    // Read actual compressed size from the destination flat buffer
+                    var resultBuffer = Marshal.PtrToStructure<QatNativeInterop.CpaFlatBuffer>(dstBufferList.Buffers);
+                    int compressedSize = (int)resultBuffer.DataLenInBytes;
+                    if (compressedSize > 0 && compressedSize < output.Length)
+                    {
+                        byte[] sliced = new byte[compressedSize];
+                        Buffer.BlockCopy(output, 0, sliced, 0, compressedSize);
+                        return sliced;
+                    }
                     return output;
                 }
                 finally
@@ -340,6 +350,16 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                     }
 
                     Interlocked.Increment(ref _operationsCompleted);
+
+                    // Read actual decompressed size from the destination flat buffer
+                    var decompResultBuffer = Marshal.PtrToStructure<QatNativeInterop.CpaFlatBuffer>(dstBufferList.Buffers);
+                    int decompressedSize = (int)decompResultBuffer.DataLenInBytes;
+                    if (decompressedSize > 0 && decompressedSize < output.Length)
+                    {
+                        byte[] sliced = new byte[decompressedSize];
+                        Buffer.BlockCopy(output, 0, sliced, 0, decompressedSize);
+                        return sliced;
+                    }
                     return output;
                 }
                 finally

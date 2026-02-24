@@ -130,6 +130,9 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         public abstract bool IsAvailable { get; }
 
+        /// <inheritdoc/>
+        public virtual bool IsCpuFallback => false;
+
         /// <summary>
         /// Gets whether the accelerator has been initialized.
         /// </summary>

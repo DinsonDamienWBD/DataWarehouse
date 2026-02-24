@@ -70,13 +70,8 @@ internal sealed class ObjectPipeline : RoutingPipeline
         // - Metadata query execution
         // - AD-04 canonical key resolution
         // - Replication-aware routing
-
-        return Task.FromResult(new StorageResponse
-        {
-            Success = false,
-            NodeId = "local",
-            ErrorMessage = "ObjectPipeline not yet implemented (Phase 34-02)"
-        });
+        throw new NotSupportedException(
+            "ObjectPipeline is not yet implemented. UUID-based object routing requires Phase 34-02.");
     }
 }
 
@@ -106,12 +101,7 @@ internal sealed class FilePathPipeline : RoutingPipeline
         // - Filesystem storage adapters for physical paths
         // - Network path resolution (SMB, NFS)
         // - Directory listing and filesystem metadata
-
-        return Task.FromResult(new StorageResponse
-        {
-            Success = false,
-            NodeId = "local",
-            ErrorMessage = "FilePathPipeline not yet implemented (Phase 34-02)"
-        });
+        throw new NotSupportedException(
+            "FilePathPipeline is not yet implemented. FilePath routing requires Phase 34-02.");
     }
 }

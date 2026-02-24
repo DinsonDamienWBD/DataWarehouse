@@ -26,8 +26,9 @@ namespace DataWarehouse.SDK.Federation.Orchestration;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Cluster-wide topology state")]
-public sealed class ClusterTopology
+public sealed class ClusterTopology : IDisposable
 {
+    private bool _disposed;
     private readonly BoundedDictionary<string, NodeTopology> _nodes;
     private readonly ReaderWriterLockSlim _lock;
 
@@ -141,5 +142,17 @@ public sealed class ClusterTopology
             topology.AddOrUpdateNode(node);
         }
         return topology;
+    }
+
+    /// <summary>
+    /// Disposes the ReaderWriterLockSlim used for thread-safe topology access.
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            _lock.Dispose();
+        }
     }
 }

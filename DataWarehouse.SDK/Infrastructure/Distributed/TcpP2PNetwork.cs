@@ -68,14 +68,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             // Security: Warn when mTLS is disabled (DIST-05, AUTH-06)
             if (!_config.EnableMutualTls)
             {
-                Console.WriteLine("[P2P-SECURITY-WARNING] mTLS is DISABLED. Inter-node communication is NOT authenticated. " +
+                System.Diagnostics.Debug.WriteLine("[P2P-SECURITY-WARNING] mTLS is DISABLED. Inter-node communication is NOT authenticated. " +
                     "This should only be used in development/testing environments.");
             }
 
             // Security: Warn when self-signed certificates are allowed
             if (_config.AllowSelfSignedCertificates)
             {
-                Console.WriteLine("[P2P-SECURITY-WARNING] Self-signed certificates are ALLOWED. " +
+                System.Diagnostics.Debug.WriteLine("[P2P-SECURITY-WARNING] Self-signed certificates are ALLOWED. " +
                     "This bypasses CA validation and should only be used in development/testing environments.");
             }
 
@@ -472,7 +472,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             switch (message.MessageType)
             {
                 case "Data":
-                    // Handle data message (could fire event or queue)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[TcpP2P] Data message received from {message.SenderId}, payload size: {message.Payload?.Length ?? 0} bytes");
                     break;
 
                 case "Request":

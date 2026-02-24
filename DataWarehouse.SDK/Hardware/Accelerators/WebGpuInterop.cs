@@ -407,6 +407,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public bool IsAvailable => _isAvailable;
 
         /// <inheritdoc/>
+        public bool IsCpuFallback => _isAvailable;
+
+        /// <inheritdoc/>
         public GpuRuntime Runtime => GpuRuntime.None; // WebGPU abstracts over multiple backends
 
         /// <inheritdoc/>

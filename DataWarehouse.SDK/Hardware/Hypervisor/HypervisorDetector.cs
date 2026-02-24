@@ -310,12 +310,51 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static string? DetectVersion(HypervisorType type)
     {
-        // Version detection is complex and platform-specific
-        // For Phase 35: return null
-        // Future work: query hypervisor-specific APIs for version
-        // - VMware: CPUID leaf 0x40000001 for version info
-        // - Hyper-V: WMI Win32_ComputerSystem.Model
-        // - KVM: /proc/version or kernel module version
+        if (type == HypervisorType.None) return null;
+
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // Try /sys/hypervisor/version/major and /sys/hypervisor/version/minor (Xen)
+                const string majorPath = "/sys/hypervisor/version/major";
+                const string minorPath = "/sys/hypervisor/version/minor";
+                if (File.Exists(majorPath) && File.Exists(minorPath))
+                {
+                    string major = File.ReadAllText(majorPath).Trim();
+                    string minor = File.ReadAllText(minorPath).Trim();
+                    return $"{major}.{minor}";
+                }
+
+                // Try DMI product_name for version hints
+                const string dmiProductPath = "/sys/class/dmi/id/product_name";
+                if (File.Exists(dmiProductPath))
+                {
+                    return File.ReadAllText(dmiProductPath).Trim();
+                }
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Try WMI via registry for Hyper-V
+                if (type == HypervisorType.HyperV)
+                {
+                    try
+                    {
+                        using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                            @"SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters");
+                        if (key != null)
+                        {
+                            return key.GetValue("HostName")?.ToString();
+                        }
+                    }
+                    catch { /* Best-effort version detection */ }
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort version detection - return null on any failure
+        }
 
         return null;
     }

@@ -81,8 +81,17 @@ namespace DataWarehouse.SDK.Edge.Inference
                     break;
             }
 
-            // Load model
-            var onnxSession = new Microsoft.ML.OnnxRuntime.InferenceSession(modelPath, sessionOptions);
+            // Load model (wrap in try/catch to prevent session leak on failure)
+            Microsoft.ML.OnnxRuntime.InferenceSession onnxSession;
+            try
+            {
+                onnxSession = new Microsoft.ML.OnnxRuntime.InferenceSession(modelPath, sessionOptions);
+            }
+            catch
+            {
+                sessionOptions.Dispose();
+                throw;
+            }
             var session = new OnnxInferenceSession(modelPath, onnxSession);
 
             // Evict oldest session if cache is full

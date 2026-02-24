@@ -30,8 +30,9 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Raft state machine for manifest")]
-internal sealed class ManifestStateMachine
+internal sealed class ManifestStateMachine : IDisposable
 {
+    private bool _disposed;
     private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _index;
     private readonly ReaderWriterLockSlim _lock;
 
@@ -219,6 +220,18 @@ internal sealed class ManifestStateMachine
         finally
         {
             _lock.ExitReadLock();
+        }
+    }
+
+    /// <summary>
+    /// Disposes the ReaderWriterLockSlim used for thread-safe manifest access.
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            _lock.Dispose();
         }
     }
 }

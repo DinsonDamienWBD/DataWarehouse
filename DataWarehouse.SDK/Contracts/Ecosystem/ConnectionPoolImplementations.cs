@@ -108,13 +108,21 @@ public abstract class ConnectionPoolBase<TConnection> : IConnectionPool<TConnect
         _globalGate = new SemaphoreSlim(_options.MaxTotalConnections, _options.MaxTotalConnections);
 
         _healthCheckTimer = new Timer(
-            _ => _ = RunHealthChecksAsync(),
+            _ =>
+            {
+                try { _ = RunHealthChecksAsync(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[ConnectionPool] Health check failed: {ex.Message}"); }
+            },
             null,
             _options.HealthCheckInterval,
             _options.HealthCheckInterval);
 
         _idleEvictionTimer = new Timer(
-            _ => _ = RunIdleEvictionAsync(),
+            _ =>
+            {
+                try { _ = RunIdleEvictionAsync(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[ConnectionPool] Idle eviction failed: {ex.Message}"); }
+            },
             null,
             _options.IdleTimeout,
             TimeSpan.FromSeconds(Math.Max(30, _options.IdleTimeout.TotalSeconds / 2)));

@@ -146,7 +146,10 @@ namespace DataWarehouse.SDK.Hardware
             // Check staleness and trigger background refresh if needed
             if (IsCacheStale())
             {
-                _ = RefreshAsync();
+                _ = RefreshAsync()
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             _cacheLock.EnterReadLock();
@@ -175,7 +178,10 @@ namespace DataWarehouse.SDK.Hardware
             // Check staleness and trigger background refresh if needed
             if (IsCacheStale())
             {
-                _ = RefreshAsync();
+                _ = RefreshAsync()
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             _cacheLock.EnterReadLock();
@@ -204,7 +210,10 @@ namespace DataWarehouse.SDK.Hardware
             // Check staleness and trigger background refresh if needed
             if (IsCacheStale())
             {
-                _ = RefreshAsync();
+                _ = RefreshAsync()
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             _cacheLock.EnterReadLock();
@@ -233,7 +242,10 @@ namespace DataWarehouse.SDK.Hardware
             // Check staleness and trigger background refresh if needed
             if (IsCacheStale())
             {
-                _ = RefreshAsync();
+                _ = RefreshAsync()
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             _cacheLock.EnterReadLock();
@@ -262,7 +274,10 @@ namespace DataWarehouse.SDK.Hardware
             // Check staleness and trigger background refresh if needed
             if (IsCacheStale())
             {
-                _ = RefreshAsync();
+                _ = RefreshAsync()
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             _cacheLock.EnterReadLock();
@@ -367,7 +382,10 @@ namespace DataWarehouse.SDK.Hardware
                 await RefreshAsync(ct);
 
             if (IsCacheStale())
-                _ = RefreshAsync(ct);
+                _ = RefreshAsync(ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
 
             _cacheLock.EnterReadLock();
             try { return _capabilities.Contains(capabilityKey); }
@@ -383,7 +401,10 @@ namespace DataWarehouse.SDK.Hardware
                 await RefreshAsync(ct);
 
             if (IsCacheStale())
-                _ = RefreshAsync(ct);
+                _ = RefreshAsync(ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
 
             _cacheLock.EnterReadLock();
             try { return _devices.Where(d => d.Type.HasFlag(typeFilter)).ToList().AsReadOnly(); }
@@ -399,7 +420,10 @@ namespace DataWarehouse.SDK.Hardware
                 await RefreshAsync(ct);
 
             if (IsCacheStale())
-                _ = RefreshAsync(ct);
+                _ = RefreshAsync(ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
 
             _cacheLock.EnterReadLock();
             try { return _devices; }
@@ -415,7 +439,10 @@ namespace DataWarehouse.SDK.Hardware
                 await RefreshAsync(ct);
 
             if (IsCacheStale())
-                _ = RefreshAsync(ct);
+                _ = RefreshAsync(ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
 
             _cacheLock.EnterReadLock();
             try { return _capabilities.ToList().AsReadOnly(); }
@@ -431,7 +458,10 @@ namespace DataWarehouse.SDK.Hardware
                 await RefreshAsync(ct);
 
             if (IsCacheStale())
-                _ = RefreshAsync(ct);
+                _ = RefreshAsync(ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
 
             _cacheLock.EnterReadLock();
             try { return _devices.Count(d => d.Type.HasFlag(typeFilter)); }
@@ -489,7 +519,10 @@ namespace DataWarehouse.SDK.Hardware
             {
                 _debounceTimer?.Dispose();
                 _debounceTimer = new Timer(
-                    callback: _ => _ = RefreshAsync(CancellationToken.None),
+                    callback: _ => _ = RefreshAsync(CancellationToken.None)
+                        .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                            $"[PlatformCapabilityRegistry] Timer refresh failed: {t.Exception?.InnerException?.Message}"),
+                            TaskContinuationOptions.OnlyOnFaulted),
                     state: null,
                     dueTime: _options.HardwareChangeDebounce,
                     period: Timeout.InfiniteTimeSpan);

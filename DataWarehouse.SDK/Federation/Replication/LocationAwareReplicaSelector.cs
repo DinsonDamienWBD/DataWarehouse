@@ -185,9 +185,16 @@ public sealed class LocationAwareReplicaSelector : IReplicaSelector
     {
         if (_raft == null) return null;
 
-        // Query Raft for current leader
-        // Placeholder: IConsensusEngine does not currently expose GetLeaderNodeId()
-        // Future work: extend consensus interface with leader discovery
-        return await Task.FromResult<string?>(null);
+        // Check if this node is the Raft leader
+        if (_raft.IsLeader)
+        {
+            // Return self node ID from topology
+            var self = await _topology.GetSelfTopologyAsync(ct).ConfigureAwait(false);
+            return self?.NodeId;
+        }
+
+        // Current node is not leader; IConsensusEngine does not expose leader discovery.
+        // For strong consistency, callers should retry on the leader node.
+        return null;
     }
 }

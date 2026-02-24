@@ -120,6 +120,12 @@ namespace DataWarehouse.SDK.Hardware
         bool IsAvailable { get; }
 
         /// <summary>
+        /// Gets whether this accelerator is using a CPU-based fallback implementation
+        /// rather than actual hardware acceleration.
+        /// </summary>
+        bool IsCpuFallback { get; }
+
+        /// <summary>
         /// Initializes the hardware accelerator.
         /// </summary>
         /// <returns>A task representing the initialization operation.</returns>

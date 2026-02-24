@@ -105,7 +105,10 @@ public sealed class BackgroundMigrationEngine : IMigrationEngine, IDisposable
         var checkpoint = await _checkpointStore.LoadCheckpointAsync(jobId, ct);
 
         // Start background execution
-        _ = Task.Run(() => ExecuteMigrationAsync(state, checkpoint), state.Cts.Token);
+        _ = Task.Run(() => ExecuteMigrationAsync(state, checkpoint), state.Cts.Token)
+            .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                $"[BackgroundMigrationEngine] Migration job {jobId} failed: {t.Exception?.InnerException?.Message}"),
+                TaskContinuationOptions.OnlyOnFaulted);
 
         return job with { Status = MigrationStatus.InProgress, StartedUtc = now };
     }
@@ -302,7 +305,10 @@ public sealed class BackgroundMigrationEngine : IMigrationEngine, IDisposable
     public void Dispose()
     {
         foreach (var state in _jobs.Values)
+        {
+            try { state.Cts.Cancel(); } catch { /* Best-effort cancel before dispose */ }
             state.Cts.Dispose();
+        }
     }
 
     private sealed class MigrationJobState

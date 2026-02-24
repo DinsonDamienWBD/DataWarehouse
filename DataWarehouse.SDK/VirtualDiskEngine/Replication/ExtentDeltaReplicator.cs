@@ -139,10 +139,20 @@ public sealed class ExtentDeltaReplicator
     /// <param name="sinceTransactionId">Baseline transaction ID to compute changes from.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A <see cref="ReplicationDelta"/> with all changed extents and their data.</returns>
-    public async Task<ReplicationDelta> ComputeDeltaAsync(long sinceTransactionId, CancellationToken ct = default)
+    public Task<ReplicationDelta> ComputeDeltaAsync(long sinceTransactionId, CancellationToken ct = default)
     {
-        // Use the MVCC manager's current sequence as the upper bound
-        long untilTransactionId = sinceTransactionId + 1;
+        // Single-arg overload is ambiguous without an upper bound transaction ID.
+        // Callers must use the two-arg overload ComputeDeltaAsync(sinceTransactionId, untilTransactionId, ct).
+        throw new NotSupportedException(
+            "Use the two-argument overload ComputeDeltaAsync(sinceTransactionId, untilTransactionId, ct) " +
+            "to specify the upper bound transaction ID explicitly.");
+    }
+
+    /// <summary>
+    /// Computes a replication delta containing all extents modified between two transaction IDs.
+    /// </summary>
+    public async Task<ReplicationDelta> ComputeDeltaAsync(long sinceTransactionId, long untilTransactionId, CancellationToken ct = default)
+    {
 
         // Collect changed extents from the device by scanning committed transaction logs
         // In a production system, the MVCC version store maintains a change log indexed by transaction ID.
