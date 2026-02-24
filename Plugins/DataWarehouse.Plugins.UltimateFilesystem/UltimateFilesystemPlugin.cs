@@ -67,9 +67,10 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     /// Semantic description of this plugin for AI discovery.
     /// </summary>
     public string SemanticDescription =>
-        "Ultimate filesystem plugin providing polymorphic storage engine with auto-detect drivers. " +
+        "Ultimate filesystem plugin providing polymorphic storage engine with auto-detect drivers, " +
+        "physical device discovery, SMART health monitoring, failure prediction, and device pool management. " +
         "Supports Windows (NTFS, ReFS), Linux (ext4, btrfs, XFS, ZFS), macOS (APFS), cloud containers, " +
-        "kernel-bypass I/O, and unified block abstraction for consistent performance across environments.";
+        "kernel-bypass I/O, unified block abstraction, hot-swap, and bare-metal bootstrap.";
 
     /// <summary>
     /// Semantic tags for AI discovery and categorization.
@@ -77,7 +78,8 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     public string[] SemanticTags =>
     [
         "filesystem", "storage", "ntfs", "ext4", "btrfs", "zfs", "apfs",
-        "block-device", "io", "kernel-bypass", "auto-detect"
+        "block-device", "io", "kernel-bypass", "auto-detect",
+        "device-discovery", "smart", "device-pool", "hot-swap", "bare-metal"
     ];
 
     /// <summary>
@@ -144,7 +146,18 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
             new() { Name = "filesystem.list-strategies", DisplayName = "List Strategies", Description = "List available filesystem strategies" },
             new() { Name = "filesystem.stats", DisplayName = "Statistics", Description = "Get filesystem statistics" },
             new() { Name = "filesystem.quota", DisplayName = "Set Quota", Description = "Set space quota" },
-            new() { Name = "filesystem.optimize", DisplayName = "Optimize", Description = "Optimize filesystem for workload" }
+            new() { Name = "filesystem.optimize", DisplayName = "Optimize", Description = "Optimize filesystem for workload" },
+            // Device management capabilities (Phase 90)
+            new() { Name = "device.discover", DisplayName = "Discover Devices", Description = "Enumerate physical storage devices" },
+            new() { Name = "device.topology", DisplayName = "Device Topology", Description = "Build controller->bus->device tree" },
+            new() { Name = "device.health", DisplayName = "Device Health", Description = "Get SMART health for a device" },
+            new() { Name = "device.predict", DisplayName = "Failure Prediction", Description = "Predict device failure risk" },
+            new() { Name = "device.pool.create", DisplayName = "Create Pool", Description = "Create named device pool" },
+            new() { Name = "device.pool.list", DisplayName = "List Pools", Description = "List all device pools" },
+            new() { Name = "device.pool.delete", DisplayName = "Delete Pool", Description = "Delete a device pool" },
+            new() { Name = "device.bootstrap", DisplayName = "Bare-Metal Bootstrap", Description = "Initialize from raw devices" },
+            new() { Name = "device.hotswap.start", DisplayName = "Start Hot-Swap", Description = "Enable hot-swap monitoring" },
+            new() { Name = "device.hotswap.stop", DisplayName = "Stop Hot-Swap", Description = "Disable hot-swap monitoring" }
         ];
     }
 
@@ -161,6 +174,9 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
         metadata["TotalBytesRead"] = Interlocked.Read(ref _totalBytesRead);
         metadata["TotalBytesWritten"] = Interlocked.Read(ref _totalBytesWritten);
         metadata["KernelBypassEnabled"] = _kernelBypassEnabled;
+        metadata["BlockStrategies"] = GetStrategiesByCategory(FilesystemStrategyCategory.Block).Count;
+        metadata["DeviceStrategies"] = new[] { "device-discovery", "device-health", "device-pool" }
+            .Count(id => _registry.Get(id) != null);
         return metadata;
     }
 
@@ -179,6 +195,17 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
             "filesystem.stats" => HandleStatsAsync(message),
             "filesystem.quota" => HandleQuotaAsync(message),
             "filesystem.optimize" => HandleOptimizeAsync(message),
+            // Device management handlers (Phase 90)
+            "device.discover" => HandleDeviceDiscoverAsync(message),
+            "device.topology" => HandleDeviceTopologyAsync(message),
+            "device.health" => HandleDeviceHealthAsync(message),
+            "device.predict" => HandleDevicePredictAsync(message),
+            "device.pool.create" => HandleDevicePoolCreateAsync(message),
+            "device.pool.list" => HandleDevicePoolListAsync(message),
+            "device.pool.delete" => HandleDevicePoolDeleteAsync(message),
+            "device.bootstrap" => HandleDeviceBootstrapAsync(message),
+            "device.hotswap.start" => HandleDeviceHotswapStartAsync(message),
+            "device.hotswap.stop" => HandleDeviceHotswapStopAsync(message),
             _ => base.OnMessageAsync(message)
         };
     }
@@ -453,6 +480,335 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
         message.Payload["success"] = true;
         message.Payload["recommendedStrategy"] = recommendedStrategy;
         return Task.CompletedTask;
+    }
+
+    #endregion
+
+    #region Device Management Handlers
+
+    private async Task HandleDeviceDiscoverAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-discovery") as Strategies.DeviceDiscoveryStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device discovery strategy not available";
+                return;
+            }
+
+            var devices = await strategy.DiscoverAsync(null, CancellationToken.None).ConfigureAwait(false);
+            var deviceList = devices.Select(d => new Dictionary<string, object>
+            {
+                ["deviceId"] = d.DeviceId,
+                ["devicePath"] = d.DevicePath,
+                ["model"] = d.ModelNumber,
+                ["serial"] = d.SerialNumber,
+                ["mediaType"] = d.MediaType.ToString(),
+                ["busType"] = d.BusType.ToString(),
+                ["capacityBytes"] = d.CapacityBytes,
+                ["supportsTrim"] = d.SupportsTrim
+            }).ToList();
+
+            message.Payload["success"] = true;
+            message.Payload["devices"] = deviceList;
+            message.Payload["count"] = deviceList.Count;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDeviceTopologyAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-discovery") as Strategies.DeviceDiscoveryStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device discovery strategy not available";
+                return;
+            }
+
+            var devices = await strategy.DiscoverAsync(null, CancellationToken.None).ConfigureAwait(false);
+            var tree = strategy.BuildTopology(devices);
+            var numaAffinity = strategy.GetNumaAffinity(tree);
+
+            message.Payload["success"] = true;
+            message.Payload["controllerCount"] = tree.ControllerCount;
+            message.Payload["deviceCount"] = tree.DeviceCount;
+            message.Payload["numaNodeCount"] = tree.NumaNodeCount;
+            message.Payload["builtUtc"] = tree.BuiltUtc.ToString("O");
+            message.Payload["numaAffinity"] = numaAffinity.Select(n => new Dictionary<string, object>
+            {
+                ["numaNode"] = n.NumaNode,
+                ["deviceIds"] = n.DeviceIds.ToList(),
+                ["cpuCores"] = n.CpuCores.ToList()
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDeviceHealthAsync(PluginMessage message)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("devicePath", out var pathObj) || pathObj is not string devicePath)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing 'devicePath' parameter";
+                return;
+            }
+
+            var busTypeStr = message.Payload.TryGetValue("busType", out var btObj) && btObj is string bt ? bt : "Unknown";
+            if (!Enum.TryParse<SDK.VirtualDiskEngine.PhysicalDevice.BusType>(busTypeStr, true, out var busType))
+            {
+                busType = SDK.VirtualDiskEngine.PhysicalDevice.BusType.Unknown;
+            }
+
+            var strategy = _registry.Get("device-health") as Strategies.DeviceHealthStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device health strategy not available";
+                return;
+            }
+
+            var health = await strategy.GetHealthAsync(devicePath, busType, CancellationToken.None).ConfigureAwait(false);
+
+            message.Payload["success"] = true;
+            message.Payload["isHealthy"] = health.IsHealthy;
+            message.Payload["temperatureCelsius"] = health.TemperatureCelsius;
+            message.Payload["wearLevelPercent"] = health.WearLevelPercent;
+            message.Payload["totalBytesWritten"] = health.TotalBytesWritten;
+            message.Payload["totalBytesRead"] = health.TotalBytesRead;
+            message.Payload["uncorrectableErrors"] = health.UncorrectableErrors;
+            message.Payload["reallocatedSectors"] = health.ReallocatedSectors;
+            message.Payload["powerOnHours"] = health.PowerOnHours;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDevicePredictAsync(PluginMessage message)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("deviceId", out var idObj) || idObj is not string deviceId)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing 'deviceId' parameter";
+                return;
+            }
+
+            var strategy = _registry.Get("device-health") as Strategies.DeviceHealthStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device health strategy not available";
+                return;
+            }
+
+            // Get health first, then predict
+            var devicePath = message.Payload.TryGetValue("devicePath", out var pathObj) && pathObj is string dp
+                ? dp : deviceId;
+            var busTypeStr = message.Payload.TryGetValue("busType", out var btObj) && btObj is string bt ? bt : "Unknown";
+            Enum.TryParse<SDK.VirtualDiskEngine.PhysicalDevice.BusType>(busTypeStr, true, out var busType);
+
+            var health = await strategy.GetHealthAsync(devicePath, busType, CancellationToken.None).ConfigureAwait(false);
+            var prediction = strategy.GetPrediction(deviceId, health);
+
+            message.Payload["success"] = true;
+            message.Payload["isAtRisk"] = prediction.IsAtRisk;
+            message.Payload["riskLevel"] = prediction.RiskLevel;
+            message.Payload["riskFactors"] = prediction.RiskFactors.ToList();
+            if (prediction.EstimatedTimeToFailure.HasValue)
+            {
+                message.Payload["estimatedTimeToFailureHours"] = prediction.EstimatedTimeToFailure.Value.TotalHours;
+            }
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private Task HandleDevicePoolCreateAsync(PluginMessage message)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("poolName", out var nameObj) || nameObj is not string poolName)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing 'poolName' parameter";
+                return Task.CompletedTask;
+            }
+
+            // Pool creation requires IPhysicalBlockDevice instances which are not available
+            // through the message bus alone. The handler validates parameters and reports
+            // that device references must be provided programmatically.
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Pool creation requires IPhysicalBlockDevice references. " +
+                "Use DevicePoolStrategy.CreatePoolAsync programmatically with device instances.";
+            message.Payload["poolName"] = poolName;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleDevicePoolListAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-pool") as Strategies.DevicePoolStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device pool strategy not available";
+                return;
+            }
+
+            var pools = await strategy.GetPoolsAsync().ConfigureAwait(false);
+            var poolList = pools.Select(p => new Dictionary<string, object>
+            {
+                ["poolId"] = p.PoolId.ToString(),
+                ["poolName"] = p.PoolName,
+                ["tier"] = p.Tier.ToString(),
+                ["memberCount"] = p.Members.Count,
+                ["totalCapacityBytes"] = p.TotalCapacityBytes,
+                ["usableCapacityBytes"] = p.UsableCapacityBytes,
+                ["createdUtc"] = p.CreatedUtc.ToString("O")
+            }).ToList();
+
+            message.Payload["success"] = true;
+            message.Payload["pools"] = poolList;
+            message.Payload["count"] = poolList.Count;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDevicePoolDeleteAsync(PluginMessage message)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("poolId", out var idObj) || idObj is not string poolIdStr
+                || !Guid.TryParse(poolIdStr, out var poolId))
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Missing or invalid 'poolId' parameter";
+                return;
+            }
+
+            var strategy = _registry.Get("device-pool") as Strategies.DevicePoolStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device pool strategy not available";
+                return;
+            }
+
+            await strategy.DeletePoolAsync(poolId, CancellationToken.None).ConfigureAwait(false);
+
+            message.Payload["success"] = true;
+            message.Payload["deletedPoolId"] = poolIdStr;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDeviceBootstrapAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-pool") as Strategies.DevicePoolStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device pool strategy not available";
+                return;
+            }
+
+            var result = await strategy.BootstrapAsync(CancellationToken.None).ConfigureAwait(false);
+
+            message.Payload["success"] = result.Success;
+            message.Payload["restoredPoolCount"] = result.RestoredPools.Count;
+            message.Payload["unpooledDeviceCount"] = result.UnpooledDevices.Count;
+            message.Payload["recoveredIntentCount"] = result.RecoveredIntents.Count;
+            message.Payload["warnings"] = result.Warnings.ToList();
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDeviceHotswapStartAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-pool") as Strategies.DevicePoolStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device pool strategy not available";
+                return;
+            }
+
+            await strategy.StartHotSwapAsync(CancellationToken.None).ConfigureAwait(false);
+            message.Payload["success"] = true;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private async Task HandleDeviceHotswapStopAsync(PluginMessage message)
+    {
+        try
+        {
+            var strategy = _registry.Get("device-pool") as Strategies.DevicePoolStrategy;
+            if (strategy == null)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = "Device pool strategy not available";
+                return;
+            }
+
+            await strategy.StopHotSwapAsync().ConfigureAwait(false);
+            message.Payload["success"] = true;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
     }
 
     #endregion
