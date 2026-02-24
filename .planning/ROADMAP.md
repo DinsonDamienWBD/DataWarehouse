@@ -2171,6 +2171,14 @@ Plans:
 - [ ] 90-05-PLAN.md -- Hot-swap and bare-metal bootstrap: graceful device add/remove, rebuild trigger, OS-free pool initialization, device-level journaling
 - [ ] 90-06-PLAN.md -- UltimateFilesystem integration: wire DeviceDiscovery + PhysicalDeviceManager + DevicePoolManager as filesystem strategies, message bus events for device lifecycle
 
+Wave structure:
+```
+Wave 1: 90-01 (IPhysicalBlockDevice + discovery) -- foundation
+Wave 2: 90-02 (SMART health) + 90-03 (pools) + 90-04 (topology) -- parallel, all depend on 90-01
+Wave 3: 90-05 (hot-swap + bootstrap, needs 90-02 + 90-03)
+Wave 4: 90-06 (UltimateFilesystem integration, needs all previous)
+```
+
 #### Phase 91: CompoundBlockDevice & Device-Level RAID
 **Goal**: Multiple physical devices are presented as a single IBlockDevice to VDE via CompoundBlockDevice. UltimateRAID strategies operate at the device level (not just data blob level), providing RAID 0/1/5/6/10 + erasure coding across physical devices. This is the "RAID at two levels" architecture: device-level RAID for physical redundancy, data-level RAID (existing) for logical redundancy.
 **Depends on**: Phase 90 (Device Discovery)
