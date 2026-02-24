@@ -840,8 +840,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
         private string GenerateChecksum(string cartridgeBarcode, string key)
         {
-            var hash = HashCode.Combine(cartridgeBarcode, key, DateTime.UtcNow.Ticks);
-            return hash.ToString("x");
+            var input = $"{cartridgeBarcode}:{key}";
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input));
+            return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
         }
 
         private async Task<string> CalculateFileChecksumAsync(string filePath, CancellationToken ct)
@@ -892,7 +893,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     await UnloadCartridgeAsync(CancellationToken.None);
                 }
-                catch { /* Best-effort cleanup — failure is non-fatal */ }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[OdaStrategy] Cleanup cartridge unload failed: {ex.Message}"); }
             }
 
             // Save catalog

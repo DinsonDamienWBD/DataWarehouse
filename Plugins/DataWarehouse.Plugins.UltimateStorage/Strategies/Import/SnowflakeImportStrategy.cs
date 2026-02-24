@@ -17,6 +17,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         public override string StrategyId => "snowflake-import";
         public override string Name => "Snowflake Import";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Cold;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, SupportsTiering = true, ConsistencyModel = ConsistencyModel.Strong };

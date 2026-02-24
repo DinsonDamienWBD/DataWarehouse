@@ -244,7 +244,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     Size = data.Length,
                     Created = DateTime.UtcNow,
                     Modified = DateTime.UtcNow,
-                    ETag = $"\"{HashCode.Combine(key, result.GetHashCode()):x}\"",
+                    ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{key}:{result}"))).Substring(0, 16)}\"",
                     ContentType = "application/graphql",
                     CustomMetadata = new Dictionary<string, string>
                     {
@@ -382,7 +382,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                             Size = 0,
                             Created = DateTime.MinValue,
                             Modified = DateTime.UtcNow,
-                            ETag = $"\"{HashCode.Combine(name):x}\"",
+                            ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name))).Substring(0, 16)}\"",
                             ContentType = "application/graphql",
                             Tier = Tier
                         };
@@ -410,7 +410,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = 0,
                 Created = DateTime.MinValue,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(key):x}\"",
+                ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))).Substring(0, 16)}\"",
                 ContentType = "application/graphql",
                 CustomMetadata = new Dictionary<string, string>
                 {

@@ -928,8 +928,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         /// </summary>
         private string GenerateETag(byte[] content)
         {
-            using var md5 = System.Security.Cryptography.MD5.Create();
-            var hash = md5.ComputeHash(content);
+            var hash = System.Security.Cryptography.SHA256.HashData(content);
             return Convert.ToHexString(hash).ToLowerInvariant();
         }
 

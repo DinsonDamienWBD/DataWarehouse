@@ -761,8 +761,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         /// </summary>
         private string GenerateETag(string key, long value)
         {
-            var hash = HashCode.Combine(key, value, DateTime.UtcNow.Ticks);
-            return $"\"{hash:x}\"";
+            var input = $"{key}:{value}";
+            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16];
+            return $"\"{hash}\"";
         }
 
         protected override int GetMaxKeyLength() => 512;

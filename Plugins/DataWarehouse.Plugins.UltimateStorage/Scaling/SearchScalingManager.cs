@@ -1069,10 +1069,10 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
 
         if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
         {
-            var oldSemaphore = _searchSemaphore;
-            _searchSemaphore = new SemaphoreSlim(
+            var newSemaphore = new SemaphoreSlim(
                 limits.MaxConcurrentOperations,
                 limits.MaxConcurrentOperations);
+            var oldSemaphore = Interlocked.Exchange(ref _searchSemaphore, newSemaphore);
             oldSemaphore.Dispose();
         }
 

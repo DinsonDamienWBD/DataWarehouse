@@ -605,39 +605,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
         }
 
-        private async Task RefreshDiscInventoryViaScsiAsync(CancellationToken ct)
+        private Task RefreshDiscInventoryViaScsiAsync(CancellationToken ct)
         {
-            // SCSI/ATAPI command implementation for jukebox inventory
-            // Send READ ELEMENT STATUS command to changer device
-            // This requires low-level SCSI command construction
-
-            await Task.Run(() =>
-            {
-                // Placeholder for SCSI passthrough implementation
-                // Would use DeviceIoControl with IOCTL_SCSI_PASS_THROUGH_DIRECT
-                // to send commands to the jukebox changer mechanism
-
-                // For now, simulate a basic inventory
-                for (int i = 1; i <= 10; i++)
-                {
-                    var volumeId = $"DISC{i:D4}";
-                    if (!_discInventory.ContainsKey(volumeId))
-                    {
-                        _discInventory[volumeId] = new BluRayDiscInfo
-                        {
-                            VolumeId = volumeId,
-                            DiscType = _discType,
-                            SlotNumber = i,
-                            IsLoaded = false,
-                            UsedCapacity = 0,
-                            ObjectCount = 0,
-                            IsWorm = _discType != BluRayDiscType.BDRE,
-                            DiscNumber = i,
-                            LastWriteTime = null
-                        };
-                    }
-                }
-            }, ct);
+            // SCSI/ATAPI READ ELEMENT STATUS command requires hardware passthrough
+            // which is platform-specific and requires elevated permissions.
+            throw new PlatformNotSupportedException(
+                "SCSI passthrough disc inventory requires hardware-level access. " +
+                "Use UseVendorApi=true with VendorApiEndpoint configured instead.");
         }
 
         private async Task LoadDiscAsync(string volumeId, CancellationToken ct)
@@ -736,23 +710,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task LoadDiscViaScsiAsync(int slotNumber, CancellationToken ct)
+        private Task LoadDiscViaScsiAsync(int slotNumber, CancellationToken ct)
         {
-            await Task.Run(() =>
-            {
-                // SCSI MOVE MEDIUM command to move disc from slot to drive
-                // This would use SCSI passthrough with appropriate CDB (Command Descriptor Block)
-                // Placeholder implementation
-            }, ct);
+            throw new PlatformNotSupportedException(
+                "SCSI MOVE MEDIUM command requires hardware passthrough. " +
+                "Use UseVendorApi=true with VendorApiEndpoint configured instead.");
         }
 
-        private async Task UnloadDiscViaScsiAsync(CancellationToken ct)
+        private Task UnloadDiscViaScsiAsync(CancellationToken ct)
         {
-            await Task.Run(() =>
-            {
-                // SCSI MOVE MEDIUM command to move disc from drive back to slot
-                // Placeholder implementation
-            }, ct);
+            throw new PlatformNotSupportedException(
+                "SCSI MOVE MEDIUM command requires hardware passthrough. " +
+                "Use UseVendorApi=true with VendorApiEndpoint configured instead.");
         }
 
         #endregion
@@ -1045,14 +1014,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
         private string GenerateETag(BluRayCatalogEntry entry)
         {
-            var hash = HashCode.Combine(entry.DiscVolumeId, entry.Key, entry.StoredAt.Ticks, entry.Size);
-            return hash.ToString("x");
+            var input = $"{entry.DiscVolumeId}:{entry.Key}:{entry.StoredAt.Ticks}:{entry.Size}";
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16].ToLowerInvariant();
         }
 
         private string GenerateETag(string discVolumeId, string key)
         {
-            var hash = HashCode.Combine(discVolumeId, key, DateTime.UtcNow.Ticks);
-            return hash.ToString("x");
+            var input = $"{discVolumeId}:{key}";
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16].ToLowerInvariant();
         }
 
         private string? GetContentType(string key)
@@ -1113,7 +1084,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     process.Kill();
                 }
-                catch { /* Best-effort process termination — failure is non-fatal */ }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[BluRayJukeboxStrategy] Process termination failed: {ex.Message}"); }
                 throw new TimeoutException($"Command '{command} {arguments}' timed out after {timeout.Value.TotalSeconds} seconds");
             }
 
@@ -1145,7 +1116,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     await UnloadDiscAsync(CancellationToken.None);
                 }
-                catch { /* Best-effort cleanup — failure is non-fatal */ }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[BluRayJukeboxStrategy] Cleanup disc unload failed: {ex.Message}"); }
             }
 
             // Close drive handle

@@ -1031,7 +1031,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             if (timeSinceLastGc.TotalMinutes >= _gcIntervalMinutes)
             {
                 // Run GC in background
-                _ = Task.Run(async () => await RunGarbageCollectionAsync(ct), ct);
+                _ = Task.Run(async () => await RunGarbageCollectionAsync(ct), ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[IpfsStrategy] Background GC failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
         }
 

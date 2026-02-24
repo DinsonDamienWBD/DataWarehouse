@@ -23,6 +23,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         public override string StrategyId => "sqlserver-import";
         public override string Name => "SQL Server Bulk Import";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Warm;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities

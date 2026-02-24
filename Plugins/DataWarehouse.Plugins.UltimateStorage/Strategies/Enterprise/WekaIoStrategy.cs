@@ -1040,7 +1040,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         /// </summary>
         private string CalculateETag(string key, DateTime modified)
         {
-            return HashCode.Combine(key, modified.Ticks).ToString("x8");
+            var input = $"{key}:{modified.Ticks}";
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16].ToLowerInvariant();
         }
 
         protected override int GetMaxKeyLength() => 255; // POSIX filename length limit

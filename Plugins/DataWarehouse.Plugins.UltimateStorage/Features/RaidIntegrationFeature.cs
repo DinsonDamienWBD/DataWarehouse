@@ -484,8 +484,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     result.AddRange(ms.ToArray());
                     stripeIndex++;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[RaidIntegrationFeature] Stripe read failed at index {stripeIndex}: {ex.Message}");
                     break; // No more stripes
                 }
             }
@@ -509,8 +510,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         return ms.ToArray();
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[RaidIntegrationFeature] Mirror read from {backendId} failed: {ex.Message}");
                     continue; // Try next mirror
                 }
             }
@@ -598,9 +600,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 await _messageBus.PublishAsync(RaidPluginTopic, message);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore message bus errors
+                System.Diagnostics.Debug.WriteLine($"[RaidIntegrationFeature] Message bus publish failed: {ex.Message}");
             }
         }
 

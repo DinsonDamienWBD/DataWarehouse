@@ -323,8 +323,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                             RecordLatency(strategy.StrategyId, sw.Elapsed.TotalMilliseconds);
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[LatencyBasedSelectionFeature] Health check failed for {strategy.StrategyId}: {ex.Message}");
                         var profile = GetOrCreateProfile(strategy.StrategyId);
                         profile.IsHealthy = false;
                         profile.LastHealthCheck = DateTime.UtcNow;
@@ -332,9 +333,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Log error but don't crash the timer
+                System.Diagnostics.Debug.WriteLine($"[LatencyBasedSelectionFeature] Health check cycle failed: {ex.Message}");
             }
         }
 

@@ -405,8 +405,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 return sourceHash.SequenceEqual(targetHash);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CrossBackendMigrationFeature] Data integrity verification failed: {ex.Message}");
                 return false;
             }
         }

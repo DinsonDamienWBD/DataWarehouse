@@ -477,8 +477,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Action execution failed for {state.Key}: {ex.Message}");
                 return false;
             }
         }
@@ -509,8 +510,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Object deletion failed for {state.Key}: {ex.Message}");
                 return false;
             }
         }
@@ -563,8 +565,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Object transition failed: {ex.Message}");
                 return false;
             }
         }

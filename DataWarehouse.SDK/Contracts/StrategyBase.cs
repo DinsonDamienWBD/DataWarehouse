@@ -46,6 +46,14 @@ namespace DataWarehouse.SDK.Contracts
         public virtual string Description => $"{Name} strategy";
 
         /// <summary>
+        /// Gets whether this strategy is production-ready.
+        /// Strategies that use in-memory simulation or lack real backend integration
+        /// should override this to return false, preventing accidental production use.
+        /// Default is true.
+        /// </summary>
+        public virtual bool IsProductionReady => true;
+
+        /// <summary>
         /// Gets the strategy characteristics metadata (performance profile, hardware
         /// requirements, supported features). Override to provide domain-specific
         /// characteristics. The parent plugin reads these to register capabilities

@@ -24,6 +24,7 @@ public sealed class PluginRemovalTracker
     private readonly Dictionary<string, PluginRemovalInfo> _removalTimeline;
     private readonly List<string> _removedPlugins;
     private readonly Dictionary<string, RemovalValidationResult> _validationCache;
+    private readonly object _syncLock = new();
 
     /// <summary>
     /// Initializes a new instance of the PluginRemovalTracker.
@@ -147,7 +148,10 @@ public sealed class PluginRemovalTracker
         }
 
         // Cache result
-        _validationCache[pluginId] = result;
+        lock (_syncLock)
+        {
+            _validationCache[pluginId] = result;
+        }
 
         return result;
     }
@@ -275,9 +279,12 @@ public sealed class PluginRemovalTracker
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
 
-        if (!_removedPlugins.Contains(pluginId))
+        lock (_syncLock)
         {
-            _removedPlugins.Add(pluginId);
+            if (!_removedPlugins.Contains(pluginId))
+            {
+                _removedPlugins.Add(pluginId);
+            }
         }
     }
 

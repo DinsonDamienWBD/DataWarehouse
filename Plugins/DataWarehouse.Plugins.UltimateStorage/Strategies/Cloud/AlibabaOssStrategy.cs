@@ -263,7 +263,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _partSize);
                 var partETags = new List<PartETag>();
-                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
 
                 var uploadTasks = new List<Task<PartETag>>();
 

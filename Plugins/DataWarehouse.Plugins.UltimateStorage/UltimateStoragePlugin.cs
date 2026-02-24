@@ -207,8 +207,9 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[UltimateStoragePlugin] Terminal delete failed for {context.StoragePath}: {ex.Message}");
             return false;
         }
     }
@@ -880,8 +881,9 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
                 await targetStrat.WriteAsync(path, data, options);
                 results[targetId] = true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[UltimateStoragePlugin] Replication to {targetId} failed: {ex.Message}");
                 results[targetId] = false;
             }
         }
@@ -1230,7 +1232,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
                 if (StorageStrategyRegistry.Get(strategyId) != null)
                     _defaultStrategyId = strategyId;
             }
-            catch { /* corrupted state — use default */ }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[UltimateStoragePlugin] Corrupted default strategy state: {ex.Message}"); }
         }
 
         var failoverData = await LoadStateAsync("autoFailover", ct);
@@ -1240,7 +1242,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             {
                 _autoFailoverEnabled = failoverData[0] == 1;
             }
-            catch { /* corrupted state — use default */ }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[UltimateStoragePlugin] Corrupted auto-failover state: {ex.Message}"); }
         }
     }
 

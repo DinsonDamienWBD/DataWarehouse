@@ -17,6 +17,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         public override string StrategyId => "mysql-import";
         public override string Name => "MySQL Bulk Import";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Warm;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, ConsistencyModel = ConsistencyModel.Strong };

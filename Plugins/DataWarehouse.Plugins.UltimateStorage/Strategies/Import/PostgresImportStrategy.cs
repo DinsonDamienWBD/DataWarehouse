@@ -19,6 +19,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         public override string StrategyId => "postgres-import";
         public override string Name => "PostgreSQL Bulk Import";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Warm;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities

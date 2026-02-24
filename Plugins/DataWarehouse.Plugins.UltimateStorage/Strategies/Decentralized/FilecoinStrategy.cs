@@ -550,7 +550,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     deals.Add(dealDetails);
 
                     // Monitor deal status in background
-                    _ = Task.Run(async () => await MonitorDealStatusAsync(dealDetails, ct), ct);
+                    _ = Task.Run(async () => await MonitorDealStatusAsync(dealDetails, ct), ct)
+                        .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                            $"[FilecoinStrategy] Background deal monitoring failed: {t.Exception?.InnerException?.Message}"),
+                            TaskContinuationOptions.OnlyOnFaulted);
                 }
                 catch (Exception ex)
                 {

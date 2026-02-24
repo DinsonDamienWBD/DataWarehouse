@@ -40,6 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         public override string StrategyId => "kafka-connector";
         public override string Name => "Apache Kafka Connector";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Hot;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities

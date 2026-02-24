@@ -248,7 +248,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             // Trigger replication if enabled
             if (_replicationEnabled && !string.IsNullOrEmpty(_replicationTarget))
             {
-                _ = Task.Run(() => ReplicateObjectAsync(key, ct), ct); // Fire and forget
+                _ = Task.Run(() => ReplicateObjectAsync(key, ct), ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[HpeStoreOnceStrategy] Background replication failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             var resultMetadata = new Dictionary<string, string>();

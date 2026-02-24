@@ -13,6 +13,7 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -282,7 +283,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             // Auto tier transition if enabled
             if (_autoTierTransition)
             {
-                _ = AutoTransitionTierAsync(key, ct);
+                _ = AutoTransitionTierAsync(key, ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[AzureBlobStrategy] Background tier transition failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             return trackingStream;
@@ -740,7 +744,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             if (_autoTierTransition)
             {
-                _ = AutoTransitionTierAsync(key, ct);
+                _ = AutoTransitionTierAsync(key, ct)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[AzureBlobStrategy] Background tier transition failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             return trackingStream;
@@ -795,38 +802,38 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 var xml = await response.Content.ReadAsStringAsync(ct);
 
-                var lines = xml.Split('\n');
-                foreach (var line in lines)
+                // Parse XML properly per-blob using XDocument
+                var xDoc = System.Xml.Linq.XDocument.Parse(xml);
+                var blobElements = xDoc.Descendants("Blob");
+
+                foreach (var blob in blobElements)
                 {
                     if (ct.IsCancellationRequested)
                         yield break;
 
-                    if (line.Contains("<Name>") && !line.Contains("<ContainerName>"))
+                    var name = blob.Element("Name")?.Value ?? string.Empty;
+                    if (string.IsNullOrEmpty(name))
+                        continue;
+
+                    var properties = blob.Element("Properties");
+                    var size = long.TryParse(properties?.Element("Content-Length")?.Value, out var s) ? s : 0L;
+                    var lastModified = DateTime.TryParse(
+                        properties?.Element("Last-Modified")?.Value,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AdjustToUniversal,
+                        out var dt) ? dt : DateTime.UtcNow;
+                    var etag = properties?.Element("Etag")?.Value ?? string.Empty;
+
+                    yield return new StorageObjectMetadata
                     {
-                        var name = ExtractXmlValue(line, "Name");
-
-                        var sizeLine = Array.Find(lines, l => l.Contains("<Content-Length>"));
-                        var size = sizeLine != null && long.TryParse(ExtractXmlValue(sizeLine, "Content-Length"), out var s) ? s : 0L;
-
-                        var lastModifiedLine = Array.Find(lines, l => l.Contains("<Last-Modified>"));
-                        var lastModified = lastModifiedLine != null
-                            ? DateTime.Parse(ExtractXmlValue(lastModifiedLine, "Last-Modified"))
-                            : DateTime.UtcNow;
-
-                        var etagLine = Array.Find(lines, l => l.Contains("<Etag>"));
-                        var etag = etagLine != null ? ExtractXmlValue(etagLine, "Etag") : string.Empty;
-
-                        yield return new StorageObjectMetadata
-                        {
-                            Key = name,
-                            Size = size,
-                            Created = lastModified,
-                            Modified = lastModified,
-                            ETag = etag,
-                            ContentType = "application/octet-stream",
-                            Tier = Tier
-                        };
-                    }
+                        Key = name,
+                        Size = size,
+                        Created = lastModified,
+                        Modified = lastModified,
+                        ETag = etag,
+                        ContentType = properties?.Element("Content-Type")?.Value ?? "application/octet-stream",
+                        Tier = Tier
+                    };
                 }
 
                 marker = xml.Contains("<NextMarker>") && !xml.Contains("<NextMarker/>")

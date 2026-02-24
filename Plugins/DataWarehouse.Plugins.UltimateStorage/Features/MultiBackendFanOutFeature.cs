@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -365,9 +366,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                                 Interlocked.Increment(ref result.SuccessCount);
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            // Ignore async write failures
+                            System.Diagnostics.Debug.WriteLine($"[MultiBackendFanOutFeature] Async write to {backendId} failed: {ex.Message}");
                             result.FailedBackends.Add(backendId);
                             Interlocked.Increment(ref result.FailureCount);
                         }
@@ -402,9 +403,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         };
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Try next backend
+                    System.Diagnostics.Debug.WriteLine($"[MultiBackendFanOutFeature] Read from backend failed: {ex.Message}");
                     continue;
                 }
             }
@@ -492,9 +493,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         };
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Try next backend
+                    System.Diagnostics.Debug.WriteLine($"[MultiBackendFanOutFeature] Read from backend failed: {ex.Message}");
                     continue;
                 }
             }
@@ -511,7 +512,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         #region Helper Methods
 
-        private async Task RollbackWritesAsync(string key, List<string> successfulBackends, CancellationToken ct)
+        private async Task RollbackWritesAsync(string key, IEnumerable<string> successfulBackends, CancellationToken ct)
         {
             var deleteTasks = successfulBackends.Select(async backendId =>
             {
@@ -610,14 +611,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <summary>Number of failed writes.</summary>
         public int FailureCount;
 
-        /// <summary>List of backends that succeeded.</summary>
-        public List<string> SuccessfulBackends { get; } = new();
+        /// <summary>List of backends that succeeded (thread-safe for concurrent mutation).</summary>
+        public ConcurrentBag<string> SuccessfulBackends { get; } = new();
 
-        /// <summary>List of backends that failed.</summary>
-        public List<string> FailedBackends { get; } = new();
+        /// <summary>List of backends that failed (thread-safe for concurrent mutation).</summary>
+        public ConcurrentBag<string> FailedBackends { get; } = new();
 
         /// <summary>Error messages per backend.</summary>
-        public Dictionary<string, string> Errors { get; } = new();
+        public ConcurrentDictionary<string, string> Errors { get; } = new();
 
         /// <summary>Whether the overall write operation succeeded according to the policy.</summary>
         public bool IsSuccess { get; set; }

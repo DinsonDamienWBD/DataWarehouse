@@ -345,9 +345,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     await ApplyPolicyAsync(policy);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Log error but don't crash the timer
+                System.Diagnostics.Debug.WriteLine($"[AutoTieringFeature] Tiering evaluation failed: {ex.Message}");
             }
         }
 

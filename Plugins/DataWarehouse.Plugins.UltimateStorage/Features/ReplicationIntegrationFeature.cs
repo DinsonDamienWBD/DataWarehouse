@@ -238,9 +238,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     {
                         await ReplicateToAllAsync(group, objectKey, data, metadata, CancellationToken.None);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Log error but don't throw
+                        System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Async replication failed for {objectKey}: {ex.Message}");
                     }
                 }, CancellationToken.None);
             }
@@ -297,9 +297,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         return data;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Try next backend
+                    System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Read from backend failed: {ex.Message}");
                     continue;
                 }
             }
@@ -482,9 +482,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore monitoring errors
+                System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Monitoring failed: {ex.Message}");
             }
         }
 
@@ -501,9 +501,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                 await _messageBus.PublishAsync(ReplicationPluginTopic, message);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore message bus errors
+                System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Message bus publish failed: {ex.Message}");
             }
         }
 

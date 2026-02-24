@@ -1169,14 +1169,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
         private string GenerateETag(TapeCatalogEntry entry)
         {
-            var hash = HashCode.Combine(entry.TapeBarcode, entry.Key, entry.StoredAt.Ticks, entry.Size);
-            return hash.ToString("x");
+            var input = $"{entry.TapeBarcode}:{entry.Key}:{entry.StoredAt.Ticks}:{entry.Size}";
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16].ToLowerInvariant();
         }
 
         private string GenerateETag(string tapeBarcode, string key)
         {
-            var hash = HashCode.Combine(tapeBarcode, key, DateTime.UtcNow.Ticks);
-            return hash.ToString("x");
+            var input = $"{tapeBarcode}:{key}";
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input)))[..16].ToLowerInvariant();
         }
 
         private string? GetContentType(string key)

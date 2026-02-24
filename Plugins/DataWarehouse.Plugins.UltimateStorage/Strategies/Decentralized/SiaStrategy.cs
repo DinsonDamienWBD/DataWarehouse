@@ -314,7 +314,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             // Monitor health in background if enabled
             if (_enableAutoRepair)
             {
-                _ = Task.Run(async () => await MonitorObjectHealthAsync(objectPath, ct), CancellationToken.None);
+                _ = Task.Run(async () => await MonitorObjectHealthAsync(objectPath, ct), CancellationToken.None)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
+                        $"[SiaStrategy] Background health monitoring failed: {t.Exception?.InnerException?.Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             return new StorageObjectMetadata

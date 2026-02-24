@@ -236,7 +236,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             if (pool.Policy.UseConsistentHashing && !string.IsNullOrWhiteSpace(objectKey))
             {
                 // Use hash of object key to deterministically select backend
-                var hash = Math.Abs(objectKey.GetHashCode());
+                var hash = Math.Abs(BitConverter.ToInt32(
+                    System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(objectKey)), 0));
                 var index = hash % enabledBackends.Count;
                 return enabledBackends[index].StrategyId;
             }

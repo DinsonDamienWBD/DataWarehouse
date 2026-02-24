@@ -838,7 +838,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
                 var completedParts = new List<ManualCompletedPart>();
-                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
                 var uploadTasks = new List<Task<ManualCompletedPart>>();
 
                 for (int partNumber = 1; partNumber <= partCount; partNumber++)

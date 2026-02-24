@@ -38,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         public override string StrategyId => "grpc-connector";
         public override string Name => "gRPC Connector";
+        public override bool IsProductionReady => false;
         public override StorageTier Tier => StorageTier.Hot; // gRPC is fast
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
