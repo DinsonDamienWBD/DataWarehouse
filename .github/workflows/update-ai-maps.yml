@@ -9,6 +9,7 @@ on:
       - '**/*.cs'
       - 'DataWarehouse.slnx'
       - 'AiArchitectureMapper/**'
+  workflow_dispatch: # <-- ADD THIS LINE to enable manual testing
 
 jobs:
   generate-and-commit:
