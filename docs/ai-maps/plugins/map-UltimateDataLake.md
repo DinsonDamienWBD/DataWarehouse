@@ -63,9 +63,9 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Governance/DataLakeGovernanceStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Zones/DataLakeZoneStrategies.cs
 ```csharp
-public sealed class DataQualityRulesStrategy : DataLakeStrategyBase
+public sealed class MedallionArchitectureStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -77,7 +77,7 @@ public sealed class DataQualityRulesStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataProfilingStrategy : DataLakeStrategyBase
+public sealed class RawZoneStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -89,7 +89,7 @@ public sealed class DataProfilingStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataRetentionPolicyStrategy : DataLakeStrategyBase
+public sealed class CuratedZoneStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -101,7 +101,7 @@ public sealed class DataRetentionPolicyStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class PiiDetectionStrategy : DataLakeStrategyBase
+public sealed class ConsumptionZoneStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -113,7 +113,7 @@ public sealed class PiiDetectionStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataStewardshipStrategy : DataLakeStrategyBase
+public sealed class SandboxZoneStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -125,7 +125,7 @@ public sealed class DataStewardshipStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ComplianceAutomationStrategy : DataLakeStrategyBase
+public sealed class ZonePromotionStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -137,7 +137,7 @@ public sealed class ComplianceAutomationStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataContractStrategy : DataLakeStrategyBase
+public sealed class ArchiveZoneStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -235,9 +235,9 @@ public sealed class AuditLoggingStrategy : DataLakeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Integration/LakeWarehouseIntegrationStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Governance/DataLakeGovernanceStrategies.cs
 ```csharp
-public sealed class MaterializedViewStrategy : DataLakeStrategyBase
+public sealed class DataQualityRulesStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -249,7 +249,7 @@ public sealed class MaterializedViewStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class LakeWarehouseSyncStrategy : DataLakeStrategyBase
+public sealed class DataProfilingStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -261,7 +261,7 @@ public sealed class LakeWarehouseSyncStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class QueryFederationStrategy : DataLakeStrategyBase
+public sealed class DataRetentionPolicyStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -273,7 +273,7 @@ public sealed class QueryFederationStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ExternalTableStrategy : DataLakeStrategyBase
+public sealed class PiiDetectionStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -285,7 +285,7 @@ public sealed class ExternalTableStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataVirtualizationStrategy : DataLakeStrategyBase
+public sealed class DataStewardshipStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -297,7 +297,7 @@ public sealed class DataVirtualizationStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class IncrementalLoadStrategy : DataLakeStrategyBase
+public sealed class ComplianceAutomationStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -309,7 +309,7 @@ public sealed class IncrementalLoadStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ReverseEtlStrategy : DataLakeStrategyBase
+public sealed class DataContractStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -321,9 +321,9 @@ public sealed class ReverseEtlStrategy : DataLakeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Zones/DataLakeZoneStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Catalog/DataCatalogStrategies.cs
 ```csharp
-public sealed class MedallionArchitectureStrategy : DataLakeStrategyBase
+public sealed class MetadataCatalogStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -335,7 +335,7 @@ public sealed class MedallionArchitectureStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class RawZoneStrategy : DataLakeStrategyBase
+public sealed class DataDiscoveryStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -347,7 +347,7 @@ public sealed class RawZoneStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class CuratedZoneStrategy : DataLakeStrategyBase
+public sealed class BusinessGlossaryStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -359,7 +359,7 @@ public sealed class CuratedZoneStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ConsumptionZoneStrategy : DataLakeStrategyBase
+public sealed class TagManagementStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -371,7 +371,7 @@ public sealed class ConsumptionZoneStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class SandboxZoneStrategy : DataLakeStrategyBase
+public sealed class HiveMetastoreStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -383,7 +383,7 @@ public sealed class SandboxZoneStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ZonePromotionStrategy : DataLakeStrategyBase
+public sealed class AwsGlueCatalogStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -395,7 +395,81 @@ public sealed class ZonePromotionStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class ArchiveZoneStrategy : DataLakeStrategyBase
+public sealed class UnityCatalogStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Schema/SchemaOnReadStrategies.cs
+```csharp
+public sealed class DynamicSchemaInferenceStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SchemaEvolutionStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SchemaMergeStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SchemaValidationStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SchemaRegistryIntegrationStrategy : DataLakeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataLakeCategory Category;;
+    public override DataLakeCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PolyglotSchemaStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -591,9 +665,9 @@ public sealed class OpenLineageStrategy : DataLakeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Catalog/DataCatalogStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Integration/LakeWarehouseIntegrationStrategies.cs
 ```csharp
-public sealed class MetadataCatalogStrategy : DataLakeStrategyBase
+public sealed class MaterializedViewStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -605,7 +679,7 @@ public sealed class MetadataCatalogStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class DataDiscoveryStrategy : DataLakeStrategyBase
+public sealed class LakeWarehouseSyncStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -617,7 +691,7 @@ public sealed class DataDiscoveryStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class BusinessGlossaryStrategy : DataLakeStrategyBase
+public sealed class QueryFederationStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -629,7 +703,7 @@ public sealed class BusinessGlossaryStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class TagManagementStrategy : DataLakeStrategyBase
+public sealed class ExternalTableStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -641,7 +715,7 @@ public sealed class TagManagementStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class HiveMetastoreStrategy : DataLakeStrategyBase
+public sealed class DataVirtualizationStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -653,7 +727,7 @@ public sealed class HiveMetastoreStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class AwsGlueCatalogStrategy : DataLakeStrategyBase
+public sealed class IncrementalLoadStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -665,81 +739,7 @@ public sealed class AwsGlueCatalogStrategy : DataLakeStrategyBase
 }
 ```
 ```csharp
-public sealed class UnityCatalogStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Schema/SchemaOnReadStrategies.cs
-```csharp
-public sealed class DynamicSchemaInferenceStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SchemaEvolutionStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SchemaMergeStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SchemaValidationStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SchemaRegistryIntegrationStrategy : DataLakeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataLakeCategory Category;;
-    public override DataLakeCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PolyglotSchemaStrategy : DataLakeStrategyBase
+public sealed class ReverseEtlStrategy : DataLakeStrategyBase
 {
 }
     public override string StrategyId;;

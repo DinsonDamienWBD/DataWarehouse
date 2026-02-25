@@ -219,10 +219,11 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/HotReload/HotReloadStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/AppPlatform/AppRuntimeStrategy.cs
 ```csharp
-public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
+public sealed class AppRuntimeStrategy : DeploymentStrategyBase
 {
+#endregion
 }
     public override DeploymentCharacteristics Characteristics { get; };
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
@@ -230,585 +231,141 @@ public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
     protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public void ConfigureAiWorkflow(string appId, AiWorkflowConfig config);
+    public bool RemoveAiWorkflow(string appId);
+    public AiWorkflowConfig? GetAiWorkflow(string appId);;
+    public async Task<AiRequestResult> SubmitAiRequestAsync(string appId, string operation, decimal estimatedCost, CancellationToken ct);
+    public AiUsageTracking? GetAiUsage(string appId);;
+    public void ResetAiUsage(string appId);
+    public void ConfigureObservability(string appId, ObservabilityConfig config);
+    public bool RemoveObservability(string appId);
+    public ObservabilityConfig? GetObservability(string appId);;
+    public void EmitMetric(string appId, string metricName, double value, Dictionary<string, string>? tags = null);
+    public void EmitTrace(string appId, string traceName, string spanId, Dictionary<string, string>? attributes = null);
+    public void EmitLog(string appId, string level, string message, Dictionary<string, string>? properties = null);
+    public sealed class AiWorkflowConfig;
+    public enum AiWorkflowMode;
+    public sealed class AiUsageTracking;
+    public sealed class AiRequestResult;
+    public sealed class ObservabilityConfig;
 }
 ```
 ```csharp
-public sealed class ConfigurationReloadStrategy : DeploymentStrategyBase
+public sealed class AiWorkflowConfig
 {
 }
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public string AppId { get; set; };
+    public AiWorkflowMode Mode { get; init; };
+    public decimal MonthlyBudgetUsd { get; init; };
+    public decimal MaxPerRequestUsd { get; init; };
+    public int MaxConcurrentRequests { get; init; };
+    public List<string> AllowedOperations { get; init; };
+    public List<string> PreferredProviders { get; init; };
+    public List<string> PreferredModels { get; init; };
 }
 ```
 ```csharp
-public sealed class PluginHotSwapStrategy : DeploymentStrategyBase
+public sealed class AiUsageTracking
 {
 }
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public string AppId { get; init; };
+    public decimal MonthlySpendUsd { get; set; }
+    public long TotalRequests { get; set; }
 }
 ```
 ```csharp
-public sealed class ModuleFederationStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class LivePatchStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ContainerOrchestration/KubernetesStrategies.cs
-```csharp
-public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
-}
-```
-```csharp
-private record PodInfo
-{
-}
-    public string Name { get; init; };
-    public bool Ready { get; init; }
-    public string Phase { get; init; };
-    public int RestartCount { get; init; }
-}
-```
-```csharp
-public sealed class DockerSwarmStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
-}
-```
-```csharp
-public sealed class NomadStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AwsEcsStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AzureAksStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
-}
-```
-```csharp
-public sealed class GoogleGkeStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class AwsEksStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ContainerOrchestration/KubernetesCsiDriver.cs
-```csharp
-public sealed class KubernetesCsiDriver
-{
-}
-    public KubernetesCsiDriver(string driverName = "datawarehouse.csi.io", string driverVersion = "1.0.0");
-    public CsiIdentityService Identity;;
-    public CsiControllerService Controller;;
-    public CsiNodeService Node;;
-}
-```
-```csharp
-public sealed class CsiIdentityService
-{
-}
-    public CsiIdentityService(string driverName, string driverVersion);
-    public CsiPluginInfo GetPluginInfo();
-    public CsiPluginCapabilities GetPluginCapabilities();
-    public CsiProbeResult Probe();
-    public void SetReady(bool ready);;
-}
-```
-```csharp
-public sealed class CsiControllerService
-{
-}
-    public CsiControllerService(string driverName);
-    public CsiVolume CreateVolume(CsiCreateVolumeRequest request);
-    public bool DeleteVolume(string volumeId);
-    public CsiPublishResult ControllerPublishVolume(string volumeId, string nodeId, CsiVolumeCapability capability);
-    public bool ControllerUnpublishVolume(string volumeId, string nodeId);
-    public CsiValidateResult ValidateVolumeCapabilities(string volumeId, CsiVolumeCapability[] capabilities);
-    public CsiListVolumesResult ListVolumes(int maxEntries = 100, string? startingToken = null);
-    public CsiCapacityResult GetCapacity(Dictionary<string, string>? parameters = null);
-    public CsiSnapshot CreateSnapshot(string sourceVolumeId, string name);
-    public bool DeleteSnapshot(string snapshotId);;
-    public IReadOnlyList<CsiSnapshot> ListSnapshots(string? sourceVolumeId = null);;
-    public void SetTotalCapacity(long bytes);;
-}
-```
-```csharp
-public sealed class CsiNodeService
-{
-}
-    public CsiNodeService(string driverName, string? nodeId = null);
-    public CsiNodeStageResult NodeStageVolume(string volumeId, string stagingTargetPath, CsiVolumeCapability capability, Dictionary<string, string>? publishContext = null);
-    public bool NodeUnstageVolume(string volumeId, string stagingTargetPath);
-    public CsiNodePublishResult NodePublishVolume(string volumeId, string targetPath, CsiVolumeCapability capability, bool readOnly = false, Dictionary<string, string>? volumeContext = null);
-    public bool NodeUnpublishVolume(string volumeId, string targetPath);
-    public CsiNodeCapabilities NodeGetCapabilities();
-    public CsiNodeInfo NodeGetInfo();
-    public int StagedVolumeCount;;
-    public int PublishedVolumeCount;;
-}
-```
-```csharp
-public sealed record CsiPluginInfo
-{
-}
-    public required string Name { get; init; }
-    public required string VendorVersion { get; init; }
-    public Dictionary<string, string> Manifest { get; init; };
-}
-```
-```csharp
-public sealed record CsiPluginCapabilities
-{
-}
-    public bool ControllerService { get; init; }
-    public bool VolumeAccessibilityConstraints { get; init; }
-    public bool NodeServiceCapability { get; init; }
-    public bool GroupControllerService { get; init; }
-}
-```
-```csharp
-public sealed record CsiProbeResult
-{
-}
-    public bool Ready { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record CsiCreateVolumeRequest
-{
-}
-    public required string Name { get; init; }
-    public long CapacityBytes { get; init; }
-    public CsiAccessMode AccessMode { get; init; };
-    public Dictionary<string, string>? Parameters { get; init; }
-    public string? VolumeContentSource { get; init; }
-    public string[]? AccessibilityRequirements { get; init; }
-}
-```
-```csharp
-public sealed record CsiVolume
-{
-}
-    public required string VolumeId { get; init; }
-    public required string Name { get; init; }
-    public long CapacityBytes { get; init; }
-    public CsiAccessMode AccessMode { get; init; }
-    public Dictionary<string, string> VolumeContext { get; init; };
-    public string? ContentSource { get; init; }
-    public string[]? AccessibleTopology { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record CsiPublishResult
-{
-}
-    public required string VolumeId { get; init; }
-    public required string NodeId { get; init; }
-    public Dictionary<string, string> PublishContext { get; init; };
-}
-```
-```csharp
-public sealed record CsiValidateResult
-{
-}
-    public bool Confirmed { get; init; }
-    public required string Message { get; init; }
-}
-```
-```csharp
-public sealed record CsiListVolumesResult
-{
-}
-    public List<CsiVolumeEntry> Entries { get; init; };
-    public string? NextToken { get; init; }
-}
-```
-```csharp
-public sealed record CsiVolumeEntry
-{
-}
-    public required CsiVolume Volume { get; init; }
-    public string[] PublishedNodeIds { get; init; };
-}
-```
-```csharp
-public sealed record CsiCapacityResult
-{
-}
-    public long AvailableCapacityBytes { get; init; }
-    public long TotalCapacityBytes { get; init; }
-    public long UsedCapacityBytes { get; init; }
-    public long MaximumVolumeSize { get; init; }
-    public long MinimumVolumeSize { get; init; }
-}
-```
-```csharp
-public sealed record CsiSnapshot
-{
-}
-    public required string SnapshotId { get; init; }
-    public required string SourceVolumeId { get; init; }
-    public required string Name { get; init; }
-    public long SizeBytes { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public bool ReadyToUse { get; init; }
-}
-```
-```csharp
-public sealed record CsiVolumeCapability
-{
-}
-    public CsiAccessMode AccessMode { get; init; }
-    public string? FsType { get; init; }
-    public string[]? MountFlags { get; init; }
-}
-```
-```csharp
-public sealed record CsiNodeStageResult
+public sealed class AiRequestResult
 {
 }
     public bool Success { get; init; }
-    public bool AlreadyStaged { get; init; }
-    public string? StagingPath { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? RequestId { get; init; }
+    public decimal EstimatedCostUsd { get; init; }
 }
 ```
 ```csharp
-public sealed record CsiNodePublishResult
+public sealed class ObservabilityConfig
 {
 }
-    public bool Success { get; init; }
-    public bool AlreadyPublished { get; init; }
-    public string? TargetPath { get; init; }
-}
-```
-```csharp
-public sealed record CsiNodeCapabilities
-{
-}
-    public bool StageUnstage { get; init; }
-    public bool GetVolumeStats { get; init; }
-    public bool ExpandVolume { get; init; }
-    public bool SingleNodeMultiWriter { get; init; }
-    public bool VolumeCondition { get; init; }
-}
-```
-```csharp
-public sealed record CsiNodeInfo
-{
-}
-    public required string NodeId { get; init; }
-    public int MaxVolumesPerNode { get; init; }
-    public Dictionary<string, string> AccessibleTopology { get; init; };
-}
-```
-```csharp
-internal sealed record StagedVolume
-{
-}
-    public required string VolumeId { get; init; }
-    public required string StagingTargetPath { get; init; }
-    public required CsiVolumeCapability Capability { get; init; }
-    public Dictionary<string, string> PublishContext { get; init; };
-    public DateTimeOffset StagedAt { get; init; }
-}
-```
-```csharp
-internal sealed record PublishedVolume
-{
-}
-    public required string VolumeId { get; init; }
-    public required string TargetPath { get; init; }
-    public bool ReadOnly { get; init; }
-    public required CsiVolumeCapability Capability { get; init; }
-    public DateTimeOffset PublishedAt { get; init; }
+    public string AppId { get; set; };
+    public bool MetricsEnabled { get; init; }
+    public bool TracesEnabled { get; init; }
+    public bool LogsEnabled { get; init; }
+    public int RetentionDays { get; init; };
+    public string LogLevel { get; init; };
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ConfigManagement/ConfigurationStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/AppPlatform/AppHostingStrategy.cs
 ```csharp
-public sealed class ConsulConfigStrategy : DeploymentStrategyBase
+public sealed class AppHostingStrategy : DeploymentStrategyBase
 {
+#endregion
 }
-    public override DeploymentCharacteristics Characteristics;;
+    public override DeploymentCharacteristics Characteristics { get; };
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public AppRegistration RegisterApp(string appName, string ownerEmail, List<string> scopes);
+    public bool DeregisterApp(string appId);
+    public AppRegistration? GetApp(string appId);;
+    public IReadOnlyList<AppRegistration> ListApps();;
+    public ServiceToken CreateToken(string appId, List<string> scopes);
+    public bool ValidateToken(string tokenId);
+    public bool RevokeToken(string tokenId);
+    public void BindPolicy(string appId, AppAccessPolicy policy);
+    public AppAccessPolicy? GetPolicy(string appId);;
+    public sealed class AppRegistration;
+    public sealed class ServiceToken;
+    public sealed class AppAccessPolicy;
+    public sealed class ServiceEndpoint;
 }
 ```
 ```csharp
-private sealed class ConfigVersion
+public sealed class AppRegistration
 {
 }
-    public required string VersionId { get; init; }
-    public required string KeyPrefix { get; init; }
-    public required string Version { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public int KeyCount { get; init; }
-    public required string Checksum { get; init; }
+    public string AppId { get; init; };
+    public string AppName { get; init; };
+    public string OwnerEmail { get; init; };
+    public List<string> Scopes { get; init; };
+    public DateTime RegisteredAt { get; init; }
+    public bool IsActive { get; set; }
 }
 ```
 ```csharp
-private sealed class ConfigWatch
+public sealed class ServiceToken
 {
 }
-    public required string WatchId { get; init; }
-    public required string KeyPattern { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
+    public string TokenId { get; init; };
+    public string AppId { get; init; };
+    public string TokenHash { get; init; };
+    public DateTime CreatedAt { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public bool IsRevoked { get; set; }
+    public List<string> Scopes { get; init; };
 }
 ```
 ```csharp
-public sealed class EtcdConfigStrategy : DeploymentStrategyBase
+public sealed class AppAccessPolicy
 {
 }
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public string AppId { get; set; };
+    public string PolicyType { get; init; };
+    public List<string> AllowedRoles { get; init; };
+    public List<string> DeniedOperations { get; init; };
 }
 ```
 ```csharp
-public sealed class SpringCloudConfigStrategy : DeploymentStrategyBase
+public sealed class ServiceEndpoint
 {
 }
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class AwsAppConfigStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class AzureAppConfigurationStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class KubernetesConfigMapStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/SecretManagement/SecretsStrategies.cs
-```csharp
-public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-private sealed class VaultLease
-{
-}
-    public required string LeaseId { get; init; }
-    public required string Path { get; init; }
-    public TimeSpan Duration { get; init; }
-    public DateTimeOffset ExpiresAt { get; init; }
-}
-```
-```csharp
-private sealed class SecretVersion
-{
-}
-    public required string Path { get; init; }
-    public int Version { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public int KeyCount { get; init; }
-}
-```
-```csharp
-public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class CyberArkConjurStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics;;
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    public string ServiceName { get; init; };
+    public string Topic { get; init; };
+    public string Description { get; init; };
+    public bool IsAvailable { get; init; }
 }
 ```
 
@@ -1186,156 +743,6 @@ public sealed class TimeBasedEvent
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/AppPlatform/AppHostingStrategy.cs
-```csharp
-public sealed class AppHostingStrategy : DeploymentStrategyBase
-{
-#endregion
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-    public AppRegistration RegisterApp(string appName, string ownerEmail, List<string> scopes);
-    public bool DeregisterApp(string appId);
-    public AppRegistration? GetApp(string appId);;
-    public IReadOnlyList<AppRegistration> ListApps();;
-    public ServiceToken CreateToken(string appId, List<string> scopes);
-    public bool ValidateToken(string tokenId);
-    public bool RevokeToken(string tokenId);
-    public void BindPolicy(string appId, AppAccessPolicy policy);
-    public AppAccessPolicy? GetPolicy(string appId);;
-    public sealed class AppRegistration;
-    public sealed class ServiceToken;
-    public sealed class AppAccessPolicy;
-    public sealed class ServiceEndpoint;
-}
-```
-```csharp
-public sealed class AppRegistration
-{
-}
-    public string AppId { get; init; };
-    public string AppName { get; init; };
-    public string OwnerEmail { get; init; };
-    public List<string> Scopes { get; init; };
-    public DateTime RegisteredAt { get; init; }
-    public bool IsActive { get; set; }
-}
-```
-```csharp
-public sealed class ServiceToken
-{
-}
-    public string TokenId { get; init; };
-    public string AppId { get; init; };
-    public string TokenHash { get; init; };
-    public DateTime CreatedAt { get; init; }
-    public DateTime ExpiresAt { get; init; }
-    public bool IsRevoked { get; set; }
-    public List<string> Scopes { get; init; };
-}
-```
-```csharp
-public sealed class AppAccessPolicy
-{
-}
-    public string AppId { get; set; };
-    public string PolicyType { get; init; };
-    public List<string> AllowedRoles { get; init; };
-    public List<string> DeniedOperations { get; init; };
-}
-```
-```csharp
-public sealed class ServiceEndpoint
-{
-}
-    public string ServiceName { get; init; };
-    public string Topic { get; init; };
-    public string Description { get; init; };
-    public bool IsAvailable { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/AppPlatform/AppRuntimeStrategy.cs
-```csharp
-public sealed class AppRuntimeStrategy : DeploymentStrategyBase
-{
-#endregion
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-    public void ConfigureAiWorkflow(string appId, AiWorkflowConfig config);
-    public bool RemoveAiWorkflow(string appId);
-    public AiWorkflowConfig? GetAiWorkflow(string appId);;
-    public async Task<AiRequestResult> SubmitAiRequestAsync(string appId, string operation, decimal estimatedCost, CancellationToken ct);
-    public AiUsageTracking? GetAiUsage(string appId);;
-    public void ResetAiUsage(string appId);
-    public void ConfigureObservability(string appId, ObservabilityConfig config);
-    public bool RemoveObservability(string appId);
-    public ObservabilityConfig? GetObservability(string appId);;
-    public void EmitMetric(string appId, string metricName, double value, Dictionary<string, string>? tags = null);
-    public void EmitTrace(string appId, string traceName, string spanId, Dictionary<string, string>? attributes = null);
-    public void EmitLog(string appId, string level, string message, Dictionary<string, string>? properties = null);
-    public sealed class AiWorkflowConfig;
-    public enum AiWorkflowMode;
-    public sealed class AiUsageTracking;
-    public sealed class AiRequestResult;
-    public sealed class ObservabilityConfig;
-}
-```
-```csharp
-public sealed class AiWorkflowConfig
-{
-}
-    public string AppId { get; set; };
-    public AiWorkflowMode Mode { get; init; };
-    public decimal MonthlyBudgetUsd { get; init; };
-    public decimal MaxPerRequestUsd { get; init; };
-    public int MaxConcurrentRequests { get; init; };
-    public List<string> AllowedOperations { get; init; };
-    public List<string> PreferredProviders { get; init; };
-    public List<string> PreferredModels { get; init; };
-}
-```
-```csharp
-public sealed class AiUsageTracking
-{
-}
-    public string AppId { get; init; };
-    public decimal MonthlySpendUsd { get; set; }
-    public long TotalRequests { get; set; }
-}
-```
-```csharp
-public sealed class AiRequestResult
-{
-}
-    public bool Success { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? RequestId { get; init; }
-    public decimal EstimatedCostUsd { get; init; }
-}
-```
-```csharp
-public sealed class ObservabilityConfig
-{
-}
-    public string AppId { get; set; };
-    public bool MetricsEnabled { get; init; }
-    public bool TracesEnabled { get; init; }
-    public bool LogsEnabled { get; init; }
-    public int RetentionDays { get; init; };
-    public string LogLevel { get; init; };
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/EnvironmentProvisioning/EnvironmentStrategies.cs
 ```csharp
 public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
@@ -1601,33 +1008,9 @@ public sealed class AzureContainerAppsStrategy : DeploymentStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/FeatureFlags/FeatureFlagStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/HotReload/HotReloadStrategies.cs
 ```csharp
-public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class SplitIoStrategy : DeploymentStrategyBase
-{
-}
-    public override DeploymentCharacteristics Characteristics { get; };
-    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
-    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class UnleashStrategy : DeploymentStrategyBase
+public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
@@ -1639,7 +1022,7 @@ public sealed class UnleashStrategy : DeploymentStrategyBase
 }
 ```
 ```csharp
-public sealed class FlagsmithStrategy : DeploymentStrategyBase
+public sealed class ConfigurationReloadStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
@@ -1651,10 +1034,129 @@ public sealed class FlagsmithStrategy : DeploymentStrategyBase
 }
 ```
 ```csharp
-public sealed class CustomFeatureFlagStrategy : DeploymentStrategyBase
+public sealed class PluginHotSwapStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class ModuleFederationStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class LivePatchStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ConfigManagement/ConfigurationStrategies.cs
+```csharp
+public sealed class ConsulConfigStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+private sealed class ConfigVersion
+{
+}
+    public required string VersionId { get; init; }
+    public required string KeyPrefix { get; init; }
+    public required string Version { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public int KeyCount { get; init; }
+    public required string Checksum { get; init; }
+}
+```
+```csharp
+private sealed class ConfigWatch
+{
+}
+    public required string WatchId { get; init; }
+    public required string KeyPattern { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed class EtcdConfigStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class SpringCloudConfigStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class AwsAppConfigStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class AzureAppConfigurationStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class KubernetesConfigMapStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
@@ -1761,9 +1263,9 @@ public sealed class SpinnakerStrategy : DeploymentStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/FeatureFlags/FeatureFlagStrategies.cs
 ```csharp
-public sealed class BlueGreenStrategy : DeploymentStrategyBase
+public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
@@ -1771,33 +1273,55 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
     protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/DeploymentPatterns/CanaryStrategy.cs
 ```csharp
-public sealed class CanaryStrategy : DeploymentStrategyBase
+public sealed class SplitIoStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
     protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
-    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
 }
 ```
 ```csharp
-private sealed class CanaryState
+public sealed class UnleashStrategy : DeploymentStrategyBase
 {
 }
-    public string DeploymentId { get; init; };
-    public int CanaryPercent { get; init; }
-    public int CurrentPercent { get; set; }
-    public string StableVersion { get; init; };
-    public string CanaryVersion { get; init; };
-    public double ErrorThreshold { get; init; }
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class FlagsmithStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class CustomFeatureFlagStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
 }
 ```
 
@@ -1848,6 +1372,482 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs
+```csharp
+public sealed class BlueGreenStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/DeploymentPatterns/CanaryStrategy.cs
+```csharp
+public sealed class CanaryStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+private sealed class CanaryState
+{
+}
+    public string DeploymentId { get; init; };
+    public int CanaryPercent { get; init; }
+    public int CurrentPercent { get; set; }
+    public string StableVersion { get; init; };
+    public string CanaryVersion { get; init; };
+    public double ErrorThreshold { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ContainerOrchestration/KubernetesStrategies.cs
+```csharp
+public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+private record PodInfo
+{
+}
+    public string Name { get; init; };
+    public bool Ready { get; init; }
+    public string Phase { get; init; };
+    public int RestartCount { get; init; }
+}
+```
+```csharp
+public sealed class DockerSwarmStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+public sealed class NomadStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AwsEcsStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AzureAksStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
+}
+```
+```csharp
+public sealed class GoogleGkeStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class AwsEksStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics { get; };
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override async Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/ContainerOrchestration/KubernetesCsiDriver.cs
+```csharp
+public sealed class KubernetesCsiDriver
+{
+}
+    public KubernetesCsiDriver(string driverName = "datawarehouse.csi.io", string driverVersion = "1.0.0");
+    public CsiIdentityService Identity;;
+    public CsiControllerService Controller;;
+    public CsiNodeService Node;;
+}
+```
+```csharp
+public sealed class CsiIdentityService
+{
+}
+    public CsiIdentityService(string driverName, string driverVersion);
+    public CsiPluginInfo GetPluginInfo();
+    public CsiPluginCapabilities GetPluginCapabilities();
+    public CsiProbeResult Probe();
+    public void SetReady(bool ready);;
+}
+```
+```csharp
+public sealed class CsiControllerService
+{
+}
+    public CsiControllerService(string driverName);
+    public CsiVolume CreateVolume(CsiCreateVolumeRequest request);
+    public bool DeleteVolume(string volumeId);
+    public CsiPublishResult ControllerPublishVolume(string volumeId, string nodeId, CsiVolumeCapability capability);
+    public bool ControllerUnpublishVolume(string volumeId, string nodeId);
+    public CsiValidateResult ValidateVolumeCapabilities(string volumeId, CsiVolumeCapability[] capabilities);
+    public CsiListVolumesResult ListVolumes(int maxEntries = 100, string? startingToken = null);
+    public CsiCapacityResult GetCapacity(Dictionary<string, string>? parameters = null);
+    public CsiSnapshot CreateSnapshot(string sourceVolumeId, string name);
+    public bool DeleteSnapshot(string snapshotId);;
+    public IReadOnlyList<CsiSnapshot> ListSnapshots(string? sourceVolumeId = null);;
+    public void SetTotalCapacity(long bytes);;
+}
+```
+```csharp
+public sealed class CsiNodeService
+{
+}
+    public CsiNodeService(string driverName, string? nodeId = null);
+    public CsiNodeStageResult NodeStageVolume(string volumeId, string stagingTargetPath, CsiVolumeCapability capability, Dictionary<string, string>? publishContext = null);
+    public bool NodeUnstageVolume(string volumeId, string stagingTargetPath);
+    public CsiNodePublishResult NodePublishVolume(string volumeId, string targetPath, CsiVolumeCapability capability, bool readOnly = false, Dictionary<string, string>? volumeContext = null);
+    public bool NodeUnpublishVolume(string volumeId, string targetPath);
+    public CsiNodeCapabilities NodeGetCapabilities();
+    public CsiNodeInfo NodeGetInfo();
+    public int StagedVolumeCount;;
+    public int PublishedVolumeCount;;
+}
+```
+```csharp
+public sealed record CsiPluginInfo
+{
+}
+    public required string Name { get; init; }
+    public required string VendorVersion { get; init; }
+    public Dictionary<string, string> Manifest { get; init; };
+}
+```
+```csharp
+public sealed record CsiPluginCapabilities
+{
+}
+    public bool ControllerService { get; init; }
+    public bool VolumeAccessibilityConstraints { get; init; }
+    public bool NodeServiceCapability { get; init; }
+    public bool GroupControllerService { get; init; }
+}
+```
+```csharp
+public sealed record CsiProbeResult
+{
+}
+    public bool Ready { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record CsiCreateVolumeRequest
+{
+}
+    public required string Name { get; init; }
+    public long CapacityBytes { get; init; }
+    public CsiAccessMode AccessMode { get; init; };
+    public Dictionary<string, string>? Parameters { get; init; }
+    public string? VolumeContentSource { get; init; }
+    public string[]? AccessibilityRequirements { get; init; }
+}
+```
+```csharp
+public sealed record CsiVolume
+{
+}
+    public required string VolumeId { get; init; }
+    public required string Name { get; init; }
+    public long CapacityBytes { get; init; }
+    public CsiAccessMode AccessMode { get; init; }
+    public Dictionary<string, string> VolumeContext { get; init; };
+    public string? ContentSource { get; init; }
+    public string[]? AccessibleTopology { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record CsiPublishResult
+{
+}
+    public required string VolumeId { get; init; }
+    public required string NodeId { get; init; }
+    public Dictionary<string, string> PublishContext { get; init; };
+}
+```
+```csharp
+public sealed record CsiValidateResult
+{
+}
+    public bool Confirmed { get; init; }
+    public required string Message { get; init; }
+}
+```
+```csharp
+public sealed record CsiListVolumesResult
+{
+}
+    public List<CsiVolumeEntry> Entries { get; init; };
+    public string? NextToken { get; init; }
+}
+```
+```csharp
+public sealed record CsiVolumeEntry
+{
+}
+    public required CsiVolume Volume { get; init; }
+    public string[] PublishedNodeIds { get; init; };
+}
+```
+```csharp
+public sealed record CsiCapacityResult
+{
+}
+    public long AvailableCapacityBytes { get; init; }
+    public long TotalCapacityBytes { get; init; }
+    public long UsedCapacityBytes { get; init; }
+    public long MaximumVolumeSize { get; init; }
+    public long MinimumVolumeSize { get; init; }
+}
+```
+```csharp
+public sealed record CsiSnapshot
+{
+}
+    public required string SnapshotId { get; init; }
+    public required string SourceVolumeId { get; init; }
+    public required string Name { get; init; }
+    public long SizeBytes { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public bool ReadyToUse { get; init; }
+}
+```
+```csharp
+public sealed record CsiVolumeCapability
+{
+}
+    public CsiAccessMode AccessMode { get; init; }
+    public string? FsType { get; init; }
+    public string[]? MountFlags { get; init; }
+}
+```
+```csharp
+public sealed record CsiNodeStageResult
+{
+}
+    public bool Success { get; init; }
+    public bool AlreadyStaged { get; init; }
+    public string? StagingPath { get; init; }
+}
+```
+```csharp
+public sealed record CsiNodePublishResult
+{
+}
+    public bool Success { get; init; }
+    public bool AlreadyPublished { get; init; }
+    public string? TargetPath { get; init; }
+}
+```
+```csharp
+public sealed record CsiNodeCapabilities
+{
+}
+    public bool StageUnstage { get; init; }
+    public bool GetVolumeStats { get; init; }
+    public bool ExpandVolume { get; init; }
+    public bool SingleNodeMultiWriter { get; init; }
+    public bool VolumeCondition { get; init; }
+}
+```
+```csharp
+public sealed record CsiNodeInfo
+{
+}
+    public required string NodeId { get; init; }
+    public int MaxVolumesPerNode { get; init; }
+    public Dictionary<string, string> AccessibleTopology { get; init; };
+}
+```
+```csharp
+internal sealed record StagedVolume
+{
+}
+    public required string VolumeId { get; init; }
+    public required string StagingTargetPath { get; init; }
+    public required CsiVolumeCapability Capability { get; init; }
+    public Dictionary<string, string> PublishContext { get; init; };
+    public DateTimeOffset StagedAt { get; init; }
+}
+```
+```csharp
+internal sealed record PublishedVolume
+{
+}
+    public required string VolumeId { get; init; }
+    public required string TargetPath { get; init; }
+    public bool ReadOnly { get; init; }
+    public required CsiVolumeCapability Capability { get; init; }
+    public DateTimeOffset PublishedAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDeployment/Strategies/SecretManagement/SecretsStrategies.cs
+```csharp
+public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override async Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+private sealed class VaultLease
+{
+}
+    public required string LeaseId { get; init; }
+    public required string Path { get; init; }
+    public TimeSpan Duration { get; init; }
+    public DateTimeOffset ExpiresAt { get; init; }
+}
+```
+```csharp
+private sealed class SecretVersion
+{
+}
+    public required string Path { get; init; }
+    public int Version { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public int KeyCount { get; init; }
+}
+```
+```csharp
+public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class CyberArkConjurStrategy : DeploymentStrategyBase
+{
+}
+    public override DeploymentCharacteristics Characteristics;;
+    protected override async Task<DeploymentState> DeployCoreAsync(DeploymentConfig config, DeploymentState initialState, CancellationToken ct);
+    protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
+    protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
 }
 ```
 

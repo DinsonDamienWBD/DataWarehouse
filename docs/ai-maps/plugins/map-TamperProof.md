@@ -5,6 +5,17 @@
 
 ## Project: DataWarehouse.Plugins.TamperProof
 
+### File: Plugins/DataWarehouse.Plugins.TamperProof/IAccessLogProvider.cs
+```csharp
+public interface IAccessLogProvider
+{
+}
+    Task LogAccessAsync(AccessLog log, CancellationToken ct = default);;
+    Task<IReadOnlyList<AccessLog>> QueryAccessLogsAsync(Guid objectId, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken ct = default);;
+    Task<IReadOnlyList<AccessLog>> QueryAccessLogsByPrincipalAsync(string principal, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken ct = default);;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.TamperProof/IPipelineOrchestrator.cs
 ```csharp
 public interface IPipelineOrchestrator
@@ -69,14 +80,158 @@ public interface IWormStorageProvider
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/IAccessLogProvider.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/CloudTimeLockProvider.cs
 ```csharp
-public interface IAccessLogProvider
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
+public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
 {
 }
-    Task LogAccessAsync(AccessLog log, CancellationToken ct = default);;
-    Task<IReadOnlyList<AccessLog>> QueryAccessLogsAsync(Guid objectId, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken ct = default);;
-    Task<IReadOnlyList<AccessLog>> QueryAccessLogsByPrincipalAsync(string principal, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken ct = default);;
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override TimeLockMode DefaultMode;;
+    public override TimeLockPolicy Policy { get; };
+    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
+    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
+    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
+    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+}
+```
+```csharp
+private static class CloudProviders
+{
+}
+    public const string AwsS3 = "aws-s3-object-lock";
+    public const string AzureBlob = "azure-immutable-blob";
+    public const string GcsRetention = "gcs-retention-policy";
+    public const string Auto = "auto-detect";
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/HsmTimeLockProvider.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
+public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override TimeLockMode DefaultMode;;
+    public override TimeLockPolicy Policy { get; };
+    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
+    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
+    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
+    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/TimeLockPolicyEngine.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
+public sealed class TimeLockPolicyEngine
+{
+}
+    public IReadOnlyList<TimeLockRule> Rules;;
+    public TimeLockPolicyEngine();
+    public TimeLockPolicy EvaluatePolicy(string? dataClassification, string? complianceFramework, string? contentType);
+    public (TimeLockPolicy Policy, string RuleName) GetEffectivePolicy(string? dataClassification, string? complianceFramework, string? contentType);
+    public void AddRule(TimeLockRule rule);
+    public bool RemoveRule(string ruleName);
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
+public sealed record TimeLockRule
+{
+}
+    public required string Name { get; init; }
+    public required int Priority { get; init; }
+    public string? DataClassificationPattern { get; init; }
+    public required string[] ComplianceFrameworks { get; init; }
+    public required string[] ContentTypePatterns { get; init; }
+    public required TimeSpan MinLockDuration { get; init; }
+    public required TimeSpan MaxLockDuration { get; init; }
+    public required TimeSpan DefaultLockDuration { get; init; }
+    public required VaccinationLevel VaccinationLevel { get; init; }
+    public required bool RequireMultiPartyUnlock { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/RansomwareVaccinationService.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
+public sealed class RansomwareVaccinationService
+{
+#endregion
+}
+    public RansomwareVaccinationService(IMessageBus messageBus);
+    public async Task<RansomwareVaccinationInfo> VaccinateAsync(Guid objectId, VaccinationLevel level, TimeLockPolicy policy, CancellationToken ct = default);
+    public async Task<RansomwareVaccinationInfo> VerifyVaccinationAsync(Guid objectId, CancellationToken ct = default);
+    public async IAsyncEnumerable<RansomwareVaccinationInfo> ScanAllAsync(int batchSize, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task<Dictionary<string, object>> GetThreatDashboardAsync(CancellationToken ct = default);
+    internal static double CalculateThreatScore(bool timeLockActive, bool integrityVerified, bool? pqcSignatureValid, bool? blockchainAnchored);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/TimeLockMessageBusIntegration.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
+public static class TimeLockMessageBusIntegration
+{
+}
+    public const string TimeLockLocked = "timelock.locked";
+    public const string TimeLockUnlocked = "timelock.unlocked";
+    public const string TimeLockExtended = "timelock.extended";
+    public const string TimeLockTamperDetected = "timelock.tamper.detected";
+    public const string TimeLockVaccinationScan = "timelock.vaccination.scan";
+    public const string TimeLockPolicyEvaluated = "timelock.policy.evaluated";
+    public static async Task PublishLockEventAsync(IMessageBus bus, TimeLockResult result, CancellationToken ct = default);
+    public static async Task PublishUnlockEventAsync(IMessageBus bus, Guid objectId, string lockId, UnlockConditionType reason, CancellationToken ct = default);
+    public static async Task PublishExtendEventAsync(IMessageBus bus, Guid objectId, TimeSpan newDuration, CancellationToken ct = default);
+    public static async Task PublishTamperDetectedEventAsync(IMessageBus bus, Guid objectId, string details, CancellationToken ct = default);
+    public static async Task PublishVaccinationScanEventAsync(IMessageBus bus, Guid objectId, RansomwareVaccinationInfo vaccinationInfo, CancellationToken ct = default);
+    public static async Task PublishPolicyEvaluatedEventAsync(IMessageBus bus, string? dataClassification, string? complianceFramework, string? contentType, string selectedRuleName, TimeLockPolicy policy, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/SoftwareTimeLockProvider.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
+public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override TimeLockMode DefaultMode;;
+    public override TimeLockPolicy Policy { get; };
+    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
+    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
+    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
+    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Registration/TimeLockRegistration.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto time-lock integration")]
+public static class TimeLockRegistration
+{
+}
+    public static async Task<IReadOnlyList<TimeLockProviderPluginBase>> RegisterTimeLockProviders(IMessageBus bus, string sourcePluginId = "com.datawarehouse.tamperproof");
+    public static async Task<RansomwareVaccinationService> RegisterVaccinationService(IMessageBus bus, string sourcePluginId = "com.datawarehouse.tamperproof");
+    public static TimeLockPolicyEngine RegisterPolicyEngine();
+    public static async Task PublishTimeLockCapabilities(IMessageBus bus, int providerCount = 3, string sourcePluginId = "com.datawarehouse.tamperproof");
 }
 ```
 
@@ -152,702 +307,6 @@ public sealed class TamperProofScalingManager : IScalableSubsystem, IBackpressur
     }
 }
     public void Dispose();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/ComplianceReportingService.cs
-```csharp
-public interface IComplianceReportingService
-{
-}
-    Task<ComplianceReport> GenerateReportAsync(ComplianceReportRequest request, CancellationToken ct = default);;
-    Task<AttestationResult> CreateAttestationAsync(AttestationRequest request, CancellationToken ct = default);;
-    Task<bool> VerifyAttestationAsync(string attestationToken, CancellationToken ct = default);;
-    Task<IReadOnlyList<ComplianceViolation>> GetViolationsAsync(DateTime? since = null, CancellationToken ct = default);;
-    Task<RetentionPolicySummary> GetRetentionPolicyStatusAsync(CancellationToken ct = default);;
-    Task<LegalHoldSummary> GetLegalHoldStatusAsync(CancellationToken ct = default);;
-}
-```
-```csharp
-public class ComplianceReportingService : IComplianceReportingService
-{
-#endregion
-}
-    public ComplianceReportingService(TamperIncidentService incidentService, BlockchainVerificationService blockchainService, TamperProofConfiguration config, ILogger<ComplianceReportingService> logger);
-    public async Task<ComplianceReport> GenerateReportAsync(ComplianceReportRequest request, CancellationToken ct = default);
-    public async Task<AttestationResult> CreateAttestationAsync(AttestationRequest request, CancellationToken ct = default);
-    public async Task<bool> VerifyAttestationAsync(string attestationToken, CancellationToken ct = default);
-    public Task<IReadOnlyList<ComplianceViolation>> GetViolationsAsync(DateTime? since = null, CancellationToken ct = default);
-    public Task<RetentionPolicySummary> GetRetentionPolicyStatusAsync(CancellationToken ct = default);
-    public Task<LegalHoldSummary> GetLegalHoldStatusAsync(CancellationToken ct = default);
-    public void TrackBlock(Guid blockId, DateTimeOffset createdAt, DateTimeOffset? retentionExpiresAt);
-    public void RecordBlockVerification(Guid blockId, bool integrityValid);
-    public void ApplyLegalHold(Guid blockId, string holdId);
-    public void CreateLegalHold(string holdId, string holdName, string createdBy);
-}
-```
-```csharp
-private class IntegrityProof
-{
-}
-    public Guid BlockId { get; init; }
-    public required string ContentHash { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-    public bool HasBlockchainAnchor { get; init; }
-    public bool RetentionValid { get; init; }
-}
-```
-```csharp
-private class AttestationPayload
-{
-}
-    public Guid AttestationId { get; init; }
-    public required string AttesterIdentity { get; init; }
-    public required string Purpose { get; init; }
-    public required Guid[] BlockIds { get; init; }
-    public required string MerkleRoot { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-    public DateTimeOffset ValidUntil { get; init; }
-    public int ProofCount { get; init; }
-}
-```
-```csharp
-private class AttestationRecord
-{
-}
-    public Guid AttestationId { get; init; }
-    public required AttestationPayload Payload { get; init; }
-    public required string Signature { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-private class BlockTrackingInfo
-{
-}
-    public Guid BlockId { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? LastVerifiedAt { get; set; }
-    public bool? LastVerificationResult { get; set; }
-    public DateTimeOffset? RetentionExpiresAt { get; init; }
-    public required List<string> LegalHoldIds { get; init; }
-    public bool IsDeleted { get; set; }
-    public bool ModifiedAfterHold { get; set; }
-    public bool HasBlockchainAnchor { get; set; }
-    public string? ContentHash { get; set; }
-}
-```
-```csharp
-private class LegalHoldInfo
-{
-}
-    public required string HoldId { get; init; }
-    public required string HoldName { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public required string CreatedBy { get; init; }
-    public bool IsActive { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/RecoveryService.cs
-```csharp
-public class RecoveryService
-{
-}
-    public RecoveryService(PluginWormProvider worm, IIntegrityProvider integrity, IBlockchainProvider blockchain, IStorageProvider dataStorage, TamperIncidentService incidentService, TamperProofConfiguration config, ILogger<RecoveryService> logger);
-    public async Task<AdvancedRecoveryResult> RecoverFromWormAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
-    public async Task<AdvancedRecoveryResult> RecoverFromRaidParityAsync(TamperProofManifest manifest, List<int> corruptedShards, Dictionary<int, byte[]> availableShards, CancellationToken ct = default);
-    public async Task<AdvancedRecoveryResult> RecoverCorruptedShardsAsync(TamperProofManifest manifest, List<int> corruptedShardIndices, CancellationToken ct = default);
-    public async Task<ShardIntegrityCheckResult> VerifyShardIntegrityAsync(TamperProofManifest manifest, CancellationToken ct = default);
-    public async Task<AdvancedRecoveryResult> HandleManualOnlyRecoveryAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
-    public async Task HandleFailClosedRecoveryAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
-    public async Task<SecureCorrectionResult> SecureCorrectAsync(Guid blockId, byte[] correctedData, string authorizationToken, string reason, CancellationToken ct = default);
-}
-```
-```csharp
-internal class AuthorizationResult
-{
-}
-    public bool IsValid { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string AuthorizedBy { get; init; };
-}
-```
-```csharp
-internal class CorrectionApplicationResult
-{
-}
-    public bool Success { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-internal class SecureCorrectionAuditEntry
-{
-}
-    public Guid AuditId { get; init; }
-    public Guid BlockId { get; init; }
-    public int Version { get; init; }
-    public string OriginalHash { get; init; };
-    public string AuthorizedBy { get; init; };
-    public string Reason { get; init; };
-    public DateTimeOffset Timestamp { get; init; }
-    public SecureCorrectionAuditStatus Status { get; set; }
-}
-```
-```csharp
-internal class BlockSealRecord
-{
-}
-    public Guid ObjectId { get; init; }
-    public int Version { get; init; }
-    public DateTimeOffset SealedAt { get; init; }
-    public List<int>? AffectedShards { get; init; }
-    public string Reason { get; init; };
-}
-```
-```csharp
-public class AdvancedRecoveryResult
-{
-}
-    public required bool Success { get; init; }
-    public required Guid ObjectId { get; init; }
-    public required int Version { get; init; }
-    public required RecoverySource RecoverySource { get; init; }
-    public required List<RecoveryStep> RecoverySteps { get; init; }
-    public IntegrityHash? RestoredDataHash { get; init; }
-    public TamperIncidentReport? IncidentReport { get; init; }
-    public required DateTimeOffset StartedAt { get; init; }
-    public required DateTimeOffset CompletedAt { get; init; }
-    public TimeSpan Duration;;
-    public string? Details { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public class RecoveryStep
-{
-}
-    public required string StepName { get; init; }
-    public required DateTimeOffset StartedAt { get; init; }
-    public DateTimeOffset? CompletedAt { get; set; }
-    public required RecoveryStepStatus Status { get; set; }
-    public string? Details { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-```
-```csharp
-public class ShardIntegrityCheckResult
-{
-}
-    public required Guid ObjectId { get; init; }
-    public required int Version { get; init; }
-    public required int TotalShards { get; init; }
-    public required int ValidShards { get; init; }
-    public required List<int> CorruptedShards { get; init; }
-    public required List<int> MissingShards { get; init; }
-    public required List<ShardCheckResult> ShardResults { get; init; }
-    public required bool CanRecover { get; init; }
-    public required DateTimeOffset CheckedAt { get; init; }
-    public ShardHealthStatus OverallHealth
-{
-    get
-    {
-        if (CorruptedShards.Count == 0 && MissingShards.Count == 0)
-            return ShardHealthStatus.Healthy;
-        if (CanRecover)
-            return ShardHealthStatus.Degraded;
-        return ShardHealthStatus.Critical;
-    }
-}
-}
-```
-```csharp
-public class ShardCheckResult
-{
-}
-    public required int ShardIndex { get; init; }
-    public required ShardStatus Status { get; init; }
-    public required string ExpectedHash { get; init; }
-    public string? ActualHash { get; init; }
-    public long? SizeBytes { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/SealService.cs
-```csharp
-public interface ISealService
-{
-}
-    Task<SealResult> SealBlockAsync(Guid blockId, string reason, CancellationToken ct = default);;
-    Task<SealResult> SealShardAsync(Guid blockId, int shardIndex, string reason, CancellationToken ct = default);;
-    Task<SealResult> SealRangeAsync(DateTime from, DateTime to, string reason, CancellationToken ct = default);;
-    Task<bool> IsSealedAsync(Guid blockId, CancellationToken ct = default);;
-    Task<bool> IsShardSealedAsync(Guid blockId, int shardIndex, CancellationToken ct = default);;
-    Task<SealInfo?> GetSealInfoAsync(Guid blockId, CancellationToken ct = default);;
-    Task<IReadOnlyList<SealInfo>> GetAllSealsAsync(CancellationToken ct = default);;
-    Task<bool> VerifySealTokenAsync(Guid blockId, string sealToken, CancellationToken ct = default);;
-}
-```
-```csharp
-public record SealResult(bool Success, string SealToken, DateTime SealedAt, string Reason, string? Error = null)
-{
-}
-    public int SealedCount { get; init; };
-    public static SealResult CreateSuccess(string sealToken, string reason, int sealedCount = 1);
-    public static SealResult CreateFailure(string error, string reason);
-}
-```
-```csharp
-public record SealInfo(Guid BlockId, int? ShardIndex, DateTime SealedAt, string Reason, string SealToken, string SealedBy)
-{
-}
-    public DateTime? RangeStart { get; init; }
-    public DateTime? RangeEnd { get; init; }
-    public bool IsBlockSeal;;
-    public bool IsRangeSeal;;
-}
-```
-```csharp
-public class SealService : ISealService
-{
-}
-    public SealService(IStorageProvider? persistentStorage, string? sealingKeyBase64, ILogger<SealService> logger);
-    public SealService(ILogger<SealService> logger) : this(null, null, logger);
-    public async Task<SealResult> SealBlockAsync(Guid blockId, string reason, CancellationToken ct = default);
-    public async Task<SealResult> SealShardAsync(Guid blockId, int shardIndex, string reason, CancellationToken ct = default);
-    public async Task<SealResult> SealRangeAsync(DateTime from, DateTime to, string reason, CancellationToken ct = default);
-    public Task<bool> IsSealedAsync(Guid blockId, CancellationToken ct = default);
-    public Task<bool> IsShardSealedAsync(Guid blockId, int shardIndex, CancellationToken ct = default);
-    public Task<SealInfo?> GetSealInfoAsync(Guid blockId, CancellationToken ct = default);
-    public Task<IReadOnlyList<SealInfo>> GetAllSealsAsync(CancellationToken ct = default);
-    public Task<bool> VerifySealTokenAsync(Guid blockId, string sealToken, CancellationToken ct = default);
-    public async Task ThrowIfSealedAsync(Guid blockId, int? shardIndex, CancellationToken ct = default);
-    public IReadOnlyList<SealAuditEntry> GetAuditLog(DateTime? from = null, DateTime? to = null);
-}
-```
-```csharp
-private class SealRecord
-{
-}
-    public required Guid BlockId { get; init; }
-    public int? ShardIndex { get; init; }
-    public required string SealToken { get; init; }
-    public required DateTime SealedAt { get; init; }
-    public required string Reason { get; init; }
-    public required string SealedBy { get; init; }
-}
-```
-```csharp
-private class RangeSealRecord
-{
-}
-    public required DateTime RangeStart { get; init; }
-    public required DateTime RangeEnd { get; init; }
-    public required string SealToken { get; init; }
-    public required DateTime SealedAt { get; init; }
-    public required string Reason { get; init; }
-    public required string SealedBy { get; init; }
-}
-```
-```csharp
-public class SealAuditEntry
-{
-}
-    public required Guid EntryId { get; init; }
-    public required SealOperation Operation { get; init; }
-    public required Guid BlockId { get; init; }
-    public int? ShardIndex { get; init; }
-    public required string Reason { get; init; }
-    public required string Principal { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public string? AdditionalInfo { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/TamperIncidentService.cs
-```csharp
-public class TamperIncidentService
-{
-}
-    public TamperIncidentService(TamperProofConfiguration config, SdkAccessLogProvider? accessLogProvider, ILogger<TamperIncidentService> logger);
-    public TamperIncidentService(TamperProofConfiguration config, PluginAccessLogProvider? accessLogProvider, ILogger<TamperIncidentService> logger);
-    public async Task<TamperIncidentReport> RecordIncidentAsync(Guid objectId, int version, IntegrityHash expectedHash, IntegrityHash actualHash, string affectedInstance, List<int>? affectedShards, TamperRecoveryBehavior recoveryAction, bool recoverySucceeded, CancellationToken ct = default);
-    public Task<TamperIncidentReport?> GetLatestIncidentAsync(Guid objectId, CancellationToken ct = default);
-    public Task<IReadOnlyList<TamperIncidentReport>> GetIncidentsAsync(Guid objectId, CancellationToken ct = default);
-    public Task<IReadOnlyList<TamperIncidentReport>> QueryIncidentsAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
-    public Task<TamperIncidentStatistics> GetStatisticsAsync(CancellationToken ct = default);
-}
-```
-```csharp
-public class TamperIncidentStatistics
-{
-}
-    public required int TotalIncidents { get; init; }
-    public required int RecoveredCount { get; init; }
-    public required int FailedRecoveryCount { get; init; }
-    public required Dictionary<AttributionConfidence, int> IncidentsByConfidence { get; init; }
-    public required int IncidentsLast24Hours { get; init; }
-    public required int AffectedObjectCount { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/AuditTrailService.cs
-```csharp
-public interface IAuditTrailService
-{
-}
-    Task<TamperProofAuditEntry> LogOperationAsync(AuditOperation operation, CancellationToken ct = default);;
-    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailAsync(Guid blockId, CancellationToken ct = default);;
-    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByTimeRangeAsync(DateTime from, DateTime to, CancellationToken ct = default);;
-    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByOperationTypeAsync(AuditOperationType operationType, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);;
-    Task<ProvenanceChain> GetProvenanceChainAsync(Guid blockId, CancellationToken ct = default);;
-    Task<bool> VerifyProvenanceChainAsync(Guid blockId, CancellationToken ct = default);;
-    Task<ProvenanceChainVerificationResult> VerifyProvenanceChainDetailedAsync(Guid blockId, CancellationToken ct = default);;
-    Task<AuditTrailStatistics> GetStatisticsAsync(CancellationToken ct = default);;
-}
-```
-```csharp
-public class AuditTrailService : IAuditTrailService
-{
-}
-    public AuditTrailService(TamperProofConfiguration config, ILogger<AuditTrailService> logger);
-    public Task<TamperProofAuditEntry> LogOperationAsync(AuditOperation operation, CancellationToken ct);
-    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailAsync(Guid blockId, CancellationToken ct);
-    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByTimeRangeAsync(DateTime from, DateTime to, CancellationToken ct);
-    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByOperationTypeAsync(AuditOperationType operationType, DateTime? from, DateTime? to, CancellationToken ct);
-    public Task<ProvenanceChain> GetProvenanceChainAsync(Guid blockId, CancellationToken ct);
-    public Task<bool> VerifyProvenanceChainAsync(Guid blockId, CancellationToken ct);
-    public Task<ProvenanceChainVerificationResult> VerifyProvenanceChainDetailedAsync(Guid blockId, CancellationToken ct);
-    public Task<AuditTrailStatistics> GetStatisticsAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/MessageBusIntegration.cs
-```csharp
-public class MessageBusIntegrationService
-{
-}
-    public MessageBusIntegrationService(IMessageBus? messageBus, TamperProofConfiguration config, ILogger<MessageBusIntegrationService> logger);
-    public bool IsAvailable;;
-    public async Task<EncryptionResponse?> RequestEncryptionAsync(byte[] data, string keyId, string? algorithmHint = null, CancellationToken ct = default);
-    public async Task<DecryptionResponse?> RequestDecryptionAsync(byte[] encryptedData, string keyId, CancellationToken ct = default);
-    public async Task<KeyGenerationResponse?> RequestKeyGenerationAsync(string keyPurpose, string keyType = "AES256", CancellationToken ct = default);
-    public async Task<KeyRetrievalResponse?> RequestKeyRetrievalAsync(string keyId, CancellationToken ct = default);
-    public async Task<WormAccessValidationResponse?> ValidateWormAccessAsync(Guid objectId, string principal, AccessType accessType, CancellationToken ct = default);
-    public async Task PublishTamperAlertAsync(TamperIncidentReport incident, CancellationToken ct = default);
-    public async Task PublishRecoveryNotificationAsync(Guid objectId, string recoverySource, bool success, CancellationToken ct = default);
-}
-```
-```csharp
-public class EncryptionRequest
-{
-}
-    public required Guid RequestId { get; init; }
-    public required byte[] Data { get; init; }
-    public required string KeyId { get; init; }
-    public string? AlgorithmHint { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-}
-```
-```csharp
-public class EncryptionResponse
-{
-}
-    public required Guid RequestId { get; init; }
-    public required bool Success { get; init; }
-    public byte[]? EncryptedData { get; init; }
-    public string? Algorithm { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public class DecryptionRequest
-{
-}
-    public required Guid RequestId { get; init; }
-    public required byte[] EncryptedData { get; init; }
-    public required string KeyId { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-}
-```
-```csharp
-public class DecryptionResponse
-{
-}
-    public required Guid RequestId { get; init; }
-    public required bool Success { get; init; }
-    public byte[]? DecryptedData { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public class KeyGenerationRequest
-{
-}
-    public required Guid RequestId { get; init; }
-    public required string Purpose { get; init; }
-    public required string KeyType { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-}
-```
-```csharp
-public class KeyGenerationResponse
-{
-}
-    public required Guid RequestId { get; init; }
-    public required bool Success { get; init; }
-    public string? KeyId { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public class KeyRetrievalRequest
-{
-}
-    public required Guid RequestId { get; init; }
-    public required string KeyId { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-}
-```
-```csharp
-public class KeyRetrievalResponse
-{
-}
-    public required Guid RequestId { get; init; }
-    public required bool Success { get; init; }
-    public byte[]? KeyMaterial { get; init; }
-    public string? KeyType { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public class WormAccessValidationRequest
-{
-}
-    public required Guid RequestId { get; init; }
-    public required Guid ObjectId { get; init; }
-    public required string Principal { get; init; }
-    public required AccessType AccessType { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-}
-```
-```csharp
-public class WormAccessValidationResponse
-{
-}
-    public required Guid RequestId { get; init; }
-    public required bool Allowed { get; init; }
-    public string? DenialReason { get; init; }
-    public DateTimeOffset? RetentionExpiresAt { get; init; }
-    public bool? HasLegalHold { get; init; }
-}
-```
-```csharp
-public class TamperAlert
-{
-}
-    public required Guid AlertId { get; init; }
-    public required Guid IncidentId { get; init; }
-    public required Guid ObjectId { get; init; }
-    public required AlertSeverity Severity { get; init; }
-    public required string Message { get; init; }
-    public TamperIncidentReport? IncidentDetails { get; init; }
-    public required DateTimeOffset PublishedAt { get; init; }
-}
-```
-```csharp
-public class RecoveryNotification
-{
-}
-    public required Guid NotificationId { get; init; }
-    public required Guid ObjectId { get; init; }
-    public required string RecoverySource { get; init; }
-    public required bool Success { get; init; }
-    public required DateTimeOffset NotifiedAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/BlockchainVerificationService.cs
-```csharp
-public class BlockchainVerificationService
-{
-}
-    public BlockchainVerificationService(IBlockchainProvider blockchain, ILogger<BlockchainVerificationService> logger);
-    public async Task<BlockchainVerificationResult> VerifyAnchorAsync(Guid objectId, IntegrityHash expectedHash, CancellationToken ct = default);
-    public async Task<AuditChain> GetAuditChainAsync(Guid objectId, CancellationToken ct = default);
-    public async Task<bool> ValidateChainIntegrityAsync(CancellationToken ct = default);
-    public async Task<BlockInfo> GetLatestBlockAsync(CancellationToken ct = default);
-    public async Task<ExternalAnchorResult> CreateExternalAnchorAsync(Guid objectId, string merkleRoot, string targetChain, CancellationToken ct = default);
-}
-```
-```csharp
-public class ExternalAnchorResult
-{
-}
-    public required bool Success { get; init; }
-    public required ExternalAnchorRecord AnchorRecord { get; init; }
-    public string? Message { get; init; }
-}
-```
-```csharp
-public record ExternalAnchorRecord
-{
-}
-    public required Guid AnchorId { get; init; }
-    public required Guid ObjectId { get; init; }
-    public required string MerkleRoot { get; init; }
-    public required string TargetChain { get; init; }
-    public required DateTimeOffset CreatedAt { get; init; }
-    public required ExternalAnchorStatus Status { get; init; }
-    public string? ExternalTransactionId { get; init; }
-    public DateTimeOffset? ConfirmedAt { get; init; }
-}
-```
-```csharp
-public class BlockchainVerificationResult
-{
-}
-    public required bool Success { get; init; }
-    public required Guid ObjectId { get; init; }
-    public long? BlockNumber { get; init; }
-    public DateTimeOffset? AnchoredAt { get; init; }
-    public int? Confirmations { get; init; }
-    public BlockchainAnchor? Anchor { get; init; }
-    public string? ErrorMessage { get; init; }
-    public IntegrityHash? ExpectedHash { get; init; }
-    public IntegrityHash? ActualHash { get; init; }
-    public static BlockchainVerificationResult CreateSuccess(Guid objectId, long blockNumber, DateTimeOffset anchoredAt, int confirmations, BlockchainAnchor? anchor);
-    public static BlockchainVerificationResult CreateFailure(Guid objectId, string errorMessage, IntegrityHash? expectedHash, IntegrityHash? actualHash);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/RetentionPolicyService.cs
-```csharp
-public interface IRetentionPolicyService
-{
-}
-    Task<RetentionPolicy> SetPolicyAsync(Guid blockId, RetentionPolicy policy, CancellationToken ct = default);;
-    Task<RetentionPolicy?> GetPolicyAsync(Guid blockId, CancellationToken ct = default);;
-    Task<bool> IsRetainedAsync(Guid blockId, CancellationToken ct = default);;
-    Task<LegalHoldResult> ApplyLegalHoldAsync(Guid blockId, LegalHoldRequest request, CancellationToken ct = default);;
-    Task<LegalHoldResult> ReleaseLegalHoldAsync(Guid blockId, string holdId, string authorizedBy, CancellationToken ct = default);;
-    Task<IReadOnlyList<RetentionLegalHold>> GetActiveLegalHoldsAsync(Guid blockId, CancellationToken ct = default);;
-    Task<RetentionReport> GetRetentionReportAsync(CancellationToken ct = default);;
-    Task<DeletionValidationResult> ValidateDeletionAsync(Guid blockId, CancellationToken ct = default);;
-    Task<RetentionPolicy> ExtendRetentionAsync(Guid blockId, DateTime newRetainUntil, string extendedBy, CancellationToken ct = default);;
-}
-```
-```csharp
-public class RetentionPolicyService : IRetentionPolicyService
-{
-}
-    public RetentionPolicyService(ILogger<RetentionPolicyService> logger);
-    public Task<RetentionPolicy> SetPolicyAsync(Guid blockId, RetentionPolicy policy, CancellationToken ct = default);
-    public Task<RetentionPolicy?> GetPolicyAsync(Guid blockId, CancellationToken ct = default);
-    public async Task<bool> IsRetainedAsync(Guid blockId, CancellationToken ct = default);
-    public Task<LegalHoldResult> ApplyLegalHoldAsync(Guid blockId, LegalHoldRequest request, CancellationToken ct = default);
-    public Task<LegalHoldResult> ReleaseLegalHoldAsync(Guid blockId, string holdId, string authorizedBy, CancellationToken ct = default);
-    public Task<IReadOnlyList<RetentionLegalHold>> GetActiveLegalHoldsAsync(Guid blockId, CancellationToken ct = default);
-    public async Task<RetentionReport> GetRetentionReportAsync(CancellationToken ct = default);
-    public async Task<DeletionValidationResult> ValidateDeletionAsync(Guid blockId, CancellationToken ct = default);
-    public Task<RetentionPolicy> ExtendRetentionAsync(Guid blockId, DateTime newRetainUntil, string extendedBy, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/OrphanCleanupService.cs
-```csharp
-internal class OrphanCleanupService : IDisposable, IAsyncDisposable
-{
-}
-    public OrphanCleanupService(ILogger<OrphanCleanupService> logger, TimeSpan? scanInterval = null);
-    public Task StartAsync(CancellationToken ct = default);
-    public async Task StopAsync(CancellationToken ct = default);
-    public void RegisterOrphan(OrphanedWormRecord orphan);
-    public void RegisterSuccessfulTransaction(string contentHash, Guid transactionId, Guid objectId);
-    public OrphanCleanupStatus GetStatus();
-    public async Task<int> ProcessOrphansAsync(CancellationToken ct = default);
-    public void Dispose();
-    protected virtual void Dispose(bool disposing);
-    public async ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/BackgroundIntegrityScanner.cs
-```csharp
-public interface IBackgroundIntegrityScanner
-{
-}
-    Task StartAsync(CancellationToken ct = default);;
-    Task StopAsync(CancellationToken ct = default);;
-    ScannerStatus GetStatus();;
-    Task<ScanResult> ScanBlockAsync(Guid blockId, CancellationToken ct = default);;
-    Task<FullScanResult> RunFullScanAsync(CancellationToken ct = default);;
-    event EventHandler<IntegrityViolationEventArgs>? ViolationDetected;
-}
-```
-```csharp
-public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposable, IAsyncDisposable
-{
-}
-    public event EventHandler<IntegrityViolationEventArgs>? ViolationDetected;
-    public BackgroundIntegrityScanner(RecoveryService recoveryService, IStorageProvider metadataStorage, IStorageProvider dataStorage, ILogger<BackgroundIntegrityScanner> logger, TimeSpan? scanInterval = null, int batchSize = 100);
-    public async Task StartAsync(CancellationToken ct = default);
-    public async Task StopAsync(CancellationToken ct = default);
-    public ScannerStatus GetStatus();
-    public async Task<ScanResult> ScanBlockAsync(Guid blockId, CancellationToken ct = default);
-    public async Task<FullScanResult> RunFullScanAsync(CancellationToken ct = default);
-    protected virtual void OnViolationDetected(IntegrityViolationEventArgs e);
-    public void TrackBlock(Guid blockId);
-    public void Dispose();
-    public async ValueTask DisposeAsync();
-    protected virtual void Dispose(bool disposing);
-    protected virtual async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-public class IntegrityViolationEventArgs : EventArgs
-{
-}
-    public Guid BlockId { get; init; }
-    public IReadOnlyList<ShardViolation> Violations { get; init; };
-    public DateTime DetectedAt { get; init; }
-}
-```
-```csharp
-internal class BlockIndex
-{
-}
-    public List<Guid>? BlockIds { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/DegradationStateService.cs
-```csharp
-public class StateChangedEventArgs : EventArgs
-{
-}
-    public required string InstanceId { get; init; }
-    public required InstanceDegradationState OldState { get; init; }
-    public required InstanceDegradationState NewState { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required string Reason { get; init; }
-    public bool IsAdminOverride { get; init; }
-    public string? AdminPrincipal { get; init; }
-}
-```
-```csharp
-internal class DegradationStateService
-{
-}
-    public event EventHandler<StateChangedEventArgs>? StateChanged;
-    public DegradationStateService(ILogger<DegradationStateService> logger);
-    public Task<bool> TransitionStateAsync(string instanceId, InstanceDegradationState newState, string? reason = null);
-    public InstanceDegradationState GetCurrentState(string instanceId);
-    public Task AdminOverrideStateAsync(string instanceId, InstanceDegradationState newState, string adminPrincipal, string reason);
-    public async Task<InstanceDegradationState> DetectStateAsync(string instanceId, HealthCheckResult healthCheck);
 }
 ```
 
@@ -1045,158 +504,699 @@ public static class ReadAuditTrailExtensions
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/Registration/TimeLockRegistration.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/OrphanCleanupService.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto time-lock integration")]
-public static class TimeLockRegistration
+internal class OrphanCleanupService : IDisposable, IAsyncDisposable
 {
 }
-    public static async Task<IReadOnlyList<TimeLockProviderPluginBase>> RegisterTimeLockProviders(IMessageBus bus, string sourcePluginId = "com.datawarehouse.tamperproof");
-    public static async Task<RansomwareVaccinationService> RegisterVaccinationService(IMessageBus bus, string sourcePluginId = "com.datawarehouse.tamperproof");
-    public static TimeLockPolicyEngine RegisterPolicyEngine();
-    public static async Task PublishTimeLockCapabilities(IMessageBus bus, int providerCount = 3, string sourcePluginId = "com.datawarehouse.tamperproof");
+    public OrphanCleanupService(ILogger<OrphanCleanupService> logger, TimeSpan? scanInterval = null);
+    public Task StartAsync(CancellationToken ct = default);
+    public async Task StopAsync(CancellationToken ct = default);
+    public void RegisterOrphan(OrphanedWormRecord orphan);
+    public void RegisterSuccessfulTransaction(string contentHash, Guid transactionId, Guid objectId);
+    public OrphanCleanupStatus GetStatus();
+    public async Task<int> ProcessOrphansAsync(CancellationToken ct = default);
+    public void Dispose();
+    protected virtual void Dispose(bool disposing);
+    public async ValueTask DisposeAsync();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/TimeLockMessageBusIntegration.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/RetentionPolicyService.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
-public static class TimeLockMessageBusIntegration
+public interface IRetentionPolicyService
 {
 }
-    public const string TimeLockLocked = "timelock.locked";
-    public const string TimeLockUnlocked = "timelock.unlocked";
-    public const string TimeLockExtended = "timelock.extended";
-    public const string TimeLockTamperDetected = "timelock.tamper.detected";
-    public const string TimeLockVaccinationScan = "timelock.vaccination.scan";
-    public const string TimeLockPolicyEvaluated = "timelock.policy.evaluated";
-    public static async Task PublishLockEventAsync(IMessageBus bus, TimeLockResult result, CancellationToken ct = default);
-    public static async Task PublishUnlockEventAsync(IMessageBus bus, Guid objectId, string lockId, UnlockConditionType reason, CancellationToken ct = default);
-    public static async Task PublishExtendEventAsync(IMessageBus bus, Guid objectId, TimeSpan newDuration, CancellationToken ct = default);
-    public static async Task PublishTamperDetectedEventAsync(IMessageBus bus, Guid objectId, string details, CancellationToken ct = default);
-    public static async Task PublishVaccinationScanEventAsync(IMessageBus bus, Guid objectId, RansomwareVaccinationInfo vaccinationInfo, CancellationToken ct = default);
-    public static async Task PublishPolicyEvaluatedEventAsync(IMessageBus bus, string? dataClassification, string? complianceFramework, string? contentType, string selectedRuleName, TimeLockPolicy policy, CancellationToken ct = default);
+    Task<RetentionPolicy> SetPolicyAsync(Guid blockId, RetentionPolicy policy, CancellationToken ct = default);;
+    Task<RetentionPolicy?> GetPolicyAsync(Guid blockId, CancellationToken ct = default);;
+    Task<bool> IsRetainedAsync(Guid blockId, CancellationToken ct = default);;
+    Task<LegalHoldResult> ApplyLegalHoldAsync(Guid blockId, LegalHoldRequest request, CancellationToken ct = default);;
+    Task<LegalHoldResult> ReleaseLegalHoldAsync(Guid blockId, string holdId, string authorizedBy, CancellationToken ct = default);;
+    Task<IReadOnlyList<RetentionLegalHold>> GetActiveLegalHoldsAsync(Guid blockId, CancellationToken ct = default);;
+    Task<RetentionReport> GetRetentionReportAsync(CancellationToken ct = default);;
+    Task<DeletionValidationResult> ValidateDeletionAsync(Guid blockId, CancellationToken ct = default);;
+    Task<RetentionPolicy> ExtendRetentionAsync(Guid blockId, DateTime newRetainUntil, string extendedBy, CancellationToken ct = default);;
+}
+```
+```csharp
+public class RetentionPolicyService : IRetentionPolicyService
+{
+}
+    public RetentionPolicyService(ILogger<RetentionPolicyService> logger);
+    public Task<RetentionPolicy> SetPolicyAsync(Guid blockId, RetentionPolicy policy, CancellationToken ct = default);
+    public Task<RetentionPolicy?> GetPolicyAsync(Guid blockId, CancellationToken ct = default);
+    public async Task<bool> IsRetainedAsync(Guid blockId, CancellationToken ct = default);
+    public Task<LegalHoldResult> ApplyLegalHoldAsync(Guid blockId, LegalHoldRequest request, CancellationToken ct = default);
+    public Task<LegalHoldResult> ReleaseLegalHoldAsync(Guid blockId, string holdId, string authorizedBy, CancellationToken ct = default);
+    public Task<IReadOnlyList<RetentionLegalHold>> GetActiveLegalHoldsAsync(Guid blockId, CancellationToken ct = default);
+    public async Task<RetentionReport> GetRetentionReportAsync(CancellationToken ct = default);
+    public async Task<DeletionValidationResult> ValidateDeletionAsync(Guid blockId, CancellationToken ct = default);
+    public Task<RetentionPolicy> ExtendRetentionAsync(Guid blockId, DateTime newRetainUntil, string extendedBy, CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/SoftwareTimeLockProvider.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/SealService.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
-public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
+public interface ISealService
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override TimeLockMode DefaultMode;;
-    public override TimeLockPolicy Policy { get; };
-    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
-    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
-    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
-    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+    Task<SealResult> SealBlockAsync(Guid blockId, string reason, CancellationToken ct = default);;
+    Task<SealResult> SealShardAsync(Guid blockId, int shardIndex, string reason, CancellationToken ct = default);;
+    Task<SealResult> SealRangeAsync(DateTime from, DateTime to, string reason, CancellationToken ct = default);;
+    Task<bool> IsSealedAsync(Guid blockId, CancellationToken ct = default);;
+    Task<bool> IsShardSealedAsync(Guid blockId, int shardIndex, CancellationToken ct = default);;
+    Task<SealInfo?> GetSealInfoAsync(Guid blockId, CancellationToken ct = default);;
+    Task<IReadOnlyList<SealInfo>> GetAllSealsAsync(CancellationToken ct = default);;
+    Task<bool> VerifySealTokenAsync(Guid blockId, string sealToken, CancellationToken ct = default);;
+}
+```
+```csharp
+public record SealResult(bool Success, string SealToken, DateTime SealedAt, string Reason, string? Error = null)
+{
+}
+    public int SealedCount { get; init; };
+    public static SealResult CreateSuccess(string sealToken, string reason, int sealedCount = 1);
+    public static SealResult CreateFailure(string error, string reason);
+}
+```
+```csharp
+public record SealInfo(Guid BlockId, int? ShardIndex, DateTime SealedAt, string Reason, string SealToken, string SealedBy)
+{
+}
+    public DateTime? RangeStart { get; init; }
+    public DateTime? RangeEnd { get; init; }
+    public bool IsBlockSeal;;
+    public bool IsRangeSeal;;
+}
+```
+```csharp
+public class SealService : ISealService
+{
+}
+    public SealService(IStorageProvider? persistentStorage, string? sealingKeyBase64, ILogger<SealService> logger);
+    public SealService(ILogger<SealService> logger) : this(null, null, logger);
+    public async Task<SealResult> SealBlockAsync(Guid blockId, string reason, CancellationToken ct = default);
+    public async Task<SealResult> SealShardAsync(Guid blockId, int shardIndex, string reason, CancellationToken ct = default);
+    public async Task<SealResult> SealRangeAsync(DateTime from, DateTime to, string reason, CancellationToken ct = default);
+    public Task<bool> IsSealedAsync(Guid blockId, CancellationToken ct = default);
+    public Task<bool> IsShardSealedAsync(Guid blockId, int shardIndex, CancellationToken ct = default);
+    public Task<SealInfo?> GetSealInfoAsync(Guid blockId, CancellationToken ct = default);
+    public Task<IReadOnlyList<SealInfo>> GetAllSealsAsync(CancellationToken ct = default);
+    public Task<bool> VerifySealTokenAsync(Guid blockId, string sealToken, CancellationToken ct = default);
+    public async Task ThrowIfSealedAsync(Guid blockId, int? shardIndex, CancellationToken ct = default);
+    public IReadOnlyList<SealAuditEntry> GetAuditLog(DateTime? from = null, DateTime? to = null);
+}
+```
+```csharp
+private class SealRecord
+{
+}
+    public required Guid BlockId { get; init; }
+    public int? ShardIndex { get; init; }
+    public required string SealToken { get; init; }
+    public required DateTime SealedAt { get; init; }
+    public required string Reason { get; init; }
+    public required string SealedBy { get; init; }
+}
+```
+```csharp
+private class RangeSealRecord
+{
+}
+    public required DateTime RangeStart { get; init; }
+    public required DateTime RangeEnd { get; init; }
+    public required string SealToken { get; init; }
+    public required DateTime SealedAt { get; init; }
+    public required string Reason { get; init; }
+    public required string SealedBy { get; init; }
+}
+```
+```csharp
+public class SealAuditEntry
+{
+}
+    public required Guid EntryId { get; init; }
+    public required SealOperation Operation { get; init; }
+    public required Guid BlockId { get; init; }
+    public int? ShardIndex { get; init; }
+    public required string Reason { get; init; }
+    public required string Principal { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public string? AdditionalInfo { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/TimeLockPolicyEngine.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/ComplianceReportingService.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
-public sealed class TimeLockPolicyEngine
+public interface IComplianceReportingService
 {
 }
-    public IReadOnlyList<TimeLockRule> Rules;;
-    public TimeLockPolicyEngine();
-    public TimeLockPolicy EvaluatePolicy(string? dataClassification, string? complianceFramework, string? contentType);
-    public (TimeLockPolicy Policy, string RuleName) GetEffectivePolicy(string? dataClassification, string? complianceFramework, string? contentType);
-    public void AddRule(TimeLockRule rule);
-    public bool RemoveRule(string ruleName);
+    Task<ComplianceReport> GenerateReportAsync(ComplianceReportRequest request, CancellationToken ct = default);;
+    Task<AttestationResult> CreateAttestationAsync(AttestationRequest request, CancellationToken ct = default);;
+    Task<bool> VerifyAttestationAsync(string attestationToken, CancellationToken ct = default);;
+    Task<IReadOnlyList<ComplianceViolation>> GetViolationsAsync(DateTime? since = null, CancellationToken ct = default);;
+    Task<RetentionPolicySummary> GetRetentionPolicyStatusAsync(CancellationToken ct = default);;
+    Task<LegalHoldSummary> GetLegalHoldStatusAsync(CancellationToken ct = default);;
 }
 ```
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
-public sealed record TimeLockRule
-{
-}
-    public required string Name { get; init; }
-    public required int Priority { get; init; }
-    public string? DataClassificationPattern { get; init; }
-    public required string[] ComplianceFrameworks { get; init; }
-    public required string[] ContentTypePatterns { get; init; }
-    public required TimeSpan MinLockDuration { get; init; }
-    public required TimeSpan MaxLockDuration { get; init; }
-    public required TimeSpan DefaultLockDuration { get; init; }
-    public required VaccinationLevel VaccinationLevel { get; init; }
-    public required bool RequireMultiPartyUnlock { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/RansomwareVaccinationService.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
-public sealed class RansomwareVaccinationService
+public class ComplianceReportingService : IComplianceReportingService
 {
 #endregion
 }
-    public RansomwareVaccinationService(IMessageBus messageBus);
-    public async Task<RansomwareVaccinationInfo> VaccinateAsync(Guid objectId, VaccinationLevel level, TimeLockPolicy policy, CancellationToken ct = default);
-    public async Task<RansomwareVaccinationInfo> VerifyVaccinationAsync(Guid objectId, CancellationToken ct = default);
-    public async IAsyncEnumerable<RansomwareVaccinationInfo> ScanAllAsync(int batchSize, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task<Dictionary<string, object>> GetThreatDashboardAsync(CancellationToken ct = default);
-    internal static double CalculateThreatScore(bool timeLockActive, bool integrityVerified, bool? pqcSignatureValid, bool? blockchainAnchored);
+    public ComplianceReportingService(TamperIncidentService incidentService, BlockchainVerificationService blockchainService, TamperProofConfiguration config, ILogger<ComplianceReportingService> logger);
+    public async Task<ComplianceReport> GenerateReportAsync(ComplianceReportRequest request, CancellationToken ct = default);
+    public async Task<AttestationResult> CreateAttestationAsync(AttestationRequest request, CancellationToken ct = default);
+    public async Task<bool> VerifyAttestationAsync(string attestationToken, CancellationToken ct = default);
+    public Task<IReadOnlyList<ComplianceViolation>> GetViolationsAsync(DateTime? since = null, CancellationToken ct = default);
+    public Task<RetentionPolicySummary> GetRetentionPolicyStatusAsync(CancellationToken ct = default);
+    public Task<LegalHoldSummary> GetLegalHoldStatusAsync(CancellationToken ct = default);
+    public void TrackBlock(Guid blockId, DateTimeOffset createdAt, DateTimeOffset? retentionExpiresAt);
+    public void RecordBlockVerification(Guid blockId, bool integrityValid);
+    public void ApplyLegalHold(Guid blockId, string holdId);
+    public void CreateLegalHold(string holdId, string holdName, string createdBy);
+}
+```
+```csharp
+private class IntegrityProof
+{
+}
+    public Guid BlockId { get; init; }
+    public required string ContentHash { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public bool HasBlockchainAnchor { get; init; }
+    public bool RetentionValid { get; init; }
+}
+```
+```csharp
+private class AttestationPayload
+{
+}
+    public Guid AttestationId { get; init; }
+    public required string AttesterIdentity { get; init; }
+    public required string Purpose { get; init; }
+    public required Guid[] BlockIds { get; init; }
+    public required string MerkleRoot { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public DateTimeOffset ValidUntil { get; init; }
+    public int ProofCount { get; init; }
+}
+```
+```csharp
+private class AttestationRecord
+{
+}
+    public Guid AttestationId { get; init; }
+    public required AttestationPayload Payload { get; init; }
+    public required string Signature { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+private class BlockTrackingInfo
+{
+}
+    public Guid BlockId { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastVerifiedAt { get; set; }
+    public bool? LastVerificationResult { get; set; }
+    public DateTimeOffset? RetentionExpiresAt { get; init; }
+    public required List<string> LegalHoldIds { get; init; }
+    public bool IsDeleted { get; set; }
+    public bool ModifiedAfterHold { get; set; }
+    public bool HasBlockchainAnchor { get; set; }
+    public string? ContentHash { get; set; }
+}
+```
+```csharp
+private class LegalHoldInfo
+{
+}
+    public required string HoldId { get; init; }
+    public required string HoldName { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public required string CreatedBy { get; init; }
+    public bool IsActive { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/CloudTimeLockProvider.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/MessageBusIntegration.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
-public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
+public class MessageBusIntegrationService
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override TimeLockMode DefaultMode;;
-    public override TimeLockPolicy Policy { get; };
-    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
-    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
-    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
-    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+    public MessageBusIntegrationService(IMessageBus? messageBus, TamperProofConfiguration config, ILogger<MessageBusIntegrationService> logger);
+    public bool IsAvailable;;
+    public async Task<EncryptionResponse?> RequestEncryptionAsync(byte[] data, string keyId, string? algorithmHint = null, CancellationToken ct = default);
+    public async Task<DecryptionResponse?> RequestDecryptionAsync(byte[] encryptedData, string keyId, CancellationToken ct = default);
+    public async Task<KeyGenerationResponse?> RequestKeyGenerationAsync(string keyPurpose, string keyType = "AES256", CancellationToken ct = default);
+    public async Task<KeyRetrievalResponse?> RequestKeyRetrievalAsync(string keyId, CancellationToken ct = default);
+    public async Task<WormAccessValidationResponse?> ValidateWormAccessAsync(Guid objectId, string principal, AccessType accessType, CancellationToken ct = default);
+    public async Task PublishTamperAlertAsync(TamperIncidentReport incident, CancellationToken ct = default);
+    public async Task PublishRecoveryNotificationAsync(Guid objectId, string recoverySource, bool success, CancellationToken ct = default);
 }
 ```
 ```csharp
-private static class CloudProviders
+public class EncryptionRequest
 {
 }
-    public const string AwsS3 = "aws-s3-object-lock";
-    public const string AzureBlob = "azure-immutable-blob";
-    public const string GcsRetention = "gcs-retention-policy";
-    public const string Auto = "auto-detect";
+    public required Guid RequestId { get; init; }
+    public required byte[] Data { get; init; }
+    public required string KeyId { get; init; }
+    public string? AlgorithmHint { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+}
+```
+```csharp
+public class EncryptionResponse
+{
+}
+    public required Guid RequestId { get; init; }
+    public required bool Success { get; init; }
+    public byte[]? EncryptedData { get; init; }
+    public string? Algorithm { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public class DecryptionRequest
+{
+}
+    public required Guid RequestId { get; init; }
+    public required byte[] EncryptedData { get; init; }
+    public required string KeyId { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+}
+```
+```csharp
+public class DecryptionResponse
+{
+}
+    public required Guid RequestId { get; init; }
+    public required bool Success { get; init; }
+    public byte[]? DecryptedData { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public class KeyGenerationRequest
+{
+}
+    public required Guid RequestId { get; init; }
+    public required string Purpose { get; init; }
+    public required string KeyType { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+}
+```
+```csharp
+public class KeyGenerationResponse
+{
+}
+    public required Guid RequestId { get; init; }
+    public required bool Success { get; init; }
+    public string? KeyId { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public class KeyRetrievalRequest
+{
+}
+    public required Guid RequestId { get; init; }
+    public required string KeyId { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+}
+```
+```csharp
+public class KeyRetrievalResponse
+{
+}
+    public required Guid RequestId { get; init; }
+    public required bool Success { get; init; }
+    public byte[]? KeyMaterial { get; init; }
+    public string? KeyType { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public class WormAccessValidationRequest
+{
+}
+    public required Guid RequestId { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required string Principal { get; init; }
+    public required AccessType AccessType { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+}
+```
+```csharp
+public class WormAccessValidationResponse
+{
+}
+    public required Guid RequestId { get; init; }
+    public required bool Allowed { get; init; }
+    public string? DenialReason { get; init; }
+    public DateTimeOffset? RetentionExpiresAt { get; init; }
+    public bool? HasLegalHold { get; init; }
+}
+```
+```csharp
+public class TamperAlert
+{
+}
+    public required Guid AlertId { get; init; }
+    public required Guid IncidentId { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public TamperIncidentReport? IncidentDetails { get; init; }
+    public required DateTimeOffset PublishedAt { get; init; }
+}
+```
+```csharp
+public class RecoveryNotification
+{
+}
+    public required Guid NotificationId { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required string RecoverySource { get; init; }
+    public required bool Success { get; init; }
+    public required DateTimeOffset NotifiedAt { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.TamperProof/TimeLock/HsmTimeLockProvider.cs
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/AuditTrailService.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Ransomware vaccination")]
-public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
+public interface IAuditTrailService
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override TimeLockMode DefaultMode;;
-    public override TimeLockPolicy Policy { get; };
-    protected override async Task<TimeLockResult> LockInternalAsync(TimeLockRequest request, CancellationToken ct);
-    protected override async Task ExtendLockInternalAsync(Guid objectId, TimeSpan additionalDuration, CancellationToken ct);
-    protected override async Task<bool> AttemptUnlockInternalAsync(Guid objectId, UnlockCondition condition, CancellationToken ct);
-    public override Task<TimeLockStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<bool> IsLockedAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<RansomwareVaccinationInfo> GetVaccinationInfoAsync(Guid objectId, CancellationToken ct = default);
-    public override Task<IReadOnlyList<TimeLockStatus>> ListLockedObjectsAsync(int limit, int offset, CancellationToken ct = default);
+    Task<TamperProofAuditEntry> LogOperationAsync(AuditOperation operation, CancellationToken ct = default);;
+    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailAsync(Guid blockId, CancellationToken ct = default);;
+    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByTimeRangeAsync(DateTime from, DateTime to, CancellationToken ct = default);;
+    Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByOperationTypeAsync(AuditOperationType operationType, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);;
+    Task<ProvenanceChain> GetProvenanceChainAsync(Guid blockId, CancellationToken ct = default);;
+    Task<bool> VerifyProvenanceChainAsync(Guid blockId, CancellationToken ct = default);;
+    Task<ProvenanceChainVerificationResult> VerifyProvenanceChainDetailedAsync(Guid blockId, CancellationToken ct = default);;
+    Task<AuditTrailStatistics> GetStatisticsAsync(CancellationToken ct = default);;
+}
+```
+```csharp
+public class AuditTrailService : IAuditTrailService
+{
+}
+    public AuditTrailService(TamperProofConfiguration config, ILogger<AuditTrailService> logger);
+    public Task<TamperProofAuditEntry> LogOperationAsync(AuditOperation operation, CancellationToken ct);
+    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailAsync(Guid blockId, CancellationToken ct);
+    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByTimeRangeAsync(DateTime from, DateTime to, CancellationToken ct);
+    public Task<IReadOnlyList<TamperProofAuditEntry>> GetAuditTrailByOperationTypeAsync(AuditOperationType operationType, DateTime? from, DateTime? to, CancellationToken ct);
+    public Task<ProvenanceChain> GetProvenanceChainAsync(Guid blockId, CancellationToken ct);
+    public Task<bool> VerifyProvenanceChainAsync(Guid blockId, CancellationToken ct);
+    public Task<ProvenanceChainVerificationResult> VerifyProvenanceChainDetailedAsync(Guid blockId, CancellationToken ct);
+    public Task<AuditTrailStatistics> GetStatisticsAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/BackgroundIntegrityScanner.cs
+```csharp
+public interface IBackgroundIntegrityScanner
+{
+}
+    Task StartAsync(CancellationToken ct = default);;
+    Task StopAsync(CancellationToken ct = default);;
+    ScannerStatus GetStatus();;
+    Task<ScanResult> ScanBlockAsync(Guid blockId, CancellationToken ct = default);;
+    Task<FullScanResult> RunFullScanAsync(CancellationToken ct = default);;
+    event EventHandler<IntegrityViolationEventArgs>? ViolationDetected;
+}
+```
+```csharp
+public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposable, IAsyncDisposable
+{
+}
+    public event EventHandler<IntegrityViolationEventArgs>? ViolationDetected;
+    public BackgroundIntegrityScanner(RecoveryService recoveryService, IStorageProvider metadataStorage, IStorageProvider dataStorage, ILogger<BackgroundIntegrityScanner> logger, TimeSpan? scanInterval = null, int batchSize = 100);
+    public async Task StartAsync(CancellationToken ct = default);
+    public async Task StopAsync(CancellationToken ct = default);
+    public ScannerStatus GetStatus();
+    public async Task<ScanResult> ScanBlockAsync(Guid blockId, CancellationToken ct = default);
+    public async Task<FullScanResult> RunFullScanAsync(CancellationToken ct = default);
+    protected virtual void OnViolationDetected(IntegrityViolationEventArgs e);
+    public void TrackBlock(Guid blockId);
+    public void Dispose();
+    public async ValueTask DisposeAsync();
+    protected virtual void Dispose(bool disposing);
+    protected virtual async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+public class IntegrityViolationEventArgs : EventArgs
+{
+}
+    public Guid BlockId { get; init; }
+    public IReadOnlyList<ShardViolation> Violations { get; init; };
+    public DateTime DetectedAt { get; init; }
+}
+```
+```csharp
+internal class BlockIndex
+{
+}
+    public List<Guid>? BlockIds { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/BlockchainVerificationService.cs
+```csharp
+public class BlockchainVerificationService
+{
+}
+    public BlockchainVerificationService(IBlockchainProvider blockchain, ILogger<BlockchainVerificationService> logger);
+    public async Task<BlockchainVerificationResult> VerifyAnchorAsync(Guid objectId, IntegrityHash expectedHash, CancellationToken ct = default);
+    public async Task<AuditChain> GetAuditChainAsync(Guid objectId, CancellationToken ct = default);
+    public async Task<bool> ValidateChainIntegrityAsync(CancellationToken ct = default);
+    public async Task<BlockInfo> GetLatestBlockAsync(CancellationToken ct = default);
+    public async Task<ExternalAnchorResult> CreateExternalAnchorAsync(Guid objectId, string merkleRoot, string targetChain, CancellationToken ct = default);
+}
+```
+```csharp
+public class ExternalAnchorResult
+{
+}
+    public required bool Success { get; init; }
+    public required ExternalAnchorRecord AnchorRecord { get; init; }
+    public string? Message { get; init; }
+}
+```
+```csharp
+public record ExternalAnchorRecord
+{
+}
+    public required Guid AnchorId { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required string MerkleRoot { get; init; }
+    public required string TargetChain { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public required ExternalAnchorStatus Status { get; init; }
+    public string? ExternalTransactionId { get; init; }
+    public DateTimeOffset? ConfirmedAt { get; init; }
+}
+```
+```csharp
+public class BlockchainVerificationResult
+{
+}
+    public required bool Success { get; init; }
+    public required Guid ObjectId { get; init; }
+    public long? BlockNumber { get; init; }
+    public DateTimeOffset? AnchoredAt { get; init; }
+    public int? Confirmations { get; init; }
+    public BlockchainAnchor? Anchor { get; init; }
+    public string? ErrorMessage { get; init; }
+    public IntegrityHash? ExpectedHash { get; init; }
+    public IntegrityHash? ActualHash { get; init; }
+    public static BlockchainVerificationResult CreateSuccess(Guid objectId, long blockNumber, DateTimeOffset anchoredAt, int confirmations, BlockchainAnchor? anchor);
+    public static BlockchainVerificationResult CreateFailure(Guid objectId, string errorMessage, IntegrityHash? expectedHash, IntegrityHash? actualHash);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/RecoveryService.cs
+```csharp
+public class RecoveryService
+{
+}
+    public RecoveryService(PluginWormProvider worm, IIntegrityProvider integrity, IBlockchainProvider blockchain, IStorageProvider dataStorage, TamperIncidentService incidentService, TamperProofConfiguration config, ILogger<RecoveryService> logger);
+    public async Task<AdvancedRecoveryResult> RecoverFromWormAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
+    public async Task<AdvancedRecoveryResult> RecoverFromRaidParityAsync(TamperProofManifest manifest, List<int> corruptedShards, Dictionary<int, byte[]> availableShards, CancellationToken ct = default);
+    public async Task<AdvancedRecoveryResult> RecoverCorruptedShardsAsync(TamperProofManifest manifest, List<int> corruptedShardIndices, CancellationToken ct = default);
+    public async Task<ShardIntegrityCheckResult> VerifyShardIntegrityAsync(TamperProofManifest manifest, CancellationToken ct = default);
+    public async Task<AdvancedRecoveryResult> HandleManualOnlyRecoveryAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
+    public async Task HandleFailClosedRecoveryAsync(TamperProofManifest manifest, IntegrityHash expectedHash, IntegrityHash actualHash, List<int>? affectedShards, CancellationToken ct = default);
+    public async Task<SecureCorrectionResult> SecureCorrectAsync(Guid blockId, byte[] correctedData, string authorizationToken, string reason, CancellationToken ct = default);
+}
+```
+```csharp
+internal class AuthorizationResult
+{
+}
+    public bool IsValid { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string AuthorizedBy { get; init; };
+}
+```
+```csharp
+internal class CorrectionApplicationResult
+{
+}
+    public bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+internal class SecureCorrectionAuditEntry
+{
+}
+    public Guid AuditId { get; init; }
+    public Guid BlockId { get; init; }
+    public int Version { get; init; }
+    public string OriginalHash { get; init; };
+    public string AuthorizedBy { get; init; };
+    public string Reason { get; init; };
+    public DateTimeOffset Timestamp { get; init; }
+    public SecureCorrectionAuditStatus Status { get; set; }
+}
+```
+```csharp
+internal class BlockSealRecord
+{
+}
+    public Guid ObjectId { get; init; }
+    public int Version { get; init; }
+    public DateTimeOffset SealedAt { get; init; }
+    public List<int>? AffectedShards { get; init; }
+    public string Reason { get; init; };
+}
+```
+```csharp
+public class AdvancedRecoveryResult
+{
+}
+    public required bool Success { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required int Version { get; init; }
+    public required RecoverySource RecoverySource { get; init; }
+    public required List<RecoveryStep> RecoverySteps { get; init; }
+    public IntegrityHash? RestoredDataHash { get; init; }
+    public TamperIncidentReport? IncidentReport { get; init; }
+    public required DateTimeOffset StartedAt { get; init; }
+    public required DateTimeOffset CompletedAt { get; init; }
+    public TimeSpan Duration;;
+    public string? Details { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public class RecoveryStep
+{
+}
+    public required string StepName { get; init; }
+    public required DateTimeOffset StartedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; set; }
+    public required RecoveryStepStatus Status { get; set; }
+    public string? Details { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
+```csharp
+public class ShardIntegrityCheckResult
+{
+}
+    public required Guid ObjectId { get; init; }
+    public required int Version { get; init; }
+    public required int TotalShards { get; init; }
+    public required int ValidShards { get; init; }
+    public required List<int> CorruptedShards { get; init; }
+    public required List<int> MissingShards { get; init; }
+    public required List<ShardCheckResult> ShardResults { get; init; }
+    public required bool CanRecover { get; init; }
+    public required DateTimeOffset CheckedAt { get; init; }
+    public ShardHealthStatus OverallHealth
+{
+    get
+    {
+        if (CorruptedShards.Count == 0 && MissingShards.Count == 0)
+            return ShardHealthStatus.Healthy;
+        if (CanRecover)
+            return ShardHealthStatus.Degraded;
+        return ShardHealthStatus.Critical;
+    }
+}
+}
+```
+```csharp
+public class ShardCheckResult
+{
+}
+    public required int ShardIndex { get; init; }
+    public required ShardStatus Status { get; init; }
+    public required string ExpectedHash { get; init; }
+    public string? ActualHash { get; init; }
+    public long? SizeBytes { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/DegradationStateService.cs
+```csharp
+public class StateChangedEventArgs : EventArgs
+{
+}
+    public required string InstanceId { get; init; }
+    public required InstanceDegradationState OldState { get; init; }
+    public required InstanceDegradationState NewState { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Reason { get; init; }
+    public bool IsAdminOverride { get; init; }
+    public string? AdminPrincipal { get; init; }
+}
+```
+```csharp
+internal class DegradationStateService
+{
+}
+    public event EventHandler<StateChangedEventArgs>? StateChanged;
+    public DegradationStateService(ILogger<DegradationStateService> logger);
+    public Task<bool> TransitionStateAsync(string instanceId, InstanceDegradationState newState, string? reason = null);
+    public InstanceDegradationState GetCurrentState(string instanceId);
+    public Task AdminOverrideStateAsync(string instanceId, InstanceDegradationState newState, string adminPrincipal, string reason);
+    public async Task<InstanceDegradationState> DetectStateAsync(string instanceId, HealthCheckResult healthCheck);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.TamperProof/Services/TamperIncidentService.cs
+```csharp
+public class TamperIncidentService
+{
+}
+    public TamperIncidentService(TamperProofConfiguration config, SdkAccessLogProvider? accessLogProvider, ILogger<TamperIncidentService> logger);
+    public TamperIncidentService(TamperProofConfiguration config, PluginAccessLogProvider? accessLogProvider, ILogger<TamperIncidentService> logger);
+    public async Task<TamperIncidentReport> RecordIncidentAsync(Guid objectId, int version, IntegrityHash expectedHash, IntegrityHash actualHash, string affectedInstance, List<int>? affectedShards, TamperRecoveryBehavior recoveryAction, bool recoverySucceeded, CancellationToken ct = default);
+    public Task<TamperIncidentReport?> GetLatestIncidentAsync(Guid objectId, CancellationToken ct = default);
+    public Task<IReadOnlyList<TamperIncidentReport>> GetIncidentsAsync(Guid objectId, CancellationToken ct = default);
+    public Task<IReadOnlyList<TamperIncidentReport>> QueryIncidentsAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
+    public Task<TamperIncidentStatistics> GetStatisticsAsync(CancellationToken ct = default);
+}
+```
+```csharp
+public class TamperIncidentStatistics
+{
+}
+    public required int TotalIncidents { get; init; }
+    public required int RecoveredCount { get; init; }
+    public required int FailedRecoveryCount { get; init; }
+    public required Dictionary<AttributionConfidence, int> IncidentsByConfidence { get; init; }
+    public required int IncidentsLast24Hours { get; init; }
+    public required int AffectedObjectCount { get; init; }
 }
 ```
 

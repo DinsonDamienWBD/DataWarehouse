@@ -5,67 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateRTOSBridge
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/UltimateRTOSBridgePlugin.cs
-```csharp
-public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
-{
-#endregion
-}
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override PluginCategory Category;;
-    public IReadOnlyCollection<IRtosStrategy> GetStrategies();;
-    public IRtosStrategy? GetStrategy(string strategyId);
-    public void RegisterStrategy(IRtosStrategy strategy);
-    public void SetDefaultStrategy(string strategyId);
-    public async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, string? strategyId = null, CancellationToken cancellationToken = default);
-    public override async Task StartAsync(CancellationToken ct);
-    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
-    protected override Task OnStartCoreAsync(CancellationToken ct);
-    public override Task StopAsync();
-    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
-{
-    get
-    {
-        var capabilities = new List<RegisteredCapability>
-        {
-            new()
-            {
-                CapabilityId = "rtos.ultimate",
-                PluginId = Id,
-                PluginName = Name,
-                PluginVersion = Version,
-                DisplayName = "Ultimate RTOS Bridge",
-                Description = "Safety-critical RTOS integration with deterministic I/O and safety certifications",
-                Category = SDK.Contracts.CapabilityCategory.Infrastructure,
-                Tags = ["rtos", "real-time", "safety-critical", "embedded", "deterministic"]
-            }
-        };
-        foreach (var(strategyId, strategy)in _strategies)
-        {
-            var tags = new List<string>
-            {
-                "rtos",
-                strategyId
-            };
-            tags.AddRange(strategy.Capabilities.SupportedStandards.Take(3));
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"rtos.{strategyId}", PluginId = Id, PluginName = Name, PluginVersion = Version, DisplayName = strategy.StrategyName, Description = $"RTOS strategy: {strategy.StrategyName}", Category = SDK.Contracts.CapabilityCategory.Infrastructure, Tags = tags.ToArray() });
-        }
-
-        return capabilities.AsReadOnly();
-    }
-}
-    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
-    protected override Dictionary<string, object> GetMetadata();
-    public override async Task OnMessageAsync(PluginMessage message);
-    public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    protected override void Dispose(bool disposing);
-    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default);;
-    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/IRtosStrategy.cs
 ```csharp
 public interface IRtosStrategy
@@ -147,6 +86,67 @@ public abstract class RtosStrategyBase : StrategyBase, IRtosStrategy
     public virtual Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken ct = default);
     public abstract Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);;
     protected RtosAuditEntry CreateAuditEntry(RtosOperationContext context, bool success, long latencyMicroseconds, string? dataHash = null);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/UltimateRTOSBridgePlugin.cs
+```csharp
+public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
+{
+#endregion
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override PluginCategory Category;;
+    public IReadOnlyCollection<IRtosStrategy> GetStrategies();;
+    public IRtosStrategy? GetStrategy(string strategyId);
+    public void RegisterStrategy(IRtosStrategy strategy);
+    public void SetDefaultStrategy(string strategyId);
+    public async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, string? strategyId = null, CancellationToken cancellationToken = default);
+    public override async Task StartAsync(CancellationToken ct);
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
+    protected override Task OnStartCoreAsync(CancellationToken ct);
+    public override Task StopAsync();
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+{
+    get
+    {
+        var capabilities = new List<RegisteredCapability>
+        {
+            new()
+            {
+                CapabilityId = "rtos.ultimate",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                DisplayName = "Ultimate RTOS Bridge",
+                Description = "Safety-critical RTOS integration with deterministic I/O and safety certifications",
+                Category = SDK.Contracts.CapabilityCategory.Infrastructure,
+                Tags = ["rtos", "real-time", "safety-critical", "embedded", "deterministic"]
+            }
+        };
+        foreach (var(strategyId, strategy)in _strategies)
+        {
+            var tags = new List<string>
+            {
+                "rtos",
+                strategyId
+            };
+            tags.AddRange(strategy.Capabilities.SupportedStandards.Take(3));
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"rtos.{strategyId}", PluginId = Id, PluginName = Name, PluginVersion = Version, DisplayName = strategy.StrategyName, Description = $"RTOS strategy: {strategy.StrategyName}", Category = SDK.Contracts.CapabilityCategory.Infrastructure, Tags = tags.ToArray() });
+        }
+
+        return capabilities.AsReadOnly();
+    }
+}
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
+    protected override Dictionary<string, object> GetMetadata();
+    public override async Task OnMessageAsync(PluginMessage message);
+    public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
+    protected override void Dispose(bool disposing);
+    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default);;
+    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
 }
 ```
 

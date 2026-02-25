@@ -177,86 +177,219 @@ public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDispo
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Scaling/LineageScalingManager.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Composition/ProvenanceCertificateService.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Paginated result for lineage queries")]
-public sealed class LineagePagedResult<T>
+[SdkCompatibility("3.0.0")]
+public sealed class ProvenanceCertificateService : IDisposable
 {
 }
-    public IReadOnlyList<T> Items { get; }
-    public int TotalCount { get; }
-    public bool HasMore { get; }
-    public LineagePagedResult(IReadOnlyList<T> items, int totalCount, bool hasMore);
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Lineage graph node")]
-public sealed class LineageNode
-{
-}
-    public string NodeId { get; }
-    public int Depth { get; }
-    public byte[]? Metadata { get; }
-    public LineageNode(string nodeId, int depth, byte[]? metadata = null);
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Lineage scaling with persistent graph, partitioned caches, paginated BFS")]
-public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
-{
-}
-    public const int DefaultPartitionCount = 16;
-    public const int DefaultMaxNodesPerPartition = 50_000;
-    public const int DefaultMaxTraversalDepth = 50;
-    public const double HotPartitionThreshold = 0.90;
-    public LineageScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? initialLimits = null, int? partitionCount = null, int? maxTraversalDepth = null);
-    public async Task PutNodeAsync(string nodeId, byte[] adjacencyData, CancellationToken ct = default);
-    public async Task<byte[]?> GetNodeAsync(string nodeId, CancellationToken ct = default);
-    public bool RemoveNode(string nodeId);
-    public LineagePagedResult<LineageNode> TraceLineage(string nodeId, LineageDirection direction, int maxDepth, int offset, int limit);
-    public int MaxTraversalDepth { get => _maxTraversalDepth; set => _maxTraversalDepth = Math.Max(1, value); }
-    public int PartitionCount;;
-    public long TotalNodeCount;;
-    public int GetPartitionCapacity(int partitionIndex);
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits
-{
-    get
-    {
-        lock (_configLock)
-        {
-            return _currentLimits;
-        }
-    }
-}
-    public BackpressureState CurrentBackpressureState
-{
-    get
-    {
-        long totalNodes = Interlocked.Read(ref _totalNodeCount);
-        long maxCapacity = 0;
-        for (int i = 0; i < _partitionCount; i++)
-            maxCapacity += _partitionCapacities[i];
-        if (maxCapacity == 0)
-            return BackpressureState.Normal;
-        double utilization = (double)totalNodes / maxCapacity;
-        return utilization switch
-        {
-            >= 0.85 => BackpressureState.Critical,
-            >= 0.50 => BackpressureState.Warning,
-            _ => BackpressureState.Normal
-        };
-    }
-}
+    public ProvenanceCertificateService(IMessageBus messageBus, ILogger? logger = null);
+    public void StartListening();
+    public async Task<ProvenanceCertificate> IssueCertificateAsync(string objectId, CancellationToken ct = default);
+    public async Task<CertificateVerificationResult> VerifyCertificateAsync(ProvenanceCertificate certificate, CancellationToken ct = default);
+    public Task<IReadOnlyList<ProvenanceCertificate>> GetCertificateHistoryAsync(string objectId, CancellationToken ct = default);
     public void Dispose();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/LineageStrategies.cs
 ```csharp
-private sealed class EdgeList
+public sealed class InMemoryGraphStrategy : LineageStrategyBase
 {
 }
-    public List<string>? Targets { get; set; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SqlTransformationStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class EtlPipelineStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ApiConsumptionStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ReportConsumptionStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/ActiveLineageStrategies.cs
+```csharp
+internal sealed class SelfTrackingDataStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
+}
+```
+```csharp
+internal sealed class RealTimeLineageCaptureStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+}
+```
+```csharp
+internal sealed class LineageInferenceStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RegisterSchema(string nodeId, Dictionary<string, string> schema);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+}
+```
+```csharp
+internal sealed class ImpactAnalysisEngineStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RegisterDependency(string sourceId, string targetId);
+    public void SetCriticality(string nodeId, double score);
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
+}
+```
+```csharp
+internal sealed class LineageVisualizationStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public string ExportDot(string rootNodeId);
+    public string ExportMermaid(string rootNodeId);
+    public string ExportJson(string rootNodeId);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/ConsciousnessLineageStrategies.cs
+```csharp
+internal sealed class MultiHopLineageBfsStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RegisterScore(string objectId, ConsciousnessScore? score);
+    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public Task<List<ConsciousnessLineageNode>> TraverseBfsAsync(string objectId, int maxDepth = 10, bool upstream = false, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+}
+```
+```csharp
+internal sealed class ConsciousnessAwareLineageStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public ConsciousnessAwareLineageStrategy(MultiHopLineageBfsStrategy bfsStrategy);
+    public async Task<ConsciousnessImpactResult> AnalyzeImpactAsync(string objectId, CancellationToken ct = default);
+    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
+}
+```
+```csharp
+internal sealed class ConsciousnessImpactPropagationStrategy : LineageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override LineageCategory Category;;
+    public override LineageStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public ConsciousnessImpactPropagationStrategy(MultiHopLineageBfsStrategy bfsStrategy);
+    public IReadOnlyList<LineagePropagationEvent> PropagationHistory;;
+    public async Task<List<LineagePropagationEvent>> PropagateAsync(string sourceObjectId, double oldScore, double newScore, CancellationToken ct = default);
+    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
 }
 ```
 
@@ -431,123 +564,6 @@ public sealed record CrossSystemEdge
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/LineageStrategies.cs
-```csharp
-public sealed class InMemoryGraphStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SqlTransformationStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class EtlPipelineStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ApiConsumptionStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ReportConsumptionStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/ConsciousnessLineageStrategies.cs
-```csharp
-internal sealed class MultiHopLineageBfsStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RegisterScore(string objectId, ConsciousnessScore? score);
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public Task<List<ConsciousnessLineageNode>> TraverseBfsAsync(string objectId, int maxDepth = 10, bool upstream = false, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-}
-```
-```csharp
-internal sealed class ConsciousnessAwareLineageStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public ConsciousnessAwareLineageStrategy(MultiHopLineageBfsStrategy bfsStrategy);
-    public async Task<ConsciousnessImpactResult> AnalyzeImpactAsync(string objectId, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
-}
-```
-```csharp
-internal sealed class ConsciousnessImpactPropagationStrategy : LineageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public ConsciousnessImpactPropagationStrategy(MultiHopLineageBfsStrategy bfsStrategy);
-    public IReadOnlyList<LineagePropagationEvent> PropagationHistory;;
-    public async Task<List<LineagePropagationEvent>> PropagateAsync(string sourceObjectId, double oldScore, double newScore, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/AdvancedLineageStrategies.cs
 ```csharp
 public sealed class BlastRadiusStrategy : LineageStrategyBase
@@ -647,101 +663,85 @@ public sealed class ExternalSourceStrategy : LineageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Strategies/ActiveLineageStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Scaling/LineageScalingManager.cs
 ```csharp
-internal sealed class SelfTrackingDataStrategy : LineageStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Paginated result for lineage queries")]
+public sealed class LineagePagedResult<T>
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
+    public IReadOnlyList<T> Items { get; }
+    public int TotalCount { get; }
+    public bool HasMore { get; }
+    public LineagePagedResult(IReadOnlyList<T> items, int totalCount, bool hasMore);
 }
 ```
 ```csharp
-internal sealed class RealTimeLineageCaptureStrategy : LineageStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Lineage graph node")]
+public sealed class LineageNode
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public string NodeId { get; }
+    public int Depth { get; }
+    public byte[]? Metadata { get; }
+    public LineageNode(string nodeId, int depth, byte[]? metadata = null);
 }
 ```
 ```csharp
-internal sealed class LineageInferenceStrategy : LineageStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Lineage scaling with persistent graph, partitioned caches, paginated BFS")]
+public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RegisterSchema(string nodeId, Dictionary<string, string> schema);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-}
-```
-```csharp
-internal sealed class ImpactAnalysisEngineStrategy : LineageStrategyBase
+    public const int DefaultPartitionCount = 16;
+    public const int DefaultMaxNodesPerPartition = 50_000;
+    public const int DefaultMaxTraversalDepth = 50;
+    public const double HotPartitionThreshold = 0.90;
+    public LineageScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? initialLimits = null, int? partitionCount = null, int? maxTraversalDepth = null);
+    public async Task PutNodeAsync(string nodeId, byte[] adjacencyData, CancellationToken ct = default);
+    public async Task<byte[]?> GetNodeAsync(string nodeId, CancellationToken ct = default);
+    public bool RemoveNode(string nodeId);
+    public LineagePagedResult<LineageNode> TraceLineage(string nodeId, LineageDirection direction, int maxDepth, int offset, int limit);
+    public int MaxTraversalDepth { get => _maxTraversalDepth; set => _maxTraversalDepth = Math.Max(1, value); }
+    public int PartitionCount;;
+    public long TotalNodeCount;;
+    public int GetPartitionCapacity(int partitionIndex);
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits
 {
+    get
+    {
+        lock (_configLock)
+        {
+            return _currentLimits;
+        }
+    }
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RegisterDependency(string sourceId, string targetId);
-    public void SetCriticality(string nodeId, double score);
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
-}
-```
-```csharp
-internal sealed class LineageVisualizationStrategy : LineageStrategyBase
+    public BackpressureState CurrentBackpressureState
 {
+    get
+    {
+        long totalNodes = Interlocked.Read(ref _totalNodeCount);
+        long maxCapacity = 0;
+        for (int i = 0; i < _partitionCount; i++)
+            maxCapacity += _partitionCapacities[i];
+        if (maxCapacity == 0)
+            return BackpressureState.Normal;
+        double utilization = (double)totalNodes / maxCapacity;
+        return utilization switch
+        {
+            >= 0.85 => BackpressureState.Critical,
+            >= 0.50 => BackpressureState.Warning,
+            _ => BackpressureState.Normal
+        };
+    }
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override LineageCategory Category;;
-    public override LineageStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
-    public string ExportDot(string rootNodeId);
-    public string ExportMermaid(string rootNodeId);
-    public string ExportJson(string rootNodeId);
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataLineage/Composition/ProvenanceCertificateService.cs
-```csharp
-[SdkCompatibility("3.0.0")]
-public sealed class ProvenanceCertificateService : IDisposable
-{
-}
-    public ProvenanceCertificateService(IMessageBus messageBus, ILogger? logger = null);
-    public void StartListening();
-    public async Task<ProvenanceCertificate> IssueCertificateAsync(string objectId, CancellationToken ct = default);
-    public async Task<CertificateVerificationResult> VerifyCertificateAsync(ProvenanceCertificate certificate, CancellationToken ct = default);
-    public Task<IReadOnlyList<ProvenanceCertificate>> GetCertificateHistoryAsync(string objectId, CancellationToken ct = default);
     public void Dispose();
+}
+```
+```csharp
+private sealed class EdgeList
+{
+}
+    public List<string>? Targets { get; set; }
 }
 ```

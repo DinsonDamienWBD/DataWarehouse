@@ -5,25 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UniversalFabric
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/AddressRouter.cs
-```csharp
-public sealed class AddressRouter
-{
-}
-    public IStorageStrategy? Resolve(StorageAddress address, IBackendRegistry registry);
-    public void MapBucket(string bucket, string backendId);
-    public void MapNode(string nodeId, string backendId);
-    public void MapCluster(string clusterName, string backendId);
-    public void SetDefaultBackend(string backendId);
-    public string? DefaultBackendId;;
-    public (string? backendId, string objectKey) ExtractRoutingKey(StorageAddress address, IBackendRegistry registry);
-    public bool UnmapBucket(string bucket);;
-    public bool UnmapNode(string nodeId);;
-    public bool UnmapCluster(string clusterName);;
-    public int TotalMappings;;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UniversalFabric/BackendRegistryImpl.cs
 ```csharp
 public sealed class BackendRegistryImpl : IBackendRegistry
@@ -40,6 +21,25 @@ public sealed class BackendRegistryImpl : IBackendRegistry
     public IReadOnlyList<BackendDescriptor> All;;
     public int Count;;
     public bool Contains(string backendId);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/AddressRouter.cs
+```csharp
+public sealed class AddressRouter
+{
+}
+    public IStorageStrategy? Resolve(StorageAddress address, IBackendRegistry registry);
+    public void MapBucket(string bucket, string backendId);
+    public void MapNode(string nodeId, string backendId);
+    public void MapCluster(string clusterName, string backendId);
+    public void SetDefaultBackend(string backendId);
+    public string? DefaultBackendId;;
+    public (string? backendId, string objectKey) ExtractRoutingKey(StorageAddress address, IBackendRegistry registry);
+    public bool UnmapBucket(string bucket);;
+    public bool UnmapNode(string nodeId);;
+    public bool UnmapCluster(string clusterName);;
+    public int TotalMappings;;
 }
 ```
 
@@ -73,258 +73,164 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Scaling/FabricScalingManager.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/MigrationProgress.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Fabric scaling with dynamic topology and health-based node management")]
-public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
+public record MigrationProgress
 {
 }
-    public event Action<TopologySwitchRecommendation>? OnTopologySwitchRecommended;
-    public event Action<string, NodeHealth>? OnNodeRemoved;
-    public event Action<string>? OnNodeDiscovered;
-    public FabricScalingManager(FabricTopology initialTopology = FabricTopology.Star, ScalingLimits? initialLimits = null, bool autoSwitchEnabled = true, int heartbeatIntervalMs = DefaultHeartbeatIntervalMs, int missedHeartbeatsThreshold = DefaultMissedHeartbeatsThreshold);
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits;;
-    public BackpressureState CurrentBackpressureState;;
-    public int GetMaxNodesForTopology(FabricTopology topology);
-    public void SetMaxNodesForTopology(FabricTopology topology, int maxNodes);
-    public FabricTopology CurrentTopology;;
-    public void ConfigureTopologySwitching(int starToMeshThreshold = DefaultStarToMeshThreshold, int meshToFederatedThreshold = DefaultMeshToFederatedThreshold, bool autoSwitch = true);
-    public void SwitchTopology(FabricTopology targetTopology);
-    public void RecordHeartbeat(string nodeId, IReadOnlyDictionary<string, string>? metadata = null);
-    public NodeHealth? GetNodeHealth(string nodeId);
-    public int ActiveNodeCount;;
-    public void ConfigureHeartbeat(int intervalMs, int missedThreshold);
-    public void Dispose();
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Node health tracking for fabric topology")]
-public sealed record NodeHealth
-{
-}
-    public required string NodeId { get; init; }
-    public required bool IsHealthy { get; init; }
-    public required DateTime LastHeartbeatUtc { get; init; }
-    public required int MissedHeartbeats { get; init; }
-    public required DateTime JoinedUtc { get; init; }
-    public IReadOnlyDictionary<string, string> Metadata { get; init; };
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Topology switch recommendation")]
-public sealed record TopologySwitchRecommendation
-{
-}
-    public required FabricTopology FromTopology { get; init; }
-    public required FabricTopology ToTopology { get; init; }
-    public required string Reason { get; init; }
-    public required int NodeCount { get; init; }
-    public required DateTime TimestampUtc { get; init; }
-    public required bool WasAutomatic { get; init; }
+    public required string JobId { get; init; }
+    public required MigrationJobStatus Status { get; init; }
+    public required long TotalObjects { get; init; }
+    public required long MigratedObjects { get; init; }
+    public required long FailedObjects { get; init; }
+    public required long SkippedObjects { get; init; }
+    public required long TotalBytes { get; init; }
+    public required long MigratedBytes { get; init; }
+    public double PercentComplete;;
+    public TimeSpan Elapsed { get; init; }
+    public double BytesPerSecond;;
+    public TimeSpan? EstimatedRemaining;;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementRule.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/LiveMigrationEngine.cs
 ```csharp
-public record PlacementCondition
+public class LiveMigrationEngine
 {
 }
-    public string? ContentTypePattern { get; init; }
-    public long? MinSizeBytes { get; init; }
-    public long? MaxSizeBytes { get; init; }
-    public IReadOnlySet<string>? MetadataKeys { get; init; }
-    public string? BucketPattern { get; init; }
-    public bool Matches(PlacementContext? context);
-}
-```
-```csharp
-public record PlacementRule
-{
-}
-    public required string Name { get; init; }
-    public PlacementRuleType Type { get; init; }
-    public PlacementCondition? Condition { get; init; }
-    public string? TargetBackendId { get; init; }
-    public IReadOnlySet<string>? RequiredTags { get; init; }
-    public IReadOnlySet<string>? ExcludedTags { get; init; }
-    public StorageTier? RequiredTier { get; init; }
-    public string? RequiredRegion { get; init; }
-    public int Priority { get; init; };
+    public LiveMigrationEngine(IStorageFabric fabric);
+    public Task<MigrationJob> StartMigrationAsync(MigrationJob job, CancellationToken ct = default);
+    public MigrationProgress? GetProgress(string jobId);
+    public void PauseJob(string jobId);
+    public void ResumeJob(string jobId);
+    public void CancelJob(string jobId);
+    public IReadOnlyList<MigrationJob> ListJobs();;
+    public MigrationJob? GetJob(string jobId);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementOptimizer.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/MigrationJob.cs
 ```csharp
-public class PlacementOptimizer
+public class MigrationJob
 {
 }
-    public PlacementOptimizer(IBackendRegistry registry, PlacementScorer? scorer = null);
-    public IReadOnlyList<PlacementRule> Rules
-{
-    get
-    {
-        _rulesLock.EnterReadLock();
-        try
-        {
-            return _rules.OrderBy(r => r.Priority).ToList().AsReadOnly();
-        }
-        finally
-        {
-            _rulesLock.ExitReadLock();
-        }
-    }
-}
-    public void AddRule(PlacementRule rule);
-    public bool RemoveRule(string ruleName);
-    public async Task<PlacementResult> SelectBackendAsync(StoragePlacementHints hints, PlacementContext? context = null, CancellationToken ct = default);
-    public async Task<IReadOnlyList<PlacementResult>> SelectBackendsAsync(StoragePlacementHints hints, int count, CancellationToken ct = default);
-}
-```
-```csharp
-public record PlacementResult
-{
-}
-    public required BackendDescriptor Backend { get; init; }
-    public required double Score { get; init; }
-    public required IReadOnlyDictionary<string, double> ScoreBreakdown { get; init; }
-    public IReadOnlyList<BackendDescriptor>? Alternatives { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementScorer.cs
-```csharp
-public record PlacementWeights
-{
-}
-    public double TierWeight { get; init; };
-    public double TagWeight { get; init; };
-    public double RegionWeight { get; init; };
-    public double CapacityWeight { get; init; };
-    public double PriorityWeight { get; init; };
-    public double HealthWeight { get; init; };
-    public double CapabilityWeight { get; init; };
-}
-```
-```csharp
-public class PlacementScorer
-{
-}
-    public PlacementScorer(PlacementWeights? weights = null);
-    public PlacementWeights Weights;;
-    public double Score(BackendDescriptor backend, StoragePlacementHints hints, StorageHealthInfo? health);
-    public ScoreBreakdown ScoreWithBreakdown(BackendDescriptor backend, StoragePlacementHints hints, StorageHealthInfo? health);
-}
-```
-```csharp
-public record ScoreBreakdown
-{
-}
-    public double TierScore { get; init; }
-    public double TagScore { get; init; }
-    public double RegionScore { get; init; }
-    public double CapacityScore { get; init; }
-    public double PriorityScore { get; init; }
-    public double HealthScore { get; init; }
-    public double CapabilityScore { get; init; }
-    public double TotalScore { get; init; }
-    public IReadOnlyDictionary<string, double> ToDictionary();;
+    public string JobId { get; };
+    public required string SourceBackendId { get; init; }
+    public required string DestinationBackendId { get; init; }
+    public string? SourcePrefix { get; init; }
+    public MigrationMode Mode { get; init; };
+    public MigrationJobStatus Status { get; private set; };
+    public DateTime CreatedAt { get; };
+    public DateTime? StartedAt { get; private set; }
+    public DateTime? CompletedAt { get; private set; }
+    public string? ErrorMessage { get; private set; }
+    public long TotalObjects;;
+    public long MigratedObjects;;
+    public long FailedObjects;;
+    public long SkippedObjects;;
+    public long TotalBytes;;
+    public long MigratedBytes;;
+    public int MaxConcurrency { get; init; };
+    public int MaxRetries { get; init; };
+    public bool VerifyAfterCopy { get; init; };
+    public bool DeleteSourceAfterVerify { get; init; }
+    public bool SkipExisting { get; init; };
+    public IReadOnlyList<MigrationFailure> Failures;;
+    public void Start();
+    public void Pause();
+    public void Resume();
+    public void Complete();
+    public void Fail(string error);
+    public void Cancel();
+    public void RecordMigrated(long bytes);
+    public void RecordFailed(string key, string error);
+    public void RecordSkipped();
+    public void SetTotal(long objects, long bytes);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementContext.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/ErrorNormalizer.cs
 ```csharp
-public record PlacementContext
+public class ErrorNormalizer
 {
 }
-    public string? ContentType { get; init; }
-    public long? ObjectSize { get; init; }
-    public IDictionary<string, string>? Metadata { get; init; }
-    public string? BucketName { get; init; }
-    public string? ObjectKey { get; init; }
+    public Exception Normalize(Exception ex, string backendId, string operation, string? key = null);
+    public bool IsRetryable(Exception ex);;
+    public bool ShouldFallback(Exception ex);;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3RequestParser.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/BackendAbstractionLayer.cs
 ```csharp
-public sealed class S3RequestParser
+public class BackendAbstractionLayer : IStorageStrategy
 {
 #endregion
 }
-    public S3Operation ParseOperation(HttpListenerRequest request);
-    public (string? Bucket, string? Key) ExtractBucketAndKey(HttpListenerRequest request);
-    public S3GetObjectRequest ParseGetObject(HttpListenerRequest req, string bucket, string key);
-    public S3PutObjectRequest ParsePutObject(HttpListenerRequest req, string bucket, string key);
-    public S3ListObjectsRequest ParseListObjects(HttpListenerRequest req, string bucket);
-    public S3InitiateMultipartRequest ParseInitiateMultipart(HttpListenerRequest req, string bucket, string key);
-    public S3UploadPartRequest ParseUploadPart(HttpListenerRequest req, string bucket, string key);
-    public async Task<S3CompleteMultipartRequest> ParseCompleteMultipartAsync(HttpListenerRequest req, string bucket, string key);
-    public S3CopyObjectRequest ParseCopyObject(HttpListenerRequest req, string destBucket, string destKey);
+    public BackendAbstractionLayer(IStorageStrategy inner, string backendId, ErrorNormalizer normalizer, FallbackChain? fallbackChain = null, BackendAbstractionOptions? options = null);
+    public string StrategyId;;
+    public string Name;;
+    public StorageTier Tier;;
+    public StorageCapabilities Capabilities;;
+    public async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);
+    public async Task DeleteAsync(string key, CancellationToken ct = default);
+    public async Task<bool> ExistsAsync(string key, CancellationToken ct = default);
+    public async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix = null, [EnumeratorCancellation] CancellationToken ct = default);
+    public async Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);
+    public async Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);
+    public async Task<long?> GetAvailableCapacityAsync(CancellationToken ct = default);
+    public int ConsecutiveFailures
+{
+    get
+    {
+        lock (_circuitLock)
+        {
+            return _consecutiveFailures;
+        }
+    }
+}
+    public bool IsCircuitOpen
+{
+    get
+    {
+        lock (_circuitLock)
+        {
+            return _consecutiveFailures >= _options.CircuitBreakerThreshold && DateTime.UtcNow < _circuitOpenUntil;
+        }
+    }
+}
+}
+```
+```csharp
+public record BackendAbstractionOptions
+{
+}
+    public TimeSpan OperationTimeout { get; init; };
+    public int CircuitBreakerThreshold { get; init; };
+    public TimeSpan CircuitBreakerCooldown { get; init; };
+    public bool EnableMetrics { get; init; };
+    public static BackendAbstractionOptions Default { get; };
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3SignatureV4.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/FallbackChain.cs
 ```csharp
-public sealed class S3SignatureV4 : IS3AuthProvider
+public class FallbackChain
 {
 }
-    public S3SignatureV4(S3CredentialStore credentialStore);
-    public Task<S3AuthResult> AuthenticateAsync(S3AuthContext context, CancellationToken ct = default);
-    public Task<S3Credentials> GetCredentialsAsync(string accessKeyId, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3BucketManager.cs
-```csharp
-public sealed class S3BucketManager
-{
-}
-    public S3BucketManager(IBackendRegistry registry, string storagePath);
-    public S3BucketInfo CreateBucket(string name, string? backendId = null, string? region = null);
-    public void DeleteBucket(string name);
-    public bool BucketExists(string name);
-    public IReadOnlyList<S3BucketInfo> ListBuckets();
-    public S3BucketInfo? GetBucket(string name);
-    public string? GetBackendId(string bucketName);
-    public void UpdateBucketStats(string bucketName, long objectCountDelta, long sizeDelta);
-    public void SetVersioning(string bucketName, bool enabled);
-    public int Count;;
-    public static bool IsValidBucketName(string name);
-    internal sealed class BucketEntry;
+    public FallbackChain(IBackendRegistry registry, ErrorNormalizer? normalizer = null);
+    public async Task<T> ExecuteWithFallbackAsync<T>(string primaryBackendId, Func<IStorageStrategy, Task<T>> operation, FallbackOptions? options = null, CancellationToken ct = default);
+    public async Task ExecuteWithFallbackAsync(string primaryBackendId, Func<IStorageStrategy, Task> operation, FallbackOptions? options = null, CancellationToken ct = default);
 }
 ```
 ```csharp
-internal sealed class BucketEntry
+public record FallbackOptions
 {
 }
-    public required string Name { get; set; }
-    public DateTime CreationDate { get; set; }
-    public string? BackendId { get; set; }
-    public string? Region { get; set; }
-    public bool VersioningEnabled { get; set; }
-    public long ObjectCount { get; set; }
-    public long TotalSizeBytes { get; set; }
-}
-```
-```csharp
-public record S3BucketInfo
-{
-}
-    public required string Name { get; init; }
-    public required DateTime CreationDate { get; init; }
-    public string? BackendId { get; init; }
-    public string? Region { get; init; }
-    public bool VersioningEnabled { get; init; }
-    public long ObjectCount { get; init; }
-    public long TotalSizeBytes { get; init; }
-}
-```
-```csharp
-[JsonSerializable(typeof(List<S3BucketManager.BucketEntry>))]
-internal partial class BucketJsonContext : JsonSerializerContext
-{
-}
+    public int MaxFallbackAttempts { get; init; };
+    public bool AllowCrossTierFallback { get; init; }
+    public bool AllowCrossRegionFallback { get; init; }
+    public static FallbackOptions Default { get; };
 }
 ```
 
@@ -435,163 +341,257 @@ public sealed class S3ResponseWriter
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/FallbackChain.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3BucketManager.cs
 ```csharp
-public class FallbackChain
+public sealed class S3BucketManager
 {
 }
-    public FallbackChain(IBackendRegistry registry, ErrorNormalizer? normalizer = null);
-    public async Task<T> ExecuteWithFallbackAsync<T>(string primaryBackendId, Func<IStorageStrategy, Task<T>> operation, FallbackOptions? options = null, CancellationToken ct = default);
-    public async Task ExecuteWithFallbackAsync(string primaryBackendId, Func<IStorageStrategy, Task> operation, FallbackOptions? options = null, CancellationToken ct = default);
+    public S3BucketManager(IBackendRegistry registry, string storagePath);
+    public S3BucketInfo CreateBucket(string name, string? backendId = null, string? region = null);
+    public void DeleteBucket(string name);
+    public bool BucketExists(string name);
+    public IReadOnlyList<S3BucketInfo> ListBuckets();
+    public S3BucketInfo? GetBucket(string name);
+    public string? GetBackendId(string bucketName);
+    public void UpdateBucketStats(string bucketName, long objectCountDelta, long sizeDelta);
+    public void SetVersioning(string bucketName, bool enabled);
+    public int Count;;
+    public static bool IsValidBucketName(string name);
+    internal sealed class BucketEntry;
 }
 ```
 ```csharp
-public record FallbackOptions
+internal sealed class BucketEntry
 {
 }
-    public int MaxFallbackAttempts { get; init; };
-    public bool AllowCrossTierFallback { get; init; }
-    public bool AllowCrossRegionFallback { get; init; }
-    public static FallbackOptions Default { get; };
+    public required string Name { get; set; }
+    public DateTime CreationDate { get; set; }
+    public string? BackendId { get; set; }
+    public string? Region { get; set; }
+    public bool VersioningEnabled { get; set; }
+    public long ObjectCount { get; set; }
+    public long TotalSizeBytes { get; set; }
+}
+```
+```csharp
+public record S3BucketInfo
+{
+}
+    public required string Name { get; init; }
+    public required DateTime CreationDate { get; init; }
+    public string? BackendId { get; init; }
+    public string? Region { get; init; }
+    public bool VersioningEnabled { get; init; }
+    public long ObjectCount { get; init; }
+    public long TotalSizeBytes { get; init; }
+}
+```
+```csharp
+[JsonSerializable(typeof(List<S3BucketManager.BucketEntry>))]
+internal partial class BucketJsonContext : JsonSerializerContext
+{
+}
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/ErrorNormalizer.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3RequestParser.cs
 ```csharp
-public class ErrorNormalizer
-{
-}
-    public Exception Normalize(Exception ex, string backendId, string operation, string? key = null);
-    public bool IsRetryable(Exception ex);;
-    public bool ShouldFallback(Exception ex);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Resilience/BackendAbstractionLayer.cs
-```csharp
-public class BackendAbstractionLayer : IStorageStrategy
+public sealed class S3RequestParser
 {
 #endregion
 }
-    public BackendAbstractionLayer(IStorageStrategy inner, string backendId, ErrorNormalizer normalizer, FallbackChain? fallbackChain = null, BackendAbstractionOptions? options = null);
-    public string StrategyId;;
-    public string Name;;
-    public StorageTier Tier;;
-    public StorageCapabilities Capabilities;;
-    public async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);
-    public async Task DeleteAsync(string key, CancellationToken ct = default);
-    public async Task<bool> ExistsAsync(string key, CancellationToken ct = default);
-    public async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix = null, [EnumeratorCancellation] CancellationToken ct = default);
-    public async Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);
-    public async Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);
-    public async Task<long?> GetAvailableCapacityAsync(CancellationToken ct = default);
-    public int ConsecutiveFailures
+    public S3Operation ParseOperation(HttpListenerRequest request);
+    public (string? Bucket, string? Key) ExtractBucketAndKey(HttpListenerRequest request);
+    public S3GetObjectRequest ParseGetObject(HttpListenerRequest req, string bucket, string key);
+    public S3PutObjectRequest ParsePutObject(HttpListenerRequest req, string bucket, string key);
+    public S3ListObjectsRequest ParseListObjects(HttpListenerRequest req, string bucket);
+    public S3InitiateMultipartRequest ParseInitiateMultipart(HttpListenerRequest req, string bucket, string key);
+    public S3UploadPartRequest ParseUploadPart(HttpListenerRequest req, string bucket, string key);
+    public async Task<S3CompleteMultipartRequest> ParseCompleteMultipartAsync(HttpListenerRequest req, string bucket, string key);
+    public S3CopyObjectRequest ParseCopyObject(HttpListenerRequest req, string destBucket, string destKey);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/S3Server/S3SignatureV4.cs
+```csharp
+public sealed class S3SignatureV4 : IS3AuthProvider
+{
+}
+    public S3SignatureV4(S3CredentialStore credentialStore);
+    public Task<S3AuthResult> AuthenticateAsync(S3AuthContext context, CancellationToken ct = default);
+    public Task<S3Credentials> GetCredentialsAsync(string accessKeyId, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementRule.cs
+```csharp
+public record PlacementCondition
+{
+}
+    public string? ContentTypePattern { get; init; }
+    public long? MinSizeBytes { get; init; }
+    public long? MaxSizeBytes { get; init; }
+    public IReadOnlySet<string>? MetadataKeys { get; init; }
+    public string? BucketPattern { get; init; }
+    public bool Matches(PlacementContext? context);
+}
+```
+```csharp
+public record PlacementRule
+{
+}
+    public required string Name { get; init; }
+    public PlacementRuleType Type { get; init; }
+    public PlacementCondition? Condition { get; init; }
+    public string? TargetBackendId { get; init; }
+    public IReadOnlySet<string>? RequiredTags { get; init; }
+    public IReadOnlySet<string>? ExcludedTags { get; init; }
+    public StorageTier? RequiredTier { get; init; }
+    public string? RequiredRegion { get; init; }
+    public int Priority { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementScorer.cs
+```csharp
+public record PlacementWeights
+{
+}
+    public double TierWeight { get; init; };
+    public double TagWeight { get; init; };
+    public double RegionWeight { get; init; };
+    public double CapacityWeight { get; init; };
+    public double PriorityWeight { get; init; };
+    public double HealthWeight { get; init; };
+    public double CapabilityWeight { get; init; };
+}
+```
+```csharp
+public class PlacementScorer
+{
+}
+    public PlacementScorer(PlacementWeights? weights = null);
+    public PlacementWeights Weights;;
+    public double Score(BackendDescriptor backend, StoragePlacementHints hints, StorageHealthInfo? health);
+    public ScoreBreakdown ScoreWithBreakdown(BackendDescriptor backend, StoragePlacementHints hints, StorageHealthInfo? health);
+}
+```
+```csharp
+public record ScoreBreakdown
+{
+}
+    public double TierScore { get; init; }
+    public double TagScore { get; init; }
+    public double RegionScore { get; init; }
+    public double CapacityScore { get; init; }
+    public double PriorityScore { get; init; }
+    public double HealthScore { get; init; }
+    public double CapabilityScore { get; init; }
+    public double TotalScore { get; init; }
+    public IReadOnlyDictionary<string, double> ToDictionary();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementContext.cs
+```csharp
+public record PlacementContext
+{
+}
+    public string? ContentType { get; init; }
+    public long? ObjectSize { get; init; }
+    public IDictionary<string, string>? Metadata { get; init; }
+    public string? BucketName { get; init; }
+    public string? ObjectKey { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Placement/PlacementOptimizer.cs
+```csharp
+public class PlacementOptimizer
+{
+}
+    public PlacementOptimizer(IBackendRegistry registry, PlacementScorer? scorer = null);
+    public IReadOnlyList<PlacementRule> Rules
 {
     get
     {
-        lock (_circuitLock)
+        _rulesLock.EnterReadLock();
+        try
         {
-            return _consecutiveFailures;
+            return _rules.OrderBy(r => r.Priority).ToList().AsReadOnly();
+        }
+        finally
+        {
+            _rulesLock.ExitReadLock();
         }
     }
 }
-    public bool IsCircuitOpen
-{
-    get
-    {
-        lock (_circuitLock)
-        {
-            return _consecutiveFailures >= _options.CircuitBreakerThreshold && DateTime.UtcNow < _circuitOpenUntil;
-        }
-    }
-}
+    public void AddRule(PlacementRule rule);
+    public bool RemoveRule(string ruleName);
+    public async Task<PlacementResult> SelectBackendAsync(StoragePlacementHints hints, PlacementContext? context = null, CancellationToken ct = default);
+    public async Task<IReadOnlyList<PlacementResult>> SelectBackendsAsync(StoragePlacementHints hints, int count, CancellationToken ct = default);
 }
 ```
 ```csharp
-public record BackendAbstractionOptions
+public record PlacementResult
 {
 }
-    public TimeSpan OperationTimeout { get; init; };
-    public int CircuitBreakerThreshold { get; init; };
-    public TimeSpan CircuitBreakerCooldown { get; init; };
-    public bool EnableMetrics { get; init; };
-    public static BackendAbstractionOptions Default { get; };
+    public required BackendDescriptor Backend { get; init; }
+    public required double Score { get; init; }
+    public required IReadOnlyDictionary<string, double> ScoreBreakdown { get; init; }
+    public IReadOnlyList<BackendDescriptor>? Alternatives { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/MigrationJob.cs
+### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Scaling/FabricScalingManager.cs
 ```csharp
-public class MigrationJob
+[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Fabric scaling with dynamic topology and health-based node management")]
+public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
 {
 }
-    public string JobId { get; };
-    public required string SourceBackendId { get; init; }
-    public required string DestinationBackendId { get; init; }
-    public string? SourcePrefix { get; init; }
-    public MigrationMode Mode { get; init; };
-    public MigrationJobStatus Status { get; private set; };
-    public DateTime CreatedAt { get; };
-    public DateTime? StartedAt { get; private set; }
-    public DateTime? CompletedAt { get; private set; }
-    public string? ErrorMessage { get; private set; }
-    public long TotalObjects;;
-    public long MigratedObjects;;
-    public long FailedObjects;;
-    public long SkippedObjects;;
-    public long TotalBytes;;
-    public long MigratedBytes;;
-    public int MaxConcurrency { get; init; };
-    public int MaxRetries { get; init; };
-    public bool VerifyAfterCopy { get; init; };
-    public bool DeleteSourceAfterVerify { get; init; }
-    public bool SkipExisting { get; init; };
-    public IReadOnlyList<MigrationFailure> Failures;;
-    public void Start();
-    public void Pause();
-    public void Resume();
-    public void Complete();
-    public void Fail(string error);
-    public void Cancel();
-    public void RecordMigrated(long bytes);
-    public void RecordFailed(string key, string error);
-    public void RecordSkipped();
-    public void SetTotal(long objects, long bytes);
+    public event Action<TopologySwitchRecommendation>? OnTopologySwitchRecommended;
+    public event Action<string, NodeHealth>? OnNodeRemoved;
+    public event Action<string>? OnNodeDiscovered;
+    public FabricScalingManager(FabricTopology initialTopology = FabricTopology.Star, ScalingLimits? initialLimits = null, bool autoSwitchEnabled = true, int heartbeatIntervalMs = DefaultHeartbeatIntervalMs, int missedHeartbeatsThreshold = DefaultMissedHeartbeatsThreshold);
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits;;
+    public BackpressureState CurrentBackpressureState;;
+    public int GetMaxNodesForTopology(FabricTopology topology);
+    public void SetMaxNodesForTopology(FabricTopology topology, int maxNodes);
+    public FabricTopology CurrentTopology;;
+    public void ConfigureTopologySwitching(int starToMeshThreshold = DefaultStarToMeshThreshold, int meshToFederatedThreshold = DefaultMeshToFederatedThreshold, bool autoSwitch = true);
+    public void SwitchTopology(FabricTopology targetTopology);
+    public void RecordHeartbeat(string nodeId, IReadOnlyDictionary<string, string>? metadata = null);
+    public NodeHealth? GetNodeHealth(string nodeId);
+    public int ActiveNodeCount;;
+    public void ConfigureHeartbeat(int intervalMs, int missedThreshold);
+    public void Dispose();
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/MigrationProgress.cs
 ```csharp
-public record MigrationProgress
+[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Node health tracking for fabric topology")]
+public sealed record NodeHealth
 {
 }
-    public required string JobId { get; init; }
-    public required MigrationJobStatus Status { get; init; }
-    public required long TotalObjects { get; init; }
-    public required long MigratedObjects { get; init; }
-    public required long FailedObjects { get; init; }
-    public required long SkippedObjects { get; init; }
-    public required long TotalBytes { get; init; }
-    public required long MigratedBytes { get; init; }
-    public double PercentComplete;;
-    public TimeSpan Elapsed { get; init; }
-    public double BytesPerSecond;;
-    public TimeSpan? EstimatedRemaining;;
+    public required string NodeId { get; init; }
+    public required bool IsHealthy { get; init; }
+    public required DateTime LastHeartbeatUtc { get; init; }
+    public required int MissedHeartbeats { get; init; }
+    public required DateTime JoinedUtc { get; init; }
+    public IReadOnlyDictionary<string, string> Metadata { get; init; };
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UniversalFabric/Migration/LiveMigrationEngine.cs
 ```csharp
-public class LiveMigrationEngine
+[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Topology switch recommendation")]
+public sealed record TopologySwitchRecommendation
 {
 }
-    public LiveMigrationEngine(IStorageFabric fabric);
-    public Task<MigrationJob> StartMigrationAsync(MigrationJob job, CancellationToken ct = default);
-    public MigrationProgress? GetProgress(string jobId);
-    public void PauseJob(string jobId);
-    public void ResumeJob(string jobId);
-    public void CancelJob(string jobId);
-    public IReadOnlyList<MigrationJob> ListJobs();;
-    public MigrationJob? GetJob(string jobId);
+    public required FabricTopology FromTopology { get; init; }
+    public required FabricTopology ToTopology { get; init; }
+    public required string Reason { get; init; }
+    public required int NodeCount { get; init; }
+    public required DateTime TimestampUtc { get; init; }
+    public required bool WasAutomatic { get; init; }
 }
 ```

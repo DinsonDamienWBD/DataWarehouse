@@ -5,32 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateCompute
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/ComputeRuntimeStrategyBase.cs
-```csharp
-internal abstract class ComputeRuntimeStrategyBase : StrategyBase, IComputeRuntimeStrategy
-{
-#endregion
-}
-    public abstract override string StrategyId { get; }
-    public abstract string StrategyName { get; }
-    public override string Name;;
-    public abstract ComputeRuntime Runtime { get; }
-    public abstract ComputeCapabilities Capabilities { get; }
-    public abstract IReadOnlyList<ComputeRuntime> SupportedRuntimes { get; }
-    public abstract Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);;
-    public new virtual Task InitializeAsync(CancellationToken cancellationToken = default);
-    public virtual Task DisposeAsync(CancellationToken cancellationToken = default);
-    protected record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);;
-    protected async Task<ProcessResult> RunProcessAsync(string executable, string arguments, string? stdin = null, string? workingDirectory = null, IReadOnlyDictionary<string, string>? environment = null, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
-    protected async Task<bool> IsToolAvailableAsync(string executable, string versionFlag = "--version", CancellationToken cancellationToken = default);
-    protected async Task<ComputeResult> MeasureExecutionAsync(string taskId, Func<Task<(byte[] output, string? logs)>> executeFunc, CancellationToken cancellationToken = default);
-    protected static void ValidateTask(ComputeTask task);
-    protected static TimeSpan GetEffectiveTimeout(ComputeTask task, TimeSpan? defaultTimeout = null);
-    protected static long GetMaxMemoryBytes(ComputeTask task, long defaultBytes = 256 * 1024 * 1024);
-    protected static byte[] EncodeOutput(string text);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompute/UltimateComputePlugin.cs
 ```csharp
 public sealed class UltimateComputePlugin : ComputePluginBase, IDisposable
@@ -109,61 +83,44 @@ internal sealed class ComputeRuntimeStrategyRegistry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Scaling/WasmScalingManager.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/ComputeRuntimeStrategyBase.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Per-module WASM configuration")]
-public sealed record WasmModuleConfig(string ModuleId, int MaxPages = 256, int MaxPoolSize = 10, bool PersistState = false)
+internal abstract class ComputeRuntimeStrategyBase : StrategyBase, IComputeRuntimeStrategy
 {
+#endregion
 }
-    public const int MinPages = 1;
-    public const int MaxPagesLimit = 65_536;
+    public abstract override string StrategyId { get; }
+    public abstract string StrategyName { get; }
+    public override string Name;;
+    public abstract ComputeRuntime Runtime { get; }
+    public abstract ComputeCapabilities Capabilities { get; }
+    public abstract IReadOnlyList<ComputeRuntime> SupportedRuntimes { get; }
+    public abstract Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);;
+    public new virtual Task InitializeAsync(CancellationToken cancellationToken = default);
+    public virtual Task DisposeAsync(CancellationToken cancellationToken = default);
+    protected record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);;
+    protected async Task<ProcessResult> RunProcessAsync(string executable, string arguments, string? stdin = null, string? workingDirectory = null, IReadOnlyDictionary<string, string>? environment = null, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
+    protected async Task<bool> IsToolAvailableAsync(string executable, string versionFlag = "--version", CancellationToken cancellationToken = default);
+    protected async Task<ComputeResult> MeasureExecutionAsync(string taskId, Func<Task<(byte[] output, string? logs)>> executeFunc, CancellationToken cancellationToken = default);
+    protected static void ValidateTask(ComputeTask task);
+    protected static TimeSpan GetEffectiveTimeout(ComputeTask task, TimeSpan? defaultTimeout = null);
+    protected static long GetMaxMemoryBytes(ComputeTask task, long defaultBytes = 256 * 1024 * 1024);
+    protected static byte[] EncodeOutput(string text);
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/SelfEmulatingComputeStrategy.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Warm WASM instance for pool reuse")]
-public sealed record WasmInstance(string ModuleId, string InstanceId, DateTime CreatedAtUtc)
+internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
 {
 }
-    public bool IsReady { get; set; };
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-10: WASM scaling manager with dynamic limits and instance pooling")]
-public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
-{
-}
-    public WasmScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? limits = null);
-    public WasmModuleConfig GetModuleConfig(string moduleId);
-    public async Task SetModuleConfigAsync(WasmModuleConfig config, CancellationToken ct = default);
-    public int GetEffectiveMaxPages(string moduleId);
-    public async Task AcquireExecutionSlotAsync(CancellationToken ct = default);
-    public void ReleaseExecutionSlot();
-    public int MaxConcurrentExecutions;;
-    public WasmInstance? AcquireWarmInstance(string moduleId);
-    public void ReturnWarmInstance(WasmInstance instance);
-    public async Task<bool> PersistModuleStateAsync(string moduleId, byte[] linearMemory, CancellationToken ct = default);
-    public async Task<byte[]?> RestoreModuleStateAsync(string moduleId, CancellationToken ct = default);
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits;;
-    public BackpressureState CurrentBackpressureState
-{
-    get
-    {
-        long pending = Interlocked.Read(ref _pendingExecutions);
-        int maxQueue = _currentLimits.MaxQueueDepth;
-        if (pending <= 0)
-            return BackpressureState.Normal;
-        if (pending < maxQueue * 0.5)
-            return BackpressureState.Normal;
-        if (pending < maxQueue * 0.8)
-            return BackpressureState.Warning;
-        if (pending < maxQueue)
-            return BackpressureState.Critical;
-        return BackpressureState.Shedding;
-    }
-}
-    public void Dispose();
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override string Description;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -224,24 +181,67 @@ private sealed class ScheduledJob
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/SelfEmulatingComputeStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Scaling/WasmScalingManager.cs
 ```csharp
-internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Per-module WASM configuration")]
+public sealed record WasmModuleConfig(string ModuleId, int MaxPages = 256, int MaxPoolSize = 10, bool PersistState = false)
 {
 }
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override string Description;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+    public const int MinPages = 1;
+    public const int MaxPagesLimit = 65_536;
+}
+```
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Warm WASM instance for pool reuse")]
+public sealed record WasmInstance(string ModuleId, string InstanceId, DateTime CreatedAtUtc)
+{
+}
+    public bool IsReady { get; set; };
+}
+```
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 88-10: WASM scaling manager with dynamic limits and instance pooling")]
+public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
+{
+}
+    public WasmScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? limits = null);
+    public WasmModuleConfig GetModuleConfig(string moduleId);
+    public async Task SetModuleConfigAsync(WasmModuleConfig config, CancellationToken ct = default);
+    public int GetEffectiveMaxPages(string moduleId);
+    public async Task AcquireExecutionSlotAsync(CancellationToken ct = default);
+    public void ReleaseExecutionSlot();
+    public int MaxConcurrentExecutions;;
+    public WasmInstance? AcquireWarmInstance(string moduleId);
+    public void ReturnWarmInstance(WasmInstance instance);
+    public async Task<bool> PersistModuleStateAsync(string moduleId, byte[] linearMemory, CancellationToken ct = default);
+    public async Task<byte[]?> RestoreModuleStateAsync(string moduleId, CancellationToken ct = default);
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits;;
+    public BackpressureState CurrentBackpressureState
+{
+    get
+    {
+        long pending = Interlocked.Read(ref _pendingExecutions);
+        int maxQueue = _currentLimits.MaxQueueDepth;
+        if (pending <= 0)
+            return BackpressureState.Normal;
+        if (pending < maxQueue * 0.5)
+            return BackpressureState.Normal;
+        if (pending < maxQueue * 0.8)
+            return BackpressureState.Warning;
+        if (pending < maxQueue)
+            return BackpressureState.Critical;
+        return BackpressureState.Shedding;
+    }
+}
+    public void Dispose();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/OpenClStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/FirecrackerStrategy.cs
 ```csharp
-internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
+internal sealed class FirecrackerStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -254,9 +254,9 @@ internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/MetalStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/KataContainersStrategy.cs
 ```csharp
-internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
+internal sealed class KataContainersStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -269,9 +269,222 @@ internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/OneApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/ContainerdStrategy.cs
 ```csharp
-internal sealed class OneApiStrategy : ComputeRuntimeStrategyBase
+internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/RunscStrategy.cs
+```csharp
+internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/PodmanStrategy.cs
+```csharp
+internal sealed class PodmanStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/YoukiStrategy.cs
+```csharp
+internal sealed class YoukiStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/GvisorStrategy.cs
+```csharp
+internal sealed class GvisorStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageEcosystemStrategy.cs
+```csharp
+internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override ComputeCapabilities Capabilities;;
+    internal record EcosystemReport(int TotalLanguages, int Tier1Count, int Tier2Count, int Tier3Count, IReadOnlyList<LanguageSummary> Languages);;
+    internal record LanguageSummary(string Language, string Tier, WasiSupportLevel WasiSupport, PerformanceTier Performance, WasmBinarySize BinarySize, string CompileCommand, string Notes);;
+    public EcosystemReport GetEcosystemReport();
+    public string GenerateEcosystemSummary();
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageBenchmark.cs
+```csharp
+internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override ComputeCapabilities Capabilities;;
+    internal record BenchmarkWorkload(string Name, string Description, byte[] WasmBytes, string ExpectedOutputPattern);;
+    internal record BenchmarkResult(string Language, string Tier, TimeSpan ExecutionTime, long PeakMemoryBytes, long BinarySizeBytes, bool Success, string? Error);;
+    public async Task<IReadOnlyList<BenchmarkResult>> RunBenchmarksAsync(IEnumerable<WasmLanguageStrategyBase> strategies, CancellationToken ct);
+    public string GenerateBenchmarkReport(IReadOnlyList<BenchmarkResult> results);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageSdkDocumentation.cs
+```csharp
+internal sealed class WasmLanguageSdkDocumentation
+{
+#endregion
+}
+    public static string GetBindingDocumentation(string language);
+    public static string GetAllBindingDocumentation();
+    public static IReadOnlyDictionary<string, string> GetHostFunctionDefinitions();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageStrategyBase.cs
+```csharp
+internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
+{
+}
+    public override ComputeRuntime Runtime;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public abstract WasmLanguageInfo LanguageInfo { get; }
+    public override ComputeCapabilities Capabilities;;
+    protected abstract ReadOnlySpan<byte> GetSampleWasmBytes();;
+    protected virtual string ExpectedSampleOutput;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+    public async Task<WasmLanguageVerificationResult> VerifyLanguageAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/NsjailStrategy.cs
+```csharp
+internal sealed class NsjailStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/SeccompStrategy.cs
+```csharp
+internal sealed class SeccompStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/LandlockStrategy.cs
+```csharp
+internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/SeLinuxStrategy.cs
+```csharp
+internal sealed class SeLinuxStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/BubbleWrapStrategy.cs
+```csharp
+internal sealed class BubbleWrapStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/AppArmorStrategy.cs
+```csharp
+internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -329,9 +542,9 @@ internal sealed class CudaStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/GvisorStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/OneApiStrategy.cs
 ```csharp
-internal sealed class GvisorStrategy : ComputeRuntimeStrategyBase
+internal sealed class OneApiStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -344,9 +557,9 @@ internal sealed class GvisorStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/RunscStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/OpenClStrategy.cs
 ```csharp
-internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
+internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -359,9 +572,9 @@ internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/KataContainersStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Gpu/MetalStrategy.cs
 ```csharp
-internal sealed class KataContainersStrategy : ComputeRuntimeStrategyBase
+internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -374,9 +587,9 @@ internal sealed class KataContainersStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/YoukiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/NitroEnclavesStrategy.cs
 ```csharp
-internal sealed class YoukiStrategy : ComputeRuntimeStrategyBase
+internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -389,9 +602,9 @@ internal sealed class YoukiStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/PodmanStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/TrustZoneStrategy.cs
 ```csharp
-internal sealed class PodmanStrategy : ComputeRuntimeStrategyBase
+internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -404,9 +617,9 @@ internal sealed class PodmanStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/FirecrackerStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/SgxStrategy.cs
 ```csharp
-internal sealed class FirecrackerStrategy : ComputeRuntimeStrategyBase
+internal sealed class SgxStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -419,9 +632,23 @@ internal sealed class FirecrackerStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Container/ContainerdStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/ConfidentialVmStrategy.cs
 ```csharp
-internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
+internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/SevStrategy.cs
+```csharp
+internal sealed class SevStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -434,9 +661,9 @@ internal sealed class ContainerdStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmEdgeStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs
 ```csharp
-internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
+internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -444,199 +671,8 @@ internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
     public override ComputeRuntime Runtime;;
     public override ComputeCapabilities Capabilities;;
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmerStrategy.cs
-```csharp
-internal sealed class WasmerStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasiNnStrategy.cs
-```csharp
-internal sealed class WasiNnStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasiStrategy.cs
-```csharp
-internal sealed class WasiStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WazeroStrategy.cs
-```csharp
-internal sealed class WazeroStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs
-```csharp
-internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override string Description;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmtimeStrategy.cs
-```csharp
-internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmComponentStrategy.cs
-```csharp
-internal sealed class WasmComponentStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/NsjailStrategy.cs
-```csharp
-internal sealed class NsjailStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/LandlockStrategy.cs
-```csharp
-internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/AppArmorStrategy.cs
-```csharp
-internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/SeccompStrategy.cs
-```csharp
-internal sealed class SeccompStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/BubbleWrapStrategy.cs
-```csharp
-internal sealed class BubbleWrapStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Sandbox/SeLinuxStrategy.cs
-```csharp
-internal sealed class SeLinuxStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public DockerExecutionStrategy() : this(SharedHttpClient);
+    public DockerExecutionStrategy(HttpClient httpClient);
     public override async Task InitializeAsync(CancellationToken cancellationToken = default);
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
@@ -717,9 +753,9 @@ internal sealed class GpuComputeAbstractionStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/FlinkStrategy.cs
 ```csharp
-internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
+internal sealed class FlinkStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -727,74 +763,7 @@ internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
     public override ComputeRuntime Runtime;;
     public override ComputeCapabilities Capabilities;;
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public DockerExecutionStrategy() : this(SharedHttpClient);
-    public DockerExecutionStrategy(HttpClient httpClient);
     public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageEcosystemStrategy.cs
-```csharp
-internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override ComputeCapabilities Capabilities;;
-    internal record EcosystemReport(int TotalLanguages, int Tier1Count, int Tier2Count, int Tier3Count, IReadOnlyList<LanguageSummary> Languages);;
-    internal record LanguageSummary(string Language, string Tier, WasiSupportLevel WasiSupport, PerformanceTier Performance, WasmBinarySize BinarySize, string CompileCommand, string Notes);;
-    public EcosystemReport GetEcosystemReport();
-    public string GenerateEcosystemSummary();
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageStrategyBase.cs
-```csharp
-internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
-{
-}
-    public override ComputeRuntime Runtime;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public abstract WasmLanguageInfo LanguageInfo { get; }
-    public override ComputeCapabilities Capabilities;;
-    protected abstract ReadOnlySpan<byte> GetSampleWasmBytes();;
-    protected virtual string ExpectedSampleOutput;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-    public async Task<WasmLanguageVerificationResult> VerifyLanguageAsync(CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageSdkDocumentation.cs
-```csharp
-internal sealed class WasmLanguageSdkDocumentation
-{
-#endregion
-}
-    public static string GetBindingDocumentation(string language);
-    public static string GetAllBindingDocumentation();
-    public static IReadOnlyDictionary<string, string> GetHostFunctionDefinitions();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/WasmLanguageBenchmark.cs
-```csharp
-internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override ComputeCapabilities Capabilities;;
-    internal record BenchmarkWorkload(string Name, string Description, byte[] WasmBytes, string ExpectedOutputPattern);;
-    internal record BenchmarkResult(string Language, string Tier, TimeSpan ExecutionTime, long PeakMemoryBytes, long BinarySizeBytes, bool Success, string? Error);;
-    public async Task<IReadOnlyList<BenchmarkResult>> RunBenchmarksAsync(IEnumerable<WasmLanguageStrategyBase> strategies, CancellationToken ct);
-    public string GenerateBenchmarkReport(IReadOnlyList<BenchmarkResult> results);
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
 ```
@@ -802,50 +771,6 @@ internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/RayStrategy.cs
 ```csharp
 internal sealed class RayStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/MapReduceStrategy.cs
-```csharp
-internal sealed class MapReduceStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/DaskStrategy.cs
-```csharp
-internal sealed class DaskStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/PrestoTrinoStrategy.cs
-```csharp
-internal sealed class PrestoTrinoStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -873,9 +798,9 @@ internal sealed class SparkStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/FlinkStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/DaskStrategy.cs
 ```csharp
-internal sealed class FlinkStrategy : ComputeRuntimeStrategyBase
+internal sealed class DaskStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -902,9 +827,23 @@ internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/TrustZoneStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/MapReduceStrategy.cs
 ```csharp
-internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
+internal sealed class MapReduceStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Distributed/PrestoTrinoStrategy.cs
+```csharp
+internal sealed class PrestoTrinoStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -917,99 +856,9 @@ internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/NitroEnclavesStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/SelfOptimizingPipelineStrategy.cs
 ```csharp
-internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/ConfidentialVmStrategy.cs
-```csharp
-internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/SgxStrategy.cs
-```csharp
-internal sealed class SgxStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Enclave/SevStrategy.cs
-```csharp
-internal sealed class SevStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/HybridComputeStrategy.cs
-```csharp
-internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken = default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken = default);
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/SpeculativeExecutionStrategy.cs
-```csharp
-internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/CarbonAwareComputeStrategy.cs
-```csharp
-internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
+internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1035,9 +884,9 @@ internal sealed class ComputeCostPredictionStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/AdaptiveRuntimeSelectionStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/CarbonAwareComputeStrategy.cs
 ```csharp
-internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyBase
+internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1052,20 +901,6 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/DataGravitySchedulerStrategy.cs
 ```csharp
 internal sealed class DataGravitySchedulerStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/SelfOptimizingPipelineStrategy.cs
-```csharp
-internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1099,6 +934,213 @@ private sealed class CachedSegment(string output, DateTime lastAccessed)
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/SpeculativeExecutionStrategy.cs
+```csharp
+internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/AdaptiveRuntimeSelectionStrategy.cs
+```csharp
+internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/IndustryFirst/HybridComputeStrategy.cs
+```csharp
+internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken = default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs
+```csharp
+internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override string Description;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmerStrategy.cs
+```csharp
+internal sealed class WasmerStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmEdgeStrategy.cs
+```csharp
+internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasiNnStrategy.cs
+```csharp
+internal sealed class WasiNnStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmtimeStrategy.cs
+```csharp
+internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WazeroStrategy.cs
+```csharp
+internal sealed class WazeroStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasiStrategy.cs
+```csharp
+internal sealed class WasiStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/Wasm/WasmComponentStrategy.cs
+```csharp
+internal sealed class WasmComponentStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/ScatterGatherStrategy.cs
+```csharp
+internal sealed class ScatterGatherStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/PartitionedQueryStrategy.cs
+```csharp
+internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs
+```csharp
+internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ComputeRuntime Runtime;;
+    public override ComputeCapabilities Capabilities;;
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/ParallelAggregationStrategy.cs
 ```csharp
 internal sealed class ParallelAggregationStrategy : ComputeRuntimeStrategyBase
@@ -1127,51 +1169,9 @@ internal sealed class ShuffleStrategy : ComputeRuntimeStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/PartitionedQueryStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/ZigWasmLanguageStrategy.cs
 ```csharp
-internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/ScatterGatherStrategy.cs
-```csharp
-internal sealed class ScatterGatherStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs
-```csharp
-internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ComputeRuntime Runtime;;
-    public override ComputeCapabilities Capabilities;;
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
-    public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/RubyWasmLanguageStrategy.cs
-```csharp
-internal sealed class RubyWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class ZigWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1181,9 +1181,9 @@ internal sealed class RubyWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/JavaWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/CppWasmLanguageStrategy.cs
 ```csharp
-internal sealed class JavaWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class CppWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1193,9 +1193,9 @@ internal sealed class JavaWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/PythonWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/AssemblyScriptWasmLanguageStrategy.cs
 ```csharp
-internal sealed class PythonWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class AssemblyScriptWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1205,9 +1205,9 @@ internal sealed class PythonWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/HaskellWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/GoWasmLanguageStrategy.cs
 ```csharp
-internal sealed class HaskellWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class GoWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1217,9 +1217,9 @@ internal sealed class HaskellWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/JavaScriptWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/DotNetWasmLanguageStrategy.cs
 ```csharp
-internal sealed class JavaScriptWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class DotNetWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1229,9 +1229,9 @@ internal sealed class JavaScriptWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/LuaWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/RustWasmLanguageStrategy.cs
 ```csharp
-internal sealed class LuaWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class RustWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1241,9 +1241,9 @@ internal sealed class LuaWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/OCamlWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/CWasmLanguageStrategy.cs
 ```csharp
-internal sealed class OCamlWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class CWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1253,33 +1253,9 @@ internal sealed class OCamlWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/TypeScriptWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/GrainWasmLanguageStrategy.cs
 ```csharp
-internal sealed class TypeScriptWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/PhpWasmLanguageStrategy.cs
-```csharp
-internal sealed class PhpWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/DartWasmLanguageStrategy.cs
-```csharp
-internal sealed class DartWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class GrainWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1301,9 +1277,21 @@ internal sealed class KotlinWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/GrainWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/OCamlWasmLanguageStrategy.cs
 ```csharp
-internal sealed class GrainWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class OCamlWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/JavaWasmLanguageStrategy.cs
+```csharp
+internal sealed class JavaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1337,6 +1325,114 @@ internal sealed class SwiftWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/TypeScriptWasmLanguageStrategy.cs
+```csharp
+internal sealed class TypeScriptWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/RubyWasmLanguageStrategy.cs
+```csharp
+internal sealed class RubyWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/HaskellWasmLanguageStrategy.cs
+```csharp
+internal sealed class HaskellWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/PythonWasmLanguageStrategy.cs
+```csharp
+internal sealed class PythonWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/DartWasmLanguageStrategy.cs
+```csharp
+internal sealed class DartWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/PhpWasmLanguageStrategy.cs
+```csharp
+internal sealed class PhpWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/JavaScriptWasmLanguageStrategy.cs
+```csharp
+internal sealed class JavaScriptWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier2/LuaWasmLanguageStrategy.cs
+```csharp
+internal sealed class LuaWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/RWasmLanguageStrategy.cs
+```csharp
+internal sealed class RWasmLanguageStrategy : WasmLanguageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override WasmLanguageInfo LanguageInfo;;
+    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/ElixirWasmLanguageStrategy.cs
 ```csharp
 internal sealed class ElixirWasmLanguageStrategy : WasmLanguageStrategyBase
@@ -1361,69 +1457,9 @@ internal sealed class PrologWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/FortranWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/AdaWasmLanguageStrategy.cs
 ```csharp
-internal sealed class FortranWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/CrystalWasmLanguageStrategy.cs
-```csharp
-internal sealed class CrystalWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/VWasmLanguageStrategy.cs
-```csharp
-internal sealed class VWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/NimWasmLanguageStrategy.cs
-```csharp
-internal sealed class NimWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/RWasmLanguageStrategy.cs
-```csharp
-internal sealed class RWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/ScalaWasmLanguageStrategy.cs
-```csharp
-internal sealed class ScalaWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class AdaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1445,9 +1481,9 @@ internal sealed class PerlWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/AdaWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/NimWasmLanguageStrategy.cs
 ```csharp
-internal sealed class AdaWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class NimWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1457,9 +1493,9 @@ internal sealed class AdaWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/GoWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/VWasmLanguageStrategy.cs
 ```csharp
-internal sealed class GoWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class VWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1469,9 +1505,9 @@ internal sealed class GoWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/RustWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/ScalaWasmLanguageStrategy.cs
 ```csharp
-internal sealed class RustWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class ScalaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1481,9 +1517,9 @@ internal sealed class RustWasmLanguageStrategy : WasmLanguageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/AssemblyScriptWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/CrystalWasmLanguageStrategy.cs
 ```csharp
-internal sealed class AssemblyScriptWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class CrystalWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1493,45 +1529,9 @@ internal sealed class AssemblyScriptWasmLanguageStrategy : WasmLanguageStrategyB
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/ZigWasmLanguageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier3/FortranWasmLanguageStrategy.cs
 ```csharp
-internal sealed class ZigWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/CWasmLanguageStrategy.cs
-```csharp
-internal sealed class CWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/CppWasmLanguageStrategy.cs
-```csharp
-internal sealed class CppWasmLanguageStrategy : WasmLanguageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override WasmLanguageInfo LanguageInfo;;
-    protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompute/Strategies/WasmLanguages/Tier1/DotNetWasmLanguageStrategy.cs
-```csharp
-internal sealed class DotNetWasmLanguageStrategy : WasmLanguageStrategyBase
+internal sealed class FortranWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;

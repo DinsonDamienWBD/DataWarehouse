@@ -643,583 +643,6 @@ public sealed record SemanticQueryResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs
-```csharp
-public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaMapping> CreateMappingAsync(string mappingId, Schema sourceSchema, Schema targetSchema, IReadOnlyList<FieldMapping>? fieldMappings = null, MappingOptions? options = null, CancellationToken ct = default);
-    public Task<SchemaMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SemanticMappingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<BusinessTerm> RegisterTermAsync(string termId, string termName, string definition, IReadOnlyList<string>? synonyms = null, IReadOnlyList<string>? relatedTerms = null, CancellationToken ct = default);
-    public Task<SemanticMapping> CreateMappingAsync(string mappingId, IReadOnlyList<SemanticFieldMapping> fieldMappings, SemanticMappingOptions? options = null, CancellationToken ct = default);
-    public Task<List<MappingSuggestion>> SuggestMappingsAsync(IReadOnlyList<string> sourceFields, IReadOnlyList<string> targetFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class HierarchicalMappingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<HierarchicalMapping> CreateMappingAsync(string mappingId, IReadOnlyList<PathMapping> pathMappings, HierarchicalMappingOptions? options = null, CancellationToken ct = default);
-    public Task<HierarchicalMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DynamicMappingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<DynamicMapping> CreateMappingAsync(string mappingId, IReadOnlyList<DynamicFieldMapping> fieldMappings, DynamicMappingOptions? options = null, CancellationToken ct = default);
-    public Task<DynamicMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, Dictionary<string, object>? runtimeContext = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class BidirectionalMappingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<BidirectionalMapping> CreateMappingAsync(string mappingId, IReadOnlyList<BidirectionalFieldMapping> fieldMappings, BidirectionalMappingOptions? options = null, CancellationToken ct = default);
-    public Task<BidirectionalMappingResult> MapForwardAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-    public Task<BidirectionalMappingResult> MapReverseAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record SchemaMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required Schema SourceSchema { get; init; }
-    public required Schema TargetSchema { get; init; }
-    public required List<FieldMapping> FieldMappings { get; init; }
-    public required MappingOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record Schema
-{
-}
-    public required string SchemaId { get; init; }
-    public required string Name { get; init; }
-    public required List<SchemaField> Fields { get; init; }
-    public int Version { get; init; };
-}
-```
-```csharp
-public sealed record SchemaField
-{
-}
-    public required string Name { get; init; }
-    public required string DataType { get; init; }
-    public bool IsNullable { get; init; };
-}
-```
-```csharp
-public sealed record FieldMapping
-{
-}
-    public required string SourceField { get; init; }
-    public required string TargetField { get; init; }
-    public FieldTransformationType TransformationType { get; init; };
-    public string? TargetType { get; init; }
-    public string? Expression { get; init; }
-    public object? DefaultValue { get; init; }
-}
-```
-```csharp
-public sealed record MappingOptions
-{
-}
-    public bool AllowMissingFields { get; init; };
-    public bool SkipOnError { get; init; };
-    public bool StrictTypeMatching { get; init; };
-}
-```
-```csharp
-public sealed record SchemaMappingResult
-{
-}
-    public required string MappingId { get; init; }
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<MappingError> Errors { get; init; }
-    public required List<Dictionary<string, object>> MappedData { get; init; }
-    public MappingStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record MappingError
-{
-}
-    public int RecordIndex { get; init; }
-    public required string ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record SemanticMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required List<SemanticFieldMapping> FieldMappings { get; init; }
-    public required SemanticMappingOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record SemanticFieldMapping
-{
-}
-    public required string SourceField { get; init; }
-    public required string TargetField { get; init; }
-    public string? BusinessTermId { get; init; }
-    public double Confidence { get; init; };
-}
-```
-```csharp
-public sealed record SemanticMappingOptions
-{
-}
-    public double MinConfidence { get; init; };
-    public bool UseSynonyms { get; init; };
-}
-```
-```csharp
-public sealed record BusinessTerm
-{
-}
-    public required string TermId { get; init; }
-    public required string TermName { get; init; }
-    public required string Definition { get; init; }
-    public required List<string> Synonyms { get; init; }
-    public required List<string> RelatedTerms { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record MappingSuggestion
-{
-}
-    public required string SourceField { get; init; }
-    public required string TargetField { get; init; }
-    public double Confidence { get; init; }
-    public required string Reason { get; init; }
-}
-```
-```csharp
-public sealed record HierarchicalMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required List<PathMapping> PathMappings { get; init; }
-    public required HierarchicalMappingOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record PathMapping
-{
-}
-    public required string SourcePath { get; init; }
-    public required string TargetPath { get; init; }
-    public ArrayHandling ArrayHandling { get; init; };
-}
-```
-```csharp
-public sealed record HierarchicalMappingOptions
-{
-}
-    public bool SkipNulls { get; init; };
-    public bool PreserveUnmapped { get; init; };
-}
-```
-```csharp
-public sealed record HierarchicalMappingResult
-{
-}
-    public required string MappingId { get; init; }
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> MappedData { get; init; }
-    public HierarchicalMappingStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record DynamicMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required List<DynamicFieldMapping> FieldMappings { get; init; }
-    public required DynamicMappingOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record DynamicFieldMapping
-{
-}
-    public required string TargetField { get; init; }
-    public required string Expression { get; init; }
-    public string? Condition { get; init; }
-}
-```
-```csharp
-public sealed record DynamicMappingOptions
-{
-}
-    public bool IncludeUnmappedFields { get; init; };
-    public bool StrictMode { get; init; };
-}
-```
-```csharp
-public sealed record DynamicMappingResult
-{
-}
-    public required string MappingId { get; init; }
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> MappedData { get; init; }
-    public DynamicMappingStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record BidirectionalMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required List<BidirectionalFieldMapping> FieldMappings { get; init; }
-    public required BidirectionalMappingOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record BidirectionalFieldMapping
-{
-}
-    public required string SourceField { get; init; }
-    public required string TargetField { get; init; }
-    public FieldTransform? ForwardTransform { get; init; }
-    public FieldTransform? ReverseTransform { get; init; }
-}
-```
-```csharp
-public sealed record FieldTransform
-{
-}
-    public TransformType Type { get; init; }
-    public double? Factor { get; init; }
-}
-```
-```csharp
-public sealed record BidirectionalMappingOptions
-{
-}
-    public bool ValidateReversibility { get; init; };
-}
-```
-```csharp
-public sealed record BidirectionalMappingResult
-{
-}
-    public required string MappingId { get; init; }
-    public MappingDirection Direction { get; init; }
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> MappedData { get; init; }
-    public BidirectionalMappingStatus Status { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs
-```csharp
-public sealed class LogBasedCdcStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<CdcConnector> CreateConnectorAsync(string connectorId, DatabaseType databaseType, string connectionString, CdcConnectorConfig? config = null, CancellationToken ct = default);
-    public Task StartCaptureAsync(string connectorId, CancellationToken ct = default);
-    public Task StopCaptureAsync(string connectorId, CancellationToken ct = default);
-    public async IAsyncEnumerable<CdcEvent> ConsumeEventsAsync(string connectorId, long? fromLsn = null, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task<CdcEvent> SimulateChangeAsync(string connectorId, CdcOperationType operation, string tableName, Dictionary<string, object>? before, Dictionary<string, object>? after, CancellationToken ct = default);
-    public Task<ConnectorStats> GetStatsAsync(string connectorId);
-}
-```
-```csharp
-public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<TriggerConfig> CreateTriggerAsync(string triggerId, string tableName, IReadOnlyList<CdcOperationType> operations, IReadOnlyList<string>? capturedColumns = null, CancellationToken ct = default);
-    public Task<ChangeRecord> FireTriggerAsync(string tableName, CdcOperationType operation, Dictionary<string, object>? oldValues, Dictionary<string, object>? newValues, CancellationToken ct = default);
-    public Task<List<ChangeRecord>> GetChangesAsync(string tableName, DateTime? since = null, int limit = 1000, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class TimestampBasedCdcStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<TimestampTracker> CreateTrackerAsync(string trackerId, string tableName, string timestampColumn, TimestampTrackerConfig? config = null, CancellationToken ct = default);
-    public Task<TimestampPollResult> PollChangesAsync(string trackerId, IReadOnlyList<Dictionary<string, object>> currentData, CancellationToken ct = default);
-    public Task SetCheckpointAsync(string trackerId, DateTime checkpoint, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class OutboxPatternCdcStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<OutboxConfig> CreateOutboxAsync(string outboxId, string tableName, OutboxOptions? options = null, CancellationToken ct = default);
-    public Task<OutboxEvent> WriteEventAsync(string outboxId, string aggregateType, string aggregateId, string eventType, Dictionary<string, object> payload, CancellationToken ct = default);
-    public async IAsyncEnumerable<OutboxEvent> ProcessEventsAsync(string outboxId, int batchSize = 100, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task MarkProcessedAsync(string eventId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class EventSourcingCdcStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<EventStream> CreateStreamAsync(string streamId, string aggregateType, EventStreamConfig? config = null, CancellationToken ct = default);
-    public Task<DomainEvent> AppendEventAsync(string streamId, string eventType, Dictionary<string, object> eventData, int? expectedVersion = null, CancellationToken ct = default);
-    public Task<List<DomainEvent>> ReadEventsAsync(string streamId, int? fromVersion = null, int? toVersion = null, CancellationToken ct = default);
-    public Task<int> GetStreamVersionAsync(string streamId, CancellationToken ct = default);
-}
-```
-```csharp
-public class ConcurrencyException : Exception
-{
-}
-    public ConcurrencyException(string message) : base(message);
-}
-```
-```csharp
-public sealed record CdcConnector
-{
-}
-    public required string ConnectorId { get; init; }
-    public DatabaseType DatabaseType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required CdcConnectorConfig Config { get; init; }
-    public ConnectorStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? StartedAt { get; set; }
-}
-```
-```csharp
-public sealed record CdcConnectorConfig
-{
-}
-    public IReadOnlyList<string>? Tables { get; init; }
-    public string? SlotName { get; init; }
-    public bool SnapshotOnStart { get; init; };
-    public int BatchSize { get; init; };
-}
-```
-```csharp
-public sealed record CdcEvent
-{
-}
-    public required string EventId { get; init; }
-    public required string ConnectorId { get; init; }
-    public CdcOperationType Operation { get; init; }
-    public required string TableName { get; init; }
-    public Dictionary<string, object>? Before { get; init; }
-    public Dictionary<string, object>? After { get; init; }
-    public long Lsn { get; init; }
-    public DateTime Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record ConnectorStats
-{
-}
-    public required string ConnectorId { get; init; }
-    public ConnectorStatus Status { get; init; }
-    public int PendingEvents { get; init; }
-    public long TotalEventsCaptured { get; init; }
-}
-```
-```csharp
-public sealed record TriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string TableName { get; init; }
-    public required List<CdcOperationType> Operations { get; init; }
-    public required List<string> CapturedColumns { get; init; }
-    public bool IsEnabled { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record ChangeRecord
-{
-}
-    public required string ChangeId { get; init; }
-    public required string TableName { get; init; }
-    public CdcOperationType Operation { get; init; }
-    public Dictionary<string, object>? OldValues { get; init; }
-    public Dictionary<string, object>? NewValues { get; init; }
-    public DateTime ChangeTimestamp { get; init; }
-}
-```
-```csharp
-public sealed record TimestampTracker
-{
-}
-    public required string TrackerId { get; init; }
-    public required string TableName { get; init; }
-    public required string TimestampColumn { get; init; }
-    public required TimestampTrackerConfig Config { get; init; }
-    public DateTime LastCheckpoint { get; set; }
-    public DateTime? LastPollAt { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record TimestampTrackerConfig
-{
-}
-    public TimeSpan PollInterval { get; init; };
-    public TimeSpan LookbackWindow { get; init; };
-}
-```
-```csharp
-public sealed record TimestampPollResult
-{
-}
-    public required string TrackerId { get; init; }
-    public DateTime PreviousCheckpoint { get; init; }
-    public DateTime NewCheckpoint { get; init; }
-    public int ChangesDetected { get; init; }
-    public required List<Dictionary<string, object>> Changes { get; init; }
-}
-```
-```csharp
-public sealed record OutboxConfig
-{
-}
-    public required string OutboxId { get; init; }
-    public required string TableName { get; init; }
-    public required OutboxOptions Options { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record OutboxOptions
-{
-}
-    public TimeSpan RetentionPeriod { get; init; };
-    public int MaxRetries { get; init; };
-    public TimeSpan RetryDelay { get; init; };
-}
-```
-```csharp
-public sealed record OutboxEvent
-{
-}
-    public required string EventId { get; init; }
-    public required string OutboxId { get; init; }
-    public required string AggregateType { get; init; }
-    public required string AggregateId { get; init; }
-    public required string EventType { get; init; }
-    public required Dictionary<string, object> Payload { get; init; }
-    public OutboxEventStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? PublishedAt { get; set; }
-}
-```
-```csharp
-public sealed record EventStream
-{
-}
-    public required string StreamId { get; init; }
-    public required string AggregateType { get; init; }
-    public required EventStreamConfig Config { get; init; }
-    public int Version { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record EventStreamConfig
-{
-}
-    public int MaxEventsPerStream { get; init; };
-    public bool EnableSnapshots { get; init; };
-    public int SnapshotInterval { get; init; };
-}
-```
-```csharp
-public sealed record DomainEvent
-{
-}
-    public required string EventId { get; init; }
-    public required string StreamId { get; init; }
-    public required string EventType { get; init; }
-    public required Dictionary<string, object> EventData { get; init; }
-    public int Version { get; init; }
-    public DateTime Timestamp { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Transformation/DataTransformationStrategies.cs
 ```csharp
 public sealed class TypeConversionStrategy : DataIntegrationStrategyBase
@@ -1454,6 +877,185 @@ public sealed record NestResult
     public int OutputRecords { get; init; }
     public required List<Dictionary<string, object>> NestedData { get; init; }
     public NestStatus Status { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs
+```csharp
+public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaMigration> CreateMigrationAsync(string migrationId, string schemaId, int fromVersion, int toVersion, IReadOnlyList<MigrationStep> upSteps, IReadOnlyList<MigrationStep>? downSteps = null, CancellationToken ct = default);
+    public async Task<MigrationExecution> ExecuteMigrationAsync(string migrationId, MigrationDirection direction = MigrationDirection.Up, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaSubject> CreateSubjectAsync(string subjectName, SchemaCompatibility compatibility = SchemaCompatibility.Backward, CancellationToken ct = default);
+    public Task<RegisteredSchema> RegisterSchemaAsync(string subjectName, string schemaDefinition, SchemaType schemaType = SchemaType.Avro, CancellationToken ct = default);
+    public Task<RegisteredSchema?> GetSchemaAsync(string subjectName, int? version = null, CancellationToken ct = default);
+    public Task<List<int>> GetVersionsAsync(string subjectName, CancellationToken ct = default);
+    public Task<bool> DeleteSchemaAsync(string subjectName, int version, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record SchemaVersion
+{
+}
+    public required string SchemaId { get; init; }
+    public required string SchemaName { get; init; }
+    public int Version { get; init; }
+    public required List<FieldDefinition> Fields { get; init; }
+    public SchemaCompatibility Compatibility { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record FieldDefinition
+{
+}
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+    public bool IsNullable { get; init; };
+    public object? DefaultValue { get; init; }
+    public string? Documentation { get; init; }
+}
+```
+```csharp
+public sealed record CompatibilityCheckResult
+{
+}
+    public bool IsCompatible { get; init; }
+    public required string Message { get; init; }
+    public List<string>? Issues { get; init; }
+}
+```
+```csharp
+public sealed record SchemaMigration
+{
+}
+    public required string MigrationId { get; init; }
+    public required string SchemaId { get; init; }
+    public int FromVersion { get; init; }
+    public int ToVersion { get; init; }
+    public required List<MigrationStep> UpSteps { get; init; }
+    public required List<MigrationStep> DownSteps { get; init; }
+    public MigrationStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record MigrationStep
+{
+}
+    public required string StepId { get; init; }
+    public MigrationStepType Type { get; init; }
+    public string? ColumnName { get; init; }
+    public string? NewColumnName { get; init; }
+    public string? DataType { get; init; }
+    public string? CustomSql { get; init; }
+}
+```
+```csharp
+public sealed record MigrationExecution
+{
+}
+    public required string ExecutionId { get; init; }
+    public required string MigrationId { get; init; }
+    public MigrationDirection Direction { get; init; }
+    public MigrationExecutionStatus Status { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+    public string? ErrorMessage { get; set; }
+    public List<StepResult>? StepResults { get; set; }
+}
+```
+```csharp
+public sealed record StepResult
+{
+}
+    public required string StepId { get; init; }
+    public bool Success { get; init; }
+    public long DurationMs { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record SchemaSubject
+{
+}
+    public required string SubjectName { get; init; }
+    public SchemaCompatibility Compatibility { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record RegisteredSchema
+{
+}
+    public required int SchemaId { get; init; }
+    public required string SubjectName { get; init; }
+    public int Version { get; init; }
+    public required string SchemaDefinition { get; init; }
+    public SchemaType SchemaType { get; init; }
+    public required string Fingerprint { get; init; }
+    public DateTime RegisteredAt { get; init; }
 }
 ```
 
@@ -1832,559 +1434,6 @@ public sealed record Alert
     public DateTime? AcknowledgedAt { get; set; }
     public string? AcknowledgedBy { get; set; }
     public DateTime? ResolvedAt { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs
-```csharp
-public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaMigration> CreateMigrationAsync(string migrationId, string schemaId, int fromVersion, int toVersion, IReadOnlyList<MigrationStep> upSteps, IReadOnlyList<MigrationStep>? downSteps = null, CancellationToken ct = default);
-    public async Task<MigrationExecution> ExecuteMigrationAsync(string migrationId, MigrationDirection direction = MigrationDirection.Up, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaSubject> CreateSubjectAsync(string subjectName, SchemaCompatibility compatibility = SchemaCompatibility.Backward, CancellationToken ct = default);
-    public Task<RegisteredSchema> RegisterSchemaAsync(string subjectName, string schemaDefinition, SchemaType schemaType = SchemaType.Avro, CancellationToken ct = default);
-    public Task<RegisteredSchema?> GetSchemaAsync(string subjectName, int? version = null, CancellationToken ct = default);
-    public Task<List<int>> GetVersionsAsync(string subjectName, CancellationToken ct = default);
-    public Task<bool> DeleteSchemaAsync(string subjectName, int version, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record SchemaVersion
-{
-}
-    public required string SchemaId { get; init; }
-    public required string SchemaName { get; init; }
-    public int Version { get; init; }
-    public required List<FieldDefinition> Fields { get; init; }
-    public SchemaCompatibility Compatibility { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record FieldDefinition
-{
-}
-    public required string Name { get; init; }
-    public required string DataType { get; init; }
-    public bool IsNullable { get; init; };
-    public object? DefaultValue { get; init; }
-    public string? Documentation { get; init; }
-}
-```
-```csharp
-public sealed record CompatibilityCheckResult
-{
-}
-    public bool IsCompatible { get; init; }
-    public required string Message { get; init; }
-    public List<string>? Issues { get; init; }
-}
-```
-```csharp
-public sealed record SchemaMigration
-{
-}
-    public required string MigrationId { get; init; }
-    public required string SchemaId { get; init; }
-    public int FromVersion { get; init; }
-    public int ToVersion { get; init; }
-    public required List<MigrationStep> UpSteps { get; init; }
-    public required List<MigrationStep> DownSteps { get; init; }
-    public MigrationStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record MigrationStep
-{
-}
-    public required string StepId { get; init; }
-    public MigrationStepType Type { get; init; }
-    public string? ColumnName { get; init; }
-    public string? NewColumnName { get; init; }
-    public string? DataType { get; init; }
-    public string? CustomSql { get; init; }
-}
-```
-```csharp
-public sealed record MigrationExecution
-{
-}
-    public required string ExecutionId { get; init; }
-    public required string MigrationId { get; init; }
-    public MigrationDirection Direction { get; init; }
-    public MigrationExecutionStatus Status { get; set; }
-    public DateTime StartedAt { get; init; }
-    public DateTime? CompletedAt { get; set; }
-    public string? ErrorMessage { get; set; }
-    public List<StepResult>? StepResults { get; set; }
-}
-```
-```csharp
-public sealed record StepResult
-{
-}
-    public required string StepId { get; init; }
-    public bool Success { get; init; }
-    public long DurationMs { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record SchemaSubject
-{
-}
-    public required string SubjectName { get; init; }
-    public SchemaCompatibility Compatibility { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record RegisteredSchema
-{
-}
-    public required int SchemaId { get; init; }
-    public required string SubjectName { get; init; }
-    public int Version { get; init; }
-    public required string SchemaDefinition { get; init; }
-    public SchemaType SchemaType { get; init; }
-    public required string Fingerprint { get; init; }
-    public DateTime RegisteredAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs
-```csharp
-public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<LambdaPipeline> CreatePipelineAsync(string pipelineId, LambdaConfig config, CancellationToken ct = default);
-    public async Task<BatchLayerResult> ProcessBatchAsync(string pipelineId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-    public async IAsyncEnumerable<SpeedLayerResult> ProcessStreamAsync(string pipelineId, IAsyncEnumerable<Dictionary<string, object>> events, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task<ServingLayerResult> QueryAsync(string pipelineId, LambdaQuery query, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class KappaArchitectureStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<KappaPipeline> CreatePipelineAsync(string pipelineId, KappaConfig config, CancellationToken ct = default);
-    public async IAsyncEnumerable<KappaResult> ProcessEventsAsync(string pipelineId, IAsyncEnumerable<StreamEvent> events, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task<ReprocessingJob> StartReprocessingAsync(string pipelineId, DateTime fromTimestamp, DateTime? toTimestamp = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<UnifiedPipeline> CreatePipelineAsync(string pipelineId, UnifiedConfig config, CancellationToken ct = default);
-    public async Task<UnifiedResult> ProcessAsync(string pipelineId, DataSource source, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class HybridIntegrationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<HybridPipeline> CreatePipelineAsync(string pipelineId, HybridConfig config, CancellationToken ct = default);
-    public Task<ModeSwitch> SwitchModeAsync(string pipelineId, IntegrationMode newMode, CancellationToken ct = default);
-    public Task<AutoTuneResult> AutoTuneAsync(string pipelineId, PipelineMetrics metrics, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class RealTimeMaterializedViewStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<MaterializedView> CreateViewAsync(string viewId, string viewDefinition, MaterializedViewConfig? config = null, CancellationToken ct = default);
-    public Task<ViewUpdateResult> ApplyUpdatesAsync(string viewId, IReadOnlyList<ViewUpdate> updates, CancellationToken ct = default);
-    public Task<ViewQueryResult> QueryViewAsync(string viewId, ViewQuery query, CancellationToken ct = default);
-    public Task<RefreshResult> RefreshViewAsync(string viewId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record LambdaPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required LambdaConfig Config { get; init; }
-    public LambdaStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record LambdaConfig
-{
-}
-    public TimeSpan BatchInterval { get; init; };
-    public TimeSpan SpeedViewRetention { get; init; };
-}
-```
-```csharp
-public sealed record BatchView
-{
-}
-    public required string PipelineId { get; init; }
-    public long TotalRecords { get; set; }
-    public int Version { get; set; }
-    public DateTime? LastUpdated { get; set; }
-}
-```
-```csharp
-public sealed record SpeedView
-{
-}
-    public required string PipelineId { get; init; }
-    public long TotalEvents { get; set; }
-    public int Version { get; set; }
-    public DateTime? LastUpdated { get; set; }
-}
-```
-```csharp
-public sealed record BatchLayerResult
-{
-}
-    public required string PipelineId { get; init; }
-    public int RecordsProcessed { get; init; }
-    public TimeSpan ProcessingTime { get; init; }
-    public int ViewVersion { get; init; }
-}
-```
-```csharp
-public sealed record SpeedLayerResult
-{
-}
-    public required string PipelineId { get; init; }
-    public bool EventProcessed { get; init; }
-    public TimeSpan Latency { get; init; }
-}
-```
-```csharp
-public sealed record LambdaQuery
-{
-}
-    public string? AggregationType { get; init; }
-    public DateTime? FromTime { get; init; }
-    public DateTime? ToTime { get; init; }
-}
-```
-```csharp
-public sealed record ServingLayerResult
-{
-}
-    public required string PipelineId { get; init; }
-    public required Dictionary<string, object> Data { get; init; }
-    public DateTime? BatchViewTimestamp { get; init; }
-    public DateTime? SpeedViewTimestamp { get; init; }
-}
-```
-```csharp
-public sealed record KappaPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required KappaConfig Config { get; init; }
-    public KappaStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record KappaConfig
-{
-}
-    public int Parallelism { get; init; };
-    public TimeSpan RetentionPeriod { get; init; };
-}
-```
-```csharp
-public sealed record StreamView
-{
-}
-    public required string PipelineId { get; init; }
-    public long TotalEvents { get; set; }
-    public int Version { get; set; }
-    public DateTime? LastUpdated { get; set; }
-}
-```
-```csharp
-public sealed record StreamEvent
-{
-}
-    public required string EventId { get; init; }
-    public required Dictionary<string, object> Data { get; init; }
-    public DateTime Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record KappaResult
-{
-}
-    public required string PipelineId { get; init; }
-    public required string EventId { get; init; }
-    public DateTime ProcessedAt { get; init; }
-    public TimeSpan Latency { get; init; }
-}
-```
-```csharp
-public sealed record ReprocessingJob
-{
-}
-    public required string JobId { get; init; }
-    public required string PipelineId { get; init; }
-    public DateTime FromTimestamp { get; init; }
-    public DateTime ToTimestamp { get; init; }
-    public ReprocessingStatus Status { get; set; }
-    public DateTime StartedAt { get; init; }
-}
-```
-```csharp
-public sealed record UnifiedPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required UnifiedConfig Config { get; init; }
-    public UnifiedStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record UnifiedConfig
-{
-}
-    public ExecutionMode? ForcedMode { get; init; }
-    public TimeSpan MaxLatency { get; init; };
-}
-```
-```csharp
-public sealed record DataSource
-{
-}
-    public required string SourceId { get; init; }
-    public bool IsStreaming { get; init; }
-    public long EstimatedRecords { get; init; }
-}
-```
-```csharp
-public sealed record UnifiedResult
-{
-}
-    public required string PipelineId { get; init; }
-    public ExecutionMode ExecutionMode { get; init; }
-    public int RecordsProcessed { get; init; }
-    public TimeSpan ProcessingTime { get; init; }
-    public UnifiedExecutionStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record HybridPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required HybridConfig Config { get; init; }
-    public IntegrationMode CurrentMode { get; set; }
-    public HybridStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? LastModeSwitch { get; set; }
-}
-```
-```csharp
-public sealed record HybridConfig
-{
-}
-    public bool EnableAutoTune { get; init; };
-    public TimeSpan LatencyThreshold { get; init; };
-    public long VolumeThresholdForStreaming { get; init; };
-    public long VolumeThresholdForBatch { get; init; };
-}
-```
-```csharp
-public sealed record ModeSwitch
-{
-}
-    public required string PipelineId { get; init; }
-    public IntegrationMode PreviousMode { get; init; }
-    public IntegrationMode NewMode { get; init; }
-    public DateTime SwitchedAt { get; init; }
-}
-```
-```csharp
-public sealed record PipelineMetrics
-{
-}
-    public TimeSpan CurrentLatency { get; init; }
-    public long DataVolumePerSecond { get; init; }
-    public double CpuUtilization { get; init; }
-    public double MemoryUtilization { get; init; }
-}
-```
-```csharp
-public sealed record AutoTuneResult
-{
-}
-    public required string PipelineId { get; init; }
-    public IntegrationMode RecommendedMode { get; init; }
-    public bool ModeSwitched { get; init; }
-    public required string Reason { get; init; }
-}
-```
-```csharp
-public sealed record MaterializedView
-{
-}
-    public required string ViewId { get; init; }
-    public required string ViewDefinition { get; init; }
-    public required MaterializedViewConfig Config { get; init; }
-    public MaterializedViewStatus Status { get; set; }
-    public int Version { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? LastUpdated { get; set; }
-    public DateTime? LastRefreshed { get; set; }
-    public Dictionary<string, object> Data { get; init; };
-}
-```
-```csharp
-public sealed record MaterializedViewConfig
-{
-}
-    public bool EnableIncrementalUpdates { get; init; };
-    public TimeSpan RefreshInterval { get; init; };
-    public int MaxViewSize { get; init; };
-}
-```
-```csharp
-public sealed record ViewUpdate
-{
-}
-    public required string Key { get; init; }
-    public UpdateOperation Operation { get; init; }
-    public object? Value { get; init; }
-    public double? Delta { get; init; }
-}
-```
-```csharp
-public sealed record ViewUpdateResult
-{
-}
-    public required string ViewId { get; init; }
-    public int UpdatesApplied { get; init; }
-    public int NewVersion { get; init; }
-    public DateTime UpdatedAt { get; init; }
-}
-```
-```csharp
-public sealed record ViewQuery
-{
-}
-    public IReadOnlyList<string>? Keys { get; init; }
-    public string? Filter { get; init; }
-}
-```
-```csharp
-public sealed record ViewQueryResult
-{
-}
-    public required string ViewId { get; init; }
-    public int Version { get; init; }
-    public required Dictionary<string, object> Data { get; init; }
-    public TimeSpan Freshness { get; init; }
-}
-```
-```csharp
-public sealed record RefreshResult
-{
-}
-    public required string ViewId { get; init; }
-    public DateTime RefreshedAt { get; init; }
-    public RefreshStatus Status { get; init; }
 }
 ```
 
@@ -2774,5 +1823,956 @@ public sealed record IncrementalRunResult
     public DateTime StartTime { get; init; }
     public DateTime EndTime { get; init; }
     public IncrementalRunStatus Status { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs
+```csharp
+public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<LambdaPipeline> CreatePipelineAsync(string pipelineId, LambdaConfig config, CancellationToken ct = default);
+    public async Task<BatchLayerResult> ProcessBatchAsync(string pipelineId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+    public async IAsyncEnumerable<SpeedLayerResult> ProcessStreamAsync(string pipelineId, IAsyncEnumerable<Dictionary<string, object>> events, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task<ServingLayerResult> QueryAsync(string pipelineId, LambdaQuery query, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class KappaArchitectureStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<KappaPipeline> CreatePipelineAsync(string pipelineId, KappaConfig config, CancellationToken ct = default);
+    public async IAsyncEnumerable<KappaResult> ProcessEventsAsync(string pipelineId, IAsyncEnumerable<StreamEvent> events, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task<ReprocessingJob> StartReprocessingAsync(string pipelineId, DateTime fromTimestamp, DateTime? toTimestamp = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<UnifiedPipeline> CreatePipelineAsync(string pipelineId, UnifiedConfig config, CancellationToken ct = default);
+    public async Task<UnifiedResult> ProcessAsync(string pipelineId, DataSource source, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class HybridIntegrationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<HybridPipeline> CreatePipelineAsync(string pipelineId, HybridConfig config, CancellationToken ct = default);
+    public Task<ModeSwitch> SwitchModeAsync(string pipelineId, IntegrationMode newMode, CancellationToken ct = default);
+    public Task<AutoTuneResult> AutoTuneAsync(string pipelineId, PipelineMetrics metrics, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class RealTimeMaterializedViewStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<MaterializedView> CreateViewAsync(string viewId, string viewDefinition, MaterializedViewConfig? config = null, CancellationToken ct = default);
+    public Task<ViewUpdateResult> ApplyUpdatesAsync(string viewId, IReadOnlyList<ViewUpdate> updates, CancellationToken ct = default);
+    public Task<ViewQueryResult> QueryViewAsync(string viewId, ViewQuery query, CancellationToken ct = default);
+    public Task<RefreshResult> RefreshViewAsync(string viewId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record LambdaPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required LambdaConfig Config { get; init; }
+    public LambdaStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record LambdaConfig
+{
+}
+    public TimeSpan BatchInterval { get; init; };
+    public TimeSpan SpeedViewRetention { get; init; };
+}
+```
+```csharp
+public sealed record BatchView
+{
+}
+    public required string PipelineId { get; init; }
+    public long TotalRecords { get; set; }
+    public int Version { get; set; }
+    public DateTime? LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record SpeedView
+{
+}
+    public required string PipelineId { get; init; }
+    public long TotalEvents { get; set; }
+    public int Version { get; set; }
+    public DateTime? LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record BatchLayerResult
+{
+}
+    public required string PipelineId { get; init; }
+    public int RecordsProcessed { get; init; }
+    public TimeSpan ProcessingTime { get; init; }
+    public int ViewVersion { get; init; }
+}
+```
+```csharp
+public sealed record SpeedLayerResult
+{
+}
+    public required string PipelineId { get; init; }
+    public bool EventProcessed { get; init; }
+    public TimeSpan Latency { get; init; }
+}
+```
+```csharp
+public sealed record LambdaQuery
+{
+}
+    public string? AggregationType { get; init; }
+    public DateTime? FromTime { get; init; }
+    public DateTime? ToTime { get; init; }
+}
+```
+```csharp
+public sealed record ServingLayerResult
+{
+}
+    public required string PipelineId { get; init; }
+    public required Dictionary<string, object> Data { get; init; }
+    public DateTime? BatchViewTimestamp { get; init; }
+    public DateTime? SpeedViewTimestamp { get; init; }
+}
+```
+```csharp
+public sealed record KappaPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required KappaConfig Config { get; init; }
+    public KappaStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record KappaConfig
+{
+}
+    public int Parallelism { get; init; };
+    public TimeSpan RetentionPeriod { get; init; };
+}
+```
+```csharp
+public sealed record StreamView
+{
+}
+    public required string PipelineId { get; init; }
+    public long TotalEvents { get; set; }
+    public int Version { get; set; }
+    public DateTime? LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record StreamEvent
+{
+}
+    public required string EventId { get; init; }
+    public required Dictionary<string, object> Data { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record KappaResult
+{
+}
+    public required string PipelineId { get; init; }
+    public required string EventId { get; init; }
+    public DateTime ProcessedAt { get; init; }
+    public TimeSpan Latency { get; init; }
+}
+```
+```csharp
+public sealed record ReprocessingJob
+{
+}
+    public required string JobId { get; init; }
+    public required string PipelineId { get; init; }
+    public DateTime FromTimestamp { get; init; }
+    public DateTime ToTimestamp { get; init; }
+    public ReprocessingStatus Status { get; set; }
+    public DateTime StartedAt { get; init; }
+}
+```
+```csharp
+public sealed record UnifiedPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required UnifiedConfig Config { get; init; }
+    public UnifiedStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record UnifiedConfig
+{
+}
+    public ExecutionMode? ForcedMode { get; init; }
+    public TimeSpan MaxLatency { get; init; };
+}
+```
+```csharp
+public sealed record DataSource
+{
+}
+    public required string SourceId { get; init; }
+    public bool IsStreaming { get; init; }
+    public long EstimatedRecords { get; init; }
+}
+```
+```csharp
+public sealed record UnifiedResult
+{
+}
+    public required string PipelineId { get; init; }
+    public ExecutionMode ExecutionMode { get; init; }
+    public int RecordsProcessed { get; init; }
+    public TimeSpan ProcessingTime { get; init; }
+    public UnifiedExecutionStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record HybridPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required HybridConfig Config { get; init; }
+    public IntegrationMode CurrentMode { get; set; }
+    public HybridStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastModeSwitch { get; set; }
+}
+```
+```csharp
+public sealed record HybridConfig
+{
+}
+    public bool EnableAutoTune { get; init; };
+    public TimeSpan LatencyThreshold { get; init; };
+    public long VolumeThresholdForStreaming { get; init; };
+    public long VolumeThresholdForBatch { get; init; };
+}
+```
+```csharp
+public sealed record ModeSwitch
+{
+}
+    public required string PipelineId { get; init; }
+    public IntegrationMode PreviousMode { get; init; }
+    public IntegrationMode NewMode { get; init; }
+    public DateTime SwitchedAt { get; init; }
+}
+```
+```csharp
+public sealed record PipelineMetrics
+{
+}
+    public TimeSpan CurrentLatency { get; init; }
+    public long DataVolumePerSecond { get; init; }
+    public double CpuUtilization { get; init; }
+    public double MemoryUtilization { get; init; }
+}
+```
+```csharp
+public sealed record AutoTuneResult
+{
+}
+    public required string PipelineId { get; init; }
+    public IntegrationMode RecommendedMode { get; init; }
+    public bool ModeSwitched { get; init; }
+    public required string Reason { get; init; }
+}
+```
+```csharp
+public sealed record MaterializedView
+{
+}
+    public required string ViewId { get; init; }
+    public required string ViewDefinition { get; init; }
+    public required MaterializedViewConfig Config { get; init; }
+    public MaterializedViewStatus Status { get; set; }
+    public int Version { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastUpdated { get; set; }
+    public DateTime? LastRefreshed { get; set; }
+    public Dictionary<string, object> Data { get; init; };
+}
+```
+```csharp
+public sealed record MaterializedViewConfig
+{
+}
+    public bool EnableIncrementalUpdates { get; init; };
+    public TimeSpan RefreshInterval { get; init; };
+    public int MaxViewSize { get; init; };
+}
+```
+```csharp
+public sealed record ViewUpdate
+{
+}
+    public required string Key { get; init; }
+    public UpdateOperation Operation { get; init; }
+    public object? Value { get; init; }
+    public double? Delta { get; init; }
+}
+```
+```csharp
+public sealed record ViewUpdateResult
+{
+}
+    public required string ViewId { get; init; }
+    public int UpdatesApplied { get; init; }
+    public int NewVersion { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+```
+```csharp
+public sealed record ViewQuery
+{
+}
+    public IReadOnlyList<string>? Keys { get; init; }
+    public string? Filter { get; init; }
+}
+```
+```csharp
+public sealed record ViewQueryResult
+{
+}
+    public required string ViewId { get; init; }
+    public int Version { get; init; }
+    public required Dictionary<string, object> Data { get; init; }
+    public TimeSpan Freshness { get; init; }
+}
+```
+```csharp
+public sealed record RefreshResult
+{
+}
+    public required string ViewId { get; init; }
+    public DateTime RefreshedAt { get; init; }
+    public RefreshStatus Status { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs
+```csharp
+public sealed class LogBasedCdcStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<CdcConnector> CreateConnectorAsync(string connectorId, DatabaseType databaseType, string connectionString, CdcConnectorConfig? config = null, CancellationToken ct = default);
+    public Task StartCaptureAsync(string connectorId, CancellationToken ct = default);
+    public Task StopCaptureAsync(string connectorId, CancellationToken ct = default);
+    public async IAsyncEnumerable<CdcEvent> ConsumeEventsAsync(string connectorId, long? fromLsn = null, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task<CdcEvent> SimulateChangeAsync(string connectorId, CdcOperationType operation, string tableName, Dictionary<string, object>? before, Dictionary<string, object>? after, CancellationToken ct = default);
+    public Task<ConnectorStats> GetStatsAsync(string connectorId);
+}
+```
+```csharp
+public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<TriggerConfig> CreateTriggerAsync(string triggerId, string tableName, IReadOnlyList<CdcOperationType> operations, IReadOnlyList<string>? capturedColumns = null, CancellationToken ct = default);
+    public Task<ChangeRecord> FireTriggerAsync(string tableName, CdcOperationType operation, Dictionary<string, object>? oldValues, Dictionary<string, object>? newValues, CancellationToken ct = default);
+    public Task<List<ChangeRecord>> GetChangesAsync(string tableName, DateTime? since = null, int limit = 1000, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class TimestampBasedCdcStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<TimestampTracker> CreateTrackerAsync(string trackerId, string tableName, string timestampColumn, TimestampTrackerConfig? config = null, CancellationToken ct = default);
+    public Task<TimestampPollResult> PollChangesAsync(string trackerId, IReadOnlyList<Dictionary<string, object>> currentData, CancellationToken ct = default);
+    public Task SetCheckpointAsync(string trackerId, DateTime checkpoint, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class OutboxPatternCdcStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<OutboxConfig> CreateOutboxAsync(string outboxId, string tableName, OutboxOptions? options = null, CancellationToken ct = default);
+    public Task<OutboxEvent> WriteEventAsync(string outboxId, string aggregateType, string aggregateId, string eventType, Dictionary<string, object> payload, CancellationToken ct = default);
+    public async IAsyncEnumerable<OutboxEvent> ProcessEventsAsync(string outboxId, int batchSize = 100, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task MarkProcessedAsync(string eventId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class EventSourcingCdcStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<EventStream> CreateStreamAsync(string streamId, string aggregateType, EventStreamConfig? config = null, CancellationToken ct = default);
+    public Task<DomainEvent> AppendEventAsync(string streamId, string eventType, Dictionary<string, object> eventData, int? expectedVersion = null, CancellationToken ct = default);
+    public Task<List<DomainEvent>> ReadEventsAsync(string streamId, int? fromVersion = null, int? toVersion = null, CancellationToken ct = default);
+    public Task<int> GetStreamVersionAsync(string streamId, CancellationToken ct = default);
+}
+```
+```csharp
+public class ConcurrencyException : Exception
+{
+}
+    public ConcurrencyException(string message) : base(message);
+}
+```
+```csharp
+public sealed record CdcConnector
+{
+}
+    public required string ConnectorId { get; init; }
+    public DatabaseType DatabaseType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required CdcConnectorConfig Config { get; init; }
+    public ConnectorStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? StartedAt { get; set; }
+}
+```
+```csharp
+public sealed record CdcConnectorConfig
+{
+}
+    public IReadOnlyList<string>? Tables { get; init; }
+    public string? SlotName { get; init; }
+    public bool SnapshotOnStart { get; init; };
+    public int BatchSize { get; init; };
+}
+```
+```csharp
+public sealed record CdcEvent
+{
+}
+    public required string EventId { get; init; }
+    public required string ConnectorId { get; init; }
+    public CdcOperationType Operation { get; init; }
+    public required string TableName { get; init; }
+    public Dictionary<string, object>? Before { get; init; }
+    public Dictionary<string, object>? After { get; init; }
+    public long Lsn { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record ConnectorStats
+{
+}
+    public required string ConnectorId { get; init; }
+    public ConnectorStatus Status { get; init; }
+    public int PendingEvents { get; init; }
+    public long TotalEventsCaptured { get; init; }
+}
+```
+```csharp
+public sealed record TriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string TableName { get; init; }
+    public required List<CdcOperationType> Operations { get; init; }
+    public required List<string> CapturedColumns { get; init; }
+    public bool IsEnabled { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record ChangeRecord
+{
+}
+    public required string ChangeId { get; init; }
+    public required string TableName { get; init; }
+    public CdcOperationType Operation { get; init; }
+    public Dictionary<string, object>? OldValues { get; init; }
+    public Dictionary<string, object>? NewValues { get; init; }
+    public DateTime ChangeTimestamp { get; init; }
+}
+```
+```csharp
+public sealed record TimestampTracker
+{
+}
+    public required string TrackerId { get; init; }
+    public required string TableName { get; init; }
+    public required string TimestampColumn { get; init; }
+    public required TimestampTrackerConfig Config { get; init; }
+    public DateTime LastCheckpoint { get; set; }
+    public DateTime? LastPollAt { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record TimestampTrackerConfig
+{
+}
+    public TimeSpan PollInterval { get; init; };
+    public TimeSpan LookbackWindow { get; init; };
+}
+```
+```csharp
+public sealed record TimestampPollResult
+{
+}
+    public required string TrackerId { get; init; }
+    public DateTime PreviousCheckpoint { get; init; }
+    public DateTime NewCheckpoint { get; init; }
+    public int ChangesDetected { get; init; }
+    public required List<Dictionary<string, object>> Changes { get; init; }
+}
+```
+```csharp
+public sealed record OutboxConfig
+{
+}
+    public required string OutboxId { get; init; }
+    public required string TableName { get; init; }
+    public required OutboxOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record OutboxOptions
+{
+}
+    public TimeSpan RetentionPeriod { get; init; };
+    public int MaxRetries { get; init; };
+    public TimeSpan RetryDelay { get; init; };
+}
+```
+```csharp
+public sealed record OutboxEvent
+{
+}
+    public required string EventId { get; init; }
+    public required string OutboxId { get; init; }
+    public required string AggregateType { get; init; }
+    public required string AggregateId { get; init; }
+    public required string EventType { get; init; }
+    public required Dictionary<string, object> Payload { get; init; }
+    public OutboxEventStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? PublishedAt { get; set; }
+}
+```
+```csharp
+public sealed record EventStream
+{
+}
+    public required string StreamId { get; init; }
+    public required string AggregateType { get; init; }
+    public required EventStreamConfig Config { get; init; }
+    public int Version { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record EventStreamConfig
+{
+}
+    public int MaxEventsPerStream { get; init; };
+    public bool EnableSnapshots { get; init; };
+    public int SnapshotInterval { get; init; };
+}
+```
+```csharp
+public sealed record DomainEvent
+{
+}
+    public required string EventId { get; init; }
+    public required string StreamId { get; init; }
+    public required string EventType { get; init; }
+    public required Dictionary<string, object> EventData { get; init; }
+    public int Version { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs
+```csharp
+public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaMapping> CreateMappingAsync(string mappingId, Schema sourceSchema, Schema targetSchema, IReadOnlyList<FieldMapping>? fieldMappings = null, MappingOptions? options = null, CancellationToken ct = default);
+    public Task<SchemaMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SemanticMappingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<BusinessTerm> RegisterTermAsync(string termId, string termName, string definition, IReadOnlyList<string>? synonyms = null, IReadOnlyList<string>? relatedTerms = null, CancellationToken ct = default);
+    public Task<SemanticMapping> CreateMappingAsync(string mappingId, IReadOnlyList<SemanticFieldMapping> fieldMappings, SemanticMappingOptions? options = null, CancellationToken ct = default);
+    public Task<List<MappingSuggestion>> SuggestMappingsAsync(IReadOnlyList<string> sourceFields, IReadOnlyList<string> targetFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class HierarchicalMappingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<HierarchicalMapping> CreateMappingAsync(string mappingId, IReadOnlyList<PathMapping> pathMappings, HierarchicalMappingOptions? options = null, CancellationToken ct = default);
+    public Task<HierarchicalMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DynamicMappingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<DynamicMapping> CreateMappingAsync(string mappingId, IReadOnlyList<DynamicFieldMapping> fieldMappings, DynamicMappingOptions? options = null, CancellationToken ct = default);
+    public Task<DynamicMappingResult> ApplyMappingAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, Dictionary<string, object>? runtimeContext = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class BidirectionalMappingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<BidirectionalMapping> CreateMappingAsync(string mappingId, IReadOnlyList<BidirectionalFieldMapping> fieldMappings, BidirectionalMappingOptions? options = null, CancellationToken ct = default);
+    public Task<BidirectionalMappingResult> MapForwardAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+    public Task<BidirectionalMappingResult> MapReverseAsync(string mappingId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record SchemaMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required Schema SourceSchema { get; init; }
+    public required Schema TargetSchema { get; init; }
+    public required List<FieldMapping> FieldMappings { get; init; }
+    public required MappingOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record Schema
+{
+}
+    public required string SchemaId { get; init; }
+    public required string Name { get; init; }
+    public required List<SchemaField> Fields { get; init; }
+    public int Version { get; init; };
+}
+```
+```csharp
+public sealed record SchemaField
+{
+}
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+    public bool IsNullable { get; init; };
+}
+```
+```csharp
+public sealed record FieldMapping
+{
+}
+    public required string SourceField { get; init; }
+    public required string TargetField { get; init; }
+    public FieldTransformationType TransformationType { get; init; };
+    public string? TargetType { get; init; }
+    public string? Expression { get; init; }
+    public object? DefaultValue { get; init; }
+}
+```
+```csharp
+public sealed record MappingOptions
+{
+}
+    public bool AllowMissingFields { get; init; };
+    public bool SkipOnError { get; init; };
+    public bool StrictTypeMatching { get; init; };
+}
+```
+```csharp
+public sealed record SchemaMappingResult
+{
+}
+    public required string MappingId { get; init; }
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<MappingError> Errors { get; init; }
+    public required List<Dictionary<string, object>> MappedData { get; init; }
+    public MappingStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record MappingError
+{
+}
+    public int RecordIndex { get; init; }
+    public required string ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record SemanticMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required List<SemanticFieldMapping> FieldMappings { get; init; }
+    public required SemanticMappingOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record SemanticFieldMapping
+{
+}
+    public required string SourceField { get; init; }
+    public required string TargetField { get; init; }
+    public string? BusinessTermId { get; init; }
+    public double Confidence { get; init; };
+}
+```
+```csharp
+public sealed record SemanticMappingOptions
+{
+}
+    public double MinConfidence { get; init; };
+    public bool UseSynonyms { get; init; };
+}
+```
+```csharp
+public sealed record BusinessTerm
+{
+}
+    public required string TermId { get; init; }
+    public required string TermName { get; init; }
+    public required string Definition { get; init; }
+    public required List<string> Synonyms { get; init; }
+    public required List<string> RelatedTerms { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record MappingSuggestion
+{
+}
+    public required string SourceField { get; init; }
+    public required string TargetField { get; init; }
+    public double Confidence { get; init; }
+    public required string Reason { get; init; }
+}
+```
+```csharp
+public sealed record HierarchicalMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required List<PathMapping> PathMappings { get; init; }
+    public required HierarchicalMappingOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record PathMapping
+{
+}
+    public required string SourcePath { get; init; }
+    public required string TargetPath { get; init; }
+    public ArrayHandling ArrayHandling { get; init; };
+}
+```
+```csharp
+public sealed record HierarchicalMappingOptions
+{
+}
+    public bool SkipNulls { get; init; };
+    public bool PreserveUnmapped { get; init; };
+}
+```
+```csharp
+public sealed record HierarchicalMappingResult
+{
+}
+    public required string MappingId { get; init; }
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> MappedData { get; init; }
+    public HierarchicalMappingStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record DynamicMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required List<DynamicFieldMapping> FieldMappings { get; init; }
+    public required DynamicMappingOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record DynamicFieldMapping
+{
+}
+    public required string TargetField { get; init; }
+    public required string Expression { get; init; }
+    public string? Condition { get; init; }
+}
+```
+```csharp
+public sealed record DynamicMappingOptions
+{
+}
+    public bool IncludeUnmappedFields { get; init; };
+    public bool StrictMode { get; init; };
+}
+```
+```csharp
+public sealed record DynamicMappingResult
+{
+}
+    public required string MappingId { get; init; }
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> MappedData { get; init; }
+    public DynamicMappingStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record BidirectionalMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required List<BidirectionalFieldMapping> FieldMappings { get; init; }
+    public required BidirectionalMappingOptions Options { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record BidirectionalFieldMapping
+{
+}
+    public required string SourceField { get; init; }
+    public required string TargetField { get; init; }
+    public FieldTransform? ForwardTransform { get; init; }
+    public FieldTransform? ReverseTransform { get; init; }
+}
+```
+```csharp
+public sealed record FieldTransform
+{
+}
+    public TransformType Type { get; init; }
+    public double? Factor { get; init; }
+}
+```
+```csharp
+public sealed record BidirectionalMappingOptions
+{
+}
+    public bool ValidateReversibility { get; init; };
+}
+```
+```csharp
+public sealed record BidirectionalMappingResult
+{
+}
+    public required string MappingId { get; init; }
+    public MappingDirection Direction { get; init; }
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> MappedData { get; init; }
+    public BidirectionalMappingStatus Status { get; init; }
 }
 ```

@@ -525,12 +525,18 @@ public sealed class GridBalancingResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs
 ```csharp
-public sealed class LocalTrainingCoordinator
+public sealed class FederatedLearningOrchestrator
 {
 }
-    public async Task<GradientUpdate> TrainLocalAsync(string nodeId, ModelWeights globalWeights, double[][] localData, double[][] localLabels, TrainingConfig config, CancellationToken ct = default);
+    public FederatedLearningOrchestrator(TrainingConfig? config = null, PrivacyConfig? privacyConfig = null);
+    public void RegisterNode(string nodeId);
+    public void UnregisterNode(string nodeId);
+    public string[] GetRegisteredNodes();
+    public async Task<TrainingResult> RunTrainingAsync(ModelWeights initialWeights, Func<string, Task<(double[][] data, double[][] labels)>> dataProvider, CancellationToken ct = default);
+    public (double[] lossHistory, bool hasConverged, int stableRounds) GetTrainingStats();
+    public double? GetRemainingPrivacyBudget();
 }
 ```
 
@@ -541,6 +547,15 @@ public sealed class GradientAggregator
 }
     public async Task<ModelWeights> AggregateAsync(GradientUpdate[] updates, AggregationStrategy strategy, CancellationToken ct = default);
     public ModelWeights ApplyGradients(ModelWeights currentWeights, Dictionary<string, double[]> gradients, double learningRate = 1.0);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs
+```csharp
+public sealed class LocalTrainingCoordinator
+{
+}
+    public async Task<GradientUpdate> TrainLocalAsync(string nodeId, ModelWeights globalWeights, double[][] localData, double[][] localLabels, TrainingConfig config, CancellationToken ct = default);
 }
 ```
 
@@ -569,21 +584,6 @@ public sealed class DifferentialPrivacyIntegration
     public void ConsumeRound(double epsilon = 1.0);
     public void ResetBudget(double newBudget);
     public bool HasSufficientBudget(double requiredEpsilon);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs
-```csharp
-public sealed class FederatedLearningOrchestrator
-{
-}
-    public FederatedLearningOrchestrator(TrainingConfig? config = null, PrivacyConfig? privacyConfig = null);
-    public void RegisterNode(string nodeId);
-    public void UnregisterNode(string nodeId);
-    public string[] GetRegisteredNodes();
-    public async Task<TrainingResult> RunTrainingAsync(ModelWeights initialWeights, Func<string, Task<(double[][] data, double[][] labels)>> dataProvider, CancellationToken ct = default);
-    public (double[] lossHistory, bool hasConverged, int stableRounds) GetTrainingStats();
-    public double? GetRemainingPrivacyBudget();
 }
 ```
 

@@ -137,49 +137,6 @@ public sealed class FilesystemStrategyRegistry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Scaling/FilesystemScalingManager.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Filesystem scaling with dynamic I/O scheduling and kernel bypass")]
-public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
-{
-}
-    public FilesystemScalingManager(ScalingLimits? initialLimits = null, int kernelBypassRedetectIntervalMs = DefaultKernelBypassRedetectIntervalMs, int defaultIoQuotaPerCaller = DefaultIoQuotaPerCaller);
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits;;
-    public BackpressureState CurrentBackpressureState;;
-    public async Task ScheduleIoAsync(Func<CancellationToken, Task<long>> operation, IoPriority priority = IoPriority.Normal, string? callerId = null, CancellationToken ct = default);
-    public Task ReconfigureQueueDepthAsync(string strategyType, int queueDepth, CancellationToken ct = default);
-    public int GetQueueDepth(string strategyType);
-    public bool IsIoUringAvailable;;
-    public bool IsDirectIoAvailable;;
-    public void ForceKernelBypassRedetect();
-    public void ConfigureCallerQuota(string callerId, int maxOperations);
-    public void Dispose();
-    internal sealed record IoQuotaInfo;
-}
-```
-```csharp
-private sealed record IoOperation
-{
-}
-    public required Func<CancellationToken, Task<long>> Execute { get; init; }
-    public required IoPriority Priority { get; init; }
-    public string? CallerId { get; init; }
-    public required TaskCompletionSource<long> Completion { get; init; }
-}
-```
-```csharp
-internal sealed record IoQuotaInfo
-{
-}
-    public required string CallerId { get; init; }
-    public required int MaxOperations { get; init; }
-    public required int CurrentOperations { get; init; }
-    public required DateTime WindowStartUtc { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/FormatStrategies.cs
 ```csharp
 public sealed class Fat32Strategy : FilesystemStrategyBase
@@ -358,134 +315,6 @@ public sealed class SysfsStrategy : FilesystemStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/UnixFuseFilesystemStrategy.cs
-```csharp
-public sealed class UnixFuseFilesystemStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DeviceDiscoveryStrategy.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Device discovery strategy (BMDV-01/BMDV-08)")]
-public sealed class DeviceDiscoveryStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-    public Task<IReadOnlyList<PhysicalDeviceInfo>> DiscoverAsync(DeviceDiscoveryOptions? options, CancellationToken ct);
-    public DeviceTopologyTree BuildTopology(IReadOnlyList<PhysicalDeviceInfo> devices);
-    public IReadOnlyList<NumaAffinityInfo> GetNumaAffinity(DeviceTopologyTree tree);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DetectionStrategies.cs
-```csharp
-public sealed class AutoDetectStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class NtfsStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DevicePoolStrategy.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Device pool management strategy (BMDV-05/BMDV-06/BMDV-07/BMDV-10/BMDV-11/BMDV-12)")]
-public sealed class DevicePoolStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task DisposeCoreAsync();
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-    public Task<DevicePoolDescriptor> CreatePoolAsync(string name, StorageTier? tier, LocalityTag? locality, IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct);
-    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsAsync();
-    public Task DeletePoolAsync(Guid poolId, CancellationToken ct);
-    public Task<BootstrapResult> BootstrapAsync(CancellationToken ct);
-    public Task StartHotSwapAsync(CancellationToken ct);
-    public Task StopHotSwapAsync();
-    public HotSwapManager? GetHotSwapManager();;
-    public DevicePoolManager? GetPoolManager();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DeviceHealthStrategy.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Device health monitoring strategy (BMDV-03/BMDV-04)")]
-public sealed class DeviceHealthStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task DisposeCoreAsync();
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-    public Task<PhysicalDeviceHealth> GetHealthAsync(string devicePath, BusType busType, CancellationToken ct);
-    public FailurePrediction GetPrediction(string deviceId, PhysicalDeviceHealth health);
-    public PhysicalDeviceManager? GetDeviceManager();;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/NetworkFilesystemStrategies.cs
 ```csharp
 public sealed class NfsStrategy : FilesystemStrategyBase
@@ -629,6 +458,630 @@ public sealed class Nfs4Strategy : FilesystemStrategyBase
     public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
     public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
     public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DevicePoolStrategy.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Device pool management strategy (BMDV-05/BMDV-06/BMDV-07/BMDV-10/BMDV-11/BMDV-12)")]
+public sealed class DevicePoolStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task DisposeCoreAsync();
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+    public Task<DevicePoolDescriptor> CreatePoolAsync(string name, StorageTier? tier, LocalityTag? locality, IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct);
+    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsAsync();
+    public Task DeletePoolAsync(Guid poolId, CancellationToken ct);
+    public Task<BootstrapResult> BootstrapAsync(CancellationToken ct);
+    public Task StartHotSwapAsync(CancellationToken ct);
+    public Task StopHotSwapAsync();
+    public HotSwapManager? GetHotSwapManager();;
+    public DevicePoolManager? GetPoolManager();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/SuperblockDetectionStrategies.cs
+```csharp
+public sealed record SuperblockDetails
+{
+}
+    public string? MagicSignature { get; init; }
+    public string? Label { get; init; }
+    public string? Uuid { get; init; }
+    public string? Version { get; init; }
+    public string[] FeatureFlags { get; init; };
+    public int InodeSize { get; init; }
+    public long TotalInodes { get; init; }
+    public long JournalSize { get; init; }
+    public string? CompressionAlgorithm { get; init; }
+    public string? ChecksumAlgorithm { get; init; }
+    public string? RaidProfile { get; init; }
+    public DateTime? CreatedAt { get; init; }
+    public DateTime? LastMountedAt { get; init; }
+    public DateTime? LastWrittenAt { get; init; }
+    public int MountCount { get; init; }
+    public int MaxMountCount { get; init; }
+    public string? State { get; init; }
+    public int GroupCount { get; init; }
+    public long BlocksPerGroup { get; init; }
+    public long TotalBlocks { get; init; }
+    public long FreeBlocks { get; init; }
+    public long ReservedBlocks { get; init; }
+    public string? EncryptionMode { get; init; }
+    public int SnapshotCount { get; init; }
+    public string? PoolName { get; init; }
+    public string? DatasetName { get; init; }
+}
+```
+```csharp
+internal static class SuperblockReader
+{
+}
+    public static byte[]? ReadBytes(string path, long offset, int length);
+    public static string? ResolveDevicePath(string path);
+    public static ushort ReadUInt16LE(byte[] data, int offset);;
+    public static uint ReadUInt32LE(byte[] data, int offset);;
+    public static ulong ReadUInt64LE(byte[] data, int offset);;
+    public static uint ReadUInt32BE(byte[] data, int offset);;
+    public static ulong ReadUInt64BE(byte[] data, int offset);;
+    public static ushort ReadUInt16BE(byte[] data, int offset);;
+    public static string ReadString(byte[] data, int offset, int maxLength);
+    public static Guid ReadUuid(byte[] data, int offset);
+    public static DateTime? FromUnixTime(uint timestamp);
+}
+```
+```csharp
+public sealed class Ext4SuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class BtrfsSuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class XfsSuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class RefsSuperblockStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public SuperblockDetails? LastSuperblockDetails;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DetectionStrategies.cs
+```csharp
+public sealed class AutoDetectStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class NtfsStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/UnixFuseFilesystemStrategy.cs
+```csharp
+public sealed class UnixFuseFilesystemStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DriverStrategies.cs
+```csharp
+public sealed class PosixDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class DirectIoDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class IoUringDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class MmapDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class WindowsNativeDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class AsyncIoDriverStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/SpecializedStrategies.cs
+```csharp
+public sealed class ContainerPackedStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class OverlayFsStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class BlockCacheStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+}
+```
+```csharp
+public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+    public void SetQuota(string path, long limitBytes);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DeviceDiscoveryStrategy.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Device discovery strategy (BMDV-01/BMDV-08)")]
+public sealed class DeviceDiscoveryStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+    public Task<IReadOnlyList<PhysicalDeviceInfo>> DiscoverAsync(DeviceDiscoveryOptions? options, CancellationToken ct);
+    public DeviceTopologyTree BuildTopology(IReadOnlyList<PhysicalDeviceInfo> devices);
+    public IReadOnlyList<NumaAffinityInfo> GetNumaAffinity(DeviceTopologyTree tree);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/WindowsWinFspFilesystemStrategy.cs
+```csharp
+public sealed class WindowsWinFspFilesystemStrategy : FilesystemStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override FilesystemStrategyCategory Category;;
+    public override FilesystemStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs
+```csharp
+public sealed class ContentAddressableStorageLayer
+{
+}
+    public ContentAddressableStorageLayer(IMessageBus? messageBus = null);
+    public async Task<string> StoreBlockAsync(byte[] data, string sourceFile, CancellationToken ct = default);
+    public byte[]? RetrieveBlock(string contentHash);
+    public void RemoveReference(string sourceFile, string contentHash);
+    public GarbageCollectionResult CollectGarbage();
+    public IReadOnlyList<byte[]> RabinChunk(byte[] data, int targetChunkSize = 8192, int minChunkSize = 2048, int maxChunkSize = 32768);
+    public DeduplicationStats GetStats();;
+}
+```
+```csharp
+public sealed class CasBlock
+{
+}
+    public required string ContentHash { get; init; }
+    public required byte[] Data { get; init; }
+    public int Size { get; init; }
+    public int ReferenceCount { get; set; }
+    public DateTime StoredAt { get; init; }
+}
+```
+```csharp
+public sealed record CasReference
+{
+}
+    public required string SourceFile { get; init; }
+    public required string ContentHash { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record GarbageCollectionResult
+{
+}
+    public int BlocksReclaimed { get; init; }
+    public long BytesReclaimed { get; init; }
+    public int RemainingBlocks { get; init; }
+    public DateTime CollectedAt { get; init; }
+}
+```
+```csharp
+public sealed record DeduplicationStats
+{
+}
+    public long TotalUniqueBlocks { get; init; }
+    public long StoredBytes { get; init; }
+    public long DeduplicatedBytes { get; init; }
+    public double DeduplicationRatio { get; init; }
+    public int TotalReferences { get; init; }
+}
+```
+```csharp
+public sealed class BlockLevelEncryptionManager
+{
+}
+    public BlockLevelEncryptionManager(IMessageBus? messageBus = null);
+    public EncryptionHeader CreateHeader(string volumeId, string cipher = "aes-xts-plain64", int keySize = 256);
+    public int AddKeySlot(string volumeId, string passphrase);
+    public async Task<byte[]> EncryptBlockAsync(string volumeId, byte[] data, long blockOffset, CancellationToken ct = default);
+    public async Task<byte[]> DecryptBlockAsync(string volumeId, byte[] encryptedData, long blockOffset, CancellationToken ct = default);
+    public PerFileEncryptionInfo CreatePerFileEncryption(string volumeId, string filePath);
+    public EncryptionMetrics GetMetrics();;
+}
+```
+```csharp
+public sealed class EncryptionHeader
+{
+}
+    public required string VolumeId { get; init; }
+    public int Version { get; init; }
+    public required string Cipher { get; init; }
+    public int KeySizeBits { get; init; }
+    public required byte[] MasterKeySalt { get; init; }
+    public List<KeySlot> KeySlots { get; init; };
+    public DateTime CreatedAt { get; init; }
+    public bool UseHardwareAcceleration { get; init; }
+}
+```
+```csharp
+public sealed class KeySlot
+{
+}
+    public int SlotIndex { get; init; }
+    public bool IsActive { get; init; }
+    public string Kdf { get; init; };
+    public int KdfIterations { get; init; }
+    public int KdfMemoryKb { get; init; }
+    public byte[] Salt { get; init; };
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record PerFileEncryptionInfo
+{
+}
+    public required string VolumeId { get; init; }
+    public required string FilePath { get; init; }
+    public required byte[] FileKeyWrapped { get; init; }
+    public required string Algorithm { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record EncryptionMetrics
+{
+}
+    public long BlocksEncrypted { get; init; }
+    public long BlocksDecrypted { get; init; }
+    public bool AesNiAvailable { get; init; }
+    public int ActiveVolumes { get; init; }
+}
+```
+```csharp
+public sealed class DistributedHaFilesystemManager
+{
+}
+    public void RegisterNode(string nodeId, long capacityBytes, string region);
+    public LeaderElectionResult ElectLeader(string candidateId);
+    public void Heartbeat(string nodeId, long usedBytes);
+    public IReadOnlyList<string> DetectUnhealthyNodes(TimeSpan threshold);
+    public IReadOnlyList<RebalanceMovement> Rebalance();
+    public string? CurrentLeader;;
+    public ClusterHealth GetClusterHealth();;
+}
+```
+```csharp
+public sealed class FilesystemNode
+{
+}
+    public required string NodeId { get; init; }
+    public long CapacityBytes { get; init; }
+    public long UsedBytes { get; set; }
+    public required string Region { get; init; }
+    public bool IsHealthy { get; set; }
+    public DateTime LastHeartbeat { get; set; }
+    public double Utilization;;
+}
+```
+```csharp
+public sealed record DataPlacement
+{
+}
+    public required string DataId { get; init; }
+    public required List<string> NodeIds { get; init; }
+    public int ReplicationFactor { get; init; }
+}
+```
+```csharp
+public sealed record LeaderElectionResult
+{
+}
+    public bool Success { get; init; }
+    public string? LeaderId { get; init; }
+    public long Term { get; init; }
+    public int VotesReceived { get; init; }
+    public int VotesNeeded { get; init; }
+}
+```
+```csharp
+public sealed record RebalanceMovement
+{
+}
+    public required string SourceNode { get; init; }
+    public required string TargetNode { get; init; }
+    public long BytesToMove { get; init; }
+}
+```
+```csharp
+public sealed record ClusterHealth
+{
+}
+    public int TotalNodes { get; init; }
+    public int HealthyNodes { get; init; }
+    public string? LeaderId { get; init; }
+    public long CurrentTerm { get; init; }
+    public long TotalCapacityBytes { get; init; }
+    public long TotalUsedBytes { get; init; }
 }
 ```
 
@@ -883,9 +1336,10 @@ public sealed class SpdkDriverStrategy : FilesystemStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DriverStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/DeviceHealthStrategy.cs
 ```csharp
-public sealed class PosixDriverStrategy : FilesystemStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Device health monitoring strategy (BMDV-03/BMDV-04)")]
+public sealed class DeviceHealthStrategy : FilesystemStrategyBase
 {
 }
     public override string StrategyId;;
@@ -894,597 +1348,58 @@ public sealed class PosixDriverStrategy : FilesystemStrategyBase
     public override FilesystemStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task DisposeCoreAsync();
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class DirectIoDriverStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class IoUringDriverStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class MmapDriverStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class WindowsNativeDriverStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class AsyncIoDriverStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/WindowsWinFspFilesystemStrategy.cs
-```csharp
-public sealed class WindowsWinFspFilesystemStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
+    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
     public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+    public Task<PhysicalDeviceHealth> GetHealthAsync(string devicePath, BusType busType, CancellationToken ct);
+    public FailurePrediction GetPrediction(string deviceId, PhysicalDeviceHealth health);
+    public PhysicalDeviceManager? GetDeviceManager();;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Scaling/FilesystemScalingManager.cs
 ```csharp
-public sealed class ContentAddressableStorageLayer
+[SdkCompatibility("6.0.0", Notes = "Phase 88-11: Filesystem scaling with dynamic I/O scheduling and kernel bypass")]
+public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
 {
 }
-    public ContentAddressableStorageLayer(IMessageBus? messageBus = null);
-    public async Task<string> StoreBlockAsync(byte[] data, string sourceFile, CancellationToken ct = default);
-    public byte[]? RetrieveBlock(string contentHash);
-    public void RemoveReference(string sourceFile, string contentHash);
-    public GarbageCollectionResult CollectGarbage();
-    public IReadOnlyList<byte[]> RabinChunk(byte[] data, int targetChunkSize = 8192, int minChunkSize = 2048, int maxChunkSize = 32768);
-    public DeduplicationStats GetStats();;
+    public FilesystemScalingManager(ScalingLimits? initialLimits = null, int kernelBypassRedetectIntervalMs = DefaultKernelBypassRedetectIntervalMs, int defaultIoQuotaPerCaller = DefaultIoQuotaPerCaller);
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits;;
+    public BackpressureState CurrentBackpressureState;;
+    public async Task ScheduleIoAsync(Func<CancellationToken, Task<long>> operation, IoPriority priority = IoPriority.Normal, string? callerId = null, CancellationToken ct = default);
+    public Task ReconfigureQueueDepthAsync(string strategyType, int queueDepth, CancellationToken ct = default);
+    public int GetQueueDepth(string strategyType);
+    public bool IsIoUringAvailable;;
+    public bool IsDirectIoAvailable;;
+    public void ForceKernelBypassRedetect();
+    public void ConfigureCallerQuota(string callerId, int maxOperations);
+    public void Dispose();
+    internal sealed record IoQuotaInfo;
 }
 ```
 ```csharp
-public sealed class CasBlock
+private sealed record IoOperation
 {
 }
-    public required string ContentHash { get; init; }
-    public required byte[] Data { get; init; }
-    public int Size { get; init; }
-    public int ReferenceCount { get; set; }
-    public DateTime StoredAt { get; init; }
+    public required Func<CancellationToken, Task<long>> Execute { get; init; }
+    public required IoPriority Priority { get; init; }
+    public string? CallerId { get; init; }
+    public required TaskCompletionSource<long> Completion { get; init; }
 }
 ```
 ```csharp
-public sealed record CasReference
+internal sealed record IoQuotaInfo
 {
 }
-    public required string SourceFile { get; init; }
-    public required string ContentHash { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record GarbageCollectionResult
-{
-}
-    public int BlocksReclaimed { get; init; }
-    public long BytesReclaimed { get; init; }
-    public int RemainingBlocks { get; init; }
-    public DateTime CollectedAt { get; init; }
-}
-```
-```csharp
-public sealed record DeduplicationStats
-{
-}
-    public long TotalUniqueBlocks { get; init; }
-    public long StoredBytes { get; init; }
-    public long DeduplicatedBytes { get; init; }
-    public double DeduplicationRatio { get; init; }
-    public int TotalReferences { get; init; }
-}
-```
-```csharp
-public sealed class BlockLevelEncryptionManager
-{
-}
-    public BlockLevelEncryptionManager(IMessageBus? messageBus = null);
-    public EncryptionHeader CreateHeader(string volumeId, string cipher = "aes-xts-plain64", int keySize = 256);
-    public int AddKeySlot(string volumeId, string passphrase);
-    public async Task<byte[]> EncryptBlockAsync(string volumeId, byte[] data, long blockOffset, CancellationToken ct = default);
-    public async Task<byte[]> DecryptBlockAsync(string volumeId, byte[] encryptedData, long blockOffset, CancellationToken ct = default);
-    public PerFileEncryptionInfo CreatePerFileEncryption(string volumeId, string filePath);
-    public EncryptionMetrics GetMetrics();;
-}
-```
-```csharp
-public sealed class EncryptionHeader
-{
-}
-    public required string VolumeId { get; init; }
-    public int Version { get; init; }
-    public required string Cipher { get; init; }
-    public int KeySizeBits { get; init; }
-    public required byte[] MasterKeySalt { get; init; }
-    public List<KeySlot> KeySlots { get; init; };
-    public DateTime CreatedAt { get; init; }
-    public bool UseHardwareAcceleration { get; init; }
-}
-```
-```csharp
-public sealed class KeySlot
-{
-}
-    public int SlotIndex { get; init; }
-    public bool IsActive { get; init; }
-    public string Kdf { get; init; };
-    public int KdfIterations { get; init; }
-    public int KdfMemoryKb { get; init; }
-    public byte[] Salt { get; init; };
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record PerFileEncryptionInfo
-{
-}
-    public required string VolumeId { get; init; }
-    public required string FilePath { get; init; }
-    public required byte[] FileKeyWrapped { get; init; }
-    public required string Algorithm { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record EncryptionMetrics
-{
-}
-    public long BlocksEncrypted { get; init; }
-    public long BlocksDecrypted { get; init; }
-    public bool AesNiAvailable { get; init; }
-    public int ActiveVolumes { get; init; }
-}
-```
-```csharp
-public sealed class DistributedHaFilesystemManager
-{
-}
-    public void RegisterNode(string nodeId, long capacityBytes, string region);
-    public LeaderElectionResult ElectLeader(string candidateId);
-    public void Heartbeat(string nodeId, long usedBytes);
-    public IReadOnlyList<string> DetectUnhealthyNodes(TimeSpan threshold);
-    public IReadOnlyList<RebalanceMovement> Rebalance();
-    public string? CurrentLeader;;
-    public ClusterHealth GetClusterHealth();;
-}
-```
-```csharp
-public sealed class FilesystemNode
-{
-}
-    public required string NodeId { get; init; }
-    public long CapacityBytes { get; init; }
-    public long UsedBytes { get; set; }
-    public required string Region { get; init; }
-    public bool IsHealthy { get; set; }
-    public DateTime LastHeartbeat { get; set; }
-    public double Utilization;;
-}
-```
-```csharp
-public sealed record DataPlacement
-{
-}
-    public required string DataId { get; init; }
-    public required List<string> NodeIds { get; init; }
-    public int ReplicationFactor { get; init; }
-}
-```
-```csharp
-public sealed record LeaderElectionResult
-{
-}
-    public bool Success { get; init; }
-    public string? LeaderId { get; init; }
-    public long Term { get; init; }
-    public int VotesReceived { get; init; }
-    public int VotesNeeded { get; init; }
-}
-```
-```csharp
-public sealed record RebalanceMovement
-{
-}
-    public required string SourceNode { get; init; }
-    public required string TargetNode { get; init; }
-    public long BytesToMove { get; init; }
-}
-```
-```csharp
-public sealed record ClusterHealth
-{
-}
-    public int TotalNodes { get; init; }
-    public int HealthyNodes { get; init; }
-    public string? LeaderId { get; init; }
-    public long CurrentTerm { get; init; }
-    public long TotalCapacityBytes { get; init; }
-    public long TotalUsedBytes { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/SpecializedStrategies.cs
-```csharp
-public sealed class ContainerPackedStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class OverlayFsStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class BlockCacheStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-}
-```
-```csharp
-public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
-    public void SetQuota(string path, long limitBytes);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/Strategies/SuperblockDetectionStrategies.cs
-```csharp
-public sealed record SuperblockDetails
-{
-}
-    public string? MagicSignature { get; init; }
-    public string? Label { get; init; }
-    public string? Uuid { get; init; }
-    public string? Version { get; init; }
-    public string[] FeatureFlags { get; init; };
-    public int InodeSize { get; init; }
-    public long TotalInodes { get; init; }
-    public long JournalSize { get; init; }
-    public string? CompressionAlgorithm { get; init; }
-    public string? ChecksumAlgorithm { get; init; }
-    public string? RaidProfile { get; init; }
-    public DateTime? CreatedAt { get; init; }
-    public DateTime? LastMountedAt { get; init; }
-    public DateTime? LastWrittenAt { get; init; }
-    public int MountCount { get; init; }
-    public int MaxMountCount { get; init; }
-    public string? State { get; init; }
-    public int GroupCount { get; init; }
-    public long BlocksPerGroup { get; init; }
-    public long TotalBlocks { get; init; }
-    public long FreeBlocks { get; init; }
-    public long ReservedBlocks { get; init; }
-    public string? EncryptionMode { get; init; }
-    public int SnapshotCount { get; init; }
-    public string? PoolName { get; init; }
-    public string? DatasetName { get; init; }
-}
-```
-```csharp
-internal static class SuperblockReader
-{
-}
-    public static byte[]? ReadBytes(string path, long offset, int length);
-    public static string? ResolveDevicePath(string path);
-    public static ushort ReadUInt16LE(byte[] data, int offset);;
-    public static uint ReadUInt32LE(byte[] data, int offset);;
-    public static ulong ReadUInt64LE(byte[] data, int offset);;
-    public static uint ReadUInt32BE(byte[] data, int offset);;
-    public static ulong ReadUInt64BE(byte[] data, int offset);;
-    public static ushort ReadUInt16BE(byte[] data, int offset);;
-    public static string ReadString(byte[] data, int offset, int maxLength);
-    public static Guid ReadUuid(byte[] data, int offset);
-    public static DateTime? FromUnixTime(uint timestamp);
-}
-```
-```csharp
-public sealed class Ext4SuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class BtrfsSuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class XfsSuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class RefsSuperblockStrategy : FilesystemStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override FilesystemStrategyCategory Category;;
-    public override FilesystemStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public SuperblockDetails? LastSuperblockDetails;;
-    public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
-    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/DevicePoolManager.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Device pool lifecycle management (BMDV-05/BMDV-06/BMDV-07)")]
-public sealed class DevicePoolManager : IAsyncDisposable
-{
-}
-    public DevicePoolManager(PoolMetadataCodec codec);
-    public async Task<DevicePoolDescriptor> CreatePoolAsync(string poolName, StorageTier? explicitTier, LocalityTag? locality, IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct = default);
-    public Task<DevicePoolDescriptor?> GetPoolAsync(Guid poolId);
-    public Task<DevicePoolDescriptor?> GetPoolByNameAsync(string poolName);
-    public Task<IReadOnlyList<DevicePoolDescriptor>> GetAllPoolsAsync();
-    public async Task AddDeviceToPoolAsync(Guid poolId, IPhysicalBlockDevice device, CancellationToken ct = default);
-    public async Task RemoveDeviceFromPoolAsync(Guid poolId, string deviceId, CancellationToken ct = default);
-    public async Task DeletePoolAsync(Guid poolId, CancellationToken ct = default);
-    public async Task<IReadOnlyList<DevicePoolDescriptor>> ScanForPoolsAsync(IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct = default);
-    public async Task UpdatePoolLocalityAsync(Guid poolId, LocalityTag locality, CancellationToken ct = default);
-    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsByTierAsync(StorageTier tier);
-    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsByLocalityAsync(string? rack = null, string? datacenter = null, string? region = null);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/SmartMonitor.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: SMART health monitoring (BMDV-03)")]
-public sealed class SmartMonitor
-{
-}
-    public SmartMonitor(ILogger? logger = null);
-    public async Task<PhysicalDeviceHealth> ReadSmartAttributesAsync(string devicePath, BusType busType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/DeviceTopologyMapper.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Device topology mapping (BMDV-08)")]
-public sealed class DeviceTopologyMapper
-{
-}
-    public DeviceTopologyTree BuildTopology(IReadOnlyList<PhysicalDeviceInfo> devices);
-    public IReadOnlyList<TopologyNode> GetDevicesByController(DeviceTopologyTree tree, string controllerNodeId);
-    public TopologyNode? FindDeviceNode(DeviceTopologyTree tree, string deviceId);
-    public IReadOnlyList<string> GetSiblingDevices(DeviceTopologyTree tree, string deviceId);
-    public IReadOnlyList<NumaAffinityInfo> GetNumaAffinity(DeviceTopologyTree tree);
-    internal static IReadOnlyList<int> ParseCpuList(string cpuList);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/BaremetalBootstrap.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Bare-metal bootstrap (BMDV-12)")]
-public sealed class BaremetalBootstrap
-{
-}
-    public BaremetalBootstrap(DeviceDiscoveryService discoveryService, DevicePoolManager poolManager, DeviceJournal journal, PhysicalDeviceManager deviceManager, ILogger? logger = null);
-    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(CancellationToken ct = default);
-    public async Task<DevicePoolDescriptor> InitializeNewSystemAsync(string poolName, IReadOnlyList<IPhysicalBlockDevice> devices, StorageTier? tier = null, LocalityTag? locality = null, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/PoolMetadataCodec.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Pool metadata binary codec (BMDV-07)")]
-public sealed class PoolMetadataCodec
-{
-}
-    public byte[] SerializePoolMetadata(DevicePoolDescriptor pool);
-    public DevicePoolDescriptor? DeserializePoolMetadata(ReadOnlySpan<byte> data);
-    public bool ValidatePoolMetadata(ReadOnlySpan<byte> data);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/NumaAwareIoScheduler.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: NUMA-aware I/O scheduling (BMDV-09)")]
-public sealed class NumaAwareIoScheduler
-{
-}
-    public NumaAwareIoScheduler(DeviceTopologyTree topology, IReadOnlyList<NumaAffinityInfo> numaInfo);
-    public IoSchedulingResult GetSchedulingHint(string deviceId);
-    public async Task<T> ScheduleIoAsync<T>(string deviceId, Func<CancellationToken, Task<T>> ioOperation, CancellationToken ct = default);
-    public IReadOnlyDictionary<string, IoSchedulingResult> GetAllHints();
+    public required string CallerId { get; init; }
+    public required int MaxOperations { get; init; }
+    public required int CurrentOperations { get; init; }
+    public required DateTime WindowStartUtc { get; init; }
 }
 ```
 
@@ -1521,6 +1436,79 @@ public sealed class PhysicalDeviceManager : IAsyncDisposable
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/NumaAwareIoScheduler.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: NUMA-aware I/O scheduling (BMDV-09)")]
+public sealed class NumaAwareIoScheduler
+{
+}
+    public NumaAwareIoScheduler(DeviceTopologyTree topology, IReadOnlyList<NumaAffinityInfo> numaInfo);
+    public IoSchedulingResult GetSchedulingHint(string deviceId);
+    public async Task<T> ScheduleIoAsync<T>(string deviceId, Func<CancellationToken, Task<T>> ioOperation, CancellationToken ct = default);
+    public IReadOnlyDictionary<string, IoSchedulingResult> GetAllHints();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/DeviceTopologyMapper.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Device topology mapping (BMDV-08)")]
+public sealed class DeviceTopologyMapper
+{
+}
+    public DeviceTopologyTree BuildTopology(IReadOnlyList<PhysicalDeviceInfo> devices);
+    public IReadOnlyList<TopologyNode> GetDevicesByController(DeviceTopologyTree tree, string controllerNodeId);
+    public TopologyNode? FindDeviceNode(DeviceTopologyTree tree, string deviceId);
+    public IReadOnlyList<string> GetSiblingDevices(DeviceTopologyTree tree, string deviceId);
+    public IReadOnlyList<NumaAffinityInfo> GetNumaAffinity(DeviceTopologyTree tree);
+    internal static IReadOnlyList<int> ParseCpuList(string cpuList);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/BaremetalBootstrap.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Bare-metal bootstrap (BMDV-12)")]
+public sealed class BaremetalBootstrap
+{
+}
+    public BaremetalBootstrap(DeviceDiscoveryService discoveryService, DevicePoolManager poolManager, DeviceJournal journal, PhysicalDeviceManager deviceManager, ILogger? logger = null);
+    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(CancellationToken ct = default);
+    public async Task<DevicePoolDescriptor> InitializeNewSystemAsync(string poolName, IReadOnlyList<IPhysicalBlockDevice> devices, StorageTier? tier = null, LocalityTag? locality = null, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/SmartMonitor.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: SMART health monitoring (BMDV-03)")]
+public sealed class SmartMonitor
+{
+}
+    public SmartMonitor(ILogger? logger = null);
+    public async Task<PhysicalDeviceHealth> ReadSmartAttributesAsync(string devicePath, BusType busType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/DevicePoolManager.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Device pool lifecycle management (BMDV-05/BMDV-06/BMDV-07)")]
+public sealed class DevicePoolManager : IAsyncDisposable
+{
+}
+    public DevicePoolManager(PoolMetadataCodec codec);
+    public async Task<DevicePoolDescriptor> CreatePoolAsync(string poolName, StorageTier? explicitTier, LocalityTag? locality, IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct = default);
+    public Task<DevicePoolDescriptor?> GetPoolAsync(Guid poolId);
+    public Task<DevicePoolDescriptor?> GetPoolByNameAsync(string poolName);
+    public Task<IReadOnlyList<DevicePoolDescriptor>> GetAllPoolsAsync();
+    public async Task AddDeviceToPoolAsync(Guid poolId, IPhysicalBlockDevice device, CancellationToken ct = default);
+    public async Task RemoveDeviceFromPoolAsync(Guid poolId, string deviceId, CancellationToken ct = default);
+    public async Task DeletePoolAsync(Guid poolId, CancellationToken ct = default);
+    public async Task<IReadOnlyList<DevicePoolDescriptor>> ScanForPoolsAsync(IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct = default);
+    public async Task UpdatePoolLocalityAsync(Guid poolId, LocalityTag locality, CancellationToken ct = default);
+    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsByTierAsync(StorageTier tier);
+    public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsByLocalityAsync(string? rack = null, string? datacenter = null, string? region = null);
+    public ValueTask DisposeAsync();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/FailurePredictionEngine.cs
 ```csharp
 internal sealed record DeviceEwmaState
@@ -1547,21 +1535,15 @@ public sealed class FailurePredictionEngine
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/HotSwapManager.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/PoolMetadataCodec.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 90: Hot-swap device management (BMDV-11)")]
-public sealed class HotSwapManager : IAsyncDisposable
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Pool metadata binary codec (BMDV-07)")]
+public sealed class PoolMetadataCodec
 {
 }
-    public Action<PhysicalDeviceInfo>? OnNewDeviceAvailable { get; set; }
-    public Action<Guid, string>? OnRebuildRequired { get; set; }
-    public Action<string, DeviceStatus>? OnDeviceDegraded { get; set; }
-    public Action<string, RebuildState>? OnRebuildProgress { get; set; }
-    public HotSwapManager(PhysicalDeviceManager deviceManager, DevicePoolManager poolManager, DeviceJournal journal, HotSwapConfig? config = null, ILogger? logger = null);
-    public Task StartAsync(CancellationToken ct = default);
-    public Task StopAsync();
-    public Task<IReadOnlyList<RebuildState>> GetActiveRebuildsAsync();
-    public async ValueTask DisposeAsync();
+    public byte[] SerializePoolMetadata(DevicePoolDescriptor pool);
+    public DevicePoolDescriptor? DeserializePoolMetadata(ReadOnlySpan<byte> data);
+    public bool ValidatePoolMetadata(ReadOnlySpan<byte> data);
 }
 ```
 
@@ -1577,5 +1559,23 @@ public sealed class DeviceJournal : IAsyncDisposable
     public async Task<IReadOnlyList<JournalEntry>> ReadJournalAsync(IPhysicalBlockDevice journalDevice, CancellationToken ct = default);
     public async Task<IReadOnlyList<JournalEntry>> GetUncommittedIntentsAsync(IPhysicalBlockDevice journalDevice, CancellationToken ct = default);
     public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateFilesystem/DeviceManagement/HotSwapManager.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 90: Hot-swap device management (BMDV-11)")]
+public sealed class HotSwapManager : IAsyncDisposable
+{
+}
+    public Action<PhysicalDeviceInfo>? OnNewDeviceAvailable { get; set; }
+    public Action<Guid, string>? OnRebuildRequired { get; set; }
+    public Action<string, DeviceStatus>? OnDeviceDegraded { get; set; }
+    public Action<string, RebuildState>? OnRebuildProgress { get; set; }
+    public HotSwapManager(PhysicalDeviceManager deviceManager, DevicePoolManager poolManager, DeviceJournal journal, HotSwapConfig? config = null, ILogger? logger = null);
+    public Task StartAsync(CancellationToken ct = default);
+    public Task StopAsync();
+    public Task<IReadOnlyList<RebuildState>> GetActiveRebuildsAsync();
+    public async ValueTask DisposeAsync();
 }
 ```

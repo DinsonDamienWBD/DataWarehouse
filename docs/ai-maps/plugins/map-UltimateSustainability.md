@@ -5,6 +5,85 @@
 
 ## Project: DataWarehouse.Plugins.UltimateSustainability
 
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/UltimateSustainabilityPlugin.cs
+```csharp
+public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
+{
+#endregion
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override string InfrastructureDomain;;
+    public override PluginCategory Category;;
+    public void RegisterStrategy(ISustainabilityStrategy strategy);
+    public ISustainabilityStrategy? GetStrategy(string strategyId);
+    public IReadOnlyCollection<string> GetRegisteredStrategies();;
+    public IReadOnlyCollection<ISustainabilityStrategy> GetStrategiesByCategory(SustainabilityCategory category);
+    public void SetActiveStrategy(string strategyId);
+    public async Task<IReadOnlyList<SustainabilityRecommendation>> GetAllRecommendationsAsync(CancellationToken ct = default);
+    public SustainabilityStatistics GetAggregateStatistics();
+    public UltimateSustainabilityPlugin();
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+{
+    get
+    {
+        var capabilities = new List<RegisteredCapability>
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.monitor",
+                DisplayName = $"{Name} - Monitor",
+                Description = "Monitor energy consumption and carbon emissions",
+                Category = CapabilityCategory.Custom,
+                SubCategory = "Sustainability",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[]
+                {
+                    "sustainability",
+                    "monitoring",
+                    "energy",
+                    "carbon"
+                }
+            },
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.optimize",
+                DisplayName = $"{Name} - Optimize",
+                Description = "Optimize energy consumption and reduce carbon footprint",
+                Category = CapabilityCategory.Custom,
+                SubCategory = "Sustainability",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[]
+                {
+                    "sustainability",
+                    "optimization",
+                    "green-computing"
+                }
+            }
+        };
+        foreach (var kvp in _strategies)
+        {
+            var strategy = kvp.Value;
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = strategy.DisplayName, Description = strategy.SemanticDescription, Category = CapabilityCategory.Custom, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = strategy.Tags, Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["category"] = strategy.Category.ToString(), ["capabilities"] = strategy.Capabilities.ToString() }, SemanticDescription = strategy.SemanticDescription });
+        }
+
+        return capabilities;
+    }
+}
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
+    public override Task OnMessageAsync(PluginMessage message);
+    public string SemanticDescription;;
+    public string[] SemanticTags;;
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
+    protected override Task OnStartCoreAsync(CancellationToken ct);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/SustainabilityStrategyBase.cs
 ```csharp
 public sealed class SustainabilityStatistics
@@ -131,85 +210,6 @@ public sealed class SustainabilityStrategyRegistry
     public IReadOnlyCollection<ISustainabilityStrategy> GetByCategory(SustainabilityCategory category);
     public int Count;;
     public int AutoDiscover(params System.Reflection.Assembly[] assemblies);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/UltimateSustainabilityPlugin.cs
-```csharp
-public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
-{
-#endregion
-}
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override string InfrastructureDomain;;
-    public override PluginCategory Category;;
-    public void RegisterStrategy(ISustainabilityStrategy strategy);
-    public ISustainabilityStrategy? GetStrategy(string strategyId);
-    public IReadOnlyCollection<string> GetRegisteredStrategies();;
-    public IReadOnlyCollection<ISustainabilityStrategy> GetStrategiesByCategory(SustainabilityCategory category);
-    public void SetActiveStrategy(string strategyId);
-    public async Task<IReadOnlyList<SustainabilityRecommendation>> GetAllRecommendationsAsync(CancellationToken ct = default);
-    public SustainabilityStatistics GetAggregateStatistics();
-    public UltimateSustainabilityPlugin();
-    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
-{
-    get
-    {
-        var capabilities = new List<RegisteredCapability>
-        {
-            new RegisteredCapability
-            {
-                CapabilityId = $"{Id}.monitor",
-                DisplayName = $"{Name} - Monitor",
-                Description = "Monitor energy consumption and carbon emissions",
-                Category = CapabilityCategory.Custom,
-                SubCategory = "Sustainability",
-                PluginId = Id,
-                PluginName = Name,
-                PluginVersion = Version,
-                Tags = new[]
-                {
-                    "sustainability",
-                    "monitoring",
-                    "energy",
-                    "carbon"
-                }
-            },
-            new RegisteredCapability
-            {
-                CapabilityId = $"{Id}.optimize",
-                DisplayName = $"{Name} - Optimize",
-                Description = "Optimize energy consumption and reduce carbon footprint",
-                Category = CapabilityCategory.Custom,
-                SubCategory = "Sustainability",
-                PluginId = Id,
-                PluginName = Name,
-                PluginVersion = Version,
-                Tags = new[]
-                {
-                    "sustainability",
-                    "optimization",
-                    "green-computing"
-                }
-            }
-        };
-        foreach (var kvp in _strategies)
-        {
-            var strategy = kvp.Value;
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = strategy.DisplayName, Description = strategy.SemanticDescription, Category = CapabilityCategory.Custom, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = strategy.Tags, Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["category"] = strategy.Category.ToString(), ["capabilities"] = strategy.Capabilities.ToString() }, SemanticDescription = strategy.SemanticDescription });
-        }
-
-        return capabilities;
-    }
-}
-    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
-    public override Task OnMessageAsync(PluginMessage message);
-    public string SemanticDescription;;
-    public string[] SemanticTags;;
-    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
-    protected override Task OnStartCoreAsync(CancellationToken ct);
 }
 ```
 
@@ -447,44 +447,6 @@ public sealed record EnergySummary
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyMeasurement/EstimationEnergyStrategy.cs
-```csharp
-public sealed class EstimationEnergyStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public static bool IsAvailable();;
-    public double BaseTdpWatts;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    public async Task<CarbonEnergyMeasurement> MeasureOperationAsync(string operationId, string operationType, long dataSizeBytes, Func<Task> operation, string? tenantId = null, CancellationToken ct = default);
-    public Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyMeasurement/PowercapEnergyMeasurementStrategy.cs
-```csharp
-public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public static bool IsAvailable();
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    public async Task<CarbonEnergyMeasurement> MeasureOperationAsync(string operationId, string operationType, long dataSizeBytes, Func<Task> operation, string? tenantId = null, CancellationToken ct = default);
-    public async Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
-    public IReadOnlyDictionary<string, string> GetDiscoveredZones();
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyMeasurement/CloudProviderEnergyStrategy.cs
 ```csharp
 public sealed class CloudProviderEnergyStrategy : SustainabilityStrategyBase
@@ -542,9 +504,9 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/ScienceBasedTargetsStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyMeasurement/EstimationEnergyStrategy.cs
 ```csharp
-public sealed class ScienceBasedTargetsStrategy : SustainabilityStrategyBase
+public sealed class EstimationEnergyStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -553,331 +515,17 @@ public sealed class ScienceBasedTargetsStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public string Pathway { get; set; };
-    public void SetTarget(int baselineYear, double baselineEmissionsKg, int targetYear, double targetReductionPercent);
-    public void RecordYearlyEmissions(int year, double emissionsKg);
-    public double GetRequiredEmissionsKg(int year);
-    public SbtProgress GetProgress();
-}
-```
-```csharp
-public sealed record EmissionRecord
-{
-}
-    public required int Year { get; init; }
-    public required double EmissionsKg { get; init; }
-}
-```
-```csharp
-public sealed record SbtProgress
-{
-}
-    public int BaselineYear { get; init; }
-    public double BaselineEmissionsKg { get; init; }
-    public int TargetYear { get; init; }
-    public double TargetReductionPercent { get; init; }
-    public int CurrentYear { get; init; }
-    public double CurrentEmissionsKg { get; init; }
-    public double RequiredEmissionsKg { get; init; }
-    public double ReductionAchievedPercent { get; init; }
-    public bool IsOnTrack { get; init; }
-    public double GapKg { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/EmbodiedCarbonStrategy.cs
-```csharp
-public sealed class EmbodiedCarbonStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int DefaultLifespanYears { get; set; };
-    public void RegisterAsset(string assetId, string assetType, double embodiedCarbonKg, DateTimeOffset purchaseDate, int? lifespanYears = null);
-    public double GetDailyCarbonGrams(string assetId);
-    public double GetTotalEmbodiedCarbonKg();
-    public double GetTotalDailyCarbonGrams();
-    public IReadOnlyList<HardwareAsset> GetAssetsNearingEndOfLife(int monthsThreshold = 6);
-}
-```
-```csharp
-public sealed class HardwareAsset
-{
-}
-    public required string AssetId { get; init; }
-    public required string AssetType { get; init; }
-    public required double EmbodiedCarbonKg { get; init; }
-    public required DateTimeOffset PurchaseDate { get; init; }
-    public required int LifespanYears { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonIntensityTrackingStrategy.cs
-```csharp
-public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double CurrentIntensity
-{
-    get
-    {
-        lock (_lock)
-            return _currentIntensity;
-    }
-}
-    public double Average24Hour
-{
-    get
-    {
-        lock (_lock)
-            return _24HourAverage;
-    }
-}
-    public TimeSpan PollingInterval { get; set; };
-    public string Region { get; set; };
-    public string? ApiEndpoint { get; set; }
-    public string? ApiKey { get; set; }
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public void RecordIntensity(double intensityGCO2ePerKwh, DateTimeOffset? timestamp = null);
-    public IReadOnlyList<CarbonIntensityDataPoint> GetHistory(TimeSpan? duration = null);
-    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGCO2ePerKwh);
-    public CarbonEmission CalculateEmissions(double energyWh);
-}
-```
-```csharp
-public sealed record CarbonIntensityDataPoint
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double Intensity { get; init; }
-    public string Region { get; init; };
-}
-```
-```csharp
-public sealed record LowCarbonWindow
-{
-}
-    public required DateTimeOffset StartTime { get; init; }
-    public required DateTimeOffset EndTime { get; init; }
-    public required double PredictedIntensity { get; init; }
-    public double Confidence { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonOffsettingStrategy.cs
-```csharp
-public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double TotalEmissionsGrams
-{
-    get
-    {
-        lock (_lock)
-            return _totalEmissionsGrams;
-    }
-}
-    public double TotalOffsetsGrams
-{
-    get
-    {
-        lock (_lock)
-            return _totalOffsetsGrams;
-    }
-}
-    public double NetCarbonBalanceGrams
-{
-    get
-    {
-        lock (_lock)
-            return _totalOffsetsGrams - _totalEmissionsGrams;
-    }
-}
-    public bool IsCarbonNeutral;;
-    public double TargetOffsetPercent { get; set; };
-    public OffsetProjectType[] PreferredProjectTypes { get; set; };
-    public double OffsetCostPerTon { get; set; };
-    public void RecordEmission(double emissionsGrams, string source, string? description = null);
-    public void RecordOffsetPurchase(double offsetGrams, string provider, OffsetProjectType projectType, string projectName, double costUsd, string? certificateId = null);
-    public OffsetRequirement CalculateOffsetRequirement();
-    public IReadOnlyDictionary<string, double> GetEmissionsBySource(TimeSpan? period = null);
-    public IReadOnlyList<OffsetPurchase> GetOffsetPurchases();
-    public CarbonNeutralityReport GenerateReport(TimeSpan period);
-    public IReadOnlyList<OffsetProjectRecommendation> GetRecommendedProjects(double offsetGramsNeeded);
-}
-```
-```csharp
-public sealed record CarbonFootprintEntry
-{
-}
-    public required string Id { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double EmissionsGrams { get; init; }
-    public required string Source { get; init; }
-    public string? Description { get; init; }
-}
-```
-```csharp
-public sealed record OffsetPurchase
-{
-}
-    public required string Id { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double OffsetGrams { get; init; }
-    public required string Provider { get; init; }
-    public required OffsetProjectType ProjectType { get; init; }
-    public required string ProjectName { get; init; }
-    public required double CostUsd { get; init; }
-    public string? CertificateId { get; init; }
-    public VerificationStatus VerificationStatus { get; init; }
-}
-```
-```csharp
-public sealed record OffsetRequirement
-{
-}
-    public required double TotalEmissionsGrams { get; init; }
-    public required double CurrentOffsetsGrams { get; init; }
-    public required double TargetOffsetsGrams { get; init; }
-    public required double AdditionalOffsetsNeededGrams { get; init; }
-    public required double EstimatedCostUsd { get; init; }
-    public required double CurrentOffsetPercent { get; init; }
-    public required double TargetOffsetPercent { get; init; }
-}
-```
-```csharp
-public sealed record CarbonNeutralityReport
-{
-}
-    public required string ReportId { get; init; }
-    public required DateTimeOffset GeneratedAt { get; init; }
-    public required DateTimeOffset PeriodStart { get; init; }
-    public required DateTimeOffset PeriodEnd { get; init; }
-    public required double TotalEmissionsGrams { get; init; }
-    public required double TotalOffsetsGrams { get; init; }
-    public required double NetCarbonBalanceGrams { get; init; }
-    public required bool IsCarbonNeutral { get; init; }
-    public required double OffsetPercentage { get; init; }
-    public required IReadOnlyDictionary<string, double> EmissionsBySource { get; init; }
-    public required IReadOnlyDictionary<OffsetProjectType, double> OffsetsByProjectType { get; init; }
-    public required double TotalOffsetCostUsd { get; init; }
-}
-```
-```csharp
-public sealed record OffsetProjectRecommendation
-{
-}
-    public required string Provider { get; init; }
-    public required OffsetProjectType ProjectType { get; init; }
-    public required string ProjectName { get; init; }
-    public required double CostPerTonUsd { get; init; }
-    public required double TotalCostUsd { get; init; }
-    public required double OffsetsAvailableTons { get; init; }
-    public required string Certification { get; init; }
-    public required double Rating { get; init; }
-    public required string Description { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonAwareSchedulingStrategy.cs
-```csharp
-public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public TimeSpan MaxDelay { get; set; };
-    public double CarbonThreshold { get; set; };
-    public int PendingWorkloadCount;;
-    public void SetCarbonIntensityProvider(Func<Task<double>> provider);
+    public static bool IsAvailable();;
+    public double BaseTdpWatts;;
     protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public string ScheduleWorkload(Func<CancellationToken, Task> workload, string name, TimeSpan estimatedDuration, double estimatedEnergyWh, WorkloadPriority priority = WorkloadPriority.Normal, DateTimeOffset? deadline = null);
-    public bool CancelWorkload(string workloadId);
-    public IReadOnlyList<ScheduledWorkloadInfo> GetPendingWorkloads();
-    public IReadOnlyList<CompletedWorkload> GetCompletedWorkloads(int count = 100);
-    public async Task<WorkloadResult> ExecuteImmediatelyAsync(string workloadId, CancellationToken ct = default);
-}
-```
-```csharp
-internal sealed class ScheduledWorkload
-{
-}
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public required Func<CancellationToken, Task> Workload { get; init; }
-    public required DateTimeOffset ScheduledAt { get; init; }
-    public required TimeSpan EstimatedDuration { get; init; }
-    public required double EstimatedEnergyWh { get; init; }
-    public required WorkloadPriority Priority { get; init; }
-    public required DateTimeOffset Deadline { get; init; }
-}
-```
-```csharp
-public sealed record ScheduledWorkloadInfo
-{
-}
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public required DateTimeOffset ScheduledAt { get; init; }
-    public required DateTimeOffset Deadline { get; init; }
-    public required WorkloadPriority Priority { get; init; }
-    public required double EstimatedEnergyWh { get; init; }
-}
-```
-```csharp
-public sealed record CompletedWorkload
-{
-}
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public required DateTimeOffset ScheduledAt { get; init; }
-    public required DateTimeOffset ExecutedAt { get; init; }
-    public required DateTimeOffset CompletedAt { get; init; }
-    public required double CarbonIntensityAtExecution { get; init; }
-    public required double EnergyConsumedWh { get; init; }
-    public required double CarbonEmittedGrams { get; init; }
-    public required bool Success { get; init; }
-}
-```
-```csharp
-public sealed record WorkloadResult
-{
-}
-    public required string WorkloadId { get; init; }
-    public required bool Success { get; init; }
-    public DateTimeOffset? ExecutedAt { get; init; }
-    public TimeSpan? Duration { get; init; }
-    public double? CarbonIntensity { get; init; }
-    public double? CarbonEmittedGrams { get; init; }
-    public string? ErrorMessage { get; init; }
+    public async Task<CarbonEnergyMeasurement> MeasureOperationAsync(string operationId, string operationType, long dataSizeBytes, Func<Task> operation, string? tenantId = null, CancellationToken ct = default);
+    public Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/GridCarbonApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyMeasurement/PowercapEnergyMeasurementStrategy.cs
 ```csharp
-public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
+public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -886,81 +534,11 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public enum ApiProvider;
-    public ApiProvider Provider { get => Enum.Parse<ApiProvider>(_selectedProvider); set => _selectedProvider = value.ToString(); }
-    public string? WattTimeUsername { get; set; }
-    public string? WattTimePassword { get; set; }
-    public string? ElectricityMapsApiKey { get; set; }
-    public double Latitude { get; set; };
-    public double Longitude { get; set; };
-    public string Region { get; set; };
+    public static bool IsAvailable();
     protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task<GridCarbonData> GetCurrentCarbonIntensityAsync(CancellationToken ct = default);
-    public async Task<IReadOnlyList<GridCarbonForecast>> GetForecastAsync(int hours = 24, CancellationToken ct = default);
-    public async Task<OptimalScheduleWindow?> FindOptimalWindowAsync(TimeSpan duration, TimeSpan maxDelay, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record GridCarbonData
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double CarbonIntensity { get; init; }
-    public required string Region { get; init; }
-    public required string Provider { get; init; }
-    public double FossilFuelPercent { get; init; }
-    public double RenewablePercent { get; init; }
-    public double Confidence { get; init; };
-}
-```
-```csharp
-public sealed record GridCarbonForecast
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double CarbonIntensity { get; init; }
-    public double Confidence { get; init; }
-}
-```
-```csharp
-public sealed record OptimalScheduleWindow
-{
-}
-    public required DateTimeOffset StartTime { get; init; }
-    public required DateTimeOffset EndTime { get; init; }
-    public required double AverageCarbonIntensity { get; init; }
-    public double CarbonSavingsPercent { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonBudget/CarbonThrottlingStrategy.cs
-```csharp
-public sealed class CarbonThrottlingStrategy : SustainabilityStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public CarbonThrottlingStrategy(CarbonBudgetEnforcementStrategy enforcement);
-    public async Task<ThrottleResult> ThrottleIfNeededAsync(string tenantId, CancellationToken ct = default);
-    public ThrottleStats? GetThrottleStats(string tenantId);
-    public IReadOnlyDictionary<string, ThrottleStats> GetAllThrottleStats();
-}
-```
-```csharp
-public sealed class ThrottleStats
-{
-}
-    public long TotalEvaluations { get; set; }
-    public long AllowedCount { get; set; }
-    public long DelayedCount { get; set; }
-    public long RejectedCount { get; set; }
-    public DateTimeOffset LastEvaluated { get; set; }
+    public async Task<CarbonEnergyMeasurement> MeasureOperationAsync(string operationId, string operationType, long dataSizeBytes, Func<Task> operation, string? tenantId = null, CancellationToken ct = default);
+    public async Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
+    public IReadOnlyDictionary<string, string> GetDiscoveredZones();
 }
 ```
 
@@ -992,6 +570,36 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     public async Task RecordUsageAsync(string tenantId, double carbonGramsCO2e, string operationType, CancellationToken ct = default);
     public async Task<CarbonThrottleDecision> EvaluateThrottleAsync(string tenantId, CancellationToken ct = default);
     internal void TrackThrottleEvent(string tenantId);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonBudget/CarbonThrottlingStrategy.cs
+```csharp
+public sealed class CarbonThrottlingStrategy : SustainabilityStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public CarbonThrottlingStrategy(CarbonBudgetEnforcementStrategy enforcement);
+    public async Task<ThrottleResult> ThrottleIfNeededAsync(string tenantId, CancellationToken ct = default);
+    public ThrottleStats? GetThrottleStats(string tenantId);
+    public IReadOnlyDictionary<string, ThrottleStats> GetAllThrottleStats();
+}
+```
+```csharp
+public sealed class ThrottleStats
+{
+}
+    public long TotalEvaluations { get; set; }
+    public long AllowedCount { get; set; }
+    public long DelayedCount { get; set; }
+    public long RejectedCount { get; set; }
+    public DateTimeOffset LastEvaluated { get; set; }
 }
 ```
 
@@ -1050,27 +658,95 @@ private sealed class StoredBudgetEntry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenPlacement/GreenPlacementService.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenPlacement/ElectricityMapsApiStrategy.cs
 ```csharp
-public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPlacementService
+public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
 {
 #endregion
 }
+    public string? ApiKey { get; set; }
+    public string ApiEndpoint { get; set; };
+    public int CacheTtlSeconds { get; set; };
     public override string StrategyId;;
     public override string DisplayName;;
     public override SustainabilityCategory Category;;
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public GreenPlacementService(WattTimeGridApiStrategy wattTimeStrategy, ElectricityMapsApiStrategy electricityMapsStrategy, BackendGreenScoreRegistry registry);
-    public GreenPlacementService() : this(new WattTimeGridApiStrategy(), new ElectricityMapsApiStrategy(), new BackendGreenScoreRegistry());
-    public override void ConfigureIntelligence(IMessageBus? messageBus);
-    public async Task<CarbonPlacementDecision> SelectGreenestBackendAsync(IReadOnlyList<string> candidateBackendIds, long dataSizeBytes, CancellationToken ct = default);
-    public Task<IReadOnlyList<GreenScore>> GetGreenScoresAsync(CancellationToken ct = default);
+    public ElectricityMapsApiStrategy(HttpClient httpClient);
+    public ElectricityMapsApiStrategy() : this(new HttpClient());
+    public bool IsAvailable();
     public async Task<GridCarbonData> GetGridCarbonDataAsync(string region, CancellationToken ct = default);
-    public async Task RefreshGridDataAsync(CancellationToken ct = default);
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task DisposeCoreAsync();
+    public async Task<GridCarbonData> GetForecastAsync(string region, CancellationToken ct = default);
+    public static string ResolveZone(string region);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+}
+```
+```csharp
+private sealed class EmCarbonIntensityResponse
+{
+}
+    [JsonPropertyName("zone")]
+public string? Zone { get; set; }
+    [JsonPropertyName("carbonIntensity")]
+public double? CarbonIntensity { get; set; }
+    [JsonPropertyName("datetime")]
+public DateTimeOffset? Datetime { get; set; }
+    [JsonPropertyName("updatedAt")]
+public DateTimeOffset? UpdatedAt { get; set; }
+    [JsonPropertyName("emissionFactorType")]
+public string? EmissionFactorType { get; set; }
+    [JsonPropertyName("isEstimated")]
+public bool? IsEstimated { get; set; }
+    [JsonPropertyName("estimationMethod")]
+public string? EstimationMethod { get; set; }
+}
+```
+```csharp
+private sealed class EmPowerBreakdownResponse
+{
+}
+    [JsonPropertyName("zone")]
+public string? Zone { get; set; }
+    [JsonPropertyName("datetime")]
+public DateTimeOffset? Datetime { get; set; }
+    [JsonPropertyName("renewablePercentage")]
+public double? RenewablePercentage { get; set; }
+    [JsonPropertyName("fossilFreePercentage")]
+public double? FossilFreePercentage { get; set; }
+    [JsonPropertyName("powerConsumptionTotal")]
+public double? PowerConsumptionTotal { get; set; }
+    [JsonPropertyName("powerProductionTotal")]
+public double? PowerProductionTotal { get; set; }
+    [JsonPropertyName("powerImportTotal")]
+public double? PowerImportTotal { get; set; }
+    [JsonPropertyName("powerExportTotal")]
+public double? PowerExportTotal { get; set; }
+    [JsonPropertyName("isEstimated")]
+public bool? IsEstimated { get; set; }
+}
+```
+```csharp
+private sealed class EmForecastResponse
+{
+}
+    [JsonPropertyName("zone")]
+public string? Zone { get; set; }
+    [JsonPropertyName("forecast")]
+public List<EmForecastPoint>? Forecast { get; set; }
+    [JsonPropertyName("updatedAt")]
+public DateTimeOffset? UpdatedAt { get; set; }
+}
+```
+```csharp
+private sealed class EmForecastPoint
+{
+}
+    [JsonPropertyName("carbonIntensity")]
+public double? CarbonIntensity { get; set; }
+    [JsonPropertyName("datetime")]
+public DateTimeOffset? Datetime { get; set; }
 }
 ```
 
@@ -1187,102 +863,35 @@ public string? Date { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenPlacement/ElectricityMapsApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenPlacement/GreenPlacementService.cs
 ```csharp
-public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
+public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPlacementService
 {
 #endregion
 }
-    public string? ApiKey { get; set; }
-    public string ApiEndpoint { get; set; };
-    public int CacheTtlSeconds { get; set; };
     public override string StrategyId;;
     public override string DisplayName;;
     public override SustainabilityCategory Category;;
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public ElectricityMapsApiStrategy(HttpClient httpClient);
-    public ElectricityMapsApiStrategy() : this(new HttpClient());
-    public bool IsAvailable();
+    public GreenPlacementService(WattTimeGridApiStrategy wattTimeStrategy, ElectricityMapsApiStrategy electricityMapsStrategy, BackendGreenScoreRegistry registry);
+    public GreenPlacementService() : this(new WattTimeGridApiStrategy(), new ElectricityMapsApiStrategy(), new BackendGreenScoreRegistry());
+    public override void ConfigureIntelligence(IMessageBus? messageBus);
+    public async Task<CarbonPlacementDecision> SelectGreenestBackendAsync(IReadOnlyList<string> candidateBackendIds, long dataSizeBytes, CancellationToken ct = default);
+    public Task<IReadOnlyList<GreenScore>> GetGreenScoresAsync(CancellationToken ct = default);
     public async Task<GridCarbonData> GetGridCarbonDataAsync(string region, CancellationToken ct = default);
-    public async Task<GridCarbonData> GetForecastAsync(string region, CancellationToken ct = default);
-    public static string ResolveZone(string region);
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-}
-```
-```csharp
-private sealed class EmCarbonIntensityResponse
-{
-}
-    [JsonPropertyName("zone")]
-public string? Zone { get; set; }
-    [JsonPropertyName("carbonIntensity")]
-public double? CarbonIntensity { get; set; }
-    [JsonPropertyName("datetime")]
-public DateTimeOffset? Datetime { get; set; }
-    [JsonPropertyName("updatedAt")]
-public DateTimeOffset? UpdatedAt { get; set; }
-    [JsonPropertyName("emissionFactorType")]
-public string? EmissionFactorType { get; set; }
-    [JsonPropertyName("isEstimated")]
-public bool? IsEstimated { get; set; }
-    [JsonPropertyName("estimationMethod")]
-public string? EstimationMethod { get; set; }
-}
-```
-```csharp
-private sealed class EmPowerBreakdownResponse
-{
-}
-    [JsonPropertyName("zone")]
-public string? Zone { get; set; }
-    [JsonPropertyName("datetime")]
-public DateTimeOffset? Datetime { get; set; }
-    [JsonPropertyName("renewablePercentage")]
-public double? RenewablePercentage { get; set; }
-    [JsonPropertyName("fossilFreePercentage")]
-public double? FossilFreePercentage { get; set; }
-    [JsonPropertyName("powerConsumptionTotal")]
-public double? PowerConsumptionTotal { get; set; }
-    [JsonPropertyName("powerProductionTotal")]
-public double? PowerProductionTotal { get; set; }
-    [JsonPropertyName("powerImportTotal")]
-public double? PowerImportTotal { get; set; }
-    [JsonPropertyName("powerExportTotal")]
-public double? PowerExportTotal { get; set; }
-    [JsonPropertyName("isEstimated")]
-public bool? IsEstimated { get; set; }
-}
-```
-```csharp
-private sealed class EmForecastResponse
-{
-}
-    [JsonPropertyName("zone")]
-public string? Zone { get; set; }
-    [JsonPropertyName("forecast")]
-public List<EmForecastPoint>? Forecast { get; set; }
-    [JsonPropertyName("updatedAt")]
-public DateTimeOffset? UpdatedAt { get; set; }
-}
-```
-```csharp
-private sealed class EmForecastPoint
-{
-}
-    [JsonPropertyName("carbonIntensity")]
-public double? CarbonIntensity { get; set; }
-    [JsonPropertyName("datetime")]
-public DateTimeOffset? Datetime { get; set; }
+    public async Task RefreshGridDataAsync(CancellationToken ct = default);
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task DisposeCoreAsync();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/ServerlessOptimizationStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/CarbonReportingService.cs
 ```csharp
-public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
+public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbonReportingService
 {
+#endregion
 }
     public override string StrategyId;;
     public override string DisplayName;;
@@ -1290,65 +899,146 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double ColdStartAlertThreshold { get; set; };
-    public double TargetMemoryEfficiency { get; set; };
-    public void RegisterFunction(string functionId, string name, string runtime, int memoryMb, string provider);
-    public void RecordExecution(string functionId, double durationMs, double billedDurationMs, int memoryUsedMb, bool wasColdStart);
-    public IReadOnlyList<ServerlessRecommendation> GetRecommendations(string functionId);
-    public ServerlessFunctionStats GetFunctionStats(string functionId);
+    public CarbonReportingService(GhgProtocolReportingStrategy ghgStrategy, CarbonDashboardDataStrategy dashboardStrategy);
+    public CarbonReportingService() : this(new GhgProtocolReportingStrategy(), new CarbonDashboardDataStrategy());
+    public GhgProtocolReportingStrategy GhgStrategy;;
+    public CarbonDashboardDataStrategy DashboardStrategy;;
+    public override void ConfigureIntelligence(IMessageBus? messageBus);
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task DisposeCoreAsync();
+    public async Task<IReadOnlyList<GhgReportEntry>> GenerateGhgReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
+    public async Task<double> GetTotalEmissionsAsync(GhgScopeCategory scope, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
+    public async Task<IReadOnlyDictionary<string, double>> GetEmissionsByRegionAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
+    public async Task<CarbonSummary> GetCarbonSummaryAsync(string? tenantId = null, CancellationToken ct = default);
+    public Task<GhgFullReport> GenerateFullReportAsync(DateTimeOffset from, DateTimeOffset to, string organizationName, string? tenantId = null, CancellationToken ct = default);
+    public IReadOnlyList<TimeSeriesPoint> GetCarbonIntensityTimeSeries(string region, TimeSpan period, TimeSpan granularity);
+    public IReadOnlyList<TimeSeriesPoint> GetBudgetUtilizationTimeSeries(string tenantId, TimeSpan period);
+    public IReadOnlyList<TimeSeriesPoint> GetGreenScoreTrend(TimeSpan period);
+    public EmissionsByOperationType GetEmissionsByOperationType(DateTimeOffset from, DateTimeOffset to);
+    public IReadOnlyList<TenantCarbonUsage> GetTopEmittingTenants(int topN, DateTimeOffset from, DateTimeOffset to);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/GhgProtocolReportingStrategy.cs
+```csharp
+public sealed record GhgFullReport
+{
+}
+    public required string ReportId { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string OrganizationName { get; init; }
+    public required DateTimeOffset PeriodStart { get; init; }
+    public required DateTimeOffset PeriodEnd { get; init; }
+    public required IReadOnlyList<GhgReportEntry> Entries { get; init; }
+    public required double TotalScope2 { get; init; }
+    public required double TotalScope3 { get; init; }
+    public double TotalEmissions;;
+    public required string Methodology { get; init; }
+    public string? ExecutiveSummary { get; init; }
+    public string? TenantId { get; init; }
 }
 ```
 ```csharp
-public sealed class ServerlessFunction
+public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 {
+#endregion
 }
-    public required string FunctionId { get; init; }
-    public required string Name { get; init; }
-    public required string Runtime { get; init; }
-    public required int MemoryMb { get; init; }
-    public required string Provider { get; init; }
-    public long InvocationCount { get; set; }
-    public long ColdStartCount { get; set; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public Task<IReadOnlyList<GhgReportEntry>> GenerateScope2ReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
+    public Task<IReadOnlyList<GhgReportEntry>> GenerateScope3ReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
+    public async Task<GhgFullReport> GenerateFullReportAsync(DateTimeOffset from, DateTimeOffset to, string organizationName, string? tenantId = null, CancellationToken ct = default);
+    public void RecordMeasurement(EnergyMeasurementRecord record);
+    public void UpdateRegionCarbonIntensity(string region, double intensityGCO2ePerKwh);
+    public int MeasurementCount;;
 }
 ```
 ```csharp
-public sealed record FunctionExecution
+public sealed record EnergyMeasurementRecord
 {
 }
-    public required string FunctionId { get; init; }
     public required DateTimeOffset Timestamp { get; init; }
+    public required double WattsConsumed { get; init; }
     public required double DurationMs { get; init; }
-    public required double BilledDurationMs { get; init; }
-    public required int MemoryUsedMb { get; init; }
-    public required bool WasColdStart { get; init; }
-    public required double MemoryEfficiency { get; init; }
+    public required double EnergyWh { get; init; }
+    public required EnergySource Source { get; init; }
+    public required string OperationType { get; init; }
+    public string? TenantId { get; init; }
+    public string? Region { get; init; }
+    public long DataSizeBytes { get; init; }
+    public double CarbonIntensity { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/CarbonDashboardDataStrategy.cs
+```csharp
+public sealed record TimeSeriesPoint
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double Value { get; init; }
+    public required string Unit { get; init; }
 }
 ```
 ```csharp
-public sealed record ServerlessRecommendation
+public sealed record EmissionsByOperationType
 {
 }
-    public required string FunctionId { get; init; }
-    public required ServerlessRecommendationType Type { get; init; }
-    public required string Description { get; init; }
-    public required int Priority { get; init; }
-    public int? RecommendedMemoryMb { get; init; }
-    public double EstimatedCostSavingsPercent { get; init; }
-    public double EstimatedSavingsMs { get; init; }
+    public double ReadGramsCO2e { get; init; }
+    public double WriteGramsCO2e { get; init; }
+    public double DeleteGramsCO2e { get; init; }
+    public double ListGramsCO2e { get; init; }
+    public double TotalGramsCO2e;;
 }
 ```
 ```csharp
-public sealed record ServerlessFunctionStats
+public sealed record TenantCarbonUsage
 {
 }
-    public required string FunctionId { get; init; }
-    public string? FunctionName { get; init; }
-    public long TotalInvocations { get; init; }
-    public long ColdStartCount { get; init; }
-    public double ColdStartRate { get; init; }
-    public double AvgDurationMs { get; init; }
-    public double P95DurationMs { get; init; }
-    public double AvgMemoryEfficiency { get; init; }
+    public required string TenantId { get; init; }
+    public required double TotalEmissionsGramsCO2e { get; init; }
+    public required double TotalEnergyWh { get; init; }
+    public required long OperationCount { get; init; }
+}
+```
+```csharp
+public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public IReadOnlyList<TimeSeriesPoint> GetCarbonIntensityTimeSeries(string region, TimeSpan period, TimeSpan granularity);
+    public IReadOnlyList<TimeSeriesPoint> GetBudgetUtilizationTimeSeries(string tenantId, TimeSpan period);
+    public IReadOnlyList<TimeSeriesPoint> GetGreenScoreTrend(TimeSpan period);
+    public EmissionsByOperationType GetEmissionsByOperationType(DateTimeOffset from, DateTimeOffset to);
+    public IReadOnlyList<TenantCarbonUsage> GetTopEmittingTenants(int topN, DateTimeOffset from, DateTimeOffset to);
+    public void RecordCarbonIntensity(string region, double intensityGCO2ePerKwh);
+    public void RecordBudgetUtilization(string tenantId, double usagePercent);
+    public void RecordGreenScore(double averageScore);
+    public void RecordOperationEmission(string operationType, double emissionsGramsCO2e);
+    public void RecordTenantEmission(string tenantId, double emissionsGramsCO2e, double energyWh);
+}
+```
+```csharp
+private sealed class TenantAccumulator
+{
+}
+    public TenantAccumulator(string tenantId);
+    public void Add(double emissionsGrams, double energyWh);
+    public TenantCarbonUsage ToUsage();
 }
 ```
 
@@ -1567,6 +1257,179 @@ public sealed record InterruptionEvent
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/RightSizingStrategy.cs
+```csharp
+public sealed class RightSizingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double CpuDownsizeThreshold { get; set; };
+    public double MemoryDownsizeThreshold { get; set; };
+    public double CpuUpsizeThreshold { get; set; };
+    public int MinObservationDays { get; set; };
+    public void RecordUtilization(string resourceId, string resourceType, double cpuPercent, double memoryPercent, double costPerHour);
+    public IReadOnlyList<RightSizingRecommendation> GetRecommendations();
+}
+```
+```csharp
+public sealed class ResourceUtilization
+{
+}
+    public required string ResourceId { get; init; }
+    public required string ResourceType { get; init; }
+    public required double CostPerHour { get; init; }
+    public required DateTimeOffset FirstSeen { get; init; }
+    public DateTimeOffset LastSeen { get; set; }
+    public List<double> CpuSamples { get; };
+    public List<double> MemorySamples { get; };
+}
+```
+```csharp
+public sealed record RightSizingRecommendation
+{
+}
+    public required string ResourceId { get; init; }
+    public required string CurrentType { get; init; }
+    public required RightSizeAction RecommendedAction { get; init; }
+    public required string Reason { get; init; }
+    public required double EstimatedSavingsPercent { get; init; }
+    public required double EstimatedSavingsPerHour { get; init; }
+    public required double AvgCpuPercent { get; init; }
+    public required double AvgMemoryPercent { get; init; }
+    public required double MaxCpuPercent { get; init; }
+    public required double MaxMemoryPercent { get; init; }
+    public string? RecommendedType { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/ServerlessOptimizationStrategy.cs
+```csharp
+public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double ColdStartAlertThreshold { get; set; };
+    public double TargetMemoryEfficiency { get; set; };
+    public void RegisterFunction(string functionId, string name, string runtime, int memoryMb, string provider);
+    public void RecordExecution(string functionId, double durationMs, double billedDurationMs, int memoryUsedMb, bool wasColdStart);
+    public IReadOnlyList<ServerlessRecommendation> GetRecommendations(string functionId);
+    public ServerlessFunctionStats GetFunctionStats(string functionId);
+}
+```
+```csharp
+public sealed class ServerlessFunction
+{
+}
+    public required string FunctionId { get; init; }
+    public required string Name { get; init; }
+    public required string Runtime { get; init; }
+    public required int MemoryMb { get; init; }
+    public required string Provider { get; init; }
+    public long InvocationCount { get; set; }
+    public long ColdStartCount { get; set; }
+}
+```
+```csharp
+public sealed record FunctionExecution
+{
+}
+    public required string FunctionId { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double DurationMs { get; init; }
+    public required double BilledDurationMs { get; init; }
+    public required int MemoryUsedMb { get; init; }
+    public required bool WasColdStart { get; init; }
+    public required double MemoryEfficiency { get; init; }
+}
+```
+```csharp
+public sealed record ServerlessRecommendation
+{
+}
+    public required string FunctionId { get; init; }
+    public required ServerlessRecommendationType Type { get; init; }
+    public required string Description { get; init; }
+    public required int Priority { get; init; }
+    public int? RecommendedMemoryMb { get; init; }
+    public double EstimatedCostSavingsPercent { get; init; }
+    public double EstimatedSavingsMs { get; init; }
+}
+```
+```csharp
+public sealed record ServerlessFunctionStats
+{
+}
+    public required string FunctionId { get; init; }
+    public string? FunctionName { get; init; }
+    public long TotalInvocations { get; init; }
+    public long ColdStartCount { get; init; }
+    public double ColdStartRate { get; init; }
+    public double AvgDurationMs { get; init; }
+    public double P95DurationMs { get; init; }
+    public double AvgMemoryEfficiency { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/CarbonAwareRegionSelectionStrategy.cs
+```csharp
+public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int MaxLatencyMs { get; set; };
+    public double CarbonWeight { get; set; };
+    public double LatencyWeight { get; set; };
+    public double CostWeight { get; set; };
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public RegionSelectionResult SelectRegion(string provider, IEnumerable<string>? preferredRegions = null, int? maxLatencyMs = null, bool prioritizeCarbon = true);
+    public IReadOnlyList<RegionCarbonData> GetRegionData();
+}
+```
+```csharp
+public sealed class RegionCarbonData
+{
+}
+    public required string Provider { get; init; }
+    public required string RegionId { get; init; }
+    public required string Name { get; init; }
+    public double CarbonIntensity { get; set; }
+    public required int LatencyMs { get; init; }
+    public required double CostMultiplier { get; init; }
+    public DateTimeOffset LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record RegionSelectionResult
+{
+}
+    public required bool Success { get; init; }
+    public string? Reason { get; init; }
+    public string? SelectedRegion { get; init; }
+    public string? Provider { get; init; }
+    public double CarbonIntensity { get; init; }
+    public int LatencyMs { get; init; }
+    public double CostMultiplier { get; init; }
+    public double CarbonSavedGCO2ePerKwh { get; init; }
+    public List<string>? AlternativeRegions { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/MultiCloudOptimizationStrategy.cs
 ```csharp
 public sealed class MultiCloudOptimizationStrategy : SustainabilityStrategyBase
@@ -1643,9 +1506,9 @@ public sealed record ProviderComparison
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/RightSizingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/WorkloadMigrationStrategy.cs
 ```csharp
-public sealed class RightSizingStrategy : SustainabilityStrategyBase
+public sealed class WorkloadMigrationStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1654,92 +1517,748 @@ public sealed class RightSizingStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double CpuDownsizeThreshold { get; set; };
-    public double MemoryDownsizeThreshold { get; set; };
-    public double CpuUpsizeThreshold { get; set; };
-    public int MinObservationDays { get; set; };
-    public void RecordUtilization(string resourceId, string resourceType, double cpuPercent, double memoryPercent, double costPerHour);
-    public IReadOnlyList<RightSizingRecommendation> GetRecommendations();
+    public double MigrationThreshold { get; set; };
+    public int MinMigrationIntervalHours { get; set; };
+    public void RegisterDataCenter(string dcId, string name, string region, double carbonIntensity, bool hasRenewable);
+    public void UpdateCarbonIntensity(string dcId, double carbonIntensity, double renewablePercent);
+    public void RegisterWorkload(string workloadId, string name, string currentDcId, double powerWatts, bool isMigratable);
+    public IReadOnlyList<MigrationRecommendation> GetMigrationRecommendations();
+    public bool MigrateWorkload(string workloadId, string targetDcId);
 }
 ```
 ```csharp
-public sealed class ResourceUtilization
+public sealed class DataCenter
 {
 }
-    public required string ResourceId { get; init; }
-    public required string ResourceType { get; init; }
-    public required double CostPerHour { get; init; }
-    public required DateTimeOffset FirstSeen { get; init; }
-    public DateTimeOffset LastSeen { get; set; }
-    public List<double> CpuSamples { get; };
-    public List<double> MemorySamples { get; };
-}
-```
-```csharp
-public sealed record RightSizingRecommendation
-{
-}
-    public required string ResourceId { get; init; }
-    public required string CurrentType { get; init; }
-    public required RightSizeAction RecommendedAction { get; init; }
-    public required string Reason { get; init; }
-    public required double EstimatedSavingsPercent { get; init; }
-    public required double EstimatedSavingsPerHour { get; init; }
-    public required double AvgCpuPercent { get; init; }
-    public required double AvgMemoryPercent { get; init; }
-    public required double MaxCpuPercent { get; init; }
-    public required double MaxMemoryPercent { get; init; }
-    public string? RecommendedType { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CloudOptimization/CarbonAwareRegionSelectionStrategy.cs
-```csharp
-public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int MaxLatencyMs { get; set; };
-    public double CarbonWeight { get; set; };
-    public double LatencyWeight { get; set; };
-    public double CostWeight { get; set; };
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public RegionSelectionResult SelectRegion(string provider, IEnumerable<string>? preferredRegions = null, int? maxLatencyMs = null, bool prioritizeCarbon = true);
-    public IReadOnlyList<RegionCarbonData> GetRegionData();
-}
-```
-```csharp
-public sealed class RegionCarbonData
-{
-}
-    public required string Provider { get; init; }
-    public required string RegionId { get; init; }
+    public required string DataCenterId { get; init; }
     public required string Name { get; init; }
+    public required string Region { get; init; }
     public double CarbonIntensity { get; set; }
-    public required int LatencyMs { get; init; }
-    public required double CostMultiplier { get; init; }
+    public bool HasRenewableEnergy { get; set; }
+    public double RenewablePercent { get; set; }
+    public double AvailableCapacityPercent { get; set; }
     public DateTimeOffset LastUpdated { get; set; }
 }
 ```
 ```csharp
-public sealed record RegionSelectionResult
+public sealed class Workload
+{
+}
+    public required string WorkloadId { get; init; }
+    public required string Name { get; init; }
+    public string CurrentDataCenterId { get; set; };
+    public required double PowerWatts { get; init; }
+    public required bool IsMigratable { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? LastMigratedAt { get; set; }
+}
+```
+```csharp
+public sealed record MigrationRecommendation
+{
+}
+    public required string WorkloadId { get; init; }
+    public required string WorkloadName { get; init; }
+    public required string CurrentDataCenterId { get; init; }
+    public required string TargetDataCenterId { get; init; }
+    public required double CurrentCarbonIntensity { get; init; }
+    public required double TargetCarbonIntensity { get; init; }
+    public required double CarbonSavedGramsPerHour { get; init; }
+    public required int Priority { get; init; }
+}
+```
+```csharp
+public sealed record MigrationEvent
+{
+}
+    public required string WorkloadId { get; init; }
+    public required string SourceDataCenterId { get; init; }
+    public required string TargetDataCenterId { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/DemandResponseStrategy.cs
+```csharp
+public sealed class DemandResponseStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public bool AutoRespond { get; set; };
+    public int MaxReductionPercent { get; set; };
+    public DemandResponseEvent? ActiveEvent
+{
+    get
+    {
+        lock (_lock)
+            return _activeEvent;
+    }
+}
+    public bool InDemandResponseEvent;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public async Task RespondToEventAsync(DemandResponseEvent drEvent, CancellationToken ct = default);
+    public void EndParticipation();
+}
+```
+```csharp
+public sealed record DemandResponseEvent
+{
+}
+    public required string EventId { get; init; }
+    public required DateTimeOffset StartTime { get; init; }
+    public required DateTimeOffset EndTime { get; init; }
+    public required int RequestedReductionPercent { get; init; }
+    public required double IncentivePerKwh { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/OffPeakSchedulingStrategy.cs
+```csharp
+public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int OffPeakStartHour { get; set; };
+    public int OffPeakEndHour { get; set; };
+    public bool WeekendIsOffPeak { get; set; };
+    public bool IsOffPeak
+{
+    get
+    {
+        var now = DateTime.Now;
+        if (WeekendIsOffPeak && (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday))
+            return true;
+        var hour = now.Hour;
+        return OffPeakStartHour > OffPeakEndHour ? hour >= OffPeakStartHour || hour < OffPeakEndHour : hour >= OffPeakStartHour && hour < OffPeakEndHour;
+    }
+}
+    public int PendingJobCount;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public string ScheduleJob(Func<CancellationToken, Task> job, string name, DateTimeOffset? deadline = null);
+    public DateTimeOffset GetNextOffPeakWindow();
+}
+```
+```csharp
+internal sealed record ScheduledJob
+{
+}
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required Func<CancellationToken, Task> Job { get; init; }
+    public required DateTimeOffset ScheduledAt { get; init; }
+    public required DateTimeOffset Deadline { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/BatchJobOptimizationStrategy.cs
+```csharp
+public sealed class BatchJobOptimizationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double LowCarbonThreshold { get; set; };
+    public int MaxDelayHours { get; set; };
+    public double CarbonWeight { get; set; };
+    public double CostWeight { get; set; };
+    public void SetCarbonIntensityProvider(Func<Task<double>> provider);;
+    public void SetElectricityPriceProvider(Func<Task<double>> provider);;
+    public string SubmitJob(string name, double estimatedKwh, TimeSpan maxDelay, int priority = 5);
+    public async Task<ScheduleRecommendation> GetOptimalScheduleAsync(string jobId);
+    public async Task<JobExecutionResult> ExecuteJobAsync(string jobId, CancellationToken ct = default);
+    public IReadOnlyList<BatchJob> GetPendingJobs();
+    public BatchJobStatistics GetJobStatistics();
+}
+```
+```csharp
+public sealed class BatchJob
+{
+}
+    public required string JobId { get; init; }
+    public required string Name { get; init; }
+    public required double EstimatedKwh { get; init; }
+    public required TimeSpan MaxDelay { get; init; }
+    public required int Priority { get; init; }
+    public required DateTimeOffset SubmittedAt { get; init; }
+    public required DateTimeOffset Deadline { get; init; }
+}
+```
+```csharp
+public sealed record ScheduleRecommendation
+{
+}
+    public required string JobId { get; init; }
+    public bool Success { get; init; }
+    public string? Reason { get; init; }
+    public DateTimeOffset? RecommendedExecutionTime { get; init; }
+    public double ExpectedCarbonIntensity { get; init; }
+    public double ExpectedPrice { get; init; }
+}
+```
+```csharp
+public sealed record JobExecutionResult
+{
+}
+    public required string JobId { get; init; }
+    public bool Success { get; init; }
+    public string? Reason { get; init; }
+    public DateTimeOffset? StartedAt { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double EstimatedEmissionsGrams { get; init; }
+}
+```
+```csharp
+public sealed class BatchJobExecution
+{
+}
+    public required string JobId { get; init; }
+    public required string JobName { get; init; }
+    public required DateTimeOffset StartedAt { get; init; }
+    public required double CarbonIntensity { get; init; }
+    public required double EstimatedEmissionsGrams { get; init; }
+}
+```
+```csharp
+public sealed record BatchJobStatistics
+{
+}
+    public int TotalJobsExecuted { get; init; }
+    public double TotalEmissionsGrams { get; init; }
+    public double AverageCarbonIntensity { get; init; }
+    public int PendingJobCount { get; init; }
+    public double PendingJobsKwh { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/RenewableEnergyWindowStrategy.cs
+```csharp
+public sealed class RenewableEnergyWindowStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double MinRenewablePercent { get; set; };
+    public double CurrentRenewablePercent
+{
+    get
+    {
+        lock (_lock)
+            return _currentRenewablePercent;
+    }
+}
+    public bool IsHighRenewable;;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public RenewableWindow? FindNextWindow(TimeSpan lookahead);
+}
+```
+```csharp
+public sealed record RenewableWindow
+{
+}
+    public required DateTimeOffset StartTime { get; init; }
+    public required DateTimeOffset EndTime { get; init; }
+    public required double AverageRenewablePercent { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/LiquidCoolingOptimizationStrategy.cs
+```csharp
+public sealed class LiquidCoolingOptimizationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TargetDeltaT { get; set; };
+    public double MaxInletTemperature { get; set; };
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public void RegisterLoop(string loopId, string name, double maxFlowRateLpm, double pumpPowerWatts);
+    public void UpdateLoopReadings(string loopId, double inletTempC, double outletTempC, double flowRateLpm);
+    public FlowRateRecommendation GetOptimalFlowRate(string loopId, double heatLoadKw);
+    public bool SetFlowRate(string loopId, double flowRateLpm);
+}
+```
+```csharp
+public sealed class CoolingLoop
+{
+}
+    public required string LoopId { get; init; }
+    public required string Name { get; init; }
+    public required double MaxFlowRateLpm { get; init; }
+    public required double PumpPowerWatts { get; init; }
+    public double CurrentFlowRateLpm { get; set; }
+    public double InletTemperatureC { get; set; }
+    public double OutletTemperatureC { get; set; }
+    public double DeltaT { get; set; }
+    public double HeatRemovalKw { get; set; }
+}
+```
+```csharp
+public sealed record FlowRateRecommendation
+{
+}
+    public required string LoopId { get; init; }
+    public bool Success { get; init; }
+    public string? Reason { get; init; }
+    public double CurrentFlowRateLpm { get; init; }
+    public double OptimalFlowRateLpm { get; init; }
+    public double CurrentPumpPowerWatts { get; init; }
+    public double OptimalPumpPowerWatts { get; init; }
+    public double PotentialSavingsWatts { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/CoolingOptimizationStrategy.cs
+```csharp
+public sealed class CoolingOptimizationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TargetTemperatureC { get; set; };
+    public CoolingProfile CurrentProfile
+{
+    get
+    {
+        lock (_lock)
+            return _currentProfile;
+    }
+}
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public async Task SetProfileAsync(CoolingProfile profile, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class FanZone
+{
+}
+    public required string Name { get; init; }
+    public int MaxRpm { get; init; }
+    public int CurrentRpm { get; set; }
+    public int CurrentPercent { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/HotColdAisleStrategy.cs
+```csharp
+public sealed class HotColdAisleStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TargetColdAisleTemp { get; set; };
+    public double MaxHotAisleTemp { get; set; };
+    public double TargetDeltaT { get; set; };
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public void RegisterZone(string zoneId, string name, AisleType type, int rackCount);
+    public void UpdateZoneReadings(string zoneId, double temperature, double humidity, double airflowCfm);
+    public ContainmentEffectiveness GetContainmentEffectiveness();
+    public IReadOnlyList<AirflowRecommendation> GetAirflowRecommendations();
+}
+```
+```csharp
+public sealed class AisleZone
+{
+}
+    public required string ZoneId { get; init; }
+    public required string Name { get; init; }
+    public required AisleType Type { get; init; }
+    public required int RackCount { get; init; }
+    public double CurrentTemperature { get; set; }
+    public double CurrentHumidity { get; set; }
+    public double AirflowCfm { get; set; }
+    public DateTimeOffset LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record ContainmentEffectiveness
+{
+}
+    public bool Success { get; init; }
+    public string? Reason { get; init; }
+    public double EffectivenessPercent { get; init; }
+    public double AverageColdAisleTemp { get; init; }
+    public double AverageHotAisleTemp { get; init; }
+    public double ActualDeltaT { get; init; }
+    public int HotSpotCount { get; init; }
+    public List<string> HotSpotZones { get; init; };
+}
+```
+```csharp
+public sealed record AirflowRecommendation
+{
+}
+    public required string ZoneId { get; init; }
+    public required AirflowRecommendationType Type { get; init; }
+    public required string Reason { get; init; }
+    public required double EstimatedSavingsWatts { get; init; }
+    public required int Priority { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/ThermalThrottlingStrategy.cs
+```csharp
+public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double LightThrottleC { get; set; };
+    public double ModerateThrottleC { get; set; };
+    public double HeavyThrottleC { get; set; };
+    public double EmergencyShutdownC { get; set; };
+    public ThrottleLevel CurrentLevel
+{
+    get
+    {
+        lock (_lock)
+            return _currentLevel;
+    }
+}
+    public double CurrentTemperature
+{
+    get
+    {
+        lock (_lock)
+            return _currentTemp;
+    }
+}
+    public void SetTemperatureProvider(Func<Task<double>> provider);;
+    public void SetFrequencyController(Func<int, Task> controller);;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/TemperatureMonitoringStrategy.cs
+```csharp
+public sealed class TemperatureMonitoringStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double WarningThresholdC { get; set; };
+    public double CriticalThresholdC { get; set; };
+    public IReadOnlyDictionary<string, ThermalZone> Zones
+{
+    get
+    {
+        lock (_lock)
+            return new Dictionary<string, ThermalZone>(_zones);
+    }
+}
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+}
+```
+```csharp
+public sealed class ThermalZone
+{
+}
+    public required string Name { get; init; }
+    public required string Type { get; init; }
+    public string? SysPath { get; init; }
+    public double CurrentTempC { get; set; }
+    public double MaxTempC { get; set; }
+    public DateTimeOffset LastUpdated { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/GreenTieringStrategy.cs
+```csharp
+public sealed record GreenMigrationCandidate
+{
+}
+    public required string ObjectKey { get; init; }
+    public required string CurrentBackendId { get; init; }
+    public required double CurrentGreenScore { get; init; }
+    public required long SizeBytes { get; init; }
+    public required DateTimeOffset LastAccessed { get; init; }
+    public required string TenantId { get; init; }
+}
+```
+```csharp
+public sealed record GreenMigrationBatch
+{
+}
+    public required IReadOnlyList<GreenMigrationCandidate> Candidates { get; init; }
+    public required string TargetBackendId { get; init; }
+    public required double TargetGreenScore { get; init; }
+    public required double EstimatedCarbonCostGrams { get; init; }
+    public required double EstimatedEnergyWh { get; init; }
+    public required DateTimeOffset ScheduledFor { get; init; }
+    public required string TenantId { get; init; }
+    public long TotalSizeBytes;;
+}
+```
+```csharp
+public sealed class GreenTieringStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public GreenTieringStrategy(GreenTieringPolicyEngine policyEngine);
+    public GreenTieringPolicyEngine PolicyEngine;;
+    public int PendingBatchCount;;
+    public IReadOnlyList<GreenMigrationBatch> GetPendingBatches();
+    public GreenMigrationBatch? DequeueBatch();
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public async Task<IReadOnlyList<GreenMigrationCandidate>> IdentifyColdDataAsync(string tenantId, CancellationToken ct = default);
+    public async Task<GreenMigrationBatch?> PlanMigrationBatchAsync(IReadOnlyList<GreenMigrationCandidate> candidates, string tenantId, CancellationToken ct = default);
+    public async Task<bool> ShouldMigrateNowAsync(GreenMigrationSchedule schedule, CancellationToken ct = default);
+    public override Task<IReadOnlyList<SustainabilityRecommendation>> GetRecommendationsAsync(CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/ColdDataCarbonMigrationStrategy.cs
+```csharp
+public sealed record MigrationRecord
+{
+}
+    public required string ObjectKey { get; init; }
+    public required string SourceBackendId { get; init; }
+    public required string TargetBackendId { get; init; }
+    public required long SizeBytes { get; init; }
+    public required double CarbonSavedGrams { get; init; }
+    public required double EnergySavedWh { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+    public required string TenantId { get; init; }
+}
+```
+```csharp
+public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public long TotalDataMigratedBytes
+{
+    get
+    {
+        lock (_statsLock2)
+            return _totalDataMigratedBytes;
+    }
+}
+    public double TotalCarbonSavedGrams
+{
+    get
+    {
+        lock (_statsLock2)
+            return _totalCarbonSavedGrams;
+    }
+}
+    public long TotalMigrationErrors
+{
+    get
+    {
+        lock (_statsLock2)
+            return _totalMigrationErrors;
+    }
+}
+    public long TotalMigrationsCompleted
+{
+    get
+    {
+        lock (_statsLock2)
+            return _totalMigrationsCompleted;
+    }
+}
+    public int RetryQueueCount;;
+    public async Task<BatchExecutionResult> ExecuteBatchAsync(GreenMigrationBatch batch, CancellationToken ct = default);
+    public IReadOnlyList<MigrationRecord> GetMigrationHistory(string? tenantId = null, int maxEntries = 100);
+    public MigrationStatistics GetMigrationStatistics();
+    public override Task<IReadOnlyList<SustainabilityRecommendation>> GetRecommendationsAsync(CancellationToken ct = default);
+}
+```
+```csharp
+private sealed record MigrationObjectResult
 {
 }
     public required bool Success { get; init; }
-    public string? Reason { get; init; }
-    public string? SelectedRegion { get; init; }
-    public string? Provider { get; init; }
-    public double CarbonIntensity { get; init; }
-    public int LatencyMs { get; init; }
-    public double CostMultiplier { get; init; }
-    public double CarbonSavedGCO2ePerKwh { get; init; }
-    public List<string>? AlternativeRegions { get; init; }
+    public required long SizeBytes { get; init; }
+    public required double CarbonSavedGrams { get; init; }
+    public required double EnergySavedWh { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record BatchExecutionResult
+{
+}
+    public required string TenantId { get; init; }
+    public required string TargetBackendId { get; init; }
+    public required int TotalCandidates { get; init; }
+    public required int SuccessfulMigrations { get; init; }
+    public required int FailedMigrations { get; init; }
+    public required double TotalCarbonSavedGrams { get; init; }
+    public required double TotalEnergySavedWh { get; init; }
+    public required long TotalBytesMigrated { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool AllSucceeded;;
+}
+```
+```csharp
+public sealed record MigrationStatistics
+{
+}
+    public required long TotalMigrationsCompleted { get; init; }
+    public required long TotalMigrationErrors { get; init; }
+    public required long TotalDataMigratedBytes { get; init; }
+    public required double TotalCarbonSavedGrams { get; init; }
+    public required int RetryQueueSize { get; init; }
+    public required int HistorySize { get; init; }
+    public required double EstimatedAnnualCarbonSavingsGrams { get; init; }
+    public string TotalDataMigratedFormatted
+{
+    get
+    {
+        if (TotalDataMigratedBytes >= 1L << 40)
+            return $"{TotalDataMigratedBytes / (double)(1L << 40):F2} TB";
+        if (TotalDataMigratedBytes >= 1L << 30)
+            return $"{TotalDataMigratedBytes / (double)(1L << 30):F2} GB";
+        if (TotalDataMigratedBytes >= 1L << 20)
+            return $"{TotalDataMigratedBytes / (double)(1L << 20):F2} MB";
+        return $"{TotalDataMigratedBytes / 1024.0:F2} KB";
+    }
+}
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/GreenTieringPolicyEngine.cs
+```csharp
+public sealed record GreenTieringPolicy
+{
+}
+    public required string TenantId { get; init; }
+    public TimeSpan ColdThreshold { get; init; };
+    public double TargetGreenScore { get; init; };
+    public GreenMigrationSchedule MigrationSchedule { get; init; };
+    public long MaxMigrationBatchSizeBytes { get; init; };
+    public int MaxConcurrentMigrations { get; init; };
+    public bool RespectCarbonBudget { get; init; };
+    public bool Enabled { get; init; };
+    public int BatchHourUtc { get; init; };
+    public DayOfWeek BatchDayOfWeek { get; init; };
+}
+```
+```csharp
+public sealed class GreenTieringPolicyEngine : IDisposable
+{
+}
+    public GreenTieringPolicyEngine(string dataDirectory);
+    public void SetPolicy(string tenantId, GreenTieringPolicy policy);
+    public GreenTieringPolicy GetPolicy(string tenantId);
+    public IReadOnlyList<string> GetEnabledTenants();
+    public bool RemovePolicy(string tenantId);
+    public int PolicyCount;;
+    public void Flush();
+    public void Dispose();
+}
+```
+```csharp
+private sealed class TimeSpanJsonConverter : JsonConverter<TimeSpan>
+{
+}
+    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options);
+    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/BatteryAwareness/ChargeAwareSchedulingStrategy.cs
+```csharp
+public sealed class ChargeAwareSchedulingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int DeferThreshold { get; set; };
+    public bool OnBattery
+{
+    get
+    {
+        lock (_lock)
+            return _onBattery;
+    }
+}
+    public int DeferredCount
+{
+    get
+    {
+        lock (_lock)
+            return _deferredWorkloads.Count;
+    }
+}
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public string ScheduleWorkload(Func<CancellationToken, Task> workload, string name, bool intensive);
+}
+```
+```csharp
+internal sealed record DeferredWorkload
+{
+}
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required Func<CancellationToken, Task> Workload { get; init; }
+    public required DateTimeOffset DeferredAt { get; init; }
 }
 ```
 
@@ -1958,9 +2477,9 @@ public sealed record UpsStatus
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/BatteryAwareness/ChargeAwareSchedulingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/CacheOptimizationStrategy.cs
 ```csharp
-public sealed class ChargeAwareSchedulingStrategy : SustainabilityStrategyBase
+public sealed class CacheOptimizationStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1969,698 +2488,46 @@ public sealed class ChargeAwareSchedulingStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public int DeferThreshold { get; set; };
-    public bool OnBattery
-{
-    get
-    {
-        lock (_lock)
-            return _onBattery;
-    }
-}
-    public int DeferredCount
-{
-    get
-    {
-        lock (_lock)
-            return _deferredWorkloads.Count;
-    }
-}
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public string ScheduleWorkload(Func<CancellationToken, Task> workload, string name, bool intensive);
+    public double TargetHitRatePercent { get; set; };
+    public double WattsPerGb { get; set; };
+    public void RegisterCache(string cacheId, string name, CacheType type, long maxSizeBytes);
+    public void RecordCacheStats(string cacheId, long hits, long misses, long currentSizeBytes, long evictions);
+    public IReadOnlyList<CacheRecommendation> GetRecommendations();
+    public double GetTotalPowerWatts();
 }
 ```
 ```csharp
-internal sealed record DeferredWorkload
+public sealed class CacheInstance
 {
 }
-    public required string Id { get; init; }
+    public required string CacheId { get; init; }
     public required string Name { get; init; }
-    public required Func<CancellationToken, Task> Workload { get; init; }
-    public required DateTimeOffset DeferredAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/CarbonReportingService.cs
-```csharp
-public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbonReportingService
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public CarbonReportingService(GhgProtocolReportingStrategy ghgStrategy, CarbonDashboardDataStrategy dashboardStrategy);
-    public CarbonReportingService() : this(new GhgProtocolReportingStrategy(), new CarbonDashboardDataStrategy());
-    public GhgProtocolReportingStrategy GhgStrategy;;
-    public CarbonDashboardDataStrategy DashboardStrategy;;
-    public override void ConfigureIntelligence(IMessageBus? messageBus);
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task DisposeCoreAsync();
-    public async Task<IReadOnlyList<GhgReportEntry>> GenerateGhgReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
-    public async Task<double> GetTotalEmissionsAsync(GhgScopeCategory scope, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
-    public async Task<IReadOnlyDictionary<string, double>> GetEmissionsByRegionAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
-    public async Task<CarbonSummary> GetCarbonSummaryAsync(string? tenantId = null, CancellationToken ct = default);
-    public Task<GhgFullReport> GenerateFullReportAsync(DateTimeOffset from, DateTimeOffset to, string organizationName, string? tenantId = null, CancellationToken ct = default);
-    public IReadOnlyList<TimeSeriesPoint> GetCarbonIntensityTimeSeries(string region, TimeSpan period, TimeSpan granularity);
-    public IReadOnlyList<TimeSeriesPoint> GetBudgetUtilizationTimeSeries(string tenantId, TimeSpan period);
-    public IReadOnlyList<TimeSeriesPoint> GetGreenScoreTrend(TimeSpan period);
-    public EmissionsByOperationType GetEmissionsByOperationType(DateTimeOffset from, DateTimeOffset to);
-    public IReadOnlyList<TenantCarbonUsage> GetTopEmittingTenants(int topN, DateTimeOffset from, DateTimeOffset to);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/GhgProtocolReportingStrategy.cs
-```csharp
-public sealed record GhgFullReport
-{
-}
-    public required string ReportId { get; init; }
-    public required DateTimeOffset GeneratedAt { get; init; }
-    public required string OrganizationName { get; init; }
-    public required DateTimeOffset PeriodStart { get; init; }
-    public required DateTimeOffset PeriodEnd { get; init; }
-    public required IReadOnlyList<GhgReportEntry> Entries { get; init; }
-    public required double TotalScope2 { get; init; }
-    public required double TotalScope3 { get; init; }
-    public double TotalEmissions;;
-    public required string Methodology { get; init; }
-    public string? ExecutiveSummary { get; init; }
-    public string? TenantId { get; init; }
+    public required CacheType Type { get; init; }
+    public required long MaxSizeBytes { get; init; }
+    public long CurrentSizeBytes { get; set; }
+    public long TotalHits { get; set; }
+    public long TotalMisses { get; set; }
+    public long TotalEvictions { get; set; }
+    public double HitRate { get; set; }
 }
 ```
 ```csharp
-public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public Task<IReadOnlyList<GhgReportEntry>> GenerateScope2ReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
-    public Task<IReadOnlyList<GhgReportEntry>> GenerateScope3ReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
-    public async Task<GhgFullReport> GenerateFullReportAsync(DateTimeOffset from, DateTimeOffset to, string organizationName, string? tenantId = null, CancellationToken ct = default);
-    public void RecordMeasurement(EnergyMeasurementRecord record);
-    public void UpdateRegionCarbonIntensity(string region, double intensityGCO2ePerKwh);
-    public int MeasurementCount;;
-}
-```
-```csharp
-public sealed record EnergyMeasurementRecord
+public sealed record CacheRecommendation
 {
 }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double WattsConsumed { get; init; }
-    public required double DurationMs { get; init; }
-    public required double EnergyWh { get; init; }
-    public required EnergySource Source { get; init; }
-    public required string OperationType { get; init; }
-    public string? TenantId { get; init; }
-    public string? Region { get; init; }
-    public long DataSizeBytes { get; init; }
-    public double CarbonIntensity { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonReporting/CarbonDashboardDataStrategy.cs
-```csharp
-public sealed record TimeSeriesPoint
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double Value { get; init; }
-    public required string Unit { get; init; }
-}
-```
-```csharp
-public sealed record EmissionsByOperationType
-{
-}
-    public double ReadGramsCO2e { get; init; }
-    public double WriteGramsCO2e { get; init; }
-    public double DeleteGramsCO2e { get; init; }
-    public double ListGramsCO2e { get; init; }
-    public double TotalGramsCO2e;;
-}
-```
-```csharp
-public sealed record TenantCarbonUsage
-{
-}
-    public required string TenantId { get; init; }
-    public required double TotalEmissionsGramsCO2e { get; init; }
-    public required double TotalEnergyWh { get; init; }
-    public required long OperationCount { get; init; }
-}
-```
-```csharp
-public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public IReadOnlyList<TimeSeriesPoint> GetCarbonIntensityTimeSeries(string region, TimeSpan period, TimeSpan granularity);
-    public IReadOnlyList<TimeSeriesPoint> GetBudgetUtilizationTimeSeries(string tenantId, TimeSpan period);
-    public IReadOnlyList<TimeSeriesPoint> GetGreenScoreTrend(TimeSpan period);
-    public EmissionsByOperationType GetEmissionsByOperationType(DateTimeOffset from, DateTimeOffset to);
-    public IReadOnlyList<TenantCarbonUsage> GetTopEmittingTenants(int topN, DateTimeOffset from, DateTimeOffset to);
-    public void RecordCarbonIntensity(string region, double intensityGCO2ePerKwh);
-    public void RecordBudgetUtilization(string tenantId, double usagePercent);
-    public void RecordGreenScore(double averageScore);
-    public void RecordOperationEmission(string operationType, double emissionsGramsCO2e);
-    public void RecordTenantEmission(string tenantId, double emissionsGramsCO2e, double energyWh);
-}
-```
-```csharp
-private sealed class TenantAccumulator
-{
-}
-    public TenantAccumulator(string tenantId);
-    public void Add(double emissionsGrams, double energyWh);
-    public TenantCarbonUsage ToUsage();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/BatchJobOptimizationStrategy.cs
-```csharp
-public sealed class BatchJobOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double LowCarbonThreshold { get; set; };
-    public int MaxDelayHours { get; set; };
-    public double CarbonWeight { get; set; };
-    public double CostWeight { get; set; };
-    public void SetCarbonIntensityProvider(Func<Task<double>> provider);;
-    public void SetElectricityPriceProvider(Func<Task<double>> provider);;
-    public string SubmitJob(string name, double estimatedKwh, TimeSpan maxDelay, int priority = 5);
-    public async Task<ScheduleRecommendation> GetOptimalScheduleAsync(string jobId);
-    public async Task<JobExecutionResult> ExecuteJobAsync(string jobId, CancellationToken ct = default);
-    public IReadOnlyList<BatchJob> GetPendingJobs();
-    public BatchJobStatistics GetJobStatistics();
-}
-```
-```csharp
-public sealed class BatchJob
-{
-}
-    public required string JobId { get; init; }
-    public required string Name { get; init; }
-    public required double EstimatedKwh { get; init; }
-    public required TimeSpan MaxDelay { get; init; }
-    public required int Priority { get; init; }
-    public required DateTimeOffset SubmittedAt { get; init; }
-    public required DateTimeOffset Deadline { get; init; }
-}
-```
-```csharp
-public sealed record ScheduleRecommendation
-{
-}
-    public required string JobId { get; init; }
-    public bool Success { get; init; }
-    public string? Reason { get; init; }
-    public DateTimeOffset? RecommendedExecutionTime { get; init; }
-    public double ExpectedCarbonIntensity { get; init; }
-    public double ExpectedPrice { get; init; }
-}
-```
-```csharp
-public sealed record JobExecutionResult
-{
-}
-    public required string JobId { get; init; }
-    public bool Success { get; init; }
-    public string? Reason { get; init; }
-    public DateTimeOffset? StartedAt { get; init; }
-    public double CarbonIntensity { get; init; }
-    public double EstimatedEmissionsGrams { get; init; }
-}
-```
-```csharp
-public sealed class BatchJobExecution
-{
-}
-    public required string JobId { get; init; }
-    public required string JobName { get; init; }
-    public required DateTimeOffset StartedAt { get; init; }
-    public required double CarbonIntensity { get; init; }
-    public required double EstimatedEmissionsGrams { get; init; }
-}
-```
-```csharp
-public sealed record BatchJobStatistics
-{
-}
-    public int TotalJobsExecuted { get; init; }
-    public double TotalEmissionsGrams { get; init; }
-    public double AverageCarbonIntensity { get; init; }
-    public int PendingJobCount { get; init; }
-    public double PendingJobsKwh { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/DemandResponseStrategy.cs
-```csharp
-public sealed class DemandResponseStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public bool AutoRespond { get; set; };
-    public int MaxReductionPercent { get; set; };
-    public DemandResponseEvent? ActiveEvent
-{
-    get
-    {
-        lock (_lock)
-            return _activeEvent;
-    }
-}
-    public bool InDemandResponseEvent;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task RespondToEventAsync(DemandResponseEvent drEvent, CancellationToken ct = default);
-    public void EndParticipation();
-}
-```
-```csharp
-public sealed record DemandResponseEvent
-{
-}
-    public required string EventId { get; init; }
-    public required DateTimeOffset StartTime { get; init; }
-    public required DateTimeOffset EndTime { get; init; }
-    public required int RequestedReductionPercent { get; init; }
-    public required double IncentivePerKwh { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/WorkloadMigrationStrategy.cs
-```csharp
-public sealed class WorkloadMigrationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double MigrationThreshold { get; set; };
-    public int MinMigrationIntervalHours { get; set; };
-    public void RegisterDataCenter(string dcId, string name, string region, double carbonIntensity, bool hasRenewable);
-    public void UpdateCarbonIntensity(string dcId, double carbonIntensity, double renewablePercent);
-    public void RegisterWorkload(string workloadId, string name, string currentDcId, double powerWatts, bool isMigratable);
-    public IReadOnlyList<MigrationRecommendation> GetMigrationRecommendations();
-    public bool MigrateWorkload(string workloadId, string targetDcId);
-}
-```
-```csharp
-public sealed class DataCenter
-{
-}
-    public required string DataCenterId { get; init; }
-    public required string Name { get; init; }
-    public required string Region { get; init; }
-    public double CarbonIntensity { get; set; }
-    public bool HasRenewableEnergy { get; set; }
-    public double RenewablePercent { get; set; }
-    public double AvailableCapacityPercent { get; set; }
-    public DateTimeOffset LastUpdated { get; set; }
-}
-```
-```csharp
-public sealed class Workload
-{
-}
-    public required string WorkloadId { get; init; }
-    public required string Name { get; init; }
-    public string CurrentDataCenterId { get; set; };
-    public required double PowerWatts { get; init; }
-    public required bool IsMigratable { get; init; }
-    public required DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset? LastMigratedAt { get; set; }
-}
-```
-```csharp
-public sealed record MigrationRecommendation
-{
-}
-    public required string WorkloadId { get; init; }
-    public required string WorkloadName { get; init; }
-    public required string CurrentDataCenterId { get; init; }
-    public required string TargetDataCenterId { get; init; }
-    public required double CurrentCarbonIntensity { get; init; }
-    public required double TargetCarbonIntensity { get; init; }
-    public required double CarbonSavedGramsPerHour { get; init; }
-    public required int Priority { get; init; }
-}
-```
-```csharp
-public sealed record MigrationEvent
-{
-}
-    public required string WorkloadId { get; init; }
-    public required string SourceDataCenterId { get; init; }
-    public required string TargetDataCenterId { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/OffPeakSchedulingStrategy.cs
-```csharp
-public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int OffPeakStartHour { get; set; };
-    public int OffPeakEndHour { get; set; };
-    public bool WeekendIsOffPeak { get; set; };
-    public bool IsOffPeak
-{
-    get
-    {
-        var now = DateTime.Now;
-        if (WeekendIsOffPeak && (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday))
-            return true;
-        var hour = now.Hour;
-        return OffPeakStartHour > OffPeakEndHour ? hour >= OffPeakStartHour || hour < OffPeakEndHour : hour >= OffPeakStartHour && hour < OffPeakEndHour;
-    }
-}
-    public int PendingJobCount;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public string ScheduleJob(Func<CancellationToken, Task> job, string name, DateTimeOffset? deadline = null);
-    public DateTimeOffset GetNextOffPeakWindow();
-}
-```
-```csharp
-internal sealed record ScheduledJob
-{
-}
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public required Func<CancellationToken, Task> Job { get; init; }
-    public required DateTimeOffset ScheduledAt { get; init; }
-    public required DateTimeOffset Deadline { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Scheduling/RenewableEnergyWindowStrategy.cs
-```csharp
-public sealed class RenewableEnergyWindowStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double MinRenewablePercent { get; set; };
-    public double CurrentRenewablePercent
-{
-    get
-    {
-        lock (_lock)
-            return _currentRenewablePercent;
-    }
-}
-    public bool IsHighRenewable;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public RenewableWindow? FindNextWindow(TimeSpan lookahead);
-}
-```
-```csharp
-public sealed record RenewableWindow
-{
-}
-    public required DateTimeOffset StartTime { get; init; }
-    public required DateTimeOffset EndTime { get; init; }
-    public required double AverageRenewablePercent { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/ThermalThrottlingStrategy.cs
-```csharp
-public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double LightThrottleC { get; set; };
-    public double ModerateThrottleC { get; set; };
-    public double HeavyThrottleC { get; set; };
-    public double EmergencyShutdownC { get; set; };
-    public ThrottleLevel CurrentLevel
-{
-    get
-    {
-        lock (_lock)
-            return _currentLevel;
-    }
-}
-    public double CurrentTemperature
-{
-    get
-    {
-        lock (_lock)
-            return _currentTemp;
-    }
-}
-    public void SetTemperatureProvider(Func<Task<double>> provider);;
-    public void SetFrequencyController(Func<int, Task> controller);;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/LiquidCoolingOptimizationStrategy.cs
-```csharp
-public sealed class LiquidCoolingOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double TargetDeltaT { get; set; };
-    public double MaxInletTemperature { get; set; };
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public void RegisterLoop(string loopId, string name, double maxFlowRateLpm, double pumpPowerWatts);
-    public void UpdateLoopReadings(string loopId, double inletTempC, double outletTempC, double flowRateLpm);
-    public FlowRateRecommendation GetOptimalFlowRate(string loopId, double heatLoadKw);
-    public bool SetFlowRate(string loopId, double flowRateLpm);
-}
-```
-```csharp
-public sealed class CoolingLoop
-{
-}
-    public required string LoopId { get; init; }
-    public required string Name { get; init; }
-    public required double MaxFlowRateLpm { get; init; }
-    public required double PumpPowerWatts { get; init; }
-    public double CurrentFlowRateLpm { get; set; }
-    public double InletTemperatureC { get; set; }
-    public double OutletTemperatureC { get; set; }
-    public double DeltaT { get; set; }
-    public double HeatRemovalKw { get; set; }
-}
-```
-```csharp
-public sealed record FlowRateRecommendation
-{
-}
-    public required string LoopId { get; init; }
-    public bool Success { get; init; }
-    public string? Reason { get; init; }
-    public double CurrentFlowRateLpm { get; init; }
-    public double OptimalFlowRateLpm { get; init; }
-    public double CurrentPumpPowerWatts { get; init; }
-    public double OptimalPumpPowerWatts { get; init; }
-    public double PotentialSavingsWatts { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/TemperatureMonitoringStrategy.cs
-```csharp
-public sealed class TemperatureMonitoringStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double WarningThresholdC { get; set; };
-    public double CriticalThresholdC { get; set; };
-    public IReadOnlyDictionary<string, ThermalZone> Zones
-{
-    get
-    {
-        lock (_lock)
-            return new Dictionary<string, ThermalZone>(_zones);
-    }
-}
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-}
-```
-```csharp
-public sealed class ThermalZone
-{
-}
-    public required string Name { get; init; }
-    public required string Type { get; init; }
-    public string? SysPath { get; init; }
-    public double CurrentTempC { get; set; }
-    public double MaxTempC { get; set; }
-    public DateTimeOffset LastUpdated { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/CoolingOptimizationStrategy.cs
-```csharp
-public sealed class CoolingOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double TargetTemperatureC { get; set; };
-    public CoolingProfile CurrentProfile
-{
-    get
-    {
-        lock (_lock)
-            return _currentProfile;
-    }
-}
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task SetProfileAsync(CoolingProfile profile, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class FanZone
-{
-}
-    public required string Name { get; init; }
-    public int MaxRpm { get; init; }
-    public int CurrentRpm { get; set; }
-    public int CurrentPercent { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ThermalManagement/HotColdAisleStrategy.cs
-```csharp
-public sealed class HotColdAisleStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double TargetColdAisleTemp { get; set; };
-    public double MaxHotAisleTemp { get; set; };
-    public double TargetDeltaT { get; set; };
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public void RegisterZone(string zoneId, string name, AisleType type, int rackCount);
-    public void UpdateZoneReadings(string zoneId, double temperature, double humidity, double airflowCfm);
-    public ContainmentEffectiveness GetContainmentEffectiveness();
-    public IReadOnlyList<AirflowRecommendation> GetAirflowRecommendations();
-}
-```
-```csharp
-public sealed class AisleZone
-{
-}
-    public required string ZoneId { get; init; }
-    public required string Name { get; init; }
-    public required AisleType Type { get; init; }
-    public required int RackCount { get; init; }
-    public double CurrentTemperature { get; set; }
-    public double CurrentHumidity { get; set; }
-    public double AirflowCfm { get; set; }
-    public DateTimeOffset LastUpdated { get; set; }
-}
-```
-```csharp
-public sealed record ContainmentEffectiveness
-{
-}
-    public bool Success { get; init; }
-    public string? Reason { get; init; }
-    public double EffectivenessPercent { get; init; }
-    public double AverageColdAisleTemp { get; init; }
-    public double AverageHotAisleTemp { get; init; }
-    public double ActualDeltaT { get; init; }
-    public int HotSpotCount { get; init; }
-    public List<string> HotSpotZones { get; init; };
-}
-```
-```csharp
-public sealed record AirflowRecommendation
-{
-}
-    public required string ZoneId { get; init; }
-    public required AirflowRecommendationType Type { get; init; }
-    public required string Reason { get; init; }
+    public required string CacheId { get; init; }
+    public required CacheRecommendationType Type { get; init; }
+    public required long CurrentSizeBytes { get; init; }
+    public required long RecommendedSizeBytes { get; init; }
+    public required double HitRate { get; init; }
     public required double EstimatedSavingsWatts { get; init; }
-    public required int Priority { get; init; }
+    public required string Reason { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/WaterUsageTrackingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/DiskSpinDownStrategy.cs
 ```csharp
-public sealed class WaterUsageTrackingStrategy : SustainabilityStrategyBase
+public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2669,58 +2536,36 @@ public sealed class WaterUsageTrackingStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double TargetWue { get; set; };
-    public double AlertThresholdWue { get; set; };
-    public double WaterCostPerLiter { get; set; };
-    public void SetWaterUsageProvider(Func<Task<double>> provider);;
-    public void SetItLoadProvider(Func<Task<double>> provider);;
+    public int SpinDownSeconds { get; set; };
+    public int ApmLevel { get; set; };
+    public IReadOnlyDictionary<string, DiskState> Disks
+{
+    get
+    {
+        lock (_lock)
+            return new Dictionary<string, DiskState>(_disks);
+    }
+}
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
-    public void RecordWaterUsage(double waterLitersPerHour, double itLoadKw);
-    public double GetCurrentWue();
-    public WaterStatistics GetStatistics(TimeSpan? period = null);
-    public IReadOnlyList<WaterSavingRecommendation> GetWaterSavingRecommendations();
+    public async Task SpinDownAsync(string diskId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record WaterReading
+public sealed class DiskState
 {
 }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double WaterLitersPerHour { get; init; }
-    public required double ItLoadKw { get; init; }
-    public required double Wue { get; init; }
-    public required double CostPerHour { get; init; }
-}
-```
-```csharp
-public sealed record WaterStatistics
-{
-}
-    public double CurrentWue { get; init; }
-    public double AverageWue { get; init; }
-    public double MinWue { get; init; }
-    public double MaxWue { get; init; }
-    public double TotalWaterLiters { get; init; }
-    public double TotalWaterCostUsd { get; init; }
-    public int ReadingCount { get; init; }
-}
-```
-```csharp
-public sealed record WaterSavingRecommendation
-{
-}
-    public required WaterSavingType Type { get; init; }
-    public required string Description { get; init; }
-    public required double EstimatedSavingsLitersPerDay { get; init; }
-    public required double EstimatedCostSavingsUsd { get; init; }
-    public required int Priority { get; init; }
+    public required string Id { get; init; }
+    public required DiskType Type { get; init; }
+    public bool IsSpunDown { get; set; }
+    public int IdleSeconds { get; set; }
+    public DateTimeOffset? LastSpinDown { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/EnergyConsumptionTrackingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/MemoryOptimizationStrategy.cs
 ```csharp
-public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBase
+public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2729,55 +2574,95 @@ public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBa
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public TimeSpan SamplingInterval { get; set; };
-    public double TotalEnergyWh
+    public double UsagePercent
 {
     get
     {
         lock (_lock)
-            return _totalEnergyWh;
+            return _totalMemoryBytes > 0 ? (double)_usedMemoryBytes / _totalMemoryBytes * 100 : 0;
     }
 }
-    public double CurrentPowerWatts
+    public double CompressionRatio
 {
     get
     {
         lock (_lock)
-            return _currentPowerWatts;
+            return _compressedBytes > 0 ? (double)_usedMemoryBytes / _compressedBytes : 1;
     }
 }
+    public double TargetUsagePercent { get; set; };
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
-    public IReadOnlyList<EnergyDataPoint> GetHistory(TimeSpan? duration = null);
-    public EnergySummary GetSummary(TimeSpan period);
+    public void OptimizeMemory();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/IdleResourceDetectionStrategy.cs
+```csharp
+public sealed class IdleResourceDetectionStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int IdleThresholdMinutes { get; set; };
+    public double IdleCpuThresholdPercent { get; set; };
+    public long IdleNetworkThresholdBytesPerSec { get; set; };
+    public void RegisterResource(string resourceId, string name, ResourceType type, double powerWatts);
+    public void RecordActivity(string resourceId, double cpuPercent, long networkBytesPerSec, int activeConnections);
+    public IReadOnlyList<IdleResource> GetIdleResources();
+    public IdleSavingsSummary GetPotentialSavings();
+    public bool TerminateResource(string resourceId);
 }
 ```
 ```csharp
-public sealed record EnergyDataPoint
+public sealed class ResourceTracker
 {
 }
-    public required DateTimeOffset Timestamp { get; init; }
+    public required string ResourceId { get; init; }
+    public required string Name { get; init; }
+    public required ResourceType Type { get; init; }
     public required double PowerWatts { get; init; }
-    public required double EnergyWh { get; init; }
-    public required string Source { get; init; }
+    public required DateTimeOffset FirstSeen { get; init; }
+    public DateTimeOffset LastActivityCheck { get; set; }
+    public DateTimeOffset? IdleSince { get; set; }
+    public DateTimeOffset? LastActiveAt { get; set; }
+    public double LastCpuPercent { get; set; }
+    public long LastNetworkBytesPerSec { get; set; }
+    public int LastActiveConnections { get; set; }
 }
 ```
 ```csharp
-public sealed record EnergySummary
+public sealed record IdleResource
 {
 }
-    public required TimeSpan Period { get; init; }
-    public required double TotalEnergyWh { get; init; }
-    public double AveragePowerWatts { get; init; }
-    public double PeakPowerWatts { get; init; }
-    public double MinPowerWatts { get; init; }
-    public int SampleCount { get; init; }
+    public required string ResourceId { get; init; }
+    public required string Name { get; init; }
+    public required ResourceType Type { get; init; }
+    public required TimeSpan IdleDuration { get; init; }
+    public required double PowerWatts { get; init; }
+    public DateTimeOffset? LastActiveAt { get; init; }
+    public bool CanShutdown { get; init; }
+}
+```
+```csharp
+public sealed record IdleSavingsSummary
+{
+}
+    public int IdleResourceCount { get; init; }
+    public double TotalPowerWatts { get; init; }
+    public double EstimatedDailyKwh { get; init; }
+    public double EstimatedMonthlyCostUsd { get; init; }
+    public Dictionary<ResourceType, double> ByType { get; init; };
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/PueTrackingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/NetworkPowerSavingStrategy.cs
 ```csharp
-public sealed class PueTrackingStrategy : SustainabilityStrategyBase
+public sealed class NetworkPowerSavingStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2786,169 +2671,23 @@ public sealed class PueTrackingStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double TargetPue { get; set; };
-    public double AlertThresholdPue { get; set; };
-    public void SetItLoadProvider(Func<Task<double>> provider);;
-    public void SetTotalPowerProvider(Func<Task<double>> provider);;
+    public bool EnableEee { get; set; };
+    public bool ReduceIdleSpeed { get; set; };
+    public int IdleSpeedMbps { get; set; };
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
-    public void RecordPue(double itLoadKw, double totalPowerKw);
-    public double GetCurrentPue();
-    public PueStatistics GetStatistics(TimeSpan? period = null);
-    public PueTrend GetTrend();
+    public async Task SetLowPowerModeAsync(string interfaceId, bool enable, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record PueReading
+public sealed class NetworkInterfaceState
 {
 }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required double ItLoadKw { get; init; }
-    public required double TotalPowerKw { get; init; }
-    public required double Pue { get; init; }
-    public required double OverheadKw { get; init; }
-}
-```
-```csharp
-public sealed record PueStatistics
-{
-}
-    public double CurrentPue { get; init; }
-    public double AveragePue { get; init; }
-    public double MinPue { get; init; }
-    public double MaxPue { get; init; }
-    public double TotalItLoadKwh { get; init; }
-    public double TotalOverheadKwh { get; init; }
-    public int ReadingCount { get; init; }
-    public TimeSpan TimeAboveTarget { get; init; }
-}
-```
-```csharp
-public sealed record PueTrend
-{
-}
-    public bool HasSufficientData { get; init; }
-    public double CurrentAverage { get; init; }
-    public double PreviousAverage { get; init; }
-    public double Change { get; init; }
-    public double ChangePercent { get; init; }
-    public bool IsImproving { get; init; }
-    public bool IsDegrading { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/CarbonFootprintCalculationStrategy.cs
-```csharp
-public sealed class CarbonFootprintCalculationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double DefaultCarbonIntensity { get; set; };
-    public double Scope3Multiplier { get; set; };
-    public double TotalScope2Grams
-{
-    get
-    {
-        lock (_lock)
-            return _totalScope2Grams;
-    }
-}
-    public double TotalScope3Grams
-{
-    get
-    {
-        lock (_lock)
-            return _totalScope3Grams;
-    }
-}
-    public double TotalEmissionsGrams;;
-    public void SetCarbonIntensityProvider(Func<Task<double>> provider);;
-    public void SetEnergyProvider(Func<Task<double>> provider);;
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task<EmissionResult> CalculateEmissionsAsync(double energyWh);
-    public void RecordEmissions(double scope2Grams, double scope3Grams = 0);
-    public EmissionsSummary GetSummary();
-}
-```
-```csharp
-public sealed record EmissionResult
-{
-}
-    public required double EnergyWh { get; init; }
-    public required double CarbonIntensity { get; init; }
-    public required double Scope2Grams { get; init; }
-    public required double Scope3Grams { get; init; }
-    public required double TotalGrams { get; init; }
-}
-```
-```csharp
-public sealed record EmissionsSummary
-{
-}
-    public required double TotalScope2Grams { get; init; }
-    public required double TotalScope3Grams { get; init; }
-    public required double TotalEmissionsGrams { get; init; }
-    public required double TotalKgCO2e { get; init; }
-    public required double TotalTonsCO2e { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/SustainabilityReportingStrategy.cs
-```csharp
-public sealed class SustainabilityReportingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public ReportFormat Format { get; set; };
-    public string OrganizationName { get; set; };
-    public SustainabilityReport GenerateReport(TimeSpan period, double totalEnergyWh, double totalEmissionsGrams, double energySavedWh, double carbonAvoidedGrams, double costSavingsUsd);
-    public string ExportReport(SustainabilityReport report, ReportFormat? format = null);
-    public IReadOnlyList<SustainabilityReport> GetReportHistory();
-}
-```
-```csharp
-public sealed record SustainabilityReport
-{
-}
-    public required string ReportId { get; init; }
-    public required DateTimeOffset GeneratedAt { get; init; }
-    public required string Organization { get; init; }
-    public required DateTimeOffset PeriodStart { get; init; }
-    public required DateTimeOffset PeriodEnd { get; init; }
-    public required double TotalEnergyConsumedWh { get; init; }
-    public required double TotalEnergyConsumedKwh { get; init; }
-    public required double TotalEmissionsGrams { get; init; }
-    public required double TotalEmissionsKgCO2e { get; init; }
-    public required double TotalEmissionsTonsCO2e { get; init; }
-    public required double EnergySavedWh { get; init; }
-    public required double EnergySavedKwh { get; init; }
-    public required double CarbonAvoidedGrams { get; init; }
-    public required double CarbonAvoidedKgCO2e { get; init; }
-    public required double CostSavingsUsd { get; init; }
-    public required double EfficiencyRatio { get; init; }
-    public required double CarbonReductionPercent { get; init; }
-    public required double EquivalentTreesPlanted { get; init; }
-    public required double EquivalentMilesDriven { get; init; }
-    public required double EquivalentHomesEnergy { get; init; }
-}
-```
-```csharp
-internal sealed record ReportRecord
-{
-}
-    public required SustainabilityReport Report { get; init; }
-    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string Id { get; init; }
+    public int MaxSpeedMbps { get; init; }
+    public int CurrentSpeedMbps { get; set; }
+    public bool LowPowerMode { get; set; }
+    public int IdleSeconds { get; set; }
 }
 ```
 
@@ -3053,6 +2792,63 @@ public sealed class GpuInfo
     public double PowerDrawWatts { get; set; }
     public double TemperatureCelsius { get; set; }
     public int UtilizationPercent { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyOptimization/VirtualizationOptimizationStrategy.cs
+```csharp
+public sealed class VirtualizationOptimizationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int TargetHostCpuPercent { get; set; };
+    public int MinVmsPerHost { get; set; };
+    public void RegisterHost(string hostId, int cpuCores, long memoryBytes, double idlePowerWatts, double maxPowerWatts);
+    public void RegisterVm(string vmId, string hostId, int vCpus, long memoryBytes, double cpuUtilization);
+    public void UpdateVmUtilization(string vmId, double cpuUtilization);
+    public IReadOnlyList<ConsolidationRecommendation> GetConsolidationRecommendations();
+    public double GetHostPowerEfficiency(string hostId);
+}
+```
+```csharp
+public sealed class HostInfo
+{
+}
+    public required string HostId { get; init; }
+    public required int CpuCores { get; init; }
+    public required long MemoryBytes { get; init; }
+    public required double IdlePowerWatts { get; init; }
+    public required double MaxPowerWatts { get; init; }
+    public double CurrentCpuPercent { get; set; }
+    public int VmCount { get; set; }
+}
+```
+```csharp
+public sealed record VmInfo
+{
+}
+    public required string VmId { get; init; }
+    public required string HostId { get; init; }
+    public required int VCpus { get; init; }
+    public required long MemoryBytes { get; init; }
+    public required double CpuUtilization { get; init; }
+}
+```
+```csharp
+public sealed record ConsolidationRecommendation
+{
+}
+    public required string SourceHostId { get; init; }
+    public required string TargetHostId { get; init; }
+    public required List<string> VmIds { get; init; }
+    public required double EstimatedPowerSavingsWatts { get; init; }
+    public required double SourceHostUtilization { get; init; }
+    public required double TargetHostUtilization { get; init; }
 }
 ```
 
@@ -3272,63 +3068,6 @@ public sealed record TieringRecommendation
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyOptimization/VirtualizationOptimizationStrategy.cs
-```csharp
-public sealed class VirtualizationOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int TargetHostCpuPercent { get; set; };
-    public int MinVmsPerHost { get; set; };
-    public void RegisterHost(string hostId, int cpuCores, long memoryBytes, double idlePowerWatts, double maxPowerWatts);
-    public void RegisterVm(string vmId, string hostId, int vCpus, long memoryBytes, double cpuUtilization);
-    public void UpdateVmUtilization(string vmId, double cpuUtilization);
-    public IReadOnlyList<ConsolidationRecommendation> GetConsolidationRecommendations();
-    public double GetHostPowerEfficiency(string hostId);
-}
-```
-```csharp
-public sealed class HostInfo
-{
-}
-    public required string HostId { get; init; }
-    public required int CpuCores { get; init; }
-    public required long MemoryBytes { get; init; }
-    public required double IdlePowerWatts { get; init; }
-    public required double MaxPowerWatts { get; init; }
-    public double CurrentCpuPercent { get; set; }
-    public int VmCount { get; set; }
-}
-```
-```csharp
-public sealed record VmInfo
-{
-}
-    public required string VmId { get; init; }
-    public required string HostId { get; init; }
-    public required int VCpus { get; init; }
-    public required long MemoryBytes { get; init; }
-    public required double CpuUtilization { get; init; }
-}
-```
-```csharp
-public sealed record ConsolidationRecommendation
-{
-}
-    public required string SourceHostId { get; init; }
-    public required string TargetHostId { get; init; }
-    public required List<string> VmIds { get; init; }
-    public required double EstimatedPowerSavingsWatts { get; init; }
-    public required double SourceHostUtilization { get; init; }
-    public required double TargetHostUtilization { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/EnergyOptimization/SleepStatesStrategy.cs
 ```csharp
 public sealed class SleepStatesStrategy : SustainabilityStrategyBase
@@ -3387,35 +3126,88 @@ public sealed record SleepStateInfo
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/GreenTieringStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonAwareSchedulingStrategy.cs
 ```csharp
-public sealed record GreenMigrationCandidate
+public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
 {
 }
-    public required string ObjectKey { get; init; }
-    public required string CurrentBackendId { get; init; }
-    public required double CurrentGreenScore { get; init; }
-    public required long SizeBytes { get; init; }
-    public required DateTimeOffset LastAccessed { get; init; }
-    public required string TenantId { get; init; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public TimeSpan MaxDelay { get; set; };
+    public double CarbonThreshold { get; set; };
+    public int PendingWorkloadCount;;
+    public void SetCarbonIntensityProvider(Func<Task<double>> provider);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public string ScheduleWorkload(Func<CancellationToken, Task> workload, string name, TimeSpan estimatedDuration, double estimatedEnergyWh, WorkloadPriority priority = WorkloadPriority.Normal, DateTimeOffset? deadline = null);
+    public bool CancelWorkload(string workloadId);
+    public IReadOnlyList<ScheduledWorkloadInfo> GetPendingWorkloads();
+    public IReadOnlyList<CompletedWorkload> GetCompletedWorkloads(int count = 100);
+    public async Task<WorkloadResult> ExecuteImmediatelyAsync(string workloadId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record GreenMigrationBatch
+internal sealed class ScheduledWorkload
 {
 }
-    public required IReadOnlyList<GreenMigrationCandidate> Candidates { get; init; }
-    public required string TargetBackendId { get; init; }
-    public required double TargetGreenScore { get; init; }
-    public required double EstimatedCarbonCostGrams { get; init; }
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required Func<CancellationToken, Task> Workload { get; init; }
+    public required DateTimeOffset ScheduledAt { get; init; }
+    public required TimeSpan EstimatedDuration { get; init; }
     public required double EstimatedEnergyWh { get; init; }
-    public required DateTimeOffset ScheduledFor { get; init; }
-    public required string TenantId { get; init; }
-    public long TotalSizeBytes;;
+    public required WorkloadPriority Priority { get; init; }
+    public required DateTimeOffset Deadline { get; init; }
 }
 ```
 ```csharp
-public sealed class GreenTieringStrategy : SustainabilityStrategyBase
+public sealed record ScheduledWorkloadInfo
+{
+}
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required DateTimeOffset ScheduledAt { get; init; }
+    public required DateTimeOffset Deadline { get; init; }
+    public required WorkloadPriority Priority { get; init; }
+    public required double EstimatedEnergyWh { get; init; }
+}
+```
+```csharp
+public sealed record CompletedWorkload
+{
+}
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required DateTimeOffset ScheduledAt { get; init; }
+    public required DateTimeOffset ExecutedAt { get; init; }
+    public required DateTimeOffset CompletedAt { get; init; }
+    public required double CarbonIntensityAtExecution { get; init; }
+    public required double EnergyConsumedWh { get; init; }
+    public required double CarbonEmittedGrams { get; init; }
+    public required bool Success { get; init; }
+}
+```
+```csharp
+public sealed record WorkloadResult
+{
+}
+    public required string WorkloadId { get; init; }
+    public required bool Success { get; init; }
+    public DateTimeOffset? ExecutedAt { get; init; }
+    public TimeSpan? Duration { get; init; }
+    public double? CarbonIntensity { get; init; }
+    public double? CarbonEmittedGrams { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/GridCarbonApiStrategy.cs
+```csharp
+public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -3424,39 +3216,57 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public GreenTieringStrategy(GreenTieringPolicyEngine policyEngine);
-    public GreenTieringPolicyEngine PolicyEngine;;
-    public int PendingBatchCount;;
-    public IReadOnlyList<GreenMigrationBatch> GetPendingBatches();
-    public GreenMigrationBatch? DequeueBatch();
+    public enum ApiProvider;
+    public ApiProvider Provider { get => Enum.Parse<ApiProvider>(_selectedProvider); set => _selectedProvider = value.ToString(); }
+    public string? WattTimeUsername { get; set; }
+    public string? WattTimePassword { get; set; }
+    public string? ElectricityMapsApiKey { get; set; }
+    public double Latitude { get; set; };
+    public double Longitude { get; set; };
+    public string Region { get; set; };
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
-    public async Task<IReadOnlyList<GreenMigrationCandidate>> IdentifyColdDataAsync(string tenantId, CancellationToken ct = default);
-    public async Task<GreenMigrationBatch?> PlanMigrationBatchAsync(IReadOnlyList<GreenMigrationCandidate> candidates, string tenantId, CancellationToken ct = default);
-    public async Task<bool> ShouldMigrateNowAsync(GreenMigrationSchedule schedule, CancellationToken ct = default);
-    public override Task<IReadOnlyList<SustainabilityRecommendation>> GetRecommendationsAsync(CancellationToken ct = default);
+    public async Task<GridCarbonData> GetCurrentCarbonIntensityAsync(CancellationToken ct = default);
+    public async Task<IReadOnlyList<GridCarbonForecast>> GetForecastAsync(int hours = 24, CancellationToken ct = default);
+    public async Task<OptimalScheduleWindow?> FindOptimalWindowAsync(TimeSpan duration, TimeSpan maxDelay, CancellationToken ct = default);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/ColdDataCarbonMigrationStrategy.cs
 ```csharp
-public sealed record MigrationRecord
+public sealed record GridCarbonData
 {
 }
-    public required string ObjectKey { get; init; }
-    public required string SourceBackendId { get; init; }
-    public required string TargetBackendId { get; init; }
-    public required long SizeBytes { get; init; }
-    public required double CarbonSavedGrams { get; init; }
-    public required double EnergySavedWh { get; init; }
     public required DateTimeOffset Timestamp { get; init; }
-    public required bool Success { get; init; }
-    public string? ErrorMessage { get; init; }
-    public required string TenantId { get; init; }
+    public required double CarbonIntensity { get; init; }
+    public required string Region { get; init; }
+    public required string Provider { get; init; }
+    public double FossilFuelPercent { get; init; }
+    public double RenewablePercent { get; init; }
+    public double Confidence { get; init; };
 }
 ```
 ```csharp
-public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
+public sealed record GridCarbonForecast
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double CarbonIntensity { get; init; }
+    public double Confidence { get; init; }
+}
+```
+```csharp
+public sealed record OptimalScheduleWindow
+{
+}
+    public required DateTimeOffset StartTime { get; init; }
+    public required DateTimeOffset EndTime { get; init; }
+    public required double AverageCarbonIntensity { get; init; }
+    public double CarbonSavingsPercent { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/ScienceBasedTargetsStrategy.cs
+```csharp
+public sealed class ScienceBasedTargetsStrategy : SustainabilityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -3465,349 +3275,539 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public long TotalDataMigratedBytes
-{
-    get
-    {
-        lock (_statsLock2)
-            return _totalDataMigratedBytes;
-    }
-}
-    public double TotalCarbonSavedGrams
-{
-    get
-    {
-        lock (_statsLock2)
-            return _totalCarbonSavedGrams;
-    }
-}
-    public long TotalMigrationErrors
-{
-    get
-    {
-        lock (_statsLock2)
-            return _totalMigrationErrors;
-    }
-}
-    public long TotalMigrationsCompleted
-{
-    get
-    {
-        lock (_statsLock2)
-            return _totalMigrationsCompleted;
-    }
-}
-    public int RetryQueueCount;;
-    public async Task<BatchExecutionResult> ExecuteBatchAsync(GreenMigrationBatch batch, CancellationToken ct = default);
-    public IReadOnlyList<MigrationRecord> GetMigrationHistory(string? tenantId = null, int maxEntries = 100);
-    public MigrationStatistics GetMigrationStatistics();
-    public override Task<IReadOnlyList<SustainabilityRecommendation>> GetRecommendationsAsync(CancellationToken ct = default);
+    public string Pathway { get; set; };
+    public void SetTarget(int baselineYear, double baselineEmissionsKg, int targetYear, double targetReductionPercent);
+    public void RecordYearlyEmissions(int year, double emissionsKg);
+    public double GetRequiredEmissionsKg(int year);
+    public SbtProgress GetProgress();
 }
 ```
 ```csharp
-private sealed record MigrationObjectResult
+public sealed record EmissionRecord
 {
 }
-    public required bool Success { get; init; }
-    public required long SizeBytes { get; init; }
-    public required double CarbonSavedGrams { get; init; }
+    public required int Year { get; init; }
+    public required double EmissionsKg { get; init; }
+}
+```
+```csharp
+public sealed record SbtProgress
+{
+}
+    public int BaselineYear { get; init; }
+    public double BaselineEmissionsKg { get; init; }
+    public int TargetYear { get; init; }
+    public double TargetReductionPercent { get; init; }
+    public int CurrentYear { get; init; }
+    public double CurrentEmissionsKg { get; init; }
+    public double RequiredEmissionsKg { get; init; }
+    public double ReductionAchievedPercent { get; init; }
+    public bool IsOnTrack { get; init; }
+    public double GapKg { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonIntensityTrackingStrategy.cs
+```csharp
+public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double CurrentIntensity
+{
+    get
+    {
+        lock (_lock)
+            return _currentIntensity;
+    }
+}
+    public double Average24Hour
+{
+    get
+    {
+        lock (_lock)
+            return _24HourAverage;
+    }
+}
+    public TimeSpan PollingInterval { get; set; };
+    public string Region { get; set; };
+    public string? ApiEndpoint { get; set; }
+    public string? ApiKey { get; set; }
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public void RecordIntensity(double intensityGCO2ePerKwh, DateTimeOffset? timestamp = null);
+    public IReadOnlyList<CarbonIntensityDataPoint> GetHistory(TimeSpan? duration = null);
+    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGCO2ePerKwh);
+    public CarbonEmission CalculateEmissions(double energyWh);
+}
+```
+```csharp
+public sealed record CarbonIntensityDataPoint
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double Intensity { get; init; }
+    public string Region { get; init; };
+}
+```
+```csharp
+public sealed record LowCarbonWindow
+{
+}
+    public required DateTimeOffset StartTime { get; init; }
+    public required DateTimeOffset EndTime { get; init; }
+    public required double PredictedIntensity { get; init; }
+    public double Confidence { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/EmbodiedCarbonStrategy.cs
+```csharp
+public sealed class EmbodiedCarbonStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public int DefaultLifespanYears { get; set; };
+    public void RegisterAsset(string assetId, string assetType, double embodiedCarbonKg, DateTimeOffset purchaseDate, int? lifespanYears = null);
+    public double GetDailyCarbonGrams(string assetId);
+    public double GetTotalEmbodiedCarbonKg();
+    public double GetTotalDailyCarbonGrams();
+    public IReadOnlyList<HardwareAsset> GetAssetsNearingEndOfLife(int monthsThreshold = 6);
+}
+```
+```csharp
+public sealed class HardwareAsset
+{
+}
+    public required string AssetId { get; init; }
+    public required string AssetType { get; init; }
+    public required double EmbodiedCarbonKg { get; init; }
+    public required DateTimeOffset PurchaseDate { get; init; }
+    public required int LifespanYears { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/CarbonAwareness/CarbonOffsettingStrategy.cs
+```csharp
+public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TotalEmissionsGrams
+{
+    get
+    {
+        lock (_lock)
+            return _totalEmissionsGrams;
+    }
+}
+    public double TotalOffsetsGrams
+{
+    get
+    {
+        lock (_lock)
+            return _totalOffsetsGrams;
+    }
+}
+    public double NetCarbonBalanceGrams
+{
+    get
+    {
+        lock (_lock)
+            return _totalOffsetsGrams - _totalEmissionsGrams;
+    }
+}
+    public bool IsCarbonNeutral;;
+    public double TargetOffsetPercent { get; set; };
+    public OffsetProjectType[] PreferredProjectTypes { get; set; };
+    public double OffsetCostPerTon { get; set; };
+    public void RecordEmission(double emissionsGrams, string source, string? description = null);
+    public void RecordOffsetPurchase(double offsetGrams, string provider, OffsetProjectType projectType, string projectName, double costUsd, string? certificateId = null);
+    public OffsetRequirement CalculateOffsetRequirement();
+    public IReadOnlyDictionary<string, double> GetEmissionsBySource(TimeSpan? period = null);
+    public IReadOnlyList<OffsetPurchase> GetOffsetPurchases();
+    public CarbonNeutralityReport GenerateReport(TimeSpan period);
+    public IReadOnlyList<OffsetProjectRecommendation> GetRecommendedProjects(double offsetGramsNeeded);
+}
+```
+```csharp
+public sealed record CarbonFootprintEntry
+{
+}
+    public required string Id { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double EmissionsGrams { get; init; }
+    public required string Source { get; init; }
+    public string? Description { get; init; }
+}
+```
+```csharp
+public sealed record OffsetPurchase
+{
+}
+    public required string Id { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double OffsetGrams { get; init; }
+    public required string Provider { get; init; }
+    public required OffsetProjectType ProjectType { get; init; }
+    public required string ProjectName { get; init; }
+    public required double CostUsd { get; init; }
+    public string? CertificateId { get; init; }
+    public VerificationStatus VerificationStatus { get; init; }
+}
+```
+```csharp
+public sealed record OffsetRequirement
+{
+}
+    public required double TotalEmissionsGrams { get; init; }
+    public required double CurrentOffsetsGrams { get; init; }
+    public required double TargetOffsetsGrams { get; init; }
+    public required double AdditionalOffsetsNeededGrams { get; init; }
+    public required double EstimatedCostUsd { get; init; }
+    public required double CurrentOffsetPercent { get; init; }
+    public required double TargetOffsetPercent { get; init; }
+}
+```
+```csharp
+public sealed record CarbonNeutralityReport
+{
+}
+    public required string ReportId { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required DateTimeOffset PeriodStart { get; init; }
+    public required DateTimeOffset PeriodEnd { get; init; }
+    public required double TotalEmissionsGrams { get; init; }
+    public required double TotalOffsetsGrams { get; init; }
+    public required double NetCarbonBalanceGrams { get; init; }
+    public required bool IsCarbonNeutral { get; init; }
+    public required double OffsetPercentage { get; init; }
+    public required IReadOnlyDictionary<string, double> EmissionsBySource { get; init; }
+    public required IReadOnlyDictionary<OffsetProjectType, double> OffsetsByProjectType { get; init; }
+    public required double TotalOffsetCostUsd { get; init; }
+}
+```
+```csharp
+public sealed record OffsetProjectRecommendation
+{
+}
+    public required string Provider { get; init; }
+    public required OffsetProjectType ProjectType { get; init; }
+    public required string ProjectName { get; init; }
+    public required double CostPerTonUsd { get; init; }
+    public required double TotalCostUsd { get; init; }
+    public required double OffsetsAvailableTons { get; init; }
+    public required string Certification { get; init; }
+    public required double Rating { get; init; }
+    public required string Description { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/WaterUsageTrackingStrategy.cs
+```csharp
+public sealed class WaterUsageTrackingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TargetWue { get; set; };
+    public double AlertThresholdWue { get; set; };
+    public double WaterCostPerLiter { get; set; };
+    public void SetWaterUsageProvider(Func<Task<double>> provider);;
+    public void SetItLoadProvider(Func<Task<double>> provider);;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public void RecordWaterUsage(double waterLitersPerHour, double itLoadKw);
+    public double GetCurrentWue();
+    public WaterStatistics GetStatistics(TimeSpan? period = null);
+    public IReadOnlyList<WaterSavingRecommendation> GetWaterSavingRecommendations();
+}
+```
+```csharp
+public sealed record WaterReading
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double WaterLitersPerHour { get; init; }
+    public required double ItLoadKw { get; init; }
+    public required double Wue { get; init; }
+    public required double CostPerHour { get; init; }
+}
+```
+```csharp
+public sealed record WaterStatistics
+{
+}
+    public double CurrentWue { get; init; }
+    public double AverageWue { get; init; }
+    public double MinWue { get; init; }
+    public double MaxWue { get; init; }
+    public double TotalWaterLiters { get; init; }
+    public double TotalWaterCostUsd { get; init; }
+    public int ReadingCount { get; init; }
+}
+```
+```csharp
+public sealed record WaterSavingRecommendation
+{
+}
+    public required WaterSavingType Type { get; init; }
+    public required string Description { get; init; }
+    public required double EstimatedSavingsLitersPerDay { get; init; }
+    public required double EstimatedCostSavingsUsd { get; init; }
+    public required int Priority { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/CarbonFootprintCalculationStrategy.cs
+```csharp
+public sealed class CarbonFootprintCalculationStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double DefaultCarbonIntensity { get; set; };
+    public double Scope3Multiplier { get; set; };
+    public double TotalScope2Grams
+{
+    get
+    {
+        lock (_lock)
+            return _totalScope2Grams;
+    }
+}
+    public double TotalScope3Grams
+{
+    get
+    {
+        lock (_lock)
+            return _totalScope3Grams;
+    }
+}
+    public double TotalEmissionsGrams;;
+    public void SetCarbonIntensityProvider(Func<Task<double>> provider);;
+    public void SetEnergyProvider(Func<Task<double>> provider);;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public async Task<EmissionResult> CalculateEmissionsAsync(double energyWh);
+    public void RecordEmissions(double scope2Grams, double scope3Grams = 0);
+    public EmissionsSummary GetSummary();
+}
+```
+```csharp
+public sealed record EmissionResult
+{
+}
+    public required double EnergyWh { get; init; }
+    public required double CarbonIntensity { get; init; }
+    public required double Scope2Grams { get; init; }
+    public required double Scope3Grams { get; init; }
+    public required double TotalGrams { get; init; }
+}
+```
+```csharp
+public sealed record EmissionsSummary
+{
+}
+    public required double TotalScope2Grams { get; init; }
+    public required double TotalScope3Grams { get; init; }
+    public required double TotalEmissionsGrams { get; init; }
+    public required double TotalKgCO2e { get; init; }
+    public required double TotalTonsCO2e { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/PueTrackingStrategy.cs
+```csharp
+public sealed class PueTrackingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public double TargetPue { get; set; };
+    public double AlertThresholdPue { get; set; };
+    public void SetItLoadProvider(Func<Task<double>> provider);;
+    public void SetTotalPowerProvider(Func<Task<double>> provider);;
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public void RecordPue(double itLoadKw, double totalPowerKw);
+    public double GetCurrentPue();
+    public PueStatistics GetStatistics(TimeSpan? period = null);
+    public PueTrend GetTrend();
+}
+```
+```csharp
+public sealed record PueReading
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double ItLoadKw { get; init; }
+    public required double TotalPowerKw { get; init; }
+    public required double Pue { get; init; }
+    public required double OverheadKw { get; init; }
+}
+```
+```csharp
+public sealed record PueStatistics
+{
+}
+    public double CurrentPue { get; init; }
+    public double AveragePue { get; init; }
+    public double MinPue { get; init; }
+    public double MaxPue { get; init; }
+    public double TotalItLoadKwh { get; init; }
+    public double TotalOverheadKwh { get; init; }
+    public int ReadingCount { get; init; }
+    public TimeSpan TimeAboveTarget { get; init; }
+}
+```
+```csharp
+public sealed record PueTrend
+{
+}
+    public bool HasSufficientData { get; init; }
+    public double CurrentAverage { get; init; }
+    public double PreviousAverage { get; init; }
+    public double Change { get; init; }
+    public double ChangePercent { get; init; }
+    public bool IsImproving { get; init; }
+    public bool IsDegrading { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/EnergyConsumptionTrackingStrategy.cs
+```csharp
+public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public TimeSpan SamplingInterval { get; set; };
+    public double TotalEnergyWh
+{
+    get
+    {
+        lock (_lock)
+            return _totalEnergyWh;
+    }
+}
+    public double CurrentPowerWatts
+{
+    get
+    {
+        lock (_lock)
+            return _currentPowerWatts;
+    }
+}
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task DisposeCoreAsync();
+    public IReadOnlyList<EnergyDataPoint> GetHistory(TimeSpan? duration = null);
+    public EnergySummary GetSummary(TimeSpan period);
+}
+```
+```csharp
+public sealed record EnergyDataPoint
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required double PowerWatts { get; init; }
+    public required double EnergyWh { get; init; }
+    public required string Source { get; init; }
+}
+```
+```csharp
+public sealed record EnergySummary
+{
+}
+    public required TimeSpan Period { get; init; }
+    public required double TotalEnergyWh { get; init; }
+    public double AveragePowerWatts { get; init; }
+    public double PeakPowerWatts { get; init; }
+    public double MinPowerWatts { get; init; }
+    public int SampleCount { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/Metrics/SustainabilityReportingStrategy.cs
+```csharp
+public sealed class SustainabilityReportingStrategy : SustainabilityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override SustainabilityCategory Category;;
+    public override SustainabilityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public ReportFormat Format { get; set; };
+    public string OrganizationName { get; set; };
+    public SustainabilityReport GenerateReport(TimeSpan period, double totalEnergyWh, double totalEmissionsGrams, double energySavedWh, double carbonAvoidedGrams, double costSavingsUsd);
+    public string ExportReport(SustainabilityReport report, ReportFormat? format = null);
+    public IReadOnlyList<SustainabilityReport> GetReportHistory();
+}
+```
+```csharp
+public sealed record SustainabilityReport
+{
+}
+    public required string ReportId { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string Organization { get; init; }
+    public required DateTimeOffset PeriodStart { get; init; }
+    public required DateTimeOffset PeriodEnd { get; init; }
+    public required double TotalEnergyConsumedWh { get; init; }
+    public required double TotalEnergyConsumedKwh { get; init; }
+    public required double TotalEmissionsGrams { get; init; }
+    public required double TotalEmissionsKgCO2e { get; init; }
+    public required double TotalEmissionsTonsCO2e { get; init; }
     public required double EnergySavedWh { get; init; }
-    public string? ErrorMessage { get; init; }
+    public required double EnergySavedKwh { get; init; }
+    public required double CarbonAvoidedGrams { get; init; }
+    public required double CarbonAvoidedKgCO2e { get; init; }
+    public required double CostSavingsUsd { get; init; }
+    public required double EfficiencyRatio { get; init; }
+    public required double CarbonReductionPercent { get; init; }
+    public required double EquivalentTreesPlanted { get; init; }
+    public required double EquivalentMilesDriven { get; init; }
+    public required double EquivalentHomesEnergy { get; init; }
 }
 ```
 ```csharp
-public sealed record BatchExecutionResult
+internal sealed record ReportRecord
 {
 }
-    public required string TenantId { get; init; }
-    public required string TargetBackendId { get; init; }
-    public required int TotalCandidates { get; init; }
-    public required int SuccessfulMigrations { get; init; }
-    public required int FailedMigrations { get; init; }
-    public required double TotalCarbonSavedGrams { get; init; }
-    public required double TotalEnergySavedWh { get; init; }
-    public required long TotalBytesMigrated { get; init; }
-    public string? ErrorMessage { get; init; }
-    public bool AllSucceeded;;
-}
-```
-```csharp
-public sealed record MigrationStatistics
-{
-}
-    public required long TotalMigrationsCompleted { get; init; }
-    public required long TotalMigrationErrors { get; init; }
-    public required long TotalDataMigratedBytes { get; init; }
-    public required double TotalCarbonSavedGrams { get; init; }
-    public required int RetryQueueSize { get; init; }
-    public required int HistorySize { get; init; }
-    public required double EstimatedAnnualCarbonSavingsGrams { get; init; }
-    public string TotalDataMigratedFormatted
-{
-    get
-    {
-        if (TotalDataMigratedBytes >= 1L << 40)
-            return $"{TotalDataMigratedBytes / (double)(1L << 40):F2} TB";
-        if (TotalDataMigratedBytes >= 1L << 30)
-            return $"{TotalDataMigratedBytes / (double)(1L << 30):F2} GB";
-        if (TotalDataMigratedBytes >= 1L << 20)
-            return $"{TotalDataMigratedBytes / (double)(1L << 20):F2} MB";
-        return $"{TotalDataMigratedBytes / 1024.0:F2} KB";
-    }
-}
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/GreenTiering/GreenTieringPolicyEngine.cs
-```csharp
-public sealed record GreenTieringPolicy
-{
-}
-    public required string TenantId { get; init; }
-    public TimeSpan ColdThreshold { get; init; };
-    public double TargetGreenScore { get; init; };
-    public GreenMigrationSchedule MigrationSchedule { get; init; };
-    public long MaxMigrationBatchSizeBytes { get; init; };
-    public int MaxConcurrentMigrations { get; init; };
-    public bool RespectCarbonBudget { get; init; };
-    public bool Enabled { get; init; };
-    public int BatchHourUtc { get; init; };
-    public DayOfWeek BatchDayOfWeek { get; init; };
-}
-```
-```csharp
-public sealed class GreenTieringPolicyEngine : IDisposable
-{
-}
-    public GreenTieringPolicyEngine(string dataDirectory);
-    public void SetPolicy(string tenantId, GreenTieringPolicy policy);
-    public GreenTieringPolicy GetPolicy(string tenantId);
-    public IReadOnlyList<string> GetEnabledTenants();
-    public bool RemovePolicy(string tenantId);
-    public int PolicyCount;;
-    public void Flush();
-    public void Dispose();
-}
-```
-```csharp
-private sealed class TimeSpanJsonConverter : JsonConverter<TimeSpan>
-{
-}
-    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options);
-    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/DiskSpinDownStrategy.cs
-```csharp
-public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int SpinDownSeconds { get; set; };
-    public int ApmLevel { get; set; };
-    public IReadOnlyDictionary<string, DiskState> Disks
-{
-    get
-    {
-        lock (_lock)
-            return new Dictionary<string, DiskState>(_disks);
-    }
-}
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task SpinDownAsync(string diskId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DiskState
-{
-}
-    public required string Id { get; init; }
-    public required DiskType Type { get; init; }
-    public bool IsSpunDown { get; set; }
-    public int IdleSeconds { get; set; }
-    public DateTimeOffset? LastSpinDown { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/NetworkPowerSavingStrategy.cs
-```csharp
-public sealed class NetworkPowerSavingStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public bool EnableEee { get; set; };
-    public bool ReduceIdleSpeed { get; set; };
-    public int IdleSpeedMbps { get; set; };
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public async Task SetLowPowerModeAsync(string interfaceId, bool enable, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class NetworkInterfaceState
-{
-}
-    public required string Id { get; init; }
-    public int MaxSpeedMbps { get; init; }
-    public int CurrentSpeedMbps { get; set; }
-    public bool LowPowerMode { get; set; }
-    public int IdleSeconds { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/MemoryOptimizationStrategy.cs
-```csharp
-public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double UsagePercent
-{
-    get
-    {
-        lock (_lock)
-            return _totalMemoryBytes > 0 ? (double)_usedMemoryBytes / _totalMemoryBytes * 100 : 0;
-    }
-}
-    public double CompressionRatio
-{
-    get
-    {
-        lock (_lock)
-            return _compressedBytes > 0 ? (double)_usedMemoryBytes / _compressedBytes : 1;
-    }
-}
-    public double TargetUsagePercent { get; set; };
-    protected override Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task DisposeCoreAsync();
-    public void OptimizeMemory();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/IdleResourceDetectionStrategy.cs
-```csharp
-public sealed class IdleResourceDetectionStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public int IdleThresholdMinutes { get; set; };
-    public double IdleCpuThresholdPercent { get; set; };
-    public long IdleNetworkThresholdBytesPerSec { get; set; };
-    public void RegisterResource(string resourceId, string name, ResourceType type, double powerWatts);
-    public void RecordActivity(string resourceId, double cpuPercent, long networkBytesPerSec, int activeConnections);
-    public IReadOnlyList<IdleResource> GetIdleResources();
-    public IdleSavingsSummary GetPotentialSavings();
-    public bool TerminateResource(string resourceId);
-}
-```
-```csharp
-public sealed class ResourceTracker
-{
-}
-    public required string ResourceId { get; init; }
-    public required string Name { get; init; }
-    public required ResourceType Type { get; init; }
-    public required double PowerWatts { get; init; }
-    public required DateTimeOffset FirstSeen { get; init; }
-    public DateTimeOffset LastActivityCheck { get; set; }
-    public DateTimeOffset? IdleSince { get; set; }
-    public DateTimeOffset? LastActiveAt { get; set; }
-    public double LastCpuPercent { get; set; }
-    public long LastNetworkBytesPerSec { get; set; }
-    public int LastActiveConnections { get; set; }
-}
-```
-```csharp
-public sealed record IdleResource
-{
-}
-    public required string ResourceId { get; init; }
-    public required string Name { get; init; }
-    public required ResourceType Type { get; init; }
-    public required TimeSpan IdleDuration { get; init; }
-    public required double PowerWatts { get; init; }
-    public DateTimeOffset? LastActiveAt { get; init; }
-    public bool CanShutdown { get; init; }
-}
-```
-```csharp
-public sealed record IdleSavingsSummary
-{
-}
-    public int IdleResourceCount { get; init; }
-    public double TotalPowerWatts { get; init; }
-    public double EstimatedDailyKwh { get; init; }
-    public double EstimatedMonthlyCostUsd { get; init; }
-    public Dictionary<ResourceType, double> ByType { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateSustainability/Strategies/ResourceEfficiency/CacheOptimizationStrategy.cs
-```csharp
-public sealed class CacheOptimizationStrategy : SustainabilityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override SustainabilityCategory Category;;
-    public override SustainabilityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public double TargetHitRatePercent { get; set; };
-    public double WattsPerGb { get; set; };
-    public void RegisterCache(string cacheId, string name, CacheType type, long maxSizeBytes);
-    public void RecordCacheStats(string cacheId, long hits, long misses, long currentSizeBytes, long evictions);
-    public IReadOnlyList<CacheRecommendation> GetRecommendations();
-    public double GetTotalPowerWatts();
-}
-```
-```csharp
-public sealed class CacheInstance
-{
-}
-    public required string CacheId { get; init; }
-    public required string Name { get; init; }
-    public required CacheType Type { get; init; }
-    public required long MaxSizeBytes { get; init; }
-    public long CurrentSizeBytes { get; set; }
-    public long TotalHits { get; set; }
-    public long TotalMisses { get; set; }
-    public long TotalEvictions { get; set; }
-    public double HitRate { get; set; }
-}
-```
-```csharp
-public sealed record CacheRecommendation
-{
-}
-    public required string CacheId { get; init; }
-    public required CacheRecommendationType Type { get; init; }
-    public required long CurrentSizeBytes { get; init; }
-    public required long RecommendedSizeBytes { get; init; }
-    public required double HitRate { get; init; }
-    public required double EstimatedSavingsWatts { get; init; }
-    public required string Reason { get; init; }
+    public required SustainabilityReport Report { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
 }
 ```
