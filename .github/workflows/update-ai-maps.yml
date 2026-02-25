@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main # Change this if your default branch is 'master'
+      - claude/implement-metadata-tasks-7gI6Q
     paths:
       # Only trigger if C# code, the solution file, or the mapper itself changes
       - '**/*.cs'
