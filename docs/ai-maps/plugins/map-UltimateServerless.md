@@ -187,9 +187,9 @@ public sealed record FunctionStatistics
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/ColdStart/ColdStartOptimizationStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/Security/SecurityStrategies.cs
 ```csharp
-public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
+public sealed class IamRoleStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -198,31 +198,13 @@ public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<ProvisionedResult> ConfigureAsync(string functionId, string qualifier, int concurrency, CancellationToken ct = default);
-    public Task<ProvisionedConfig?> GetStatusAsync(string functionId, string qualifier, CancellationToken ct = default);
-    public Task<ProvisionedResult> ScaleAsync(string functionId, string qualifier, int newConcurrency, CancellationToken ct = default);
-    public Task RemoveAsync(string functionId, string qualifier, CancellationToken ct = default);
-    public Task<ProvisionedMetrics> GetMetricsAsync(string functionId, string qualifier, CancellationToken ct = default);
+    public Task<IamRole> CreateExecutionRoleAsync(IamRoleConfig config, CancellationToken ct = default);
+    public Task AttachPolicyAsync(string roleName, string policyArn, CancellationToken ct = default);
+    public Task<PermissionAnalysis> AnalyzePermissionsAsync(string roleName, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessPlatform? TargetPlatform;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SnapStartResult> EnableAsync(string functionArn, SnapStartConfig config, CancellationToken ct = default);
-    public Task<SnapStartStatus> GetStatusAsync(string functionArn, CancellationToken ct = default);
-    public Task RegisterRestoreHookAsync(string functionArn, string hookName, Func<Task> hook, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class WarmupSchedulerStrategy : ServerlessStrategyBase
+public sealed class SecretsManagementStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -231,14 +213,14 @@ public sealed class WarmupSchedulerStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<WarmupSchedule> ConfigureScheduleAsync(WarmupScheduleConfig config, CancellationToken ct = default);
-    public Task<WarmupResult> WarmupNowAsync(string functionId, int concurrency = 1, CancellationToken ct = default);
-    public Task<WarmupStats> GetStatsAsync(string functionId, CancellationToken ct = default);
-    public Task DisableAsync(string scheduleId, CancellationToken ct = default);
+    public Task<SecretValue> GetSecretAsync(string secretId, string? version = null, CancellationToken ct = default);
+    public Task<SecretEntry> PutSecretAsync(string secretId, string value, Dictionary<string, string>? tags = null, CancellationToken ct = default);
+    public Task ConfigureRotationAsync(string secretId, int rotationDays, string rotationLambdaArn, CancellationToken ct = default);
+    public Task RotateSecretAsync(string secretId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class LazyLoadingStrategy : ServerlessStrategyBase
+public sealed class VpcIntegrationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -247,12 +229,12 @@ public sealed class LazyLoadingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<LazyLoadingAnalysis> AnalyzeAsync(string functionId, CancellationToken ct = default);
-    public Task RegisterLazyComponentAsync(string componentId, Func<Task<object>> initializer, CancellationToken ct = default);
+    public Task<VpcConfiguration> ConfigureVpcAsync(string functionId, VpcConfig config, CancellationToken ct = default);
+    public Task<VpcEndpoint> CreateVpcEndpointAsync(string vpcId, string serviceName, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class MinimumInstancesStrategy : ServerlessStrategyBase
+public sealed class WafIntegrationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -261,12 +243,11 @@ public sealed class MinimumInstancesStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<MinInstancesResult> ConfigureAsync(string serviceId, int minInstances, CancellationToken ct = default);
-    public Task<int> GetCurrentInstancesAsync(string serviceId, CancellationToken ct = default);
+    public Task<WafConfig> ConfigureWafAsync(string apiId, IReadOnlyList<string> ruleGroups, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class ContainerPreWarmingStrategy : ServerlessStrategyBase
+public sealed class ApiKeyManagementStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -275,11 +256,11 @@ public sealed class ContainerPreWarmingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task ConfigurePrePullAsync(string image, IReadOnlyList<string> regions, CancellationToken ct = default);
+    public Task<ApiKey> CreateApiKeyAsync(string name, string usagePlanId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class EdgePreWarmingStrategy : ServerlessStrategyBase
+public sealed class JwtAuthenticationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -288,11 +269,11 @@ public sealed class EdgePreWarmingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task WarmEdgeLocationsAsync(string functionId, IReadOnlyList<string> locations, CancellationToken ct = default);
+    public Task<JwtAuthorizer> CreateAuthorizerAsync(JwtAuthorizerConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class PredictiveWarmingStrategy : ServerlessStrategyBase
+public sealed class CodeSigningStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -301,183 +282,192 @@ public sealed class PredictiveWarmingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<TrafficPrediction> PredictTrafficAsync(string functionId, int hoursAhead, CancellationToken ct = default);
-    public Task ConfigurePredictiveWarmingAsync(string functionId, PredictiveConfig config, CancellationToken ct = default);
+    public Task<SigningProfile> CreateSigningProfileAsync(string profileName, string platformId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class ProvisionedConfig
+public sealed class ResourcePolicyStrategy : ServerlessStrategyBase
 {
 }
-    public required string FunctionId { get; init; }
-    public required string Qualifier { get; init; }
-    public int RequestedConcurrency { get; set; }
-    public int AllocatedConcurrency { get; set; }
-    public string Status { get; set; };
-    public DateTimeOffset LastUpdated { get; set; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task AddPermissionAsync(string functionId, string statementId, string principal, string action, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record ProvisionedResult
+public sealed class EnvironmentEncryptionStrategy : ServerlessStrategyBase
 {
 }
-    public bool Success { get; init; }
-    public required string FunctionId { get; init; }
-    public required string Qualifier { get; init; }
-    public int AllocatedConcurrency { get; init; }
-    public required string Status { get; init; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task ConfigureKmsKeyAsync(string functionId, string kmsKeyArn, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record ProvisionedMetrics
+public sealed class RuntimeSecurityStrategy : ServerlessStrategyBase
 {
 }
-    public required string FunctionId { get; init; }
-    public required string Qualifier { get; init; }
-    public int AllocatedConcurrency { get; init; }
-    public int UtilizedConcurrency { get; init; }
-    public int SpilloverInvocations { get; init; }
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SecurityFindings> GetFindingsAsync(string functionId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record SnapStartConfig
+public sealed class IamRole
 {
 }
-    public string ApplyOn { get; init; };
-}
-```
-```csharp
-public sealed record SnapStartResult
-{
-}
-    public bool Success { get; init; }
-    public required string FunctionArn { get; init; }
-    public required string ApplyOn { get; init; }
-    public required string OptimizationStatus { get; init; }
-}
-```
-```csharp
-public sealed record SnapStartStatus
-{
-}
-    public required string FunctionArn { get; init; }
-    public required string ApplyOn { get; init; }
-    public required string OptimizationStatus { get; init; }
-    public IReadOnlyList<string> RestoredVersions { get; init; };
-}
-```
-```csharp
-public sealed class WarmupSchedule
-{
-}
-    public required string ScheduleId { get; init; }
-    public required string FunctionId { get; init; }
-    public int IntervalMinutes { get; init; }
-    public int ConcurrentWarmups { get; init; }
-    public bool Enabled { get; set; }
-    public DateTimeOffset NextWarmup { get; set; }
+    public required string RoleArn { get; init; }
+    public required string RoleName { get; init; }
+    public required string AssumeRolePolicy { get; init; }
+    public List<string> ManagedPolicies { get; init; };
+    public Dictionary<string, string> InlinePolicies { get; init; };
+    public string? PermissionBoundary { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }
 ```
 ```csharp
-public sealed record WarmupScheduleConfig
+public sealed record IamRoleConfig
+{
+}
+    public required string AccountId { get; init; }
+    public required string RoleName { get; init; }
+    public required string AssumeRolePolicy { get; init; }
+    public List<string> ManagedPolicies { get; init; };
+    public Dictionary<string, string> InlinePolicies { get; init; };
+    public string? PermissionBoundary { get; init; }
+}
+```
+```csharp
+public sealed record PermissionAnalysis
+{
+}
+    public required string RoleName { get; init; }
+    public IReadOnlyList<string> UnusedPermissions { get; init; };
+    public IReadOnlyList<string> OverlyPermissiveActions { get; init; };
+    public IReadOnlyList<string> Recommendations { get; init; };
+}
+```
+```csharp
+public sealed class SecretEntry
+{
+}
+    public required string SecretId { get; init; }
+    public required string VersionId { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public bool RotationEnabled { get; set; }
+    public int? RotationDays { get; set; }
+}
+```
+```csharp
+public sealed record SecretValue
+{
+}
+    public required string SecretId { get; init; }
+    public required string Version { get; init; }
+    public required string Value { get; init; }
+    public DateTimeOffset RetrievedAt { get; init; }
+}
+```
+```csharp
+public sealed record VpcConfiguration
 {
 }
     public required string FunctionId { get; init; }
-    public int IntervalMinutes { get; init; };
-    public int ConcurrentWarmups { get; init; };
+    public required string VpcId { get; init; }
+    public IReadOnlyList<string> SubnetIds { get; init; };
+    public IReadOnlyList<string> SecurityGroupIds { get; init; };
+    public int EniCount { get; init; }
 }
 ```
 ```csharp
-public sealed record WarmupResult
+public sealed record VpcEndpoint
 {
 }
-    public bool Success { get; init; }
-    public required string FunctionId { get; init; }
-    public int WarmedInstances { get; init; }
-    public TimeSpan Duration { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
+    public required string EndpointId { get; init; }
+    public required string VpcId { get; init; }
+    public required string ServiceName { get; init; }
+    public required string State { get; init; }
 }
 ```
 ```csharp
-public sealed record WarmupStats
+public sealed record WafConfig
 {
 }
-    public required string FunctionId { get; init; }
-    public long TotalWarmups { get; init; }
-    public long SuccessfulWarmups { get; init; }
-    public double AverageWarmupTimeMs { get; init; }
-    public double EstimatedMonthlyCost { get; init; }
+    public required string ApiId { get; init; }
+    public List<string> RuleGroups { get; init; };
+    public bool Enabled { get; init; }
 }
 ```
 ```csharp
-public sealed record LazyLoadingAnalysis
+public sealed record ApiKey
 {
 }
-    public required string FunctionId { get; init; }
-    public double CurrentInitTimeMs { get; init; }
-    public double OptimizedInitTimeMs { get; init; }
-    public IReadOnlyList<LazyLoadingRecommendation> Recommendations { get; init; };
+    public required string KeyId { get; init; }
+    public required string Name { get; init; }
+    public required string UsagePlanId { get; init; }
+    public bool Enabled { get; init; }
 }
 ```
 ```csharp
-public sealed record LazyLoadingRecommendation
+public sealed record JwtAuthorizerConfig
 {
 }
-    public required string Component { get; init; }
-    public int Priority { get; init; }
-    public double EstimatedSavingsMs { get; init; }
+    public required string Name { get; init; }
+    public required string Issuer { get; init; }
+    public IReadOnlyList<string> Audience { get; init; };
 }
 ```
 ```csharp
-public sealed class MinInstancesConfig
+public sealed record JwtAuthorizer
 {
 }
-    public required string ServiceId { get; init; }
-    public int MinInstances { get; set; }
-    public int CurrentInstances { get; set; }
-    public string Status { get; set; };
+    public required string AuthorizerId { get; init; }
+    public required string Name { get; init; }
+    public required string Issuer { get; init; }
+    public IReadOnlyList<string> Audience { get; init; };
 }
 ```
 ```csharp
-public sealed record MinInstancesResult
+public sealed record SigningProfile
 {
 }
-    public bool Success { get; init; }
-    public required string ServiceId { get; init; }
-    public int MinInstances { get; init; }
+    public required string ProfileName { get; init; }
+    public required string ProfileVersionArn { get; init; }
 }
 ```
 ```csharp
-public sealed record TrafficPrediction
+public sealed record SecurityFindings
 {
 }
     public required string FunctionId { get; init; }
-    public IReadOnlyList<TrafficSpike> PredictedSpikes { get; init; };
-    public int RecommendedWarmInstances { get; init; }
+    public IReadOnlyList<SecurityFinding> Findings { get; init; };
 }
 ```
 ```csharp
-public sealed record TrafficSpike
+public sealed record SecurityFinding
 {
 }
-    public DateTimeOffset Time { get; init; }
-    public int ExpectedRps { get; init; }
-}
-```
-```csharp
-public sealed record PredictiveConfig
-{
-}
-    public bool Enabled { get; init; };
-    public int LookAheadHours { get; init; };
-    public double ConfidenceThreshold { get; init; };
+    public required string Severity { get; init; }
+    public required string Type { get; init; }
+    public required string Description { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/CostTracking/CostTrackingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/Scaling/ScalingStrategies.cs
 ```csharp
-public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
+public sealed class KedaScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -486,13 +476,13 @@ public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task RecordUsageAsync(UsageRecord record, CancellationToken ct = default);
-    public Task<UsageSummary> GetUsageSummaryAsync(string functionId, TimeSpan period, CancellationToken ct = default);
-    public Task<IReadOnlyList<UsageTimeSlice>> GetUsageBreakdownAsync(string functionId, TimeSpan period, TimeSpan granularity, CancellationToken ct = default);
+    public Task<KedaScaledObject> CreateScaledObjectAsync(KedaScaledObjectConfig config, CancellationToken ct = default);
+    public Task AddTriggerAsync(string scaledObjectName, KedaTrigger trigger, CancellationToken ct = default);
+    public Task<KedaMetrics> GetMetricsAsync(string scaledObjectName, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CostEstimationStrategy : ServerlessStrategyBase
+public sealed class ConcurrencyLimitsStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -501,12 +491,13 @@ public sealed class CostEstimationStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<CostEstimate> EstimateCostAsync(CostEstimationRequest request, CancellationToken ct = default);
-    public Task<CostProjection> ProjectCostAsync(string functionId, int monthsAhead, CancellationToken ct = default);
+    public Task SetReservedConcurrencyAsync(string functionId, int reservedConcurrency, CancellationToken ct = default);
+    public Task<ConcurrencyStatus> GetStatusAsync(string functionId, CancellationToken ct = default);
+    public Task RemoveReservedConcurrencyAsync(string functionId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class BudgetAlertingStrategy : ServerlessStrategyBase
+public sealed class TargetTrackingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -515,13 +506,12 @@ public sealed class BudgetAlertingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<Budget> CreateBudgetAsync(BudgetConfig config, CancellationToken ct = default);
-    public Task<BudgetStatus> GetBudgetStatusAsync(string budgetId, CancellationToken ct = default);
-    public Task UpdateSpendAsync(string budgetId, double amount, CancellationToken ct = default);
+    public Task<TargetTrackingPolicy> CreatePolicyAsync(TargetTrackingConfig config, CancellationToken ct = default);
+    public Task<IReadOnlyList<ScalingActivity>> GetActivitiesAsync(string policyName, int limit = 10, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CostOptimizationStrategy : ServerlessStrategyBase
+public sealed class ScheduledScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -530,12 +520,11 @@ public sealed class CostOptimizationStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<OptimizationAnalysis> AnalyzeAsync(string functionId, CancellationToken ct = default);
-    public Task<PowerTuningResult> RunPowerTuningAsync(string functionArn, int[] memorySizes, int invocationsPerSize, CancellationToken ct = default);
+    public Task<ScheduledScalingRule> CreateScheduleAsync(ScheduledScalingConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CostAllocationStrategy : ServerlessStrategyBase
+public sealed class StepScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -544,11 +533,11 @@ public sealed class CostAllocationStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<AllocationReport> GetAllocationReportAsync(string tagKey, TimeSpan period, CancellationToken ct = default);
+    public Task<StepScalingPolicy> CreatePolicyAsync(StepScalingConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CostAnomalyDetectionStrategy : ServerlessStrategyBase
+public sealed class QueueBasedScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -557,11 +546,11 @@ public sealed class CostAnomalyDetectionStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<IReadOnlyList<CostAnomaly>> DetectAnomaliesAsync(TimeSpan lookbackPeriod, CancellationToken ct = default);
+    public Task<QueueScalingConfig> ConfigureAsync(string queueUrl, int messagesPerInstance, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class SavingsPlansStrategy : ServerlessStrategyBase
+public sealed class PredictiveScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -570,11 +559,11 @@ public sealed class SavingsPlansStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<SavingsPlanRecommendation> GetRecommendationAsync(CancellationToken ct = default);
+    public Task<PredictiveScalingForecast> GetForecastAsync(string resourceId, int hoursAhead, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CostReportingStrategy : ServerlessStrategyBase
+public sealed class CustomMetricsScalingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -583,612 +572,190 @@ public sealed class CostReportingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<CostReport> GenerateReportAsync(ReportConfig config, CancellationToken ct = default);
+    public Task<CustomMetricScaler> CreateScalerAsync(CustomMetricConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed record UsageRecord
-{
-}
-    public required string FunctionId { get; init; }
-    public long Invocations { get; init; }
-    public double DurationMs { get; init; }
-    public int MemoryMb { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record UsageSummary
-{
-}
-    public required string FunctionId { get; init; }
-    public TimeSpan Period { get; init; }
-    public long TotalInvocations { get; init; }
-    public double TotalDurationMs { get; init; }
-    public double AvgDurationMs { get; init; }
-    public double TotalGbSeconds { get; init; }
-    public int MemoryMb { get; init; }
-    public int ColdStartCount { get; init; }
-    public int ErrorCount { get; init; }
-}
-```
-```csharp
-public sealed record UsageTimeSlice
-{
-}
-    public DateTimeOffset StartTime { get; init; }
-    public DateTimeOffset EndTime { get; init; }
-    public long Invocations { get; init; }
-    public double DurationMs { get; init; }
-    public double GbSeconds { get; init; }
-}
-```
-```csharp
-public sealed record PricingModel
-{
-}
-    public double RequestPrice { get; init; }
-    public double GbSecondPrice { get; init; }
-    public long FreeRequests { get; init; }
-    public long FreeGbSeconds { get; init; }
-}
-```
-```csharp
-public sealed record CostEstimationRequest
-{
-}
-    public ServerlessPlatform Platform { get; init; }
-    public string Period { get; init; };
-    public long Invocations { get; init; }
-    public double GbSeconds { get; init; }
-}
-```
-```csharp
-public sealed record CostEstimate
-{
-}
-    public ServerlessPlatform Platform { get; init; }
-    public required string Period { get; init; }
-    public long Invocations { get; init; }
-    public double GbSeconds { get; init; }
-    public double RequestCost { get; init; }
-    public double ComputeCost { get; init; }
-    public double TotalCost { get; init; }
-    public double FreeTierSavings { get; init; }
-    public double CostPerInvocation { get; init; }
-}
-```
-```csharp
-public sealed record CostProjection
-{
-}
-    public required string FunctionId { get; init; }
-    public int MonthsAhead { get; init; }
-    public IReadOnlyList<MonthlyProjection> MonthlyProjections { get; init; };
-}
-```
-```csharp
-public sealed record MonthlyProjection
-{
-}
-    public required string Month { get; init; }
-    public long ProjectedInvocations { get; init; }
-    public double ProjectedCost { get; init; }
-    public int ConfidencePercent { get; init; }
-}
-```
-```csharp
-public sealed class Budget
-{
-}
-    public required string BudgetId { get; init; }
-    public required string Name { get; init; }
-    public double Amount { get; init; }
-    public required string Period { get; init; }
-    public IReadOnlyList<double> Thresholds { get; init; };
-    public IReadOnlyList<string> NotificationChannels { get; init; };
-    public double CurrentSpend { get; set; }
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record BudgetConfig
+public sealed class KedaScaledObject
 {
 }
     public required string Name { get; init; }
-    public double Amount { get; init; }
-    public required string Period { get; init; }
-    public IReadOnlyList<double> Thresholds { get; init; };
-    public IReadOnlyList<string> NotificationChannels { get; init; };
+    public required string Namespace { get; init; }
+    public required string ScaleTargetRef { get; init; }
+    public int MinReplicaCount { get; init; }
+    public int MaxReplicaCount { get; init; }
+    public List<KedaTrigger> Triggers { get; init; };
+    public string Status { get; set; };
 }
 ```
 ```csharp
-public sealed record BudgetStatus
+public sealed record KedaScaledObjectConfig
 {
 }
-    public required string BudgetId { get; init; }
-    public double BudgetAmount { get; init; }
-    public double CurrentSpend { get; init; }
-    public double PercentUsed { get; init; }
-    public double ForecastedSpend { get; init; }
-    public int DaysRemaining { get; init; }
-    public IReadOnlyList<double> TriggeredThresholds { get; init; };
+    public required string Name { get; init; }
+    public required string Namespace { get; init; }
+    public required string ScaleTargetRef { get; init; }
+    public int MinReplicaCount { get; init; };
+    public int MaxReplicaCount { get; init; };
+    public List<KedaTrigger> Triggers { get; init; };
 }
 ```
 ```csharp
-public sealed record OptimizationAnalysis
-{
-}
-    public required string FunctionId { get; init; }
-    public double CurrentMonthlyCost { get; init; }
-    public double OptimizedMonthlyCost { get; init; }
-    public double PotentialSavingsPercent { get; init; }
-    public IReadOnlyList<OptimizationRecommendation> Recommendations { get; init; };
-}
-```
-```csharp
-public sealed record OptimizationRecommendation
+public sealed record KedaTrigger
 {
 }
     public required string Type { get; init; }
-    public int Priority { get; init; }
-    public required string CurrentValue { get; init; }
-    public required string RecommendedValue { get; init; }
-    public double EstimatedSavingsPercent { get; init; }
+    public Dictionary<string, string> Metadata { get; init; };
+}
+```
+```csharp
+public sealed record KedaMetrics
+{
+}
+    public required string ScaledObjectName { get; init; }
+    public int CurrentReplicas { get; init; }
+    public int DesiredReplicas { get; init; }
+    public bool IsActive { get; init; }
+    public Dictionary<string, double> TriggerMetrics { get; init; };
+}
+```
+```csharp
+public sealed class ConcurrencyConfig
+{
+}
+    public required string FunctionId { get; init; }
+    public int? ReservedConcurrency { get; set; }
+    public int CurrentConcurrency { get; set; }
+}
+```
+```csharp
+public sealed record ConcurrencyStatus
+{
+}
+    public required string FunctionId { get; init; }
+    public int? ReservedConcurrency { get; init; }
+    public int CurrentConcurrency { get; init; }
+    public int ThrottledRequests { get; init; }
+    public int AvailableConcurrency { get; init; }
+}
+```
+```csharp
+public sealed record TargetTrackingConfig
+{
+}
+    public required string PolicyName { get; init; }
+    public double TargetValue { get; init; }
+    public string MetricType { get; init; };
+    public TimeSpan ScaleInCooldown { get; init; };
+    public TimeSpan ScaleOutCooldown { get; init; };
+    public bool DisableScaleIn { get; init; }
+}
+```
+```csharp
+public sealed record TargetTrackingPolicy
+{
+}
+    public required string PolicyName { get; init; }
+    public double TargetValue { get; init; }
+    public required string MetricType { get; init; }
+    public TimeSpan ScaleInCooldown { get; init; }
+    public TimeSpan ScaleOutCooldown { get; init; }
+    public bool DisableScaleIn { get; init; }
+}
+```
+```csharp
+public sealed record ScalingActivity
+{
+}
+    public required string ActivityId { get; init; }
+    public required string PolicyName { get; init; }
+    public DateTimeOffset StartTime { get; init; }
+    public required string StatusCode { get; init; }
     public required string Description { get; init; }
 }
 ```
 ```csharp
-public sealed record PowerTuningResult
+public sealed record ScheduledScalingConfig
 {
 }
-    public required string FunctionArn { get; init; }
-    public int OptimalMemory { get; init; }
-    public IReadOnlyList<PowerTuningDataPoint> Results { get; init; };
+    public required string Schedule { get; init; }
+    public int TargetCapacity { get; init; }
 }
 ```
 ```csharp
-public sealed record PowerTuningDataPoint
+public sealed record ScheduledScalingRule
 {
 }
-    public int MemoryMb { get; init; }
-    public double AvgDurationMs { get; init; }
-    public double CostPerInvocation { get; init; }
+    public required string RuleId { get; init; }
+    public required string Schedule { get; init; }
+    public int TargetCapacity { get; init; }
 }
 ```
 ```csharp
-public sealed record AllocationReport
+public sealed record StepScalingConfig
 {
 }
-    public required string TagKey { get; init; }
-    public TimeSpan Period { get; init; }
-    public IReadOnlyList<CostAllocation> Allocations { get; init; };
+    public required string PolicyName { get; init; }
+    public IReadOnlyList<ScalingStep> Steps { get; init; };
 }
 ```
 ```csharp
-public sealed record CostAllocation
+public sealed record StepScalingPolicy
 {
 }
-    public required string TagValue { get; init; }
-    public double Cost { get; init; }
-    public double Percent { get; init; }
+    public required string PolicyName { get; init; }
+    public IReadOnlyList<ScalingStep> Steps { get; init; };
 }
 ```
 ```csharp
-public sealed record CostAnomaly
+public sealed record ScalingStep
 {
 }
-    public required string AnomalyId { get; init; }
-    public DateTimeOffset DetectedAt { get; init; }
-    public required string Severity { get; init; }
-    public double ExpectedCost { get; init; }
-    public double ActualCost { get; init; }
-    public required string RootCause { get; init; }
+    public double LowerBound { get; init; }
+    public double UpperBound { get; init; }
+    public int Adjustment { get; init; }
 }
 ```
 ```csharp
-public sealed record SavingsPlanRecommendation
+public sealed record QueueScalingConfig
 {
 }
-    public double RecommendedCommitment { get; init; }
-    public required string Term { get; init; }
-    public double EstimatedSavingsPercent { get; init; }
-    public double EstimatedMonthlySavings { get; init; }
-    public double Coverage { get; init; }
-}
-```
-```csharp
-public sealed record ReportConfig
-{
-}
-    public required string Period { get; init; }
-    public string? Format { get; init; }
-}
-```
-```csharp
-public sealed record CostReport
-{
-}
-    public required string ReportId { get; init; }
-    public required string Period { get; init; }
-    public double TotalCost { get; init; }
-    public IReadOnlyList<FunctionCost> FunctionBreakdown { get; init; };
-    public DateTimeOffset GeneratedAt { get; init; }
-}
-```
-```csharp
-public sealed record FunctionCost
-{
-}
-    public required string FunctionId { get; init; }
-    public double Cost { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/EventTriggers/EventTriggerStrategies.cs
-```csharp
-public sealed class HttpTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<HttpTriggerResult> CreateTriggerAsync(HttpTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigureAuthAsync(string triggerId, HttpAuthConfig auth, CancellationToken ct = default);
-    public Task ConfigureRateLimitAsync(string triggerId, int requestsPerSecond, int burstSize, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class QueueTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<QueueTriggerResult> CreateTriggerAsync(QueueTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigureBatchAsync(string triggerId, int batchSize, int maxBatchingWindowSeconds, CancellationToken ct = default);
-    public Task ConfigureDeadLetterQueueAsync(string triggerId, string dlqUrl, int maxReceiveCount, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ScheduleTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<ScheduleTriggerResult> CreateTriggerAsync(ScheduleTriggerConfig config, CancellationToken ct = default);
-    public Task DisableAsync(string triggerId, CancellationToken ct = default);
-    public Task<IReadOnlyList<DateTimeOffset>> GetNextExecutionsAsync(string triggerId, int count = 5, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class StreamTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<StreamTriggerResult> CreateTriggerAsync(StreamTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigureParallelismAsync(string triggerId, int parallelizationFactor, CancellationToken ct = default);
-    public Task<StreamMetrics> GetMetricsAsync(string triggerId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class StorageTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<StorageTriggerResult> CreateTriggerAsync(StorageTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigurePrefixFilterAsync(string triggerId, string prefix, CancellationToken ct = default);
-    public Task ConfigureSuffixFilterAsync(string triggerId, string suffix, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DatabaseTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<DatabaseTriggerResult> CreateTriggerAsync(DatabaseTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigureChangeTypesAsync(string triggerId, IReadOnlyList<string> changeTypes, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class WebhookTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<WebhookResult> CreateWebhookAsync(WebhookConfig config, CancellationToken ct = default);
-    public Task<bool> ValidateSignatureAsync(string webhookId, string payload, string signature, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class IoTTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<IoTTriggerResult> CreateTriggerAsync(IoTTriggerConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<GraphQLTriggerResult> CreateTriggerAsync(GraphQLTriggerConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class EventBusTriggerStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<EventBusTriggerResult> CreateTriggerAsync(EventBusTriggerConfig config, CancellationToken ct = default);
-    public Task ConfigurePatternAsync(string triggerId, Dictionary<string, object> pattern, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record HttpTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string Path { get; init; }
-    public IReadOnlyList<string> Methods { get; init; };
-    public bool RequireAuth { get; init; }
-    public bool EnableCors { get; init; };
-}
-```
-```csharp
-public sealed record HttpTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? Endpoint { get; init; }
-    public IReadOnlyList<string> Methods { get; init; };
-}
-```
-```csharp
-public sealed record HttpAuthConfig
-{
-}
-    public required string AuthType { get; init; }
-    public Dictionary<string, string> Config { get; init; };
-}
-```
-```csharp
-public sealed record QueueTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
     public required string QueueUrl { get; init; }
-    public int BatchSize { get; init; };
-    public int MaxBatchingWindowSeconds { get; init; };
-    public int VisibilityTimeoutSeconds { get; init; };
+    public int MessagesPerInstance { get; init; }
 }
 ```
 ```csharp
-public sealed record QueueTriggerResult
+public sealed record PredictiveScalingForecast
 {
 }
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? QueueUrl { get; init; }
-    public int BatchSize { get; init; }
+    public required string ResourceId { get; init; }
+    public IReadOnlyList<CapacityForecast> Forecasts { get; init; };
 }
 ```
 ```csharp
-public sealed record ScheduleTriggerConfig
+public sealed record CapacityForecast
 {
 }
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string ScheduleExpression { get; init; }
-    public string? Timezone { get; init; }
-    public bool Enabled { get; init; };
+    public DateTimeOffset Time { get; init; }
+    public int PredictedCapacity { get; init; }
 }
 ```
 ```csharp
-public sealed record ScheduleTriggerResult
+public sealed record CustomMetricConfig
 {
 }
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? Schedule { get; init; }
-    public DateTimeOffset? NextExecution { get; init; }
+    public required string MetricName { get; init; }
+    public double TargetValue { get; init; }
+    public double ScaleInThreshold { get; init; }
 }
 ```
 ```csharp
-public sealed record StreamTriggerConfig
+public sealed record CustomMetricScaler
 {
 }
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string StreamArn { get; init; }
-    public string StartingPosition { get; init; };
-    public int BatchSize { get; init; };
-    public int ParallelizationFactor { get; init; };
-}
-```
-```csharp
-public sealed record StreamTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? StreamArn { get; init; }
-    public string? StartingPosition { get; init; }
-}
-```
-```csharp
-public sealed record StreamMetrics
-{
-}
-    public required string TriggerId { get; init; }
-    public long RecordsProcessed { get; init; }
-    public TimeSpan IteratorAge { get; init; }
-    public int ErrorCount { get; init; }
-}
-```
-```csharp
-public sealed record StorageTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string BucketName { get; init; }
-    public IReadOnlyList<string> EventTypes { get; init; };
-    public string? Prefix { get; init; }
-    public string? Suffix { get; init; }
-}
-```
-```csharp
-public sealed record StorageTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? BucketName { get; init; }
-    public IReadOnlyList<string> EventTypes { get; init; };
-}
-```
-```csharp
-public sealed record DatabaseTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string DatabaseType { get; init; }
-    public required string TableName { get; init; }
-}
-```
-```csharp
-public sealed record DatabaseTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? DatabaseType { get; init; }
-    public string? TableName { get; init; }
-}
-```
-```csharp
-public sealed record WebhookConfig
-{
-}
-    public required string WebhookId { get; init; }
-    public required string FunctionId { get; init; }
-    public string? SecretHeader { get; init; }
-}
-```
-```csharp
-public sealed record WebhookResult
-{
-}
-    public bool Success { get; init; }
-    public string? WebhookId { get; init; }
-    public string? Endpoint { get; init; }
-    public string? Secret { get; init; }
-}
-```
-```csharp
-public sealed record IoTTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string TopicFilter { get; init; }
-}
-```
-```csharp
-public sealed record IoTTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? TopicFilter { get; init; }
-}
-```
-```csharp
-public sealed record GraphQLTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string SubscriptionName { get; init; }
-}
-```
-```csharp
-public sealed record GraphQLTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? SubscriptionName { get; init; }
-}
-```
-```csharp
-public sealed record EventBusTriggerConfig
-{
-}
-    public required string TriggerId { get; init; }
-    public required string FunctionId { get; init; }
-    public required string RuleName { get; init; }
-    public Dictionary<string, object> EventPattern { get; init; };
-}
-```
-```csharp
-public sealed record EventBusTriggerResult
-{
-}
-    public bool Success { get; init; }
-    public string? TriggerId { get; init; }
-    public string? RuleName { get; init; }
-    public Dictionary<string, object> EventPattern { get; init; };
+    public required string MetricName { get; init; }
+    public double TargetValue { get; init; }
+    public double ScaleInThreshold { get; init; }
 }
 ```
 
@@ -1626,6 +1193,661 @@ public sealed record FaaSDeployResult
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/ColdStart/ColdStartOptimizationStrategies.cs
+```csharp
+public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<ProvisionedResult> ConfigureAsync(string functionId, string qualifier, int concurrency, CancellationToken ct = default);
+    public Task<ProvisionedConfig?> GetStatusAsync(string functionId, string qualifier, CancellationToken ct = default);
+    public Task<ProvisionedResult> ScaleAsync(string functionId, string qualifier, int newConcurrency, CancellationToken ct = default);
+    public Task RemoveAsync(string functionId, string qualifier, CancellationToken ct = default);
+    public Task<ProvisionedMetrics> GetMetricsAsync(string functionId, string qualifier, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessPlatform? TargetPlatform;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SnapStartResult> EnableAsync(string functionArn, SnapStartConfig config, CancellationToken ct = default);
+    public Task<SnapStartStatus> GetStatusAsync(string functionArn, CancellationToken ct = default);
+    public Task RegisterRestoreHookAsync(string functionArn, string hookName, Func<Task> hook, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class WarmupSchedulerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<WarmupSchedule> ConfigureScheduleAsync(WarmupScheduleConfig config, CancellationToken ct = default);
+    public Task<WarmupResult> WarmupNowAsync(string functionId, int concurrency = 1, CancellationToken ct = default);
+    public Task<WarmupStats> GetStatsAsync(string functionId, CancellationToken ct = default);
+    public Task DisableAsync(string scheduleId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class LazyLoadingStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<LazyLoadingAnalysis> AnalyzeAsync(string functionId, CancellationToken ct = default);
+    public Task RegisterLazyComponentAsync(string componentId, Func<Task<object>> initializer, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class MinimumInstancesStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<MinInstancesResult> ConfigureAsync(string serviceId, int minInstances, CancellationToken ct = default);
+    public Task<int> GetCurrentInstancesAsync(string serviceId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ContainerPreWarmingStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task ConfigurePrePullAsync(string image, IReadOnlyList<string> regions, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class EdgePreWarmingStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task WarmEdgeLocationsAsync(string functionId, IReadOnlyList<string> locations, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class PredictiveWarmingStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<TrafficPrediction> PredictTrafficAsync(string functionId, int hoursAhead, CancellationToken ct = default);
+    public Task ConfigurePredictiveWarmingAsync(string functionId, PredictiveConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ProvisionedConfig
+{
+}
+    public required string FunctionId { get; init; }
+    public required string Qualifier { get; init; }
+    public int RequestedConcurrency { get; set; }
+    public int AllocatedConcurrency { get; set; }
+    public string Status { get; set; };
+    public DateTimeOffset LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record ProvisionedResult
+{
+}
+    public bool Success { get; init; }
+    public required string FunctionId { get; init; }
+    public required string Qualifier { get; init; }
+    public int AllocatedConcurrency { get; init; }
+    public required string Status { get; init; }
+}
+```
+```csharp
+public sealed record ProvisionedMetrics
+{
+}
+    public required string FunctionId { get; init; }
+    public required string Qualifier { get; init; }
+    public int AllocatedConcurrency { get; init; }
+    public int UtilizedConcurrency { get; init; }
+    public int SpilloverInvocations { get; init; }
+}
+```
+```csharp
+public sealed record SnapStartConfig
+{
+}
+    public string ApplyOn { get; init; };
+}
+```
+```csharp
+public sealed record SnapStartResult
+{
+}
+    public bool Success { get; init; }
+    public required string FunctionArn { get; init; }
+    public required string ApplyOn { get; init; }
+    public required string OptimizationStatus { get; init; }
+}
+```
+```csharp
+public sealed record SnapStartStatus
+{
+}
+    public required string FunctionArn { get; init; }
+    public required string ApplyOn { get; init; }
+    public required string OptimizationStatus { get; init; }
+    public IReadOnlyList<string> RestoredVersions { get; init; };
+}
+```
+```csharp
+public sealed class WarmupSchedule
+{
+}
+    public required string ScheduleId { get; init; }
+    public required string FunctionId { get; init; }
+    public int IntervalMinutes { get; init; }
+    public int ConcurrentWarmups { get; init; }
+    public bool Enabled { get; set; }
+    public DateTimeOffset NextWarmup { get; set; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record WarmupScheduleConfig
+{
+}
+    public required string FunctionId { get; init; }
+    public int IntervalMinutes { get; init; };
+    public int ConcurrentWarmups { get; init; };
+}
+```
+```csharp
+public sealed record WarmupResult
+{
+}
+    public bool Success { get; init; }
+    public required string FunctionId { get; init; }
+    public int WarmedInstances { get; init; }
+    public TimeSpan Duration { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record WarmupStats
+{
+}
+    public required string FunctionId { get; init; }
+    public long TotalWarmups { get; init; }
+    public long SuccessfulWarmups { get; init; }
+    public double AverageWarmupTimeMs { get; init; }
+    public double EstimatedMonthlyCost { get; init; }
+}
+```
+```csharp
+public sealed record LazyLoadingAnalysis
+{
+}
+    public required string FunctionId { get; init; }
+    public double CurrentInitTimeMs { get; init; }
+    public double OptimizedInitTimeMs { get; init; }
+    public IReadOnlyList<LazyLoadingRecommendation> Recommendations { get; init; };
+}
+```
+```csharp
+public sealed record LazyLoadingRecommendation
+{
+}
+    public required string Component { get; init; }
+    public int Priority { get; init; }
+    public double EstimatedSavingsMs { get; init; }
+}
+```
+```csharp
+public sealed class MinInstancesConfig
+{
+}
+    public required string ServiceId { get; init; }
+    public int MinInstances { get; set; }
+    public int CurrentInstances { get; set; }
+    public string Status { get; set; };
+}
+```
+```csharp
+public sealed record MinInstancesResult
+{
+}
+    public bool Success { get; init; }
+    public required string ServiceId { get; init; }
+    public int MinInstances { get; init; }
+}
+```
+```csharp
+public sealed record TrafficPrediction
+{
+}
+    public required string FunctionId { get; init; }
+    public IReadOnlyList<TrafficSpike> PredictedSpikes { get; init; };
+    public int RecommendedWarmInstances { get; init; }
+}
+```
+```csharp
+public sealed record TrafficSpike
+{
+}
+    public DateTimeOffset Time { get; init; }
+    public int ExpectedRps { get; init; }
+}
+```
+```csharp
+public sealed record PredictiveConfig
+{
+}
+    public bool Enabled { get; init; };
+    public int LookAheadHours { get; init; };
+    public double ConfidenceThreshold { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/EventTriggers/EventTriggerStrategies.cs
+```csharp
+public sealed class HttpTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<HttpTriggerResult> CreateTriggerAsync(HttpTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigureAuthAsync(string triggerId, HttpAuthConfig auth, CancellationToken ct = default);
+    public Task ConfigureRateLimitAsync(string triggerId, int requestsPerSecond, int burstSize, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class QueueTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<QueueTriggerResult> CreateTriggerAsync(QueueTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigureBatchAsync(string triggerId, int batchSize, int maxBatchingWindowSeconds, CancellationToken ct = default);
+    public Task ConfigureDeadLetterQueueAsync(string triggerId, string dlqUrl, int maxReceiveCount, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ScheduleTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<ScheduleTriggerResult> CreateTriggerAsync(ScheduleTriggerConfig config, CancellationToken ct = default);
+    public Task DisableAsync(string triggerId, CancellationToken ct = default);
+    public Task<IReadOnlyList<DateTimeOffset>> GetNextExecutionsAsync(string triggerId, int count = 5, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class StreamTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<StreamTriggerResult> CreateTriggerAsync(StreamTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigureParallelismAsync(string triggerId, int parallelizationFactor, CancellationToken ct = default);
+    public Task<StreamMetrics> GetMetricsAsync(string triggerId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class StorageTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<StorageTriggerResult> CreateTriggerAsync(StorageTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigurePrefixFilterAsync(string triggerId, string prefix, CancellationToken ct = default);
+    public Task ConfigureSuffixFilterAsync(string triggerId, string suffix, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DatabaseTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<DatabaseTriggerResult> CreateTriggerAsync(DatabaseTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigureChangeTypesAsync(string triggerId, IReadOnlyList<string> changeTypes, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class WebhookTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<WebhookResult> CreateWebhookAsync(WebhookConfig config, CancellationToken ct = default);
+    public Task<bool> ValidateSignatureAsync(string webhookId, string payload, string signature, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class IoTTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<IoTTriggerResult> CreateTriggerAsync(IoTTriggerConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<GraphQLTriggerResult> CreateTriggerAsync(GraphQLTriggerConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class EventBusTriggerStrategy : ServerlessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ServerlessCategory Category;;
+    public override ServerlessStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<EventBusTriggerResult> CreateTriggerAsync(EventBusTriggerConfig config, CancellationToken ct = default);
+    public Task ConfigurePatternAsync(string triggerId, Dictionary<string, object> pattern, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record HttpTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string Path { get; init; }
+    public IReadOnlyList<string> Methods { get; init; };
+    public bool RequireAuth { get; init; }
+    public bool EnableCors { get; init; };
+}
+```
+```csharp
+public sealed record HttpTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? Endpoint { get; init; }
+    public IReadOnlyList<string> Methods { get; init; };
+}
+```
+```csharp
+public sealed record HttpAuthConfig
+{
+}
+    public required string AuthType { get; init; }
+    public Dictionary<string, string> Config { get; init; };
+}
+```
+```csharp
+public sealed record QueueTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string QueueUrl { get; init; }
+    public int BatchSize { get; init; };
+    public int MaxBatchingWindowSeconds { get; init; };
+    public int VisibilityTimeoutSeconds { get; init; };
+}
+```
+```csharp
+public sealed record QueueTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? QueueUrl { get; init; }
+    public int BatchSize { get; init; }
+}
+```
+```csharp
+public sealed record ScheduleTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string ScheduleExpression { get; init; }
+    public string? Timezone { get; init; }
+    public bool Enabled { get; init; };
+}
+```
+```csharp
+public sealed record ScheduleTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? Schedule { get; init; }
+    public DateTimeOffset? NextExecution { get; init; }
+}
+```
+```csharp
+public sealed record StreamTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string StreamArn { get; init; }
+    public string StartingPosition { get; init; };
+    public int BatchSize { get; init; };
+    public int ParallelizationFactor { get; init; };
+}
+```
+```csharp
+public sealed record StreamTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? StreamArn { get; init; }
+    public string? StartingPosition { get; init; }
+}
+```
+```csharp
+public sealed record StreamMetrics
+{
+}
+    public required string TriggerId { get; init; }
+    public long RecordsProcessed { get; init; }
+    public TimeSpan IteratorAge { get; init; }
+    public int ErrorCount { get; init; }
+}
+```
+```csharp
+public sealed record StorageTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string BucketName { get; init; }
+    public IReadOnlyList<string> EventTypes { get; init; };
+    public string? Prefix { get; init; }
+    public string? Suffix { get; init; }
+}
+```
+```csharp
+public sealed record StorageTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? BucketName { get; init; }
+    public IReadOnlyList<string> EventTypes { get; init; };
+}
+```
+```csharp
+public sealed record DatabaseTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string DatabaseType { get; init; }
+    public required string TableName { get; init; }
+}
+```
+```csharp
+public sealed record DatabaseTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? DatabaseType { get; init; }
+    public string? TableName { get; init; }
+}
+```
+```csharp
+public sealed record WebhookConfig
+{
+}
+    public required string WebhookId { get; init; }
+    public required string FunctionId { get; init; }
+    public string? SecretHeader { get; init; }
+}
+```
+```csharp
+public sealed record WebhookResult
+{
+}
+    public bool Success { get; init; }
+    public string? WebhookId { get; init; }
+    public string? Endpoint { get; init; }
+    public string? Secret { get; init; }
+}
+```
+```csharp
+public sealed record IoTTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string TopicFilter { get; init; }
+}
+```
+```csharp
+public sealed record IoTTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? TopicFilter { get; init; }
+}
+```
+```csharp
+public sealed record GraphQLTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string SubscriptionName { get; init; }
+}
+```
+```csharp
+public sealed record GraphQLTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? SubscriptionName { get; init; }
+}
+```
+```csharp
+public sealed record EventBusTriggerConfig
+{
+}
+    public required string TriggerId { get; init; }
+    public required string FunctionId { get; init; }
+    public required string RuleName { get; init; }
+    public Dictionary<string, object> EventPattern { get; init; };
+}
+```
+```csharp
+public sealed record EventBusTriggerResult
+{
+}
+    public bool Success { get; init; }
+    public string? TriggerId { get; init; }
+    public string? RuleName { get; init; }
+    public Dictionary<string, object> EventPattern { get; init; };
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/Monitoring/MonitoringStrategies.cs
 ```csharp
 public sealed class DistributedTracingStrategy : ServerlessStrategyBase
@@ -1891,9 +2113,9 @@ public sealed record LiveTailSession
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/Scaling/ScalingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/CostTracking/CostTrackingStrategies.cs
 ```csharp
-public sealed class KedaScalingStrategy : ServerlessStrategyBase
+public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1902,13 +2124,13 @@ public sealed class KedaScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<KedaScaledObject> CreateScaledObjectAsync(KedaScaledObjectConfig config, CancellationToken ct = default);
-    public Task AddTriggerAsync(string scaledObjectName, KedaTrigger trigger, CancellationToken ct = default);
-    public Task<KedaMetrics> GetMetricsAsync(string scaledObjectName, CancellationToken ct = default);
+    public Task RecordUsageAsync(UsageRecord record, CancellationToken ct = default);
+    public Task<UsageSummary> GetUsageSummaryAsync(string functionId, TimeSpan period, CancellationToken ct = default);
+    public Task<IReadOnlyList<UsageTimeSlice>> GetUsageBreakdownAsync(string functionId, TimeSpan period, TimeSpan granularity, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class ConcurrencyLimitsStrategy : ServerlessStrategyBase
+public sealed class CostEstimationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1917,13 +2139,12 @@ public sealed class ConcurrencyLimitsStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task SetReservedConcurrencyAsync(string functionId, int reservedConcurrency, CancellationToken ct = default);
-    public Task<ConcurrencyStatus> GetStatusAsync(string functionId, CancellationToken ct = default);
-    public Task RemoveReservedConcurrencyAsync(string functionId, CancellationToken ct = default);
+    public Task<CostEstimate> EstimateCostAsync(CostEstimationRequest request, CancellationToken ct = default);
+    public Task<CostProjection> ProjectCostAsync(string functionId, int monthsAhead, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class TargetTrackingStrategy : ServerlessStrategyBase
+public sealed class BudgetAlertingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1932,12 +2153,13 @@ public sealed class TargetTrackingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<TargetTrackingPolicy> CreatePolicyAsync(TargetTrackingConfig config, CancellationToken ct = default);
-    public Task<IReadOnlyList<ScalingActivity>> GetActivitiesAsync(string policyName, int limit = 10, CancellationToken ct = default);
+    public Task<Budget> CreateBudgetAsync(BudgetConfig config, CancellationToken ct = default);
+    public Task<BudgetStatus> GetBudgetStatusAsync(string budgetId, CancellationToken ct = default);
+    public Task UpdateSpendAsync(string budgetId, double amount, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class ScheduledScalingStrategy : ServerlessStrategyBase
+public sealed class CostOptimizationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1946,11 +2168,12 @@ public sealed class ScheduledScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<ScheduledScalingRule> CreateScheduleAsync(ScheduledScalingConfig config, CancellationToken ct = default);
+    public Task<OptimizationAnalysis> AnalyzeAsync(string functionId, CancellationToken ct = default);
+    public Task<PowerTuningResult> RunPowerTuningAsync(string functionArn, int[] memorySizes, int invocationsPerSize, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class StepScalingStrategy : ServerlessStrategyBase
+public sealed class CostAllocationStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1959,11 +2182,11 @@ public sealed class StepScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<StepScalingPolicy> CreatePolicyAsync(StepScalingConfig config, CancellationToken ct = default);
+    public Task<AllocationReport> GetAllocationReportAsync(string tagKey, TimeSpan period, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class QueueBasedScalingStrategy : ServerlessStrategyBase
+public sealed class CostAnomalyDetectionStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1972,11 +2195,11 @@ public sealed class QueueBasedScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<QueueScalingConfig> ConfigureAsync(string queueUrl, int messagesPerInstance, CancellationToken ct = default);
+    public Task<IReadOnlyList<CostAnomaly>> DetectAnomaliesAsync(TimeSpan lookbackPeriod, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class PredictiveScalingStrategy : ServerlessStrategyBase
+public sealed class SavingsPlansStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1985,11 +2208,11 @@ public sealed class PredictiveScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<PredictiveScalingForecast> GetForecastAsync(string resourceId, int hoursAhead, CancellationToken ct = default);
+    public Task<SavingsPlanRecommendation> GetRecommendationAsync(CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CustomMetricsScalingStrategy : ServerlessStrategyBase
+public sealed class CostReportingStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1998,468 +2221,245 @@ public sealed class CustomMetricsScalingStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<CustomMetricScaler> CreateScalerAsync(CustomMetricConfig config, CancellationToken ct = default);
+    public Task<CostReport> GenerateReportAsync(ReportConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class KedaScaledObject
-{
-}
-    public required string Name { get; init; }
-    public required string Namespace { get; init; }
-    public required string ScaleTargetRef { get; init; }
-    public int MinReplicaCount { get; init; }
-    public int MaxReplicaCount { get; init; }
-    public List<KedaTrigger> Triggers { get; init; };
-    public string Status { get; set; };
-}
-```
-```csharp
-public sealed record KedaScaledObjectConfig
-{
-}
-    public required string Name { get; init; }
-    public required string Namespace { get; init; }
-    public required string ScaleTargetRef { get; init; }
-    public int MinReplicaCount { get; init; };
-    public int MaxReplicaCount { get; init; };
-    public List<KedaTrigger> Triggers { get; init; };
-}
-```
-```csharp
-public sealed record KedaTrigger
-{
-}
-    public required string Type { get; init; }
-    public Dictionary<string, string> Metadata { get; init; };
-}
-```
-```csharp
-public sealed record KedaMetrics
-{
-}
-    public required string ScaledObjectName { get; init; }
-    public int CurrentReplicas { get; init; }
-    public int DesiredReplicas { get; init; }
-    public bool IsActive { get; init; }
-    public Dictionary<string, double> TriggerMetrics { get; init; };
-}
-```
-```csharp
-public sealed class ConcurrencyConfig
+public sealed record UsageRecord
 {
 }
     public required string FunctionId { get; init; }
-    public int? ReservedConcurrency { get; set; }
-    public int CurrentConcurrency { get; set; }
+    public long Invocations { get; init; }
+    public double DurationMs { get; init; }
+    public int MemoryMb { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
 }
 ```
 ```csharp
-public sealed record ConcurrencyStatus
+public sealed record UsageSummary
 {
 }
     public required string FunctionId { get; init; }
-    public int? ReservedConcurrency { get; init; }
-    public int CurrentConcurrency { get; init; }
-    public int ThrottledRequests { get; init; }
-    public int AvailableConcurrency { get; init; }
+    public TimeSpan Period { get; init; }
+    public long TotalInvocations { get; init; }
+    public double TotalDurationMs { get; init; }
+    public double AvgDurationMs { get; init; }
+    public double TotalGbSeconds { get; init; }
+    public int MemoryMb { get; init; }
+    public int ColdStartCount { get; init; }
+    public int ErrorCount { get; init; }
 }
 ```
 ```csharp
-public sealed record TargetTrackingConfig
+public sealed record UsageTimeSlice
 {
 }
-    public required string PolicyName { get; init; }
-    public double TargetValue { get; init; }
-    public string MetricType { get; init; };
-    public TimeSpan ScaleInCooldown { get; init; };
-    public TimeSpan ScaleOutCooldown { get; init; };
-    public bool DisableScaleIn { get; init; }
-}
-```
-```csharp
-public sealed record TargetTrackingPolicy
-{
-}
-    public required string PolicyName { get; init; }
-    public double TargetValue { get; init; }
-    public required string MetricType { get; init; }
-    public TimeSpan ScaleInCooldown { get; init; }
-    public TimeSpan ScaleOutCooldown { get; init; }
-    public bool DisableScaleIn { get; init; }
-}
-```
-```csharp
-public sealed record ScalingActivity
-{
-}
-    public required string ActivityId { get; init; }
-    public required string PolicyName { get; init; }
     public DateTimeOffset StartTime { get; init; }
-    public required string StatusCode { get; init; }
-    public required string Description { get; init; }
+    public DateTimeOffset EndTime { get; init; }
+    public long Invocations { get; init; }
+    public double DurationMs { get; init; }
+    public double GbSeconds { get; init; }
 }
 ```
 ```csharp
-public sealed record ScheduledScalingConfig
+public sealed record PricingModel
 {
 }
-    public required string Schedule { get; init; }
-    public int TargetCapacity { get; init; }
+    public double RequestPrice { get; init; }
+    public double GbSecondPrice { get; init; }
+    public long FreeRequests { get; init; }
+    public long FreeGbSeconds { get; init; }
 }
 ```
 ```csharp
-public sealed record ScheduledScalingRule
+public sealed record CostEstimationRequest
 {
 }
-    public required string RuleId { get; init; }
-    public required string Schedule { get; init; }
-    public int TargetCapacity { get; init; }
+    public ServerlessPlatform Platform { get; init; }
+    public string Period { get; init; };
+    public long Invocations { get; init; }
+    public double GbSeconds { get; init; }
 }
 ```
 ```csharp
-public sealed record StepScalingConfig
+public sealed record CostEstimate
 {
 }
-    public required string PolicyName { get; init; }
-    public IReadOnlyList<ScalingStep> Steps { get; init; };
+    public ServerlessPlatform Platform { get; init; }
+    public required string Period { get; init; }
+    public long Invocations { get; init; }
+    public double GbSeconds { get; init; }
+    public double RequestCost { get; init; }
+    public double ComputeCost { get; init; }
+    public double TotalCost { get; init; }
+    public double FreeTierSavings { get; init; }
+    public double CostPerInvocation { get; init; }
 }
 ```
 ```csharp
-public sealed record StepScalingPolicy
+public sealed record CostProjection
 {
 }
-    public required string PolicyName { get; init; }
-    public IReadOnlyList<ScalingStep> Steps { get; init; };
+    public required string FunctionId { get; init; }
+    public int MonthsAhead { get; init; }
+    public IReadOnlyList<MonthlyProjection> MonthlyProjections { get; init; };
 }
 ```
 ```csharp
-public sealed record ScalingStep
+public sealed record MonthlyProjection
 {
 }
-    public double LowerBound { get; init; }
-    public double UpperBound { get; init; }
-    public int Adjustment { get; init; }
+    public required string Month { get; init; }
+    public long ProjectedInvocations { get; init; }
+    public double ProjectedCost { get; init; }
+    public int ConfidencePercent { get; init; }
 }
 ```
 ```csharp
-public sealed record QueueScalingConfig
+public sealed class Budget
 {
 }
-    public required string QueueUrl { get; init; }
-    public int MessagesPerInstance { get; init; }
-}
-```
-```csharp
-public sealed record PredictiveScalingForecast
-{
-}
-    public required string ResourceId { get; init; }
-    public IReadOnlyList<CapacityForecast> Forecasts { get; init; };
-}
-```
-```csharp
-public sealed record CapacityForecast
-{
-}
-    public DateTimeOffset Time { get; init; }
-    public int PredictedCapacity { get; init; }
-}
-```
-```csharp
-public sealed record CustomMetricConfig
-{
-}
-    public required string MetricName { get; init; }
-    public double TargetValue { get; init; }
-    public double ScaleInThreshold { get; init; }
-}
-```
-```csharp
-public sealed record CustomMetricScaler
-{
-}
-    public required string MetricName { get; init; }
-    public double TargetValue { get; init; }
-    public double ScaleInThreshold { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateServerless/Strategies/Security/SecurityStrategies.cs
-```csharp
-public sealed class IamRoleStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<IamRole> CreateExecutionRoleAsync(IamRoleConfig config, CancellationToken ct = default);
-    public Task AttachPolicyAsync(string roleName, string policyArn, CancellationToken ct = default);
-    public Task<PermissionAnalysis> AnalyzePermissionsAsync(string roleName, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SecretsManagementStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SecretValue> GetSecretAsync(string secretId, string? version = null, CancellationToken ct = default);
-    public Task<SecretEntry> PutSecretAsync(string secretId, string value, Dictionary<string, string>? tags = null, CancellationToken ct = default);
-    public Task ConfigureRotationAsync(string secretId, int rotationDays, string rotationLambdaArn, CancellationToken ct = default);
-    public Task RotateSecretAsync(string secretId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class VpcIntegrationStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<VpcConfiguration> ConfigureVpcAsync(string functionId, VpcConfig config, CancellationToken ct = default);
-    public Task<VpcEndpoint> CreateVpcEndpointAsync(string vpcId, string serviceName, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class WafIntegrationStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<WafConfig> ConfigureWafAsync(string apiId, IReadOnlyList<string> ruleGroups, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ApiKeyManagementStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<ApiKey> CreateApiKeyAsync(string name, string usagePlanId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class JwtAuthenticationStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<JwtAuthorizer> CreateAuthorizerAsync(JwtAuthorizerConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class CodeSigningStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SigningProfile> CreateSigningProfileAsync(string profileName, string platformId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ResourcePolicyStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task AddPermissionAsync(string functionId, string statementId, string principal, string action, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class EnvironmentEncryptionStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task ConfigureKmsKeyAsync(string functionId, string kmsKeyArn, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class RuntimeSecurityStrategy : ServerlessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ServerlessCategory Category;;
-    public override ServerlessStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SecurityFindings> GetFindingsAsync(string functionId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class IamRole
-{
-}
-    public required string RoleArn { get; init; }
-    public required string RoleName { get; init; }
-    public required string AssumeRolePolicy { get; init; }
-    public List<string> ManagedPolicies { get; init; };
-    public Dictionary<string, string> InlinePolicies { get; init; };
-    public string? PermissionBoundary { get; init; }
+    public required string BudgetId { get; init; }
+    public required string Name { get; init; }
+    public double Amount { get; init; }
+    public required string Period { get; init; }
+    public IReadOnlyList<double> Thresholds { get; init; };
+    public IReadOnlyList<string> NotificationChannels { get; init; };
+    public double CurrentSpend { get; set; }
     public DateTimeOffset CreatedAt { get; init; }
 }
 ```
 ```csharp
-public sealed record IamRoleConfig
+public sealed record BudgetConfig
 {
 }
-    public required string AccountId { get; init; }
-    public required string RoleName { get; init; }
-    public required string AssumeRolePolicy { get; init; }
-    public List<string> ManagedPolicies { get; init; };
-    public Dictionary<string, string> InlinePolicies { get; init; };
-    public string? PermissionBoundary { get; init; }
+    public required string Name { get; init; }
+    public double Amount { get; init; }
+    public required string Period { get; init; }
+    public IReadOnlyList<double> Thresholds { get; init; };
+    public IReadOnlyList<string> NotificationChannels { get; init; };
 }
 ```
 ```csharp
-public sealed record PermissionAnalysis
+public sealed record BudgetStatus
 {
 }
-    public required string RoleName { get; init; }
-    public IReadOnlyList<string> UnusedPermissions { get; init; };
-    public IReadOnlyList<string> OverlyPermissiveActions { get; init; };
-    public IReadOnlyList<string> Recommendations { get; init; };
+    public required string BudgetId { get; init; }
+    public double BudgetAmount { get; init; }
+    public double CurrentSpend { get; init; }
+    public double PercentUsed { get; init; }
+    public double ForecastedSpend { get; init; }
+    public int DaysRemaining { get; init; }
+    public IReadOnlyList<double> TriggeredThresholds { get; init; };
 }
 ```
 ```csharp
-public sealed class SecretEntry
-{
-}
-    public required string SecretId { get; init; }
-    public required string VersionId { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public bool RotationEnabled { get; set; }
-    public int? RotationDays { get; set; }
-}
-```
-```csharp
-public sealed record SecretValue
-{
-}
-    public required string SecretId { get; init; }
-    public required string Version { get; init; }
-    public required string Value { get; init; }
-    public DateTimeOffset RetrievedAt { get; init; }
-}
-```
-```csharp
-public sealed record VpcConfiguration
+public sealed record OptimizationAnalysis
 {
 }
     public required string FunctionId { get; init; }
-    public required string VpcId { get; init; }
-    public IReadOnlyList<string> SubnetIds { get; init; };
-    public IReadOnlyList<string> SecurityGroupIds { get; init; };
-    public int EniCount { get; init; }
+    public double CurrentMonthlyCost { get; init; }
+    public double OptimizedMonthlyCost { get; init; }
+    public double PotentialSavingsPercent { get; init; }
+    public IReadOnlyList<OptimizationRecommendation> Recommendations { get; init; };
 }
 ```
 ```csharp
-public sealed record VpcEndpoint
+public sealed record OptimizationRecommendation
 {
 }
-    public required string EndpointId { get; init; }
-    public required string VpcId { get; init; }
-    public required string ServiceName { get; init; }
-    public required string State { get; init; }
-}
-```
-```csharp
-public sealed record WafConfig
-{
-}
-    public required string ApiId { get; init; }
-    public List<string> RuleGroups { get; init; };
-    public bool Enabled { get; init; }
-}
-```
-```csharp
-public sealed record ApiKey
-{
-}
-    public required string KeyId { get; init; }
-    public required string Name { get; init; }
-    public required string UsagePlanId { get; init; }
-    public bool Enabled { get; init; }
-}
-```
-```csharp
-public sealed record JwtAuthorizerConfig
-{
-}
-    public required string Name { get; init; }
-    public required string Issuer { get; init; }
-    public IReadOnlyList<string> Audience { get; init; };
-}
-```
-```csharp
-public sealed record JwtAuthorizer
-{
-}
-    public required string AuthorizerId { get; init; }
-    public required string Name { get; init; }
-    public required string Issuer { get; init; }
-    public IReadOnlyList<string> Audience { get; init; };
-}
-```
-```csharp
-public sealed record SigningProfile
-{
-}
-    public required string ProfileName { get; init; }
-    public required string ProfileVersionArn { get; init; }
-}
-```
-```csharp
-public sealed record SecurityFindings
-{
-}
-    public required string FunctionId { get; init; }
-    public IReadOnlyList<SecurityFinding> Findings { get; init; };
-}
-```
-```csharp
-public sealed record SecurityFinding
-{
-}
-    public required string Severity { get; init; }
     public required string Type { get; init; }
+    public int Priority { get; init; }
+    public required string CurrentValue { get; init; }
+    public required string RecommendedValue { get; init; }
+    public double EstimatedSavingsPercent { get; init; }
     public required string Description { get; init; }
+}
+```
+```csharp
+public sealed record PowerTuningResult
+{
+}
+    public required string FunctionArn { get; init; }
+    public int OptimalMemory { get; init; }
+    public IReadOnlyList<PowerTuningDataPoint> Results { get; init; };
+}
+```
+```csharp
+public sealed record PowerTuningDataPoint
+{
+}
+    public int MemoryMb { get; init; }
+    public double AvgDurationMs { get; init; }
+    public double CostPerInvocation { get; init; }
+}
+```
+```csharp
+public sealed record AllocationReport
+{
+}
+    public required string TagKey { get; init; }
+    public TimeSpan Period { get; init; }
+    public IReadOnlyList<CostAllocation> Allocations { get; init; };
+}
+```
+```csharp
+public sealed record CostAllocation
+{
+}
+    public required string TagValue { get; init; }
+    public double Cost { get; init; }
+    public double Percent { get; init; }
+}
+```
+```csharp
+public sealed record CostAnomaly
+{
+}
+    public required string AnomalyId { get; init; }
+    public DateTimeOffset DetectedAt { get; init; }
+    public required string Severity { get; init; }
+    public double ExpectedCost { get; init; }
+    public double ActualCost { get; init; }
+    public required string RootCause { get; init; }
+}
+```
+```csharp
+public sealed record SavingsPlanRecommendation
+{
+}
+    public double RecommendedCommitment { get; init; }
+    public required string Term { get; init; }
+    public double EstimatedSavingsPercent { get; init; }
+    public double EstimatedMonthlySavings { get; init; }
+    public double Coverage { get; init; }
+}
+```
+```csharp
+public sealed record ReportConfig
+{
+}
+    public required string Period { get; init; }
+    public string? Format { get; init; }
+}
+```
+```csharp
+public sealed record CostReport
+{
+}
+    public required string ReportId { get; init; }
+    public required string Period { get; init; }
+    public double TotalCost { get; init; }
+    public IReadOnlyList<FunctionCost> FunctionBreakdown { get; init; };
+    public DateTimeOffset GeneratedAt { get; init; }
+}
+```
+```csharp
+public sealed record FunctionCost
+{
+}
+    public required string FunctionId { get; init; }
+    public double Cost { get; init; }
 }
 ```
 

@@ -5,6 +5,80 @@
 
 ## Project: DataWarehouse.Plugins.UltimateMicroservices
 
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/UltimateMicroservicesPlugin.cs
+```csharp
+public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposable
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override string PlatformDomain;;
+    public override PluginCategory Category;;
+    public string SemanticDescription;;
+    public string[] SemanticTags;;
+    public IReadOnlyDictionary<MicroservicesCategory, IReadOnlyList<MicroservicesStrategyBase>> StrategiesByCategory
+{
+    get
+    {
+        return _strategies.Values.GroupBy(s => s.Category).ToDictionary(g => g.Key, g => (IReadOnlyList<MicroservicesStrategyBase>)g.ToList());
+    }
+}
+    public UltimateMicroservicesPlugin();
+    public void RegisterStrategy(MicroservicesStrategyBase strategy);
+    public MicroservicesStrategyBase? GetStrategy(string strategyId);
+    public IReadOnlyList<MicroservicesStrategyBase> GetStrategiesForCategory(MicroservicesCategory category);;
+    public void RegisterService(MicroserviceConfig config);
+    public ServiceInstance? GetService(string serviceId);
+    public IReadOnlyList<ServiceInstance> ListServices();;
+    public void RecordRequest(ServiceRequest request, bool success, double durationMs);
+    public ServiceStatistics GetServiceStatistics(string serviceId);
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
+    protected override List<PluginCapabilityDescriptor> GetCapabilities();
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+{
+    get
+    {
+        var capabilities = new List<RegisteredCapability>
+        {
+            new()
+            {
+                CapabilityId = $"{Id}.orchestration",
+                DisplayName = "Microservices Orchestration",
+                Description = "Orchestrate microservices architecture patterns",
+                Category = SDK.Contracts.CapabilityCategory.Infrastructure,
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = ["microservices", "orchestration", "distributed"]
+            }
+        };
+        foreach (var strategy in _strategies.Values)
+        {
+            capabilities.Add(strategy.GetCapability());
+        }
+
+        return capabilities;
+    }
+}
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
+    protected override Dictionary<string, object> GetMetadata();
+    protected override Task OnStartCoreAsync(CancellationToken ct);;
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
+    public override Task OnMessageAsync(PluginMessage message);
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+public sealed record ServiceStatistics
+{
+}
+    public required string ServiceId { get; init; }
+    public long TotalRequests { get; init; }
+    public int UniqueCallers { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/MicroservicesStrategyBase.cs
 ```csharp
 public sealed record MicroserviceConfig
@@ -98,83 +172,9 @@ public abstract class MicroservicesStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/UltimateMicroservicesPlugin.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/Security/SecurityStrategies.cs
 ```csharp
-public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposable
-{
-}
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override string PlatformDomain;;
-    public override PluginCategory Category;;
-    public string SemanticDescription;;
-    public string[] SemanticTags;;
-    public IReadOnlyDictionary<MicroservicesCategory, IReadOnlyList<MicroservicesStrategyBase>> StrategiesByCategory
-{
-    get
-    {
-        return _strategies.Values.GroupBy(s => s.Category).ToDictionary(g => g.Key, g => (IReadOnlyList<MicroservicesStrategyBase>)g.ToList());
-    }
-}
-    public UltimateMicroservicesPlugin();
-    public void RegisterStrategy(MicroservicesStrategyBase strategy);
-    public MicroservicesStrategyBase? GetStrategy(string strategyId);
-    public IReadOnlyList<MicroservicesStrategyBase> GetStrategiesForCategory(MicroservicesCategory category);;
-    public void RegisterService(MicroserviceConfig config);
-    public ServiceInstance? GetService(string serviceId);
-    public IReadOnlyList<ServiceInstance> ListServices();;
-    public void RecordRequest(ServiceRequest request, bool success, double durationMs);
-    public ServiceStatistics GetServiceStatistics(string serviceId);
-    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    protected override List<PluginCapabilityDescriptor> GetCapabilities();
-    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
-{
-    get
-    {
-        var capabilities = new List<RegisteredCapability>
-        {
-            new()
-            {
-                CapabilityId = $"{Id}.orchestration",
-                DisplayName = "Microservices Orchestration",
-                Description = "Orchestrate microservices architecture patterns",
-                Category = SDK.Contracts.CapabilityCategory.Infrastructure,
-                PluginId = Id,
-                PluginName = Name,
-                PluginVersion = Version,
-                Tags = ["microservices", "orchestration", "distributed"]
-            }
-        };
-        foreach (var strategy in _strategies.Values)
-        {
-            capabilities.Add(strategy.GetCapability());
-        }
-
-        return capabilities;
-    }
-}
-    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
-    protected override Dictionary<string, object> GetMetadata();
-    protected override Task OnStartCoreAsync(CancellationToken ct);;
-    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
-    public override Task OnMessageAsync(PluginMessage message);
-    protected override void Dispose(bool disposing);
-}
-```
-```csharp
-public sealed record ServiceStatistics
-{
-}
-    public required string ServiceId { get; init; }
-    public long TotalRequests { get; init; }
-    public int UniqueCallers { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/ApiGateway/ApiGatewayStrategies.cs
-```csharp
-public sealed class KongApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class OAuth2SecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -186,7 +186,7 @@ public sealed class KongApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class NginxApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class JwtSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -198,7 +198,7 @@ public sealed class NginxApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class EnvoyApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class MtlsSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -210,7 +210,7 @@ public sealed class EnvoyApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class AwsApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class ServiceMeshSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -222,7 +222,7 @@ public sealed class AwsApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class AzureApiManagementStrategy : MicroservicesStrategyBase
+public sealed class ApiKeySecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -234,7 +234,7 @@ public sealed class AzureApiManagementStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class GcpApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class SamlSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -246,7 +246,7 @@ public sealed class GcpApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class TykApiGatewayStrategy : MicroservicesStrategyBase
+public sealed class OpenIdConnectSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -258,21 +258,7 @@ public sealed class TykApiGatewayStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class ApisixApiGatewayStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs
-```csharp
-public sealed class HystrixCircuitBreakerStrategy : MicroservicesStrategyBase
+public sealed class RbacSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -284,7 +270,7 @@ public sealed class HystrixCircuitBreakerStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class Resilience4jCircuitBreakerStrategy : MicroservicesStrategyBase
+public sealed class SpiffeSpireSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -296,67 +282,7 @@ public sealed class Resilience4jCircuitBreakerStrategy : MicroservicesStrategyBa
 }
 ```
 ```csharp
-public sealed class PollyCircuitBreakerStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class BulkheadIsolationStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class TimeoutCircuitBreakerStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AdaptiveCircuitBreakerStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class HalfOpenCircuitBreakerStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class FailFastCircuitBreakerStrategy : MicroservicesStrategyBase
+public sealed class VaultSecretsSecurityStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -490,9 +416,37 @@ public sealed class NatsCommunicationStrategy : MicroservicesStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/LoadBalancing/LoadBalancingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/ServiceDiscovery/ServiceDiscoveryStrategies.cs
 ```csharp
-public sealed class RoundRobinLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class ConsulServiceDiscoveryStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<ServiceInstance?> DiscoverServiceAsync(string serviceName, CancellationToken ct = default);
+    public Task RegisterServiceAsync(ServiceInstance instance, CancellationToken ct = default);
+    public Task DeregisterServiceAsync(string instanceId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class EurekaServiceDiscoveryStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<ServiceInstance>> GetInstancesAsync(string serviceName, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ZookeeperServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -504,7 +458,7 @@ public sealed class RoundRobinLoadBalancingStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class LeastConnectionsLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class EtcdServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -516,7 +470,7 @@ public sealed class LeastConnectionsLoadBalancingStrategy : MicroservicesStrateg
 }
 ```
 ```csharp
-public sealed class WeightedLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class DnsServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -528,7 +482,7 @@ public sealed class WeightedLoadBalancingStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class IpHashLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class KubernetesServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -540,7 +494,7 @@ public sealed class IpHashLoadBalancingStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class ConsistentHashingLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class AwsCloudMapServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -552,7 +506,7 @@ public sealed class ConsistentHashingLoadBalancingStrategy : MicroservicesStrate
 }
 ```
 ```csharp
-public sealed class RandomLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class AzureServiceFabricDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -564,7 +518,7 @@ public sealed class RandomLoadBalancingStrategy : MicroservicesStrategyBase
 }
 ```
 ```csharp
-public sealed class ResponseTimeLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class NacosServiceDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -576,31 +530,7 @@ public sealed class ResponseTimeLoadBalancingStrategy : MicroservicesStrategyBas
 }
 ```
 ```csharp
-public sealed class ResourceBasedLoadBalancingStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class GeographicLoadBalancingStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PowerOfTwoChoicesLoadBalancingStrategy : MicroservicesStrategyBase
+public sealed class IstioServiceMeshDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;
@@ -734,6 +664,324 @@ public sealed class OpenTelemetryMonitoringStrategy : MicroservicesStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/ApiGateway/ApiGatewayStrategies.cs
+```csharp
+public sealed class KongApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class NginxApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class EnvoyApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AwsApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AzureApiManagementStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GcpApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TykApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ApisixApiGatewayStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/LoadBalancing/LoadBalancingStrategies.cs
+```csharp
+public sealed class RoundRobinLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class LeastConnectionsLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class WeightedLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class IpHashLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ConsistentHashingLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RandomLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ResponseTimeLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ResourceBasedLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GeographicLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PowerOfTwoChoicesLoadBalancingStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs
+```csharp
+public sealed class HystrixCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class Resilience4jCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PollyCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class BulkheadIsolationStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TimeoutCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AdaptiveCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class HalfOpenCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FailFastCircuitBreakerStrategy : MicroservicesStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override MicroservicesCategory Category;;
+    public override MicroservicesStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/Orchestration/OrchestrationStrategies.cs
 ```csharp
 public sealed class KubernetesOrchestrationStrategy : MicroservicesStrategyBase
@@ -845,254 +1093,6 @@ public sealed class OpenShiftOrchestrationStrategy : MicroservicesStrategyBase
 ```
 ```csharp
 public sealed class RancherOrchestrationStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/Security/SecurityStrategies.cs
-```csharp
-public sealed class OAuth2SecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class JwtSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class MtlsSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ServiceMeshSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ApiKeySecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SamlSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class OpenIdConnectSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class RbacSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SpiffeSpireSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class VaultSecretsSecurityStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateMicroservices/Strategies/ServiceDiscovery/ServiceDiscoveryStrategies.cs
-```csharp
-public sealed class ConsulServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<ServiceInstance?> DiscoverServiceAsync(string serviceName, CancellationToken ct = default);
-    public Task RegisterServiceAsync(ServiceInstance instance, CancellationToken ct = default);
-    public Task DeregisterServiceAsync(string instanceId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class EurekaServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<ServiceInstance>> GetInstancesAsync(string serviceName, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ZookeeperServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class EtcdServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DnsServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class KubernetesServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AwsCloudMapServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AzureServiceFabricDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class NacosServiceDiscoveryStrategy : MicroservicesStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override MicroservicesCategory Category;;
-    public override MicroservicesStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class IstioServiceMeshDiscoveryStrategy : MicroservicesStrategyBase
 {
 }
     public override string StrategyId;;

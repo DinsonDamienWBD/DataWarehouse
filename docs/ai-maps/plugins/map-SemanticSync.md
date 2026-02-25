@@ -86,86 +86,6 @@ internal sealed class SyncPipeline
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/EmbeddingClassifier.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
-public sealed class EmbeddingClassifier : SemanticSyncStrategyBase, ISemanticClassifier
-{
-}
-    public EmbeddingClassifier(IAIProvider aiProvider);
-    public override string StrategyId;;
-    public override string Name;;
-    public override string Description;;
-    public override string SemanticDomain;;
-    public override bool SupportsLocalInference;;
-    public SemanticClassifierCapabilities Capabilities { get; };
-    public async Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
-    public async Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/HybridClassifier.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
-public sealed class HybridClassifier : SemanticSyncStrategyBase, ISemanticClassifier
-{
-}
-    public HybridClassifier(ISemanticClassifier embeddingClassifier, ISemanticClassifier ruleBasedClassifier, double embeddingWeight = 0.7);
-    public override string StrategyId;;
-    public override string Name;;
-    public override string Description;;
-    public override string SemanticDomain;;
-    public override bool SupportsLocalInference;;
-    public SemanticClassifierCapabilities Capabilities;;
-    public async Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
-    public async Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/RuleBasedClassifier.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
-public sealed class RuleBasedClassifier : SemanticSyncStrategyBase, ISemanticClassifier
-{
-#endregion
-}
-    public RuleBasedClassifier();
-    public override string StrategyId;;
-    public override string Name;;
-    public override string Description;;
-    public override string SemanticDomain;;
-    public override bool SupportsLocalInference;;
-    public SemanticClassifierCapabilities Capabilities { get; };
-    public Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
-    public Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/ConflictResolution/ConflictClassificationEngine.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
-internal sealed class ConflictClassificationEngine
-{
-}
-    public ConflictType Classify(SemanticConflict conflict, double? similarityScore);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/ConflictResolution/EmbeddingSimilarityDetector.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
-internal sealed class EmbeddingSimilarityDetector
-{
-}
-    public EmbeddingSimilarityDetector(IAIProvider? aiProvider = null);
-    public double? LastSimilarityScore { get; private set; }
-    public async Task<SemanticConflict?> DetectAsync(string dataId, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/ConflictResolution/SemanticMergeResolver.cs
 ```csharp
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
@@ -182,6 +102,75 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
     public Task<SemanticConflict?> DetectConflictAsync(string dataId, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, CancellationToken ct = default);
     public Task<ConflictType> ClassifyConflictAsync(SemanticConflict conflict, CancellationToken ct = default);
     public Task<ConflictResolutionResult> ResolveAsync(SemanticConflict conflict, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/ConflictResolution/EmbeddingSimilarityDetector.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
+internal sealed class EmbeddingSimilarityDetector
+{
+}
+    public EmbeddingSimilarityDetector(IAIProvider? aiProvider = null);
+    public double? LastSimilarityScore { get; private set; }
+    public async Task<SemanticConflict?> DetectAsync(string dataId, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/ConflictResolution/ConflictClassificationEngine.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
+internal sealed class ConflictClassificationEngine
+{
+}
+    public ConflictType Classify(SemanticConflict conflict, double? similarityScore);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/FidelityPolicyEngine.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
+internal sealed class FidelityPolicyEngine
+{
+}
+    public FidelityPolicyEngine(FidelityPolicy policy);
+    public SyncFidelity ApplyPolicy(SemanticClassification classification, SyncFidelity proposedFidelity);
+    public SyncFidelity GetFidelityForBandwidth(long bandwidthBps);
+    public bool ShouldDefer(SemanticClassification classification, FidelityBudget budget);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/AdaptiveFidelityController.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
+public sealed class AdaptiveFidelityController : SemanticSyncStrategyBase, ISyncFidelityController
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override string Description;;
+    public override string SemanticDomain;;
+    internal AdaptiveFidelityController(BandwidthBudgetTracker tracker, FidelityPolicyEngine policyEngine);
+    public Task<SyncDecision> DecideFidelityAsync(SemanticClassification classification, FidelityBudget budget, CancellationToken ct = default);
+    public Task<FidelityBudget> GetCurrentBudgetAsync(CancellationToken ct = default);
+    public Task UpdateBandwidthAsync(long currentBandwidthBps, CancellationToken ct = default);
+    public Task SetPolicyAsync(FidelityPolicy policy, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/BandwidthBudgetTracker.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
+internal sealed class BandwidthBudgetTracker
+{
+}
+    public BandwidthBudgetTracker();
+    public void UpdateBandwidth(long currentBps);
+    public void RecordConsumption(SyncFidelity fidelity, long bytes);
+    public void RecordSyncQueued();
+    public void RecordSyncCompleted();
+    public FidelityBudget GetCurrentBudget();
+    public double GetRemainingCapacityPercent();
 }
 ```
 
@@ -234,50 +223,61 @@ internal sealed class LocalModelManager : IDisposable
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/AdaptiveFidelityController.cs
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/HybridClassifier.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
-public sealed class AdaptiveFidelityController : SemanticSyncStrategyBase, ISyncFidelityController
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
+public sealed class HybridClassifier : SemanticSyncStrategyBase, ISemanticClassifier
 {
 }
+    public HybridClassifier(ISemanticClassifier embeddingClassifier, ISemanticClassifier ruleBasedClassifier, double embeddingWeight = 0.7);
     public override string StrategyId;;
     public override string Name;;
     public override string Description;;
     public override string SemanticDomain;;
-    internal AdaptiveFidelityController(BandwidthBudgetTracker tracker, FidelityPolicyEngine policyEngine);
-    public Task<SyncDecision> DecideFidelityAsync(SemanticClassification classification, FidelityBudget budget, CancellationToken ct = default);
-    public Task<FidelityBudget> GetCurrentBudgetAsync(CancellationToken ct = default);
-    public Task UpdateBandwidthAsync(long currentBandwidthBps, CancellationToken ct = default);
-    public Task SetPolicyAsync(FidelityPolicy policy, CancellationToken ct = default);
+    public override bool SupportsLocalInference;;
+    public SemanticClassifierCapabilities Capabilities;;
+    public async Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
+    public async Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/BandwidthBudgetTracker.cs
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/EmbeddingClassifier.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
-internal sealed class BandwidthBudgetTracker
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
+public sealed class EmbeddingClassifier : SemanticSyncStrategyBase, ISemanticClassifier
 {
 }
-    public BandwidthBudgetTracker();
-    public void UpdateBandwidth(long currentBps);
-    public void RecordConsumption(SyncFidelity fidelity, long bytes);
-    public void RecordSyncQueued();
-    public void RecordSyncCompleted();
-    public FidelityBudget GetCurrentBudget();
-    public double GetRemainingCapacityPercent();
+    public EmbeddingClassifier(IAIProvider aiProvider);
+    public override string StrategyId;;
+    public override string Name;;
+    public override string Description;;
+    public override string SemanticDomain;;
+    public override bool SupportsLocalInference;;
+    public SemanticClassifierCapabilities Capabilities { get; };
+    public async Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
+    public async Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Fidelity/FidelityPolicyEngine.cs
+### File: Plugins/DataWarehouse.Plugins.SemanticSync/Strategies/Classification/RuleBasedClassifier.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic conflict resolution")]
-internal sealed class FidelityPolicyEngine
+[SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
+public sealed class RuleBasedClassifier : SemanticSyncStrategyBase, ISemanticClassifier
 {
+#endregion
 }
-    public FidelityPolicyEngine(FidelityPolicy policy);
-    public SyncFidelity ApplyPolicy(SemanticClassification classification, SyncFidelity proposedFidelity);
-    public SyncFidelity GetFidelityForBandwidth(long bandwidthBps);
-    public bool ShouldDefer(SemanticClassification classification, FidelityBudget budget);
+    public RuleBasedClassifier();
+    public override string StrategyId;;
+    public override string Name;;
+    public override string Description;;
+    public override string SemanticDomain;;
+    public override bool SupportsLocalInference;;
+    public SemanticClassifierCapabilities Capabilities { get; };
+    public Task<SemanticClassification> ClassifyAsync(ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public async IAsyncEnumerable<SemanticClassification> ClassifyBatchAsync(IAsyncEnumerable<(string DataId, ReadOnlyMemory<byte> Data)> items, [EnumeratorCancellation] CancellationToken ct = default);
+    public Task<double> ComputeSemanticSimilarityAsync(ReadOnlyMemory<byte> data1, ReadOnlyMemory<byte> data2, CancellationToken ct = default);
 }
 ```
 

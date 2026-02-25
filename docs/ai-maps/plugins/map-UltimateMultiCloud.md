@@ -362,463 +362,380 @@ public sealed record ArbitrageDecision
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Abstraction/CloudAbstractionStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs
 ```csharp
-public sealed class UnifiedCloudApiStrategy : MultiCloudStrategyBase
+public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterAdapter(string providerId, CloudProviderAdapter adapter);
-    public ICloudStorageAbstraction GetStorage(string providerId);
-    public ICloudComputeAbstraction GetCompute(string providerId);
-    public async Task<CloudOperationResult> ExecuteAsync(string operation, string? preferredProvider, Dictionary<string, object> parameters, CancellationToken ct = default);
+    public UnifiedIdentity CreateIdentity(string identityId, string email, string displayName);
+    public void MapRole(string unifiedRole, string providerId, string providerRole);
+    public void AssignRole(string identityId, string unifiedRole);
+    public UnifiedIdentity? GetIdentity(string identityId);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class AwsCloudAdapterStrategy : MultiCloudStrategyBase
+public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public CloudProviderAdapter CreateAdapter(string region, string accessKey, string secretKey);
-}
-```
-```csharp
-public sealed class AzureCloudAdapterStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-    public CloudProviderAdapter CreateAdapter(string subscriptionId, string tenantId);
-}
-```
-```csharp
-public sealed class GcpCloudAdapterStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-    public CloudProviderAdapter CreateAdapter(string projectId);
-}
-```
-```csharp
-public sealed class AlibabaCloudAdapterStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-}
-```
-```csharp
-public sealed class OracleCloudAdapterStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-}
-```
-```csharp
-public sealed class IbmCloudAdapterStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-}
-```
-```csharp
-public sealed class ResourceNormalizationStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-    public NormalizedResource Normalize(string providerId, string resourceType, string resourceId);
-}
-```
-```csharp
-public sealed class CloudProviderAdapter
-{
-}
-    public required string ProviderId { get; init; }
-    public required CloudProviderType ProviderType { get; init; }
-    public required string Region { get; init; }
-    public required ICloudStorageAbstraction Storage { get; init; }
-    public required ICloudComputeAbstraction Compute { get; init; }
-    public Task<object?> ExecuteOperationAsync(string operation, Dictionary<string, object> parameters, CancellationToken ct);
-}
-```
-```csharp
-public interface ICloudStorageAbstraction
-{
-}
-    Task<Stream> ReadAsync(string path, CancellationToken ct);;
-    Task WriteAsync(string path, Stream data, CancellationToken ct);;
-    Task DeleteAsync(string path, CancellationToken ct);;
-    Task<bool> ExistsAsync(string path, CancellationToken ct);;
-}
-```
-```csharp
-public interface ICloudComputeAbstraction
-{
-}
-    Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
-    Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
-    Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class ComputeInstanceSpec
-{
-}
-    public required string InstanceType { get; init; }
-    public required string ImageId { get; init; }
-    public string? Region { get; init; }
-    public Dictionary<string, string> Tags { get; init; };
-}
-```
-```csharp
-public sealed class ComputeInstanceStatus
-{
-}
-    public required string InstanceId { get; init; }
-    public required string State { get; init; }
-    public string? PublicIp { get; init; }
-    public string? PrivateIp { get; init; }
-}
-```
-```csharp
-public sealed class CloudOperationResult
-{
-}
-    public bool Success { get; init; }
-    public string? ProviderId { get; init; }
-    public TimeSpan Duration { get; init; }
-    public object? Data { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed class NormalizedResource
-{
-}
-    public required string UniversalId { get; init; }
-    public required string ProviderId { get; init; }
-    public required string ResourceType { get; init; }
-    public required string NativeId { get; init; }
-}
-```
-```csharp
-public sealed class AwsStorageAbstraction : ICloudStorageAbstraction
-{
-}
-    public AwsStorageAbstraction(IAmazonS3? s3Client = null);
-    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
-    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
-    public async Task DeleteAsync(string path, CancellationToken ct);
-    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AwsComputeAbstraction : ICloudComputeAbstraction
-{
-}
-    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
-    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
-    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class AzureStorageAbstraction : ICloudStorageAbstraction
-{
-}
-    public AzureStorageAbstraction(BlobServiceClient? blobServiceClient = null);
-    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
-    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
-    public async Task DeleteAsync(string path, CancellationToken ct);
-    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AzureComputeAbstraction : ICloudComputeAbstraction
-{
-}
-    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
-    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
-    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
-}
-```
-```csharp
-public sealed class GcpStorageAbstraction : ICloudStorageAbstraction
-{
-}
-    public GcpStorageAbstraction(StorageClient? storageClient = null);
-    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
-    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
-    public async Task DeleteAsync(string path, CancellationToken ct);
-    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
-}
-```
-```csharp
-public sealed class GcpComputeAbstraction : ICloudComputeAbstraction
-{
-}
-    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
-    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
-    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Arbitrage/CloudArbitrageStrategies.cs
-```csharp
-public sealed class RealTimePricingArbitrageStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-    public void UpdatePricing(string providerId, string resourceType, string region, double pricePerUnit);
-    public IReadOnlyList<ArbitrageOpportunity> GetOpportunities(double minSavingsPercent = 10);
-    public PricingSnapshot? GetBestPrice(string resourceType);
+    public EncryptionKeyInfo CreateMasterKey(string keyId, string? description = null);
+    public EncryptedData Encrypt(string keyId, ReadOnlySpan<byte> plaintext);
+    public KeyReplicationResult ReplicateKey(string keyId, string targetProvider);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class WorkloadPlacementArbitrageStrategy : MultiCloudStrategyBase
+public sealed class CrossCloudComplianceStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterWorkload(string workloadId, WorkloadRequirements requirements, double currentMonthlyCost);
-    public PlacementRecommendation GetPlacementRecommendation(string workloadId, IEnumerable<ProviderOffer> offers);
+    public void RegisterPolicy(string policyId, string name, ComplianceFramework framework, IEnumerable<ComplianceRule> rules);
+    public ComplianceCheckResult ValidateResource(string resourceId, string providerId, Dictionary<string, object> resourceProperties);
+    public ComplianceStatusSummary GetComplianceStatus();
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class SpotInstanceArbitrageStrategy : MultiCloudStrategyBase
+public sealed class ZeroTrustNetworkStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void UpdateSpotOffer(string providerId, string instanceType, string region, double spotPrice, double onDemandPrice, double interruptionProbability);
-    public SpotInstanceOffer? GetBestSpotOffer(string instanceType, double maxInterruptionProbability = 0.20);
-    public IReadOnlyList<SpotArbitrageOpportunity> GetSpotArbitrageOpportunities();
+    public void CreatePolicy(string policyId, string resourcePattern, AccessRequirements requirements);
+    public AccessDecision EvaluateAccess(AccessRequest request);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class MarketBasedSchedulingStrategy : MultiCloudStrategyBase
+public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RecordPriceWindow(string providerId, double price, DateTimeOffset start, DateTimeOffset end);
-    public OptimalWindow FindOptimalWindow(JobRequirements requirements, int hoursAhead = 24);
-    public string ScheduleJob(string jobId, JobRequirements requirements);
+    public void StoreSecret(string secretId, string value, Dictionary<string, string>? tags = null);
+    public string? GetSecret(string secretId, string requesterId);
+    public void RotateSecret(string secretId, string newValue);
+    public IReadOnlyList<SecretAccess> GetAccessLog(string secretId);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class BandwidthArbitrageStrategy : MultiCloudStrategyBase
+public sealed class CrossCloudThreatDetectionStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void SetPricing(string sourceProvider, string destProvider, double pricePerGb, int latencyMs);
-    public TransferRoute FindCheapestRoute(string source, string dest, double dataSizeGb);
+    public ThreatAnalysisResult AnalyzeEvent(SecurityEvent securityEvent);
+    public void AddIndicator(string indicatorId, string pattern, string threatType, string severity);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class PricingSnapshot
+public sealed class UnifiedIdentity
 {
 }
-    public required string ProviderId { get; init; }
-    public required string ResourceType { get; init; }
-    public required string Region { get; init; }
-    public double PricePerUnit { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed class ArbitrageOpportunity
-{
-}
-    public required string OpportunityId { get; init; }
-    public required string ResourceType { get; init; }
-    public required string CheapestProvider { get; init; }
-    public required string CheapestRegion { get; init; }
-    public double CheapestPrice { get; init; }
-    public required string ExpensiveProvider { get; init; }
-    public double ExpensivePrice { get; init; }
-    public double SavingsPercent { get; init; }
-    public DateTimeOffset DetectedAt { get; init; }
-    public DateTimeOffset ExpiresAt { get; init; }
-}
-```
-```csharp
-public sealed class WorkloadProfile
-{
-}
-    public required string WorkloadId { get; init; }
-    public required WorkloadRequirements Requirements { get; init; }
-    public double CurrentMonthlyCost { get; init; }
+    public required string IdentityId { get; init; }
+    public required string Email { get; init; }
+    public required string DisplayName { get; init; }
+    public HashSet<string> Roles { get; };
+    public Dictionary<string, ProviderCredential> ProviderCredentials { get; };
     public DateTimeOffset CreatedAt { get; init; }
 }
 ```
 ```csharp
-public sealed class WorkloadRequirements
+public sealed class ProviderRoleMapping
 {
 }
-    public int MinCpuCores { get; init; }
-    public int MinMemoryGb { get; init; }
-    public int MinStorageGb { get; init; }
-    public List<string> RequiredRegions { get; init; };
-    public bool RequiresGpu { get; init; }
+    public required string UnifiedRole { get; init; }
+    public required string ProviderId { get; init; }
+    public required string ProviderRole { get; init; }
 }
 ```
 ```csharp
-public sealed class ProviderOffer
+public sealed class ProviderCredential
 {
 }
     public required string ProviderId { get; init; }
-    public required string Region { get; init; }
-    public int CpuCores { get; init; }
-    public int MemoryGb { get; init; }
-    public int StorageGb { get; init; }
-    public double MonthlyCost { get; init; }
-    public bool HasGpu { get; init; }
+    public required string ProviderRole { get; init; }
+    public DateTimeOffset GrantedAt { get; init; }
 }
 ```
 ```csharp
-public sealed class PlacementRecommendation
+public sealed class EncryptionKeyInfo
+{
+}
+    public required string KeyId { get; init; }
+    public required string Algorithm { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public string? Description { get; init; }
+    public string? KeyHash { get; init; }
+    public HashSet<string> ReplicatedTo { get; };
+}
+```
+```csharp
+public sealed class EncryptedData
+{
+}
+    public required string KeyId { get; init; }
+    public required byte[] Ciphertext { get; init; }
+    public required byte[] Nonce { get; init; }
+    public required string Algorithm { get; init; }
+}
+```
+```csharp
+public sealed class KeyReplicationResult
 {
 }
     public bool Success { get; init; }
-    public string? WorkloadId { get; init; }
-    public string? RecommendedProvider { get; init; }
-    public string? RecommendedRegion { get; init; }
-    public double EstimatedMonthlyCost { get; init; }
-    public double MonthlySavings { get; init; }
-    public string? Reason { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? KeyId { get; init; }
+    public string? TargetProvider { get; init; }
+    public DateTimeOffset ReplicatedAt { get; init; }
 }
 ```
 ```csharp
-public sealed class SpotInstanceOffer
+public sealed class CompliancePolicy
 {
 }
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public ComplianceFramework Framework { get; init; }
+    public List<ComplianceRule> Rules { get; init; };
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string Description { get; init; }
+    public string? PropertyName { get; init; }
+    public required string Severity { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceViolation
+{
+}
+    public required string ViolationId { get; init; }
+    public required string PolicyId { get; init; }
+    public required string RuleId { get; init; }
+    public required string ResourceId { get; init; }
     public required string ProviderId { get; init; }
-    public required string InstanceType { get; init; }
-    public required string Region { get; init; }
-    public double SpotPrice { get; init; }
-    public double OnDemandPrice { get; init; }
-    public double Savings { get; init; }
-    public double InterruptionProbability { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
+    public required string Severity { get; init; }
+    public required string Description { get; init; }
+    public DateTimeOffset DetectedAt { get; init; }
 }
 ```
 ```csharp
-public sealed class SpotArbitrageOpportunity
+public sealed class ComplianceCheckResult
 {
 }
-    public required string InstanceType { get; init; }
-    public required string CheapestProvider { get; init; }
-    public required string CheapestRegion { get; init; }
-    public double CheapestPrice { get; init; }
-    public required string ExpensiveProvider { get; init; }
-    public double ExpensivePrice { get; init; }
-    public double SavingsPercent { get; init; }
-    public double InterruptionRisk { get; init; }
+    public required string ResourceId { get; init; }
+    public bool IsCompliant { get; init; }
+    public List<ComplianceViolation> Violations { get; init; };
+    public DateTimeOffset CheckedAt { get; init; }
 }
 ```
 ```csharp
-public sealed class PriceWindow
+public sealed class ComplianceStatusSummary
 {
 }
+    public int TotalPolicies { get; init; }
+    public int TotalViolations { get; init; }
+    public int CriticalViolations { get; init; }
+    public int HighViolations { get; init; }
+    public Dictionary<string, int> ByFramework { get; init; };
+}
+```
+```csharp
+public sealed class TrustPolicy
+{
+}
+    public required string PolicyId { get; init; }
+    public required string ResourcePattern { get; init; }
+    public required AccessRequirements Requirements { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed class AccessRequirements
+{
+}
+    public bool RequireMfa { get; init; }
+    public List<string>? AllowedSourceIps { get; init; }
+    public List<string>? RequiredRoles { get; init; }
+    public int? MaxSessionDurationMinutes { get; init; }
+}
+```
+```csharp
+public sealed class AccessRequest
+{
+}
+    public required string RequestId { get; init; }
+    public required string ResourceId { get; init; }
+    public required string RequesterId { get; init; }
+    public required string SourceIp { get; init; }
+    public bool MfaVerified { get; init; }
+    public List<string> Roles { get; init; };
+}
+```
+```csharp
+public sealed class AccessDecision
+{
+}
+    public required string DecisionId { get; init; }
+    public required string RequestId { get; init; }
+    public bool Allowed { get; set; }
+    public string? DenialReason { get; set; }
+    public DateTimeOffset EvaluatedAt { get; init; }
+}
+```
+```csharp
+public sealed class SecretEntry
+{
+}
+    public required string SecretId { get; init; }
+    public required string EncryptedValue { get; set; }
+    public int Version { get; set; }
+    public Dictionary<string, string> Tags { get; init; };
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? LastRotated { get; set; }
+}
+```
+```csharp
+public sealed class SecretAccess
+{
+}
+    public required string SecretId { get; init; }
+    public required string RequesterId { get; init; }
+    public DateTimeOffset AccessedAt { get; init; }
+    public required string AccessType { get; init; }
+}
+```
+```csharp
+public sealed class SecurityEvent
+{
+}
+    public string EventId { get; init; };
     public required string ProviderId { get; init; }
-    public double Price { get; init; }
-    public DateTimeOffset StartTime { get; init; }
-    public DateTimeOffset EndTime { get; init; }
+    public required string EventType { get; init; }
+    public required string SourceId { get; init; }
+    public DateTimeOffset Timestamp { get; init; };
+    public Dictionary<string, object> Properties { get; init; };
+    public string? ResourceId { get; init; }
+    public string Severity { get; init; };
+    public string? Message { get; init; }
 }
 ```
 ```csharp
-public sealed class JobRequirements
+public sealed class ThreatIndicator
 {
 }
-    public required string ResourceType { get; init; }
-    public int EstimatedDurationMinutes { get; init; }
-    public bool CanBeInterrupted { get; init; }
-    public DateTimeOffset? Deadline { get; init; }
+    public required string IndicatorId { get; init; }
+    public required string Pattern { get; init; }
+    public required string ThreatType { get; init; }
+    public required string Severity { get; init; }
+    public string? Description { get; init; }
 }
 ```
 ```csharp
-public sealed class ScheduledJob
+public sealed class DetectedThreat
 {
 }
-    public required string JobId { get; init; }
-    public required JobRequirements Requirements { get; init; }
-    public required string ScheduledProvider { get; init; }
-    public DateTimeOffset ScheduledTime { get; init; }
-    public double EstimatedCost { get; init; }
-    public required string Status { get; init; }
-}
-```
-```csharp
-public sealed class OptimalWindow
-{
-}
-    public bool Found { get; init; }
-    public string? ProviderId { get; init; }
-    public DateTimeOffset StartTime { get; init; }
-    public double EstimatedPrice { get; init; }
-    public double Confidence { get; init; }
-}
-```
-```csharp
-public sealed class BandwidthPricing
-{
-}
+    public required string ThreatId { get; init; }
+    public string? IndicatorId { get; init; }
+    public required string ThreatType { get; init; }
+    public required string Severity { get; init; }
+    public DateTimeOffset DetectedAt { get; init; }
     public required string SourceProvider { get; init; }
-    public required string DestProvider { get; init; }
-    public double PricePerGb { get; init; }
-    public int TypicalLatencyMs { get; init; }
+    public string? Description { get; init; }
 }
 ```
 ```csharp
-public sealed class TransferRoute
+public sealed class ThreatAnalysisResult
 {
 }
-    public required string Source { get; init; }
-    public required string Destination { get; init; }
-    public string? ViaProvider { get; init; }
-    public double TotalCost { get; init; }
-    public int EstimatedLatencyMs { get; init; }
-    public double SavingsVsDirect { get; init; }
+    public required string EventId { get; init; }
+    public List<DetectedThreat> Threats { get; init; };
+    public DateTimeOffset AnalyzedAt { get; init; }
+}
+```
+```csharp
+public sealed class SiemIntegrationStrategy : MultiCloudStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+    public void RegisterSiemEndpoint(string endpointId, SiemType siemType, string url, Dictionary<string, string> credentials);
+    public async Task<SiemSendResult> SendEventAsync(SecurityEvent evt, CancellationToken ct = default);
+    public async Task<BatchSiemSendResult> SendBatchAsync(IEnumerable<SecurityEvent> events, CancellationToken ct = default);
+    public async Task<SiemQueryResult> QueryAsync(string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
+    public IReadOnlyDictionary<string, long> GetEventStatistics();;
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class SiemEndpoint
+{
+}
+    public required string EndpointId { get; init; }
+    public required SiemType SiemType { get; init; }
+    public required string Url { get; init; }
+    public required Dictionary<string, string> Credentials { get; init; }
+    public DateTimeOffset RegisteredAt { get; init; }
+    public bool IsActive { get; set; }
+}
+```
+```csharp
+public sealed class SiemSendResult
+{
+}
+    public required string EventId { get; init; }
+    public DateTimeOffset SentAt { get; init; }
+    public required Dictionary<string, bool> EndpointResults { get; init; }
+}
+```
+```csharp
+public sealed class BatchSiemSendResult
+{
+}
+    public int TotalEvents { get; init; }
+    public int SuccessfulEvents { get; init; }
+    public int FailedEvents { get; init; }
+    public required List<SiemSendResult> Results { get; init; }
+}
+```
+```csharp
+public sealed class SiemQueryResult
+{
+}
+    public required string Query { get; init; }
+    public DateTimeOffset From { get; init; }
+    public DateTimeOffset To { get; init; }
+    public int MatchCount { get; init; }
+    public required List<SecurityEvent> Events { get; init; }
 }
 ```
 
@@ -1079,183 +996,240 @@ public sealed class AnomalyDetectionResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Failover/CloudFailoverStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Arbitrage/CloudArbitrageStrategies.cs
 ```csharp
-public sealed class AutomaticCloudFailoverStrategy : MultiCloudStrategyBase
+public sealed class RealTimePricingArbitrageStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public string? ActiveProvider;;
-    public void Configure(string providerId, FailoverConfiguration config);
-    public FailoverDecision ReportHealthCheck(string providerId, bool isHealthy, double latencyMs, double errorRate);
+    public void UpdatePricing(string providerId, string resourceType, string region, double pricePerUnit);
+    public IReadOnlyList<ArbitrageOpportunity> GetOpportunities(double minSavingsPercent = 10);
+    public PricingSnapshot? GetBestPrice(string resourceType);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class ActiveActiveCloudStrategy : MultiCloudStrategyBase
+public sealed class WorkloadPlacementArbitrageStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void SetWeight(string providerId, int weight, bool isHealthy = true);
-    public string SelectProvider();
-    public IReadOnlyDictionary<string, double> GetDistribution();
+    public void RegisterWorkload(string workloadId, WorkloadRequirements requirements, double currentMonthlyCost);
+    public PlacementRecommendation GetPlacementRecommendation(string workloadId, IEnumerable<ProviderOffer> offers);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class ActivePassiveCloudStrategy : MultiCloudStrategyBase
+public sealed class SpotInstanceArbitrageStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public string? PrimaryProvider;;
-    public void SetPrimary(string providerId);
-    public void AddStandby(string providerId);
-    public FailoverResult PromoteStandby(string? preferredStandby = null);
-    public void UpdateHealth(string providerId, bool isHealthy);
+    public void UpdateSpotOffer(string providerId, string instanceType, string region, double spotPrice, double onDemandPrice, double interruptionProbability);
+    public SpotInstanceOffer? GetBestSpotOffer(string instanceType, double maxInterruptionProbability = 0.20);
+    public IReadOnlyList<SpotArbitrageOpportunity> GetSpotArbitrageOpportunities();
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class HealthBasedRoutingStrategy : MultiCloudStrategyBase
+public sealed class MarketBasedSchedulingStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterProvider(string providerId, int failureThreshold = 5, TimeSpan? resetTimeout = null);
-    public string? GetAvailableProvider();
-    public void ReportSuccess(string providerId);
-    public void ReportFailure(string providerId);
-    public IReadOnlyDictionary<string, CircuitState> GetCircuitStatus();
-    protected override string? GetCurrentState();
-}
-```
-```csharp
-public sealed class DnsFailoverStrategy : MultiCloudStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterRecord(string hostname, string providerId, string endpoint, int priority = 100, int ttl = 60);
-    public string? Resolve(string hostname);
-    public void UpdateHealth(string hostname, string providerId, bool isHealthy);
+    public void RecordPriceWindow(string providerId, double price, DateTimeOffset start, DateTimeOffset end);
+    public OptimalWindow FindOptimalWindow(JobRequirements requirements, int hoursAhead = 24);
+    public string ScheduleJob(string jobId, JobRequirements requirements);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class LatencyBasedFailoverStrategy : MultiCloudStrategyBase
+public sealed class BandwidthArbitrageStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RecordLatency(string providerId, double latencyMs);
-    public string? GetLowestLatencyProvider();
-    public IReadOnlyDictionary<string, double> GetLatencyStats();
-    protected override string? GetCurrentState();
+    public void SetPricing(string sourceProvider, string destProvider, double pricePerGb, int latencyMs);
+    public TransferRoute FindCheapestRoute(string source, string dest, double dataSizeGb);
+    protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class ProviderHealthState
+public sealed class PricingSnapshot
 {
 }
     public required string ProviderId { get; init; }
-    public bool IsHealthy { get; set; }
-    public int ConsecutiveFailures { get; set; }
-    public double LastLatencyMs { get; set; }
-    public double LastErrorRate { get; set; }
-    public DateTimeOffset LastCheck { get; set; }
+    public required string ResourceType { get; init; }
+    public required string Region { get; init; }
+    public double PricePerUnit { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
 }
 ```
 ```csharp
-public sealed class FailoverConfiguration
+public sealed class ArbitrageOpportunity
 {
 }
-    public int Priority { get; init; };
-    public int FailureThreshold { get; init; };
-    public TimeSpan HealthCheckInterval { get; init; };
-    public double MaxLatencyMs { get; init; };
-    public double MaxErrorRate { get; init; };
+    public required string OpportunityId { get; init; }
+    public required string ResourceType { get; init; }
+    public required string CheapestProvider { get; init; }
+    public required string CheapestRegion { get; init; }
+    public double CheapestPrice { get; init; }
+    public required string ExpensiveProvider { get; init; }
+    public double ExpensivePrice { get; init; }
+    public double SavingsPercent { get; init; }
+    public DateTimeOffset DetectedAt { get; init; }
+    public DateTimeOffset ExpiresAt { get; init; }
 }
 ```
 ```csharp
-public sealed class FailoverDecision
+public sealed class WorkloadProfile
 {
 }
-    public bool ShouldFailover { get; init; }
-    public string? FromProvider { get; init; }
-    public string? ToProvider { get; init; }
+    public required string WorkloadId { get; init; }
+    public required WorkloadRequirements Requirements { get; init; }
+    public double CurrentMonthlyCost { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed class WorkloadRequirements
+{
+}
+    public int MinCpuCores { get; init; }
+    public int MinMemoryGb { get; init; }
+    public int MinStorageGb { get; init; }
+    public List<string> RequiredRegions { get; init; };
+    public bool RequiresGpu { get; init; }
+}
+```
+```csharp
+public sealed class ProviderOffer
+{
+}
+    public required string ProviderId { get; init; }
+    public required string Region { get; init; }
+    public int CpuCores { get; init; }
+    public int MemoryGb { get; init; }
+    public int StorageGb { get; init; }
+    public double MonthlyCost { get; init; }
+    public bool HasGpu { get; init; }
+}
+```
+```csharp
+public sealed class PlacementRecommendation
+{
+}
+    public bool Success { get; init; }
+    public string? WorkloadId { get; init; }
+    public string? RecommendedProvider { get; init; }
+    public string? RecommendedRegion { get; init; }
+    public double EstimatedMonthlyCost { get; init; }
+    public double MonthlySavings { get; init; }
     public string? Reason { get; init; }
 }
 ```
 ```csharp
-public sealed class ProviderWeight
+public sealed class SpotInstanceOffer
 {
 }
     public required string ProviderId { get; init; }
-    public int Weight { get; set; }
-    public bool IsHealthy { get; set; }
+    public required string InstanceType { get; init; }
+    public required string Region { get; init; }
+    public double SpotPrice { get; init; }
+    public double OnDemandPrice { get; init; }
+    public double Savings { get; init; }
+    public double InterruptionProbability { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
 }
 ```
 ```csharp
-public sealed class FailoverResult
+public sealed class SpotArbitrageOpportunity
 {
 }
-    public bool Success { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? PreviousPrimary { get; init; }
-    public string? NewPrimary { get; init; }
+    public required string InstanceType { get; init; }
+    public required string CheapestProvider { get; init; }
+    public required string CheapestRegion { get; init; }
+    public double CheapestPrice { get; init; }
+    public required string ExpensiveProvider { get; init; }
+    public double ExpensivePrice { get; init; }
+    public double SavingsPercent { get; init; }
+    public double InterruptionRisk { get; init; }
 }
 ```
 ```csharp
-public sealed class CircuitBreakerState
-{
-}
-    public required string ProviderId { get; init; }
-    public int FailureThreshold { get; init; }
-    public TimeSpan ResetTimeout { get; init; }
-    public CircuitState State { get; set; }
-    public int FailureCount { get; set; }
-    public DateTimeOffset? OpenedAt { get; set; }
-    public DateTimeOffset? LastSuccess { get; set; }
-    public DateTimeOffset? LastFailure { get; set; }
-}
-```
-```csharp
-public sealed class DnsRecord
-{
-}
-    public required string Hostname { get; init; }
-    public required string ProviderId { get; init; }
-    public required string Endpoint { get; init; }
-    public int Priority { get; init; }
-    public int Ttl { get; init; }
-    public bool IsHealthy { get; set; }
-    public DateTimeOffset LastCheck { get; set; }
-}
-```
-```csharp
-public sealed class LatencyMeasurement
+public sealed class PriceWindow
 {
 }
     public required string ProviderId { get; init; }
-    public double CurrentLatencyMs { get; set; }
-    public double AverageLatencyMs { get; set; }
-    public int SampleCount { get; set; }
-    public DateTimeOffset LastUpdate { get; set; }
+    public double Price { get; init; }
+    public DateTimeOffset StartTime { get; init; }
+    public DateTimeOffset EndTime { get; init; }
+}
+```
+```csharp
+public sealed class JobRequirements
+{
+}
+    public required string ResourceType { get; init; }
+    public int EstimatedDurationMinutes { get; init; }
+    public bool CanBeInterrupted { get; init; }
+    public DateTimeOffset? Deadline { get; init; }
+}
+```
+```csharp
+public sealed class ScheduledJob
+{
+}
+    public required string JobId { get; init; }
+    public required JobRequirements Requirements { get; init; }
+    public required string ScheduledProvider { get; init; }
+    public DateTimeOffset ScheduledTime { get; init; }
+    public double EstimatedCost { get; init; }
+    public required string Status { get; init; }
+}
+```
+```csharp
+public sealed class OptimalWindow
+{
+}
+    public bool Found { get; init; }
+    public string? ProviderId { get; init; }
+    public DateTimeOffset StartTime { get; init; }
+    public double EstimatedPrice { get; init; }
+    public double Confidence { get; init; }
+}
+```
+```csharp
+public sealed class BandwidthPricing
+{
+}
+    public required string SourceProvider { get; init; }
+    public required string DestProvider { get; init; }
+    public double PricePerGb { get; init; }
+    public int TypicalLatencyMs { get; init; }
+}
+```
+```csharp
+public sealed class TransferRoute
+{
+}
+    public required string Source { get; init; }
+    public required string Destination { get; init; }
+    public string? ViaProvider { get; init; }
+    public double TotalCost { get; init; }
+    public int EstimatedLatencyMs { get; init; }
+    public double SavingsVsDirect { get; init; }
 }
 ```
 
@@ -2091,379 +2065,405 @@ public sealed class CrdtMergeResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Failover/CloudFailoverStrategies.cs
 ```csharp
-public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
+public sealed class AutomaticCloudFailoverStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public UnifiedIdentity CreateIdentity(string identityId, string email, string displayName);
-    public void MapRole(string unifiedRole, string providerId, string providerRole);
-    public void AssignRole(string identityId, string unifiedRole);
-    public UnifiedIdentity? GetIdentity(string identityId);
+    public string? ActiveProvider;;
+    public void Configure(string providerId, FailoverConfiguration config);
+    public FailoverDecision ReportHealthCheck(string providerId, bool isHealthy, double latencyMs, double errorRate);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
+public sealed class ActiveActiveCloudStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public EncryptionKeyInfo CreateMasterKey(string keyId, string? description = null);
-    public EncryptedData Encrypt(string keyId, ReadOnlySpan<byte> plaintext);
-    public KeyReplicationResult ReplicateKey(string keyId, string targetProvider);
+    public void SetWeight(string providerId, int weight, bool isHealthy = true);
+    public string SelectProvider();
+    public IReadOnlyDictionary<string, double> GetDistribution();
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class CrossCloudComplianceStrategy : MultiCloudStrategyBase
+public sealed class ActivePassiveCloudStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterPolicy(string policyId, string name, ComplianceFramework framework, IEnumerable<ComplianceRule> rules);
-    public ComplianceCheckResult ValidateResource(string resourceId, string providerId, Dictionary<string, object> resourceProperties);
-    public ComplianceStatusSummary GetComplianceStatus();
+    public string? PrimaryProvider;;
+    public void SetPrimary(string providerId);
+    public void AddStandby(string providerId);
+    public FailoverResult PromoteStandby(string? preferredStandby = null);
+    public void UpdateHealth(string providerId, bool isHealthy);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class ZeroTrustNetworkStrategy : MultiCloudStrategyBase
+public sealed class HealthBasedRoutingStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void CreatePolicy(string policyId, string resourcePattern, AccessRequirements requirements);
-    public AccessDecision EvaluateAccess(AccessRequest request);
-    protected override string? GetCurrentState();;
+    public void RegisterProvider(string providerId, int failureThreshold = 5, TimeSpan? resetTimeout = null);
+    public string? GetAvailableProvider();
+    public void ReportSuccess(string providerId);
+    public void ReportFailure(string providerId);
+    public IReadOnlyDictionary<string, CircuitState> GetCircuitStatus();
+    protected override string? GetCurrentState();
 }
 ```
 ```csharp
-public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
+public sealed class DnsFailoverStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void StoreSecret(string secretId, string value, Dictionary<string, string>? tags = null);
-    public string? GetSecret(string secretId, string requesterId);
-    public void RotateSecret(string secretId, string newValue);
-    public IReadOnlyList<SecretAccess> GetAccessLog(string secretId);
+    public void RegisterRecord(string hostname, string providerId, string endpoint, int priority = 100, int ttl = 60);
+    public string? Resolve(string hostname);
+    public void UpdateHealth(string hostname, string providerId, bool isHealthy);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class CrossCloudThreatDetectionStrategy : MultiCloudStrategyBase
+public sealed class LatencyBasedFailoverStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public ThreatAnalysisResult AnalyzeEvent(SecurityEvent securityEvent);
-    public void AddIndicator(string indicatorId, string pattern, string threatType, string severity);
-    protected override string? GetCurrentState();;
+    public void RecordLatency(string providerId, double latencyMs);
+    public string? GetLowestLatencyProvider();
+    public IReadOnlyDictionary<string, double> GetLatencyStats();
+    protected override string? GetCurrentState();
 }
 ```
 ```csharp
-public sealed class UnifiedIdentity
-{
-}
-    public required string IdentityId { get; init; }
-    public required string Email { get; init; }
-    public required string DisplayName { get; init; }
-    public HashSet<string> Roles { get; };
-    public Dictionary<string, ProviderCredential> ProviderCredentials { get; };
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed class ProviderRoleMapping
-{
-}
-    public required string UnifiedRole { get; init; }
-    public required string ProviderId { get; init; }
-    public required string ProviderRole { get; init; }
-}
-```
-```csharp
-public sealed class ProviderCredential
+public sealed class ProviderHealthState
 {
 }
     public required string ProviderId { get; init; }
-    public required string ProviderRole { get; init; }
-    public DateTimeOffset GrantedAt { get; init; }
+    public bool IsHealthy { get; set; }
+    public int ConsecutiveFailures { get; set; }
+    public double LastLatencyMs { get; set; }
+    public double LastErrorRate { get; set; }
+    public DateTimeOffset LastCheck { get; set; }
 }
 ```
 ```csharp
-public sealed class EncryptionKeyInfo
+public sealed class FailoverConfiguration
 {
 }
-    public required string KeyId { get; init; }
-    public required string Algorithm { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public string? Description { get; init; }
-    public string? KeyHash { get; init; }
-    public HashSet<string> ReplicatedTo { get; };
+    public int Priority { get; init; };
+    public int FailureThreshold { get; init; };
+    public TimeSpan HealthCheckInterval { get; init; };
+    public double MaxLatencyMs { get; init; };
+    public double MaxErrorRate { get; init; };
 }
 ```
 ```csharp
-public sealed class EncryptedData
+public sealed class FailoverDecision
 {
 }
-    public required string KeyId { get; init; }
-    public required byte[] Ciphertext { get; init; }
-    public required byte[] Nonce { get; init; }
-    public required string Algorithm { get; init; }
+    public bool ShouldFailover { get; init; }
+    public string? FromProvider { get; init; }
+    public string? ToProvider { get; init; }
+    public string? Reason { get; init; }
 }
 ```
 ```csharp
-public sealed class KeyReplicationResult
+public sealed class ProviderWeight
+{
+}
+    public required string ProviderId { get; init; }
+    public int Weight { get; set; }
+    public bool IsHealthy { get; set; }
+}
+```
+```csharp
+public sealed class FailoverResult
 {
 }
     public bool Success { get; init; }
     public string? ErrorMessage { get; init; }
-    public string? KeyId { get; init; }
-    public string? TargetProvider { get; init; }
-    public DateTimeOffset ReplicatedAt { get; init; }
+    public string? PreviousPrimary { get; init; }
+    public string? NewPrimary { get; init; }
 }
 ```
 ```csharp
-public sealed class CompliancePolicy
+public sealed class CircuitBreakerState
 {
 }
-    public required string PolicyId { get; init; }
-    public required string Name { get; init; }
-    public ComplianceFramework Framework { get; init; }
-    public List<ComplianceRule> Rules { get; init; };
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string Description { get; init; }
-    public string? PropertyName { get; init; }
-    public required string Severity { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceViolation
-{
-}
-    public required string ViolationId { get; init; }
-    public required string PolicyId { get; init; }
-    public required string RuleId { get; init; }
-    public required string ResourceId { get; init; }
     public required string ProviderId { get; init; }
-    public required string Severity { get; init; }
-    public required string Description { get; init; }
-    public DateTimeOffset DetectedAt { get; init; }
+    public int FailureThreshold { get; init; }
+    public TimeSpan ResetTimeout { get; init; }
+    public CircuitState State { get; set; }
+    public int FailureCount { get; set; }
+    public DateTimeOffset? OpenedAt { get; set; }
+    public DateTimeOffset? LastSuccess { get; set; }
+    public DateTimeOffset? LastFailure { get; set; }
 }
 ```
 ```csharp
-public sealed class ComplianceCheckResult
+public sealed class DnsRecord
 {
 }
-    public required string ResourceId { get; init; }
-    public bool IsCompliant { get; init; }
-    public List<ComplianceViolation> Violations { get; init; };
-    public DateTimeOffset CheckedAt { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceStatusSummary
-{
-}
-    public int TotalPolicies { get; init; }
-    public int TotalViolations { get; init; }
-    public int CriticalViolations { get; init; }
-    public int HighViolations { get; init; }
-    public Dictionary<string, int> ByFramework { get; init; };
-}
-```
-```csharp
-public sealed class TrustPolicy
-{
-}
-    public required string PolicyId { get; init; }
-    public required string ResourcePattern { get; init; }
-    public required AccessRequirements Requirements { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed class AccessRequirements
-{
-}
-    public bool RequireMfa { get; init; }
-    public List<string>? AllowedSourceIps { get; init; }
-    public List<string>? RequiredRoles { get; init; }
-    public int? MaxSessionDurationMinutes { get; init; }
-}
-```
-```csharp
-public sealed class AccessRequest
-{
-}
-    public required string RequestId { get; init; }
-    public required string ResourceId { get; init; }
-    public required string RequesterId { get; init; }
-    public required string SourceIp { get; init; }
-    public bool MfaVerified { get; init; }
-    public List<string> Roles { get; init; };
-}
-```
-```csharp
-public sealed class AccessDecision
-{
-}
-    public required string DecisionId { get; init; }
-    public required string RequestId { get; init; }
-    public bool Allowed { get; set; }
-    public string? DenialReason { get; set; }
-    public DateTimeOffset EvaluatedAt { get; init; }
-}
-```
-```csharp
-public sealed class SecretEntry
-{
-}
-    public required string SecretId { get; init; }
-    public required string EncryptedValue { get; set; }
-    public int Version { get; set; }
-    public Dictionary<string, string> Tags { get; init; };
-    public DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public DateTimeOffset? LastRotated { get; set; }
-}
-```
-```csharp
-public sealed class SecretAccess
-{
-}
-    public required string SecretId { get; init; }
-    public required string RequesterId { get; init; }
-    public DateTimeOffset AccessedAt { get; init; }
-    public required string AccessType { get; init; }
-}
-```
-```csharp
-public sealed class SecurityEvent
-{
-}
-    public string EventId { get; init; };
+    public required string Hostname { get; init; }
     public required string ProviderId { get; init; }
-    public required string EventType { get; init; }
-    public required string SourceId { get; init; }
-    public DateTimeOffset Timestamp { get; init; };
-    public Dictionary<string, object> Properties { get; init; };
-    public string? ResourceId { get; init; }
-    public string Severity { get; init; };
-    public string? Message { get; init; }
+    public required string Endpoint { get; init; }
+    public int Priority { get; init; }
+    public int Ttl { get; init; }
+    public bool IsHealthy { get; set; }
+    public DateTimeOffset LastCheck { get; set; }
 }
 ```
 ```csharp
-public sealed class ThreatIndicator
+public sealed class LatencyMeasurement
 {
 }
-    public required string IndicatorId { get; init; }
-    public required string Pattern { get; init; }
-    public required string ThreatType { get; init; }
-    public required string Severity { get; init; }
-    public string? Description { get; init; }
+    public required string ProviderId { get; init; }
+    public double CurrentLatencyMs { get; set; }
+    public double AverageLatencyMs { get; set; }
+    public int SampleCount { get; set; }
+    public DateTimeOffset LastUpdate { get; set; }
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateMultiCloud/Strategies/Abstraction/CloudAbstractionStrategies.cs
 ```csharp
-public sealed class DetectedThreat
-{
-}
-    public required string ThreatId { get; init; }
-    public string? IndicatorId { get; init; }
-    public required string ThreatType { get; init; }
-    public required string Severity { get; init; }
-    public DateTimeOffset DetectedAt { get; init; }
-    public required string SourceProvider { get; init; }
-    public string? Description { get; init; }
-}
-```
-```csharp
-public sealed class ThreatAnalysisResult
-{
-}
-    public required string EventId { get; init; }
-    public List<DetectedThreat> Threats { get; init; };
-    public DateTimeOffset AnalyzedAt { get; init; }
-}
-```
-```csharp
-public sealed class SiemIntegrationStrategy : MultiCloudStrategyBase
+public sealed class UnifiedCloudApiStrategy : MultiCloudStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override MultiCloudCharacteristics Characteristics;;
-    public void RegisterSiemEndpoint(string endpointId, SiemType siemType, string url, Dictionary<string, string> credentials);
-    public async Task<SiemSendResult> SendEventAsync(SecurityEvent evt, CancellationToken ct = default);
-    public async Task<BatchSiemSendResult> SendBatchAsync(IEnumerable<SecurityEvent> events, CancellationToken ct = default);
-    public async Task<SiemQueryResult> QueryAsync(string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
-    public IReadOnlyDictionary<string, long> GetEventStatistics();;
+    public void RegisterAdapter(string providerId, CloudProviderAdapter adapter);
+    public ICloudStorageAbstraction GetStorage(string providerId);
+    public ICloudComputeAbstraction GetCompute(string providerId);
+    public async Task<CloudOperationResult> ExecuteAsync(string operation, string? preferredProvider, Dictionary<string, object> parameters, CancellationToken ct = default);
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class SiemEndpoint
+public sealed class AwsCloudAdapterStrategy : MultiCloudStrategyBase
 {
 }
-    public required string EndpointId { get; init; }
-    public required SiemType SiemType { get; init; }
-    public required string Url { get; init; }
-    public required Dictionary<string, string> Credentials { get; init; }
-    public DateTimeOffset RegisteredAt { get; init; }
-    public bool IsActive { get; set; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+    public CloudProviderAdapter CreateAdapter(string region, string accessKey, string secretKey);
 }
 ```
 ```csharp
-public sealed class SiemSendResult
+public sealed class AzureCloudAdapterStrategy : MultiCloudStrategyBase
 {
 }
-    public required string EventId { get; init; }
-    public DateTimeOffset SentAt { get; init; }
-    public required Dictionary<string, bool> EndpointResults { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+    public CloudProviderAdapter CreateAdapter(string subscriptionId, string tenantId);
 }
 ```
 ```csharp
-public sealed class BatchSiemSendResult
+public sealed class GcpCloudAdapterStrategy : MultiCloudStrategyBase
 {
 }
-    public int TotalEvents { get; init; }
-    public int SuccessfulEvents { get; init; }
-    public int FailedEvents { get; init; }
-    public required List<SiemSendResult> Results { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+    public CloudProviderAdapter CreateAdapter(string projectId);
 }
 ```
 ```csharp
-public sealed class SiemQueryResult
+public sealed class AlibabaCloudAdapterStrategy : MultiCloudStrategyBase
 {
 }
-    public required string Query { get; init; }
-    public DateTimeOffset From { get; init; }
-    public DateTimeOffset To { get; init; }
-    public int MatchCount { get; init; }
-    public required List<SecurityEvent> Events { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+}
+```
+```csharp
+public sealed class OracleCloudAdapterStrategy : MultiCloudStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+}
+```
+```csharp
+public sealed class IbmCloudAdapterStrategy : MultiCloudStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+}
+```
+```csharp
+public sealed class ResourceNormalizationStrategy : MultiCloudStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override MultiCloudCharacteristics Characteristics;;
+    public NormalizedResource Normalize(string providerId, string resourceType, string resourceId);
+}
+```
+```csharp
+public sealed class CloudProviderAdapter
+{
+}
+    public required string ProviderId { get; init; }
+    public required CloudProviderType ProviderType { get; init; }
+    public required string Region { get; init; }
+    public required ICloudStorageAbstraction Storage { get; init; }
+    public required ICloudComputeAbstraction Compute { get; init; }
+    public Task<object?> ExecuteOperationAsync(string operation, Dictionary<string, object> parameters, CancellationToken ct);
+}
+```
+```csharp
+public interface ICloudStorageAbstraction
+{
+}
+    Task<Stream> ReadAsync(string path, CancellationToken ct);;
+    Task WriteAsync(string path, Stream data, CancellationToken ct);;
+    Task DeleteAsync(string path, CancellationToken ct);;
+    Task<bool> ExistsAsync(string path, CancellationToken ct);;
+}
+```
+```csharp
+public interface ICloudComputeAbstraction
+{
+}
+    Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
+    Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
+    Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class ComputeInstanceSpec
+{
+}
+    public required string InstanceType { get; init; }
+    public required string ImageId { get; init; }
+    public string? Region { get; init; }
+    public Dictionary<string, string> Tags { get; init; };
+}
+```
+```csharp
+public sealed class ComputeInstanceStatus
+{
+}
+    public required string InstanceId { get; init; }
+    public required string State { get; init; }
+    public string? PublicIp { get; init; }
+    public string? PrivateIp { get; init; }
+}
+```
+```csharp
+public sealed class CloudOperationResult
+{
+}
+    public bool Success { get; init; }
+    public string? ProviderId { get; init; }
+    public TimeSpan Duration { get; init; }
+    public object? Data { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed class NormalizedResource
+{
+}
+    public required string UniversalId { get; init; }
+    public required string ProviderId { get; init; }
+    public required string ResourceType { get; init; }
+    public required string NativeId { get; init; }
+}
+```
+```csharp
+public sealed class AwsStorageAbstraction : ICloudStorageAbstraction
+{
+}
+    public AwsStorageAbstraction(IAmazonS3? s3Client = null);
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
+    public async Task DeleteAsync(string path, CancellationToken ct);
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AwsComputeAbstraction : ICloudComputeAbstraction
+{
+}
+    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
+    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
+    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class AzureStorageAbstraction : ICloudStorageAbstraction
+{
+}
+    public AzureStorageAbstraction(BlobServiceClient? blobServiceClient = null);
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
+    public async Task DeleteAsync(string path, CancellationToken ct);
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AzureComputeAbstraction : ICloudComputeAbstraction
+{
+}
+    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
+    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
+    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
+}
+```
+```csharp
+public sealed class GcpStorageAbstraction : ICloudStorageAbstraction
+{
+}
+    public GcpStorageAbstraction(StorageClient? storageClient = null);
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct);
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct);
+    public async Task DeleteAsync(string path, CancellationToken ct);
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct);
+}
+```
+```csharp
+public sealed class GcpComputeAbstraction : ICloudComputeAbstraction
+{
+}
+    public Task<string> LaunchInstanceAsync(ComputeInstanceSpec spec, CancellationToken ct);;
+    public Task TerminateInstanceAsync(string instanceId, CancellationToken ct);;
+    public Task<ComputeInstanceStatus> GetStatusAsync(string instanceId, CancellationToken ct);;
 }
 ```

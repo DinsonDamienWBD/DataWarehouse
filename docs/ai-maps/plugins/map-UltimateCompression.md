@@ -162,13 +162,13 @@ private sealed class RarDecompressionStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/SevenZipStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/ZipStrategy.cs
 ```csharp
-public sealed class SevenZipStrategy : CompressionStrategyBase
+public sealed class ZipStrategy : CompressionStrategyBase
 {
 #endregion
 }
-    public SevenZipStrategy() : base(SdkCompressionLevel.Default);
+    public ZipStrategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -182,15 +182,15 @@ public sealed class SevenZipStrategy : CompressionStrategyBase
 }
 ```
 ```csharp
-private sealed class SevenZipCompressionStream : Stream
+private sealed class ZipCompressionStream : Stream
 {
 }
-    public SevenZipCompressionStream(Stream output, bool leaveOpen, SevenZipStrategy strategy);
+    public ZipCompressionStream(Stream output, bool leaveOpen, SDK.Contracts.Compression.CompressionLevel level);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
     public override void Write(byte[] buffer, int offset, int count);
     public override void Flush();
     protected override void Dispose(bool disposing);
@@ -200,19 +200,19 @@ private sealed class SevenZipCompressionStream : Stream
 }
 ```
 ```csharp
-private sealed class SevenZipDecompressionStream : Stream
+private sealed class ZipDecompressionStream : Stream
 {
 }
-    public SevenZipDecompressionStream(Stream input, bool leaveOpen, SevenZipStrategy strategy);
+    public ZipDecompressionStream(Stream input, bool leaveOpen);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
     public override int Read(byte[] buffer, int offset, int count);
+    public override void Flush();
     protected override void Dispose(bool disposing);
     public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
 }
@@ -274,6 +274,62 @@ private sealed class TarDecompressionStream : Stream
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/SevenZipStrategy.cs
+```csharp
+public sealed class SevenZipStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public SevenZipStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class SevenZipCompressionStream : Stream
+{
+}
+    public SevenZipCompressionStream(Stream output, bool leaveOpen, SevenZipStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class SevenZipDecompressionStream : Stream
+{
+}
+    public SevenZipDecompressionStream(Stream input, bool leaveOpen, SevenZipStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/XzStrategy.cs
 ```csharp
 public sealed class XzStrategy : CompressionStrategyBase
@@ -311,13 +367,12 @@ private sealed class XzCompressionStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/ZipStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/MtfStrategy.cs
 ```csharp
-public sealed class ZipStrategy : CompressionStrategyBase
+public sealed class MtfStrategy : CompressionStrategyBase
 {
-#endregion
 }
-    public ZipStrategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
+    public MtfStrategy() : base(SdkCompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -331,10 +386,10 @@ public sealed class ZipStrategy : CompressionStrategyBase
 }
 ```
 ```csharp
-private sealed class ZipCompressionStream : Stream
+private sealed class MtfCompressionStream : Stream
 {
 }
-    public ZipCompressionStream(Stream output, bool leaveOpen, SDK.Contracts.Compression.CompressionLevel level);
+    public MtfCompressionStream(Stream output, bool leaveOpen);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
@@ -349,1386 +404,30 @@ private sealed class ZipCompressionStream : Stream
 }
 ```
 ```csharp
-private sealed class ZipDecompressionStream : Stream
+private sealed class MtfDecompressionStream : Stream
 {
 }
-    public ZipDecompressionStream(Stream input, bool leaveOpen);
+    public MtfDecompressionStream(Stream input, bool leaveOpen);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
     public override int Read(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/CmixStrategy.cs
-```csharp
-public sealed class CmixStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public CmixStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class GradientMixer
-{
-}
-    public GradientMixer();
-    public int Predict(byte[] data, int position);
-    public void Update(byte[] data, int position, int bit);
-}
-```
-```csharp
-private sealed class ArithmeticEncoder
-{
-}
-    public ArithmeticEncoder(Stream output);;
-    public void EncodeBit(int bit, int prob);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticDecoder
-{
-}
-    public ArithmeticDecoder(Stream input);
-    public int DecodeBit(int prob);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/NnzStrategy.cs
-```csharp
-public sealed class NnzStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public NnzStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class Perceptron
-{
-}
-    public Perceptron();
-    public int Predict(byte contextByte);
-    public void Update(byte contextByte, int actualBit);
-}
-```
-```csharp
-private sealed class ArithmeticEncoder
-{
-}
-    public ArithmeticEncoder(Stream output);;
-    public void EncodeBit(int bit, int prob);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticDecoder
-{
-}
-    public ArithmeticDecoder(Stream input);
-    public int DecodeBit(int prob);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PaqStrategy.cs
-```csharp
-public sealed class PaqStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public PaqStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class LogisticMixer
-{
-}
-    public LogisticMixer(int numModels, int tableSize);
-    public int Predict(byte[] data, int position);
-    public void Update(byte[] data, int position, int bit);
-}
-```
-```csharp
-private sealed class ArithmeticEncoder
-{
-}
-    public ArithmeticEncoder(Stream output);;
-    public void EncodeBit(int bit, int prob);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticDecoder
-{
-}
-    public ArithmeticDecoder(Stream input);
-    public int DecodeBit(int prob);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PpmdStrategy.cs
-```csharp
-public sealed class PpmdStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public PpmdStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class PpmdModel
-{
-}
-    public int MaxOrder;;
-    public PpmdModel(int maxOrder);
-    public void UpdateModel(byte[] data, int position, byte symbol);
-    public ContextNode? GetContext(byte[] data, int position, int order);
-    public int GetEscapeCount(ContextNode context, int order);
-    public void UpdateSee(ContextNode context, int order, bool wasEscape);
-}
-```
-```csharp
-private sealed class SeeBin
-{
-}
-    public int EscapeCount { get; set; };
-    public int TotalCount { get; set; };
-}
-```
-```csharp
-private sealed class ContextNode
-{
-}
-    public int TotalCount { get; private set; }
-    public int NumDistinct;;
-    public void Increment(byte symbol);
-    public int GetCount(byte symbol);
-    public int GetCumulativeBelow(byte symbol, HashSet<byte> excluded);
-    public (byte symbol, int cumLow, int count) FindSymbol(int target, HashSet<byte> excluded);
-    public IEnumerable<byte> GetSymbols();;
-}
-```
-```csharp
-private sealed class ArithmeticRangeEncoder
-{
-}
-    public ArithmeticRangeEncoder(Stream output);;
-    public void EncodeRange(int cumLow, int cumHigh, int total);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticRangeDecoder
-{
-}
-    public ArithmeticRangeDecoder(Stream input);
-    public int GetTarget(int total);
-    public void Decode(int cumLow, int cumHigh, int total);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PpmStrategy.cs
-```csharp
-public sealed class PpmStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public PpmStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class PpmTrie
-{
-}
-    public PpmTrie(int maxOrder);;
-    public void AddContext(byte[] data, int position);
-    public ContextNode? GetContext(byte[] data, int position, int order);
-}
-```
-```csharp
-private sealed class ContextNode
-{
-}
-    public int TotalCount { get; private set; }
-    public int NumDistinct;;
-    public void Increment(byte symbol);
-    public int GetCount(byte symbol);
-    public int GetCumulativeBelow(byte symbol, HashSet<byte> excluded);
-    public (byte symbol, int cumLow, int count) FindSymbol(int target, HashSet<byte> excluded);
-    public IEnumerable<byte> GetSymbols();;
-}
-```
-```csharp
-private sealed class ArithmeticRangeEncoder
-{
-}
-    public ArithmeticRangeEncoder(Stream output);;
-    public void EncodeRange(int cumLow, int cumHigh, int total);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticRangeDecoder
-{
-}
-    public ArithmeticRangeDecoder(Stream input);
-    public int GetTarget(int total);
-    public void Decode(int cumLow, int cumHigh, int total);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/ZpaqStrategy.cs
-```csharp
-public sealed class ZpaqStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public ZpaqStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class ArithmeticEncoder
-{
-}
-    public ArithmeticEncoder(Stream output);
-    public void EncodeBit(int bit, int prob);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticDecoder
-{
-}
-    public ArithmeticDecoder(Stream input);
-    public int DecodeBit(int prob);
-}
-```
-```csharp
-private sealed class ContextModel
-{
-}
-    public ContextModel();
-    public int GetPrediction(byte context);
-    public void Update(byte context, int bit);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _decompressed?.Position ?? 0; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/BsdiffStrategy.cs
-```csharp
-public sealed class BsdiffStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public BsdiffStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/DeltaStrategy.cs
-```csharp
-public sealed class DeltaStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public DeltaStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class DeltaCompressionStream : Stream
-{
-}
-    public DeltaCompressionStream(Stream output, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
     public override void Flush();;
-    public override int Read(byte[] buffer, int offset, int count);;
+    protected override void Dispose(bool disposing);
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-```csharp
-private sealed class DeltaDecompressionStream : Stream
-{
-}
-    public DeltaDecompressionStream(Stream input, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
     public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/VcdiffStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/BwtStrategy.cs
 ```csharp
-public sealed class VcdiffStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public VcdiffStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
+public sealed class BwtStrategy : CompressionStrategyBase
 {
 }
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/XdeltaStrategy.cs
-```csharp
-public sealed class XdeltaStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public XdeltaStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/ZdeltaStrategy.cs
-```csharp
-public sealed class ZdeltaStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public ZdeltaStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/ApngStrategy.cs
-```csharp
-public sealed class ApngStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public ApngStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/AvifLosslessStrategy.cs
-```csharp
-public sealed class AvifLosslessStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public AvifLosslessStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, AvifLosslessStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, AvifLosslessStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/DnaCompressionStrategy.cs
-```csharp
-public sealed class DnaCompressionStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public DnaCompressionStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private class HuffmanNode
-{
-}
-    public byte Symbol { get; set; }
-    public int Frequency { get; set; }
-    public HuffmanNode? Left { get; set; }
-    public HuffmanNode? Right { get; set; }
-}
-```
-```csharp
-private struct HuffmanCode
-{
-}
-    public uint Code { get; set; }
-    public int Length { get; set; }
-}
-```
-```csharp
-private class BitPackWriter
-{
-}
-    public BitPackWriter(Stream stream);;
-    public void WriteBit(int bit);
-    public void WriteBits(uint value, int count);
-    public void Flush();
-}
-```
-```csharp
-private class BitPackReader
-{
-}
-    public BitPackReader(byte[] data);;
-    public int ReadBit();
-    public uint ReadBits(int count);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, DnaCompressionStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, DnaCompressionStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/FlacStrategy.cs
-```csharp
-public sealed class FlacStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public FlacStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BitWriter
-{
-}
-    public BitWriter(Stream stream);
-    public void WriteBit(int bit);
-    public void Flush();
-}
-```
-```csharp
-private sealed class BitReader
-{
-}
-    public BitReader(byte[] data);
-    public int ReadBit();
-}
-```
-```csharp
-private sealed class FlacCompressionStream : Stream
-{
-}
-    public FlacCompressionStream(Stream output, bool leaveOpen, FlacStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class FlacDecompressionStream : Stream
-{
-}
-    public FlacDecompressionStream(Stream input, bool leaveOpen, FlacStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/JxlLosslessStrategy.cs
-```csharp
-public sealed class JxlLosslessStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public JxlLosslessStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class JxlCompressionStream : Stream
-{
-}
-    public JxlCompressionStream(Stream output, bool leaveOpen, JxlLosslessStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class JxlDecompressionStream : Stream
-{
-}
-    public JxlDecompressionStream(Stream input, bool leaveOpen, JxlLosslessStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/TimeSeriesStrategy.cs
-```csharp
-public sealed class TimeSeriesStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public TimeSeriesStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private class GorillaWriter
-{
-}
-    public GorillaWriter(Stream stream);;
-    public void WriteBit(int bit);
-    public void WriteBits(ulong value, int count);
-    public void WriteUInt64(ulong value);
-    public void Flush();
-}
-```
-```csharp
-private class GorillaReader
-{
-}
-    public GorillaReader(byte[] data);;
-    public int ReadBit();
-    public ulong ReadBits(int count);
-    public ulong ReadUInt64();
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, TimeSeriesStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, TimeSeriesStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/WebpLosslessStrategy.cs
-```csharp
-public sealed class WebpLosslessStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public WebpLosslessStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCodecStream : Stream
-{
-}
-    public BufferedCodecStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> codec, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override int Read(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/DensityStrategy.cs
-```csharp
-public sealed class DensityStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public DensityStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, DensityStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, DensityStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/GipfeligStrategy.cs
-```csharp
-public sealed class GipfeligStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public GipfeligStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, GipfeligStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, GipfeligStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/LizardStrategy.cs
-```csharp
-public sealed class LizardStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public LizardStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, LizardStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, LizardStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/OodleStrategy.cs
-```csharp
-public sealed class OodleStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public OodleStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, OodleStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, OodleStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/ZlingStrategy.cs
-```csharp
-public sealed class ZlingStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public ZlingStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedCompressionStream : Stream
-{
-}
-    public BufferedCompressionStream(Stream output, bool leaveOpen, ZlingStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BufferedDecompressionStream : Stream
-{
-}
-    public BufferedDecompressionStream(Stream input, bool leaveOpen, ZlingStrategy strategy);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/AnsStrategy.cs
-```csharp
-public sealed class AnsStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public AnsStrategy() : base(CompressionLevel.Default);
+    public BwtStrategy() : base(SdkCompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -1742,244 +441,10 @@ public sealed class AnsStrategy : CompressionStrategyBase
 }
 ```
 ```csharp
-private struct EncodingEntry
+private sealed class BwtCompressionStream : Stream
 {
 }
-    public int Start;
-    public int Frequency;
-}
-```
-```csharp
-private struct DecodingEntry
-{
-}
-    public byte Symbol;
-    public int Frequency;
-    public int Start;
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/ArithmeticStrategy.cs
-```csharp
-public sealed class ArithmeticStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public ArithmeticStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class AdaptiveModel
-{
-}
-    public int TotalFrequency { get; private set; }
-    public AdaptiveModel();
-    public (int cumLow, int cumHigh, int total) GetRange(byte symbol);
-    public byte FindSymbol(int target);
-    public void Update(byte symbol);
-}
-```
-```csharp
-private sealed class ArithmeticEncoder
-{
-}
-    public ArithmeticEncoder(Stream output);;
-    public void Encode(int cumLow, int cumHigh, int total);
-    public void Flush();
-}
-```
-```csharp
-private sealed class ArithmeticDecoder
-{
-}
-    public ArithmeticDecoder(Stream input);
-    public int GetTarget(int total);
-    public void Decode(int cumLow, int cumHigh, int total);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/HuffmanStrategy.cs
-```csharp
-public sealed class HuffmanStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public HuffmanStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class HuffmanNode
-{
-}
-    public byte Symbol { get; set; }
-    public bool IsLeaf { get; set; }
-    public HuffmanNode? Left { get; set; }
-    public HuffmanNode? Right { get; set; }
-    public long Frequency { get; set; }
-}
-```
-```csharp
-private sealed class HuffmanDecoder
-{
-}
-    public HuffmanDecoder((uint code, int length)[] codes, byte[] codeLengths);
-    public byte DecodeSymbol(BitReader reader);
-}
-```
-```csharp
-private sealed class BitWriter
-{
-}
-    public BitWriter(Stream output);;
-    public void WriteBits(uint value, int numBits);
-    public byte Flush();
-}
-```
-```csharp
-private sealed class BitReader
-{
-}
-    public BitReader(byte[] data, int paddingBits);
-    public int ReadBit();
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/RansStrategy.cs
-```csharp
-public sealed class RansStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public RansStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class BufferedTransformStream : Stream
-{
-}
-    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/RleStrategy.cs
-```csharp
-public sealed class RleStrategy : CompressionStrategyBase
-{
-#endregion
-}
-    public RleStrategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class RleCompressionStream : Stream
-{
-}
-    public RleCompressionStream(Stream output, bool leaveOpen);
+    public BwtCompressionStream(Stream output, bool leaveOpen);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
@@ -1987,28 +452,65 @@ private sealed class RleCompressionStream : Stream
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
     public override void Write(byte[] buffer, int offset, int count);
     public override void Flush();
+    protected override void Dispose(bool disposing);
     public override int Read(byte[] buffer, int offset, int count);;
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
-private sealed class RleDecompressionStream : Stream
+private sealed class BwtDecompressionStream : Stream
 {
 }
-    public RleDecompressionStream(Stream input, bool leaveOpen);
+    public BwtDecompressionStream(Stream input, bool leaveOpen);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
     public override int Read(byte[] buffer, int offset, int count);
-    public override void Write(byte[] buffer, int offset, int count);;
-    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override void Flush();;
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/BrotliStrategy.cs
+```csharp
+public sealed class BrotliStrategy : CompressionStrategyBase
+{
+}
+    public int Quality { get; set; };
+    public BrotliStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/Bzip2Strategy.cs
+```csharp
+public sealed class Bzip2Strategy : CompressionStrategyBase
+{
+}
+    public Bzip2Strategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
 }
 ```
 
@@ -2306,12 +808,13 @@ private sealed class BufferedDecompressionStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/DeflateStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PaqStrategy.cs
 ```csharp
-public sealed class DeflateStrategy : CompressionStrategyBase
+public sealed class PaqStrategy : CompressionStrategyBase
 {
+#endregion
 }
-    public DeflateStrategy() : base(SdkCompressionLevel.Default);
+    public PaqStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2323,208 +826,100 @@ public sealed class DeflateStrategy : CompressionStrategyBase
     public override long EstimateCompressedSize(long inputSize);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/GZipStrategy.cs
 ```csharp
-public sealed class GZipStrategy : CompressionStrategyBase
+private sealed class LogisticMixer
 {
 }
-    public GZipStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz4Strategy.cs
-```csharp
-public sealed class Lz4Strategy : CompressionStrategyBase
-{
-}
-    public Lz4Strategy() : base(CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz77Strategy.cs
-```csharp
-public sealed class Lz77Strategy : CompressionStrategyBase
-{
-}
-    public Lz77Strategy() : base(CompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz78Strategy.cs
-```csharp
-public sealed class Lz78Strategy : CompressionStrategyBase
-{
-}
-    public Lz78Strategy() : base(CompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public LogisticMixer(int numModels, int tableSize);
+    public int Predict(byte[] data, int position);
+    public void Update(byte[] data, int position, int bit);
 }
 ```
 ```csharp
-private sealed class BitWriter
+private sealed class ArithmeticEncoder
 {
 }
-    public BitWriter(Stream stream);
-    public void WriteBits(int value, int numBits);
-    public void FlushBits();
-}
-```
-```csharp
-private sealed class BitReader
-{
-}
-    public BitReader(Stream stream);
-    public int ReadBits(int numBits);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzfseStrategy.cs
-```csharp
-public sealed class LzfseStrategy : CompressionStrategyBase
-{
-}
-    public LzfseStrategy() : base(CompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzhStrategy.cs
-```csharp
-public sealed class LzhStrategy : CompressionStrategyBase
-{
-}
-    public LzhStrategy() : base(CompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-}
-```
-```csharp
-private sealed class LzhBitWriter
-{
-}
-    public LzhBitWriter(Stream stream);;
-    public void WriteBits(int value, int numBits);
-    public void WriteByte(byte value);;
-    public void WriteBytes(byte[] data);;
-    public void WriteInt32(int value);
+    public ArithmeticEncoder(Stream output);;
+    public void EncodeBit(int bit, int prob);
     public void Flush();
 }
 ```
 ```csharp
-private sealed class LzhBitReader
+private sealed class ArithmeticDecoder
 {
 }
-    public LzhBitReader(Stream stream);;
-    public int ReadBits(int numBits);
-    public byte ReadByte();
-    public int ReadInt32();
+    public ArithmeticDecoder(Stream input);
+    public int DecodeBit(int prob);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lzma2Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/ZpaqStrategy.cs
 ```csharp
-public sealed class Lzma2Strategy : CompressionStrategyBase
+public sealed class ZpaqStrategy : CompressionStrategyBase
 {
+#endregion
 }
-    public Lzma2Strategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
+    public ZpaqStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override ValueTask DisposeAsyncCore();
     protected override byte[] CompressCore(byte[] input);
     protected override byte[] DecompressCore(byte[] input);
-    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
     protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
     protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
     public override long EstimateCompressedSize(long inputSize);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzmaStrategy.cs
 ```csharp
-public sealed class LzmaStrategy : CompressionStrategyBase
+private sealed class ArithmeticEncoder
 {
 }
-    public LzmaStrategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzoStrategy.cs
-```csharp
-public sealed class LzoStrategy : CompressionStrategyBase
-{
-}
-    public LzoStrategy() : base(CompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public ArithmeticEncoder(Stream output);
+    public void EncodeBit(int bit, int prob);
+    public void Flush();
 }
 ```
 ```csharp
-internal sealed class BufferedAlgorithmCompressionStream : Stream
+private sealed class ArithmeticDecoder
 {
 }
-    public BufferedAlgorithmCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
+    public ArithmeticDecoder(Stream input);
+    public int DecodeBit(int prob);
+}
+```
+```csharp
+private sealed class ContextModel
+{
+}
+    public ContextModel();
+    public int GetPrediction(byte context);
+    public void Update(byte context, int bit);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
@@ -2539,15 +934,15 @@ internal sealed class BufferedAlgorithmCompressionStream : Stream
 }
 ```
 ```csharp
-internal sealed class BufferedAlgorithmDecompressionStream : Stream
+private sealed class BufferedDecompressionStream : Stream
 {
 }
-    public BufferedAlgorithmDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => EnsureDecompressed().Position; set => EnsureDecompressed().Position = value; }
+    public override long Position { get => _decompressed?.Position ?? 0; set => throw new NotSupportedException(); }
     public override int Read(byte[] buffer, int offset, int count);
     public override void Write(byte[] buffer, int offset, int count);;
     public override void Flush();
@@ -2557,66 +952,13 @@ internal sealed class BufferedAlgorithmDecompressionStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzxStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PpmStrategy.cs
 ```csharp
-public sealed class LzxStrategy : CompressionStrategyBase
+public sealed class PpmStrategy : CompressionStrategyBase
 {
+#endregion
 }
-    public LzxStrategy() : base(SdkCompressionLevel.Default);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-```csharp
-private sealed class LzxCompressionStream : Stream
-{
-}
-    public LzxCompressionStream(Stream output, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class LzxDecompressionStream : Stream
-{
-}
-    public LzxDecompressionStream(Stream input, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
-    protected override void Dispose(bool disposing);
-    public override void Flush();;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    public override void Write(byte[] buffer, int offset, int count);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/SnappyStrategy.cs
-```csharp
-public sealed class SnappyStrategy : CompressionStrategyBase
-{
-}
-    public SnappyStrategy() : base(CompressionLevel.Default);
+    public PpmStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2629,35 +971,57 @@ public sealed class SnappyStrategy : CompressionStrategyBase
 }
 ```
 ```csharp
-private sealed class SnappyBufferedCompressionStream : Stream
+private sealed class PpmTrie
 {
 }
-    public SnappyBufferedCompressionStream(Stream output, bool leaveOpen);
+    public PpmTrie(int maxOrder);;
+    public void AddContext(byte[] data, int position);
+    public ContextNode? GetContext(byte[] data, int position, int order);
+}
+```
+```csharp
+private sealed class ContextNode
+{
+}
+    public int TotalCount { get; private set; }
+    public int NumDistinct;;
+    public void Increment(byte symbol);
+    public int GetCount(byte symbol);
+    public int GetCumulativeBelow(byte symbol, HashSet<byte> excluded);
+    public (byte symbol, int cumLow, int count) FindSymbol(int target, HashSet<byte> excluded);
+    public IEnumerable<byte> GetSymbols();;
+}
+```
+```csharp
+private sealed class ArithmeticRangeEncoder
+{
+}
+    public ArithmeticRangeEncoder(Stream output);;
+    public void EncodeRange(int cumLow, int cumHigh, int total);
+    public void Flush();
+}
+```
+```csharp
+private sealed class ArithmeticRangeDecoder
+{
+}
+    public ArithmeticRangeDecoder(Stream input);
+    public int GetTarget(int total);
+    public void Decode(int cumLow, int cumHigh, int total);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
     public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
-    public override void Flush();
     public override int Read(byte[] buffer, int offset, int count);;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    protected override void Dispose(bool disposing);
-}
-```
-```csharp
-private sealed class SnappyBufferedDecompressionStream : Stream
-{
-}
-    public SnappyBufferedDecompressionStream(Stream input, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => EnsureDecompressed().Position; set => EnsureDecompressed().Position = value; }
-    public override int Read(byte[] buffer, int offset, int count);
-    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
     public override void Flush();
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
@@ -2665,12 +1029,13 @@ private sealed class SnappyBufferedDecompressionStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/ZstdStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/NnzStrategy.cs
 ```csharp
-public sealed class ZstdStrategy : CompressionStrategyBase
+public sealed class NnzStrategy : CompressionStrategyBase
 {
+#endregion
 }
-    public ZstdStrategy() : base(CompressionLevel.Default);
+    public NnzStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2682,14 +1047,58 @@ public sealed class ZstdStrategy : CompressionStrategyBase
     public override long EstimateCompressedSize(long inputSize);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/BrotliStrategy.cs
 ```csharp
-public sealed class BrotliStrategy : CompressionStrategyBase
+private sealed class Perceptron
 {
 }
-    public int Quality { get; set; };
-    public BrotliStrategy() : base(SdkCompressionLevel.Default);
+    public Perceptron();
+    public int Predict(byte contextByte);
+    public void Update(byte contextByte, int actualBit);
+}
+```
+```csharp
+private sealed class ArithmeticEncoder
+{
+}
+    public ArithmeticEncoder(Stream output);;
+    public void EncodeBit(int bit, int prob);
+    public void Flush();
+}
+```
+```csharp
+private sealed class ArithmeticDecoder
+{
+}
+    public ArithmeticDecoder(Stream input);
+    public int DecodeBit(int prob);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/CmixStrategy.cs
+```csharp
+public sealed class CmixStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public CmixStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2701,68 +1110,58 @@ public sealed class BrotliStrategy : CompressionStrategyBase
     public override long EstimateCompressedSize(long inputSize);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/BwtStrategy.cs
 ```csharp
-public sealed class BwtStrategy : CompressionStrategyBase
+private sealed class GradientMixer
 {
 }
-    public BwtStrategy() : base(SdkCompressionLevel.Default);
-    public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
+    public GradientMixer();
+    public int Predict(byte[] data, int position);
+    public void Update(byte[] data, int position, int bit);
 }
 ```
 ```csharp
-private sealed class BwtCompressionStream : Stream
+private sealed class ArithmeticEncoder
 {
 }
-    public BwtCompressionStream(Stream output, bool leaveOpen);
+    public ArithmeticEncoder(Stream output);;
+    public void EncodeBit(int bit, int prob);
+    public void Flush();
+}
+```
+```csharp
+private sealed class ArithmeticDecoder
+{
+}
+    public ArithmeticDecoder(Stream input);
+    public int DecodeBit(int prob);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
     public override void Write(byte[] buffer, int offset, int count);
     public override void Flush();
-    protected override void Dispose(bool disposing);
-    public override int Read(byte[] buffer, int offset, int count);;
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
-}
-```
-```csharp
-private sealed class BwtDecompressionStream : Stream
-{
-}
-    public BwtDecompressionStream(Stream input, bool leaveOpen);
-    public override bool CanRead;;
-    public override bool CanSeek;;
-    public override bool CanWrite;;
-    public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override int Read(byte[] buffer, int offset, int count);
     protected override void Dispose(bool disposing);
-    public override void Flush();;
-    public override long Seek(long offset, SeekOrigin origin);;
-    public override void SetLength(long value);;
-    public override void Write(byte[] buffer, int offset, int count);;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/Bzip2Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/ContextMixing/PpmdStrategy.cs
 ```csharp
-public sealed class Bzip2Strategy : CompressionStrategyBase
+public sealed class PpmdStrategy : CompressionStrategyBase
 {
+#endregion
 }
-    public Bzip2Strategy() : base(SdkCompressionLevel.Default);
+    public PpmdStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2774,18 +1173,87 @@ public sealed class Bzip2Strategy : CompressionStrategyBase
     public override long EstimateCompressedSize(long inputSize);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transform/MtfStrategy.cs
 ```csharp
-public sealed class MtfStrategy : CompressionStrategyBase
+private sealed class PpmdModel
 {
 }
-    public MtfStrategy() : base(SdkCompressionLevel.Default);
+    public int MaxOrder;;
+    public PpmdModel(int maxOrder);
+    public void UpdateModel(byte[] data, int position, byte symbol);
+    public ContextNode? GetContext(byte[] data, int position, int order);
+    public int GetEscapeCount(ContextNode context, int order);
+    public void UpdateSee(ContextNode context, int order, bool wasEscape);
+}
+```
+```csharp
+private sealed class SeeBin
+{
+}
+    public int EscapeCount { get; set; };
+    public int TotalCount { get; set; };
+}
+```
+```csharp
+private sealed class ContextNode
+{
+}
+    public int TotalCount { get; private set; }
+    public int NumDistinct;;
+    public void Increment(byte symbol);
+    public int GetCount(byte symbol);
+    public int GetCumulativeBelow(byte symbol, HashSet<byte> excluded);
+    public (byte symbol, int cumLow, int count) FindSymbol(int target, HashSet<byte> excluded);
+    public IEnumerable<byte> GetSymbols();;
+}
+```
+```csharp
+private sealed class ArithmeticRangeEncoder
+{
+}
+    public ArithmeticRangeEncoder(Stream output);;
+    public void EncodeRange(int cumLow, int cumHigh, int total);
+    public void Flush();
+}
+```
+```csharp
+private sealed class ArithmeticRangeDecoder
+{
+}
+    public ArithmeticRangeDecoder(Stream input);
+    public int GetTarget(int total);
+    public void Decode(int cumLow, int cumHigh, int total);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/OodleStrategy.cs
+```csharp
+public sealed class OodleStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public OodleStrategy() : base(CompressionLevel.Default);
     public override CompressionCharacteristics Characteristics { get; };
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
     protected override byte[] CompressCore(byte[] input);
     protected override byte[] DecompressCore(byte[] input);
     protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
@@ -2794,16 +1262,16 @@ public sealed class MtfStrategy : CompressionStrategyBase
 }
 ```
 ```csharp
-private sealed class MtfCompressionStream : Stream
+private sealed class BufferedCompressionStream : Stream
 {
 }
-    public MtfCompressionStream(Stream output, bool leaveOpen);
+    public BufferedCompressionStream(Stream output, bool leaveOpen, OodleStrategy strategy);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-    public override void Write(byte[] buffer, int offset, int count);
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
     public override void Flush();
     protected override void Dispose(bool disposing);
     public override int Read(byte[] buffer, int offset, int count);;
@@ -2812,30 +1280,250 @@ private sealed class MtfCompressionStream : Stream
 }
 ```
 ```csharp
-private sealed class MtfDecompressionStream : Stream
+private sealed class BufferedDecompressionStream : Stream
 {
 }
-    public MtfDecompressionStream(Stream input, bool leaveOpen);
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, OodleStrategy strategy);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;
     public override long Length;;
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
     public override int Read(byte[] buffer, int offset, int count);
-    public override void Flush();;
     protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
     public override long Seek(long offset, SeekOrigin origin);;
     public override void SetLength(long value);;
-    public override void Write(byte[] buffer, int offset, int count);;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/AdaptiveTransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/LizardStrategy.cs
 ```csharp
-public sealed class AdaptiveTransitStrategy : CompressionStrategyBase
+public sealed class LizardStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public LizardStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
 {
 }
-    public AdaptiveTransitStrategy(CompressionLevel level, bool lowLatencyMode = false, bool meteredConnection = false) : base(level);
+    public BufferedCompressionStream(Stream output, bool leaveOpen, LizardStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, LizardStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/ZlingStrategy.cs
+```csharp
+public sealed class ZlingStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public ZlingStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, ZlingStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, ZlingStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/GipfeligStrategy.cs
+```csharp
+public sealed class GipfeligStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public GipfeligStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, GipfeligStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, GipfeligStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Emerging/DensityStrategy.cs
+```csharp
+public sealed class DensityStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public DensityStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, DensityStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, DensityStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/SnappyTransitStrategy.cs
+```csharp
+public sealed class SnappyTransitStrategy : CompressionStrategyBase
+{
+}
+    public SnappyTransitStrategy(CompressionLevel level) : base(level);
     public override CompressionCharacteristics Characteristics;;
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2846,49 +1534,8 @@ public sealed class AdaptiveTransitStrategy : CompressionStrategyBase
     protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken);
     protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
     protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
     public override bool ShouldCompress(ReadOnlySpan<byte> input);
-    public override long EstimateCompressedSize(long inputSize);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/BrotliTransitStrategy.cs
-```csharp
-public sealed class BrotliTransitStrategy : CompressionStrategyBase
-{
-}
-    public BrotliTransitStrategy(SDK.Contracts.Compression.CompressionLevel level) : base(level);
-    public override CompressionCharacteristics Characteristics;;
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
-    public override bool ShouldCompress(ReadOnlySpan<byte> input);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/DeflateTransitStrategy.cs
-```csharp
-public sealed class DeflateTransitStrategy : CompressionStrategyBase
-{
-}
-    public DeflateTransitStrategy(SDK.Contracts.Compression.CompressionLevel level) : base(level);
-    public override CompressionCharacteristics Characteristics;;
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override ValueTask DisposeAsyncCore();
-    protected override byte[] CompressCore(byte[] input);
-    protected override byte[] DecompressCore(byte[] input);
-    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken);
-    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
-    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
-    public override long EstimateCompressedSize(long inputSize);
 }
 ```
 
@@ -2974,12 +1621,12 @@ private sealed class PassThroughStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/SnappyTransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/BrotliTransitStrategy.cs
 ```csharp
-public sealed class SnappyTransitStrategy : CompressionStrategyBase
+public sealed class BrotliTransitStrategy : CompressionStrategyBase
 {
 }
-    public SnappyTransitStrategy(CompressionLevel level) : base(level);
+    public BrotliTransitStrategy(SDK.Contracts.Compression.CompressionLevel level) : base(level);
     public override CompressionCharacteristics Characteristics;;
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -2992,6 +1639,26 @@ public sealed class SnappyTransitStrategy : CompressionStrategyBase
     protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
     public override long EstimateCompressedSize(long inputSize);
     public override bool ShouldCompress(ReadOnlySpan<byte> input);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/DeflateTransitStrategy.cs
+```csharp
+public sealed class DeflateTransitStrategy : CompressionStrategyBase
+{
+}
+    public DeflateTransitStrategy(SDK.Contracts.Compression.CompressionLevel level) : base(level);
+    public override CompressionCharacteristics Characteristics;;
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
 }
 ```
 
@@ -3012,5 +1679,1338 @@ public sealed class ZstdTransitStrategy : CompressionStrategyBase
     protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
     protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
     public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Transit/AdaptiveTransitStrategy.cs
+```csharp
+public sealed class AdaptiveTransitStrategy : CompressionStrategyBase
+{
+}
+    public AdaptiveTransitStrategy(CompressionLevel level, bool lowLatencyMode = false, bool meteredConnection = false) : base(level);
+    public override CompressionCharacteristics Characteristics;;
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override bool ShouldCompress(ReadOnlySpan<byte> input);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz78Strategy.cs
+```csharp
+public sealed class Lz78Strategy : CompressionStrategyBase
+{
+}
+    public Lz78Strategy() : base(CompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+}
+```
+```csharp
+private sealed class BitWriter
+{
+}
+    public BitWriter(Stream stream);
+    public void WriteBits(int value, int numBits);
+    public void FlushBits();
+}
+```
+```csharp
+private sealed class BitReader
+{
+}
+    public BitReader(Stream stream);
+    public int ReadBits(int numBits);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzfseStrategy.cs
+```csharp
+public sealed class LzfseStrategy : CompressionStrategyBase
+{
+}
+    public LzfseStrategy() : base(CompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzmaStrategy.cs
+```csharp
+public sealed class LzmaStrategy : CompressionStrategyBase
+{
+}
+    public LzmaStrategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzoStrategy.cs
+```csharp
+public sealed class LzoStrategy : CompressionStrategyBase
+{
+}
+    public LzoStrategy() : base(CompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+}
+```
+```csharp
+internal sealed class BufferedAlgorithmCompressionStream : Stream
+{
+}
+    public BufferedAlgorithmCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+internal sealed class BufferedAlgorithmDecompressionStream : Stream
+{
+}
+    public BufferedAlgorithmDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => EnsureDecompressed().Position; set => EnsureDecompressed().Position = value; }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/DeflateStrategy.cs
+```csharp
+public sealed class DeflateStrategy : CompressionStrategyBase
+{
+}
+    public DeflateStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzhStrategy.cs
+```csharp
+public sealed class LzhStrategy : CompressionStrategyBase
+{
+}
+    public LzhStrategy() : base(CompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+}
+```
+```csharp
+private sealed class LzhBitWriter
+{
+}
+    public LzhBitWriter(Stream stream);;
+    public void WriteBits(int value, int numBits);
+    public void WriteByte(byte value);;
+    public void WriteBytes(byte[] data);;
+    public void WriteInt32(int value);
+    public void Flush();
+}
+```
+```csharp
+private sealed class LzhBitReader
+{
+}
+    public LzhBitReader(Stream stream);;
+    public int ReadBits(int numBits);
+    public byte ReadByte();
+    public int ReadInt32();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/SnappyStrategy.cs
+```csharp
+public sealed class SnappyStrategy : CompressionStrategyBase
+{
+}
+    public SnappyStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class SnappyBufferedCompressionStream : Stream
+{
+}
+    public SnappyBufferedCompressionStream(Stream output, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class SnappyBufferedDecompressionStream : Stream
+{
+}
+    public SnappyBufferedDecompressionStream(Stream input, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => EnsureDecompressed().Position; set => EnsureDecompressed().Position = value; }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz4Strategy.cs
+```csharp
+public sealed class Lz4Strategy : CompressionStrategyBase
+{
+}
+    public Lz4Strategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lzma2Strategy.cs
+```csharp
+public sealed class Lzma2Strategy : CompressionStrategyBase
+{
+}
+    public Lzma2Strategy() : base(SDK.Contracts.Compression.CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/GZipStrategy.cs
+```csharp
+public sealed class GZipStrategy : CompressionStrategyBase
+{
+}
+    public GZipStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/LzxStrategy.cs
+```csharp
+public sealed class LzxStrategy : CompressionStrategyBase
+{
+}
+    public LzxStrategy() : base(SdkCompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class LzxCompressionStream : Stream
+{
+}
+    public LzxCompressionStream(Stream output, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class LzxDecompressionStream : Stream
+{
+}
+    public LzxDecompressionStream(Stream input, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Flush();;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    public override void Write(byte[] buffer, int offset, int count);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/Lz77Strategy.cs
+```csharp
+public sealed class Lz77Strategy : CompressionStrategyBase
+{
+}
+    public Lz77Strategy() : base(CompressionLevel.Default);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/LzFamily/ZstdStrategy.cs
+```csharp
+public sealed class ZstdStrategy : CompressionStrategyBase
+{
+}
+    public ZstdStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/HuffmanStrategy.cs
+```csharp
+public sealed class HuffmanStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public HuffmanStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class HuffmanNode
+{
+}
+    public byte Symbol { get; set; }
+    public bool IsLeaf { get; set; }
+    public HuffmanNode? Left { get; set; }
+    public HuffmanNode? Right { get; set; }
+    public long Frequency { get; set; }
+}
+```
+```csharp
+private sealed class HuffmanDecoder
+{
+}
+    public HuffmanDecoder((uint code, int length)[] codes, byte[] codeLengths);
+    public byte DecodeSymbol(BitReader reader);
+}
+```
+```csharp
+private sealed class BitWriter
+{
+}
+    public BitWriter(Stream output);;
+    public void WriteBits(uint value, int numBits);
+    public byte Flush();
+}
+```
+```csharp
+private sealed class BitReader
+{
+}
+    public BitReader(byte[] data, int paddingBits);
+    public int ReadBit();
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/ArithmeticStrategy.cs
+```csharp
+public sealed class ArithmeticStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public ArithmeticStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class AdaptiveModel
+{
+}
+    public int TotalFrequency { get; private set; }
+    public AdaptiveModel();
+    public (int cumLow, int cumHigh, int total) GetRange(byte symbol);
+    public byte FindSymbol(int target);
+    public void Update(byte symbol);
+}
+```
+```csharp
+private sealed class ArithmeticEncoder
+{
+}
+    public ArithmeticEncoder(Stream output);;
+    public void Encode(int cumLow, int cumHigh, int total);
+    public void Flush();
+}
+```
+```csharp
+private sealed class ArithmeticDecoder
+{
+}
+    public ArithmeticDecoder(Stream input);
+    public int GetTarget(int total);
+    public void Decode(int cumLow, int cumHigh, int total);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/RansStrategy.cs
+```csharp
+public sealed class RansStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public RansStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/AnsStrategy.cs
+```csharp
+public sealed class AnsStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public AnsStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private struct EncodingEntry
+{
+}
+    public int Start;
+    public int Frequency;
+}
+```
+```csharp
+private struct DecodingEntry
+{
+}
+    public byte Symbol;
+    public int Frequency;
+    public int Start;
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/EntropyCoding/RleStrategy.cs
+```csharp
+public sealed class RleStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public RleStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class RleCompressionStream : Stream
+{
+}
+    public RleCompressionStream(Stream output, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class RleDecompressionStream : Stream
+{
+}
+    public RleDecompressionStream(Stream input, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/DeltaStrategy.cs
+```csharp
+public sealed class DeltaStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public DeltaStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class DeltaCompressionStream : Stream
+{
+}
+    public DeltaCompressionStream(Stream output, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();;
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class DeltaDecompressionStream : Stream
+{
+}
+    public DeltaDecompressionStream(Stream input, bool leaveOpen);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/BsdiffStrategy.cs
+```csharp
+public sealed class BsdiffStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public BsdiffStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/ZdeltaStrategy.cs
+```csharp
+public sealed class ZdeltaStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public ZdeltaStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/VcdiffStrategy.cs
+```csharp
+public sealed class VcdiffStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public VcdiffStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Delta/XdeltaStrategy.cs
+```csharp
+public sealed class XdeltaStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public XdeltaStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedTransformStream : Stream
+{
+}
+    public BufferedTransformStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> transform, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/AvifLosslessStrategy.cs
+```csharp
+public sealed class AvifLosslessStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public AvifLosslessStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, AvifLosslessStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, AvifLosslessStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/DnaCompressionStrategy.cs
+```csharp
+public sealed class DnaCompressionStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public DnaCompressionStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private class HuffmanNode
+{
+}
+    public byte Symbol { get; set; }
+    public int Frequency { get; set; }
+    public HuffmanNode? Left { get; set; }
+    public HuffmanNode? Right { get; set; }
+}
+```
+```csharp
+private struct HuffmanCode
+{
+}
+    public uint Code { get; set; }
+    public int Length { get; set; }
+}
+```
+```csharp
+private class BitPackWriter
+{
+}
+    public BitPackWriter(Stream stream);;
+    public void WriteBit(int bit);
+    public void WriteBits(uint value, int count);
+    public void Flush();
+}
+```
+```csharp
+private class BitPackReader
+{
+}
+    public BitPackReader(byte[] data);;
+    public int ReadBit();
+    public uint ReadBits(int count);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, DnaCompressionStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, DnaCompressionStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/ApngStrategy.cs
+```csharp
+public sealed class ApngStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public ApngStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, Func<byte[], byte[]> compressFunc);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, Func<byte[], byte[]> decompressFunc);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/JxlLosslessStrategy.cs
+```csharp
+public sealed class JxlLosslessStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public JxlLosslessStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class JxlCompressionStream : Stream
+{
+}
+    public JxlCompressionStream(Stream output, bool leaveOpen, JxlLosslessStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class JxlDecompressionStream : Stream
+{
+}
+    public JxlDecompressionStream(Stream input, bool leaveOpen, JxlLosslessStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/FlacStrategy.cs
+```csharp
+public sealed class FlacStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public FlacStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BitWriter
+{
+}
+    public BitWriter(Stream stream);
+    public void WriteBit(int bit);
+    public void Flush();
+}
+```
+```csharp
+private sealed class BitReader
+{
+}
+    public BitReader(byte[] data);
+    public int ReadBit();
+}
+```
+```csharp
+private sealed class FlacCompressionStream : Stream
+{
+}
+    public FlacCompressionStream(Stream output, bool leaveOpen, FlacStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class FlacDecompressionStream : Stream
+{
+}
+    public FlacDecompressionStream(Stream input, bool leaveOpen, FlacStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/TimeSeriesStrategy.cs
+```csharp
+public sealed class TimeSeriesStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public TimeSeriesStrategy() : base(CompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private class GorillaWriter
+{
+}
+    public GorillaWriter(Stream stream);;
+    public void WriteBit(int bit);
+    public void WriteBits(ulong value, int count);
+    public void WriteUInt64(ulong value);
+    public void Flush();
+}
+```
+```csharp
+private class GorillaReader
+{
+}
+    public GorillaReader(byte[] data);;
+    public int ReadBit();
+    public ulong ReadBits(int count);
+    public ulong ReadUInt64();
+}
+```
+```csharp
+private sealed class BufferedCompressionStream : Stream
+{
+}
+    public BufferedCompressionStream(Stream output, bool leaveOpen, TimeSeriesStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _buffer.Position; set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override int Read(byte[] buffer, int offset, int count);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+```csharp
+private sealed class BufferedDecompressionStream : Stream
+{
+}
+    public BufferedDecompressionStream(Stream input, bool leaveOpen, TimeSeriesStrategy strategy);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    protected override void Dispose(bool disposing);
+    public override void Write(byte[] buffer, int offset, int count);;
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Domain/WebpLosslessStrategy.cs
+```csharp
+public sealed class WebpLosslessStrategy : CompressionStrategyBase
+{
+#endregion
+}
+    public WebpLosslessStrategy() : base(SdkCompressionLevel.Default);
+    public override CompressionCharacteristics Characteristics { get; };
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override ValueTask DisposeAsyncCore();
+    protected override byte[] CompressCore(byte[] input);
+    protected override byte[] DecompressCore(byte[] input);
+    protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen);
+    protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen);
+    public override long EstimateCompressedSize(long inputSize);
+}
+```
+```csharp
+private sealed class BufferedCodecStream : Stream
+{
+}
+    public BufferedCodecStream(Stream inner, bool leaveOpen, Func<byte[], byte[]> codec, bool isCompression);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count);
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Flush();
+    protected override void Dispose(bool disposing);
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
 }
 ```

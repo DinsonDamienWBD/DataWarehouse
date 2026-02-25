@@ -187,6 +187,35 @@ public class DashRepresentation
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/MediaFormatDetector.cs
+```csharp
+public static class MediaFormatDetector
+{
+}
+    public static MediaFormat DetectFormat(byte[] data);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/TranscodePackageExecutor.cs
+```csharp
+public sealed class TranscodePackageExecutor
+{
+}
+    public TranscodePackageExecutor(FfmpegExecutor? ffmpegExecutor = null);
+    public bool IsAvailable;;
+    public async Task<Stream> ExecutePackageAsync(Stream packageStream, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/FfmpegTranscodeHelper.cs
+```csharp
+public static class FfmpegTranscodeHelper
+{
+}
+    public static async Task<Stream> ExecuteOrPackageAsync(string ffmpegArgs, byte[] sourceBytes, Func<Task<Stream>> packageWriter, CancellationToken cancellationToken = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/FfmpegExecutor.cs
 ```csharp
 public sealed class FfmpegExecutor
@@ -218,35 +247,6 @@ public sealed class FfmpegNotFoundException : Exception
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/FfmpegTranscodeHelper.cs
-```csharp
-public static class FfmpegTranscodeHelper
-{
-}
-    public static async Task<Stream> ExecuteOrPackageAsync(string ffmpegArgs, byte[] sourceBytes, Func<Task<Stream>> packageWriter, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/MediaFormatDetector.cs
-```csharp
-public static class MediaFormatDetector
-{
-}
-    public static MediaFormat DetectFormat(byte[] data);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Execution/TranscodePackageExecutor.cs
-```csharp
-public sealed class TranscodePackageExecutor
-{
-}
-    public TranscodePackageExecutor(FfmpegExecutor? ffmpegExecutor = null);
-    public bool IsAvailable;;
-    public async Task<Stream> ExecutePackageAsync(Stream packageStream, CancellationToken cancellationToken = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Camera/CameraFrameSource.cs
 ```csharp
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Camera frame source strategy (EDGE-07)")]
@@ -269,6 +269,527 @@ public sealed class CameraFrameSource : MediaStrategyBase, IAsyncDisposable
     protected override Task<Uri> StreamAsyncCore(Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
     public new async ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs
+```csharp
+internal sealed class GpuAccelerationStrategy : MediaStrategyBase
+{
+}
+    public GpuAccelerationStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_qsv", "hevc_qsv", "av1_qsv", "h264_amf", "hevc_amf", "av1_amf", "h264", "h265", "av1" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<GpuDetectionResult> DetectGpuHardwareAsync(CancellationToken cancellationToken = default);
+    public bool CheckGpuMemory(long requiredBytes);
+    public GpuMemoryAllocation AllocateGpuMemory(long bytes, string purpose);
+    public void ReleaseGpuMemory(GpuMemoryAllocation allocation);
+    public string GetEncoderArgs(string codec);
+    public GpuHealthStats GetHealthStats();
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+public sealed class GpuDetectionResult
+{
+}
+    public required List<GpuDeviceInfo> AvailableGpus { get; init; }
+    public required HardwareEncoder ActiveEncoder { get; init; }
+    public required int SelectedGpuIndex { get; init; }
+    public required bool IsCached { get; init; }
+}
+```
+```csharp
+public sealed class GpuDeviceInfo
+{
+}
+    public required int Index { get; init; }
+    public required string Name { get; init; }
+    public required GpuVendor Vendor { get; init; }
+    public required int TotalMemoryMb { get; init; }
+    public required int FreeMemoryMb { get; init; }
+    public required int Utilization { get; init; }
+    public required int Temperature { get; init; }
+    public required string[] SupportedEncoders { get; init; }
+}
+```
+```csharp
+public sealed class GpuMemoryAllocation
+{
+}
+    public required string AllocationId { get; init; }
+    public required long AllocatedBytes { get; init; }
+    public required string Purpose { get; init; }
+    public required bool IsCpuFallback { get; init; }
+    public required int GpuIndex { get; init; }
+}
+```
+```csharp
+public sealed class GpuHealthStats
+{
+}
+    public required HardwareEncoder ActiveEncoder { get; init; }
+    public required int SelectedGpuIndex { get; init; }
+    public required long MemoryAllocatedBytes { get; init; }
+    public required long MemoryLimitBytes { get; init; }
+    public required double MemoryUtilization { get; init; }
+    public required int GpuCount { get; init; }
+    public required List<GpuDeviceInfo> Gpus { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/Av1CodecStrategy.cs
+```csharp
+internal sealed class Av1CodecStrategy : MediaStrategyBase
+{
+}
+    public Av1CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "av1", "libaom-av1", "libsvtav1" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/Vp9CodecStrategy.cs
+```csharp
+internal sealed class Vp9CodecStrategy : MediaStrategyBase
+{
+}
+    public Vp9CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM, MediaFormat.FLV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.WebM, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: 50_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "vp9", "libvpx-vp9" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/VvcCodecStrategy.cs
+```csharp
+internal sealed class VvcCodecStrategy : MediaStrategyBase
+{
+}
+    public VvcCodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "vvc", "h266", "libvvenc" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/H265CodecStrategy.cs
+```csharp
+internal sealed class H265CodecStrategy : MediaStrategyBase
+{
+}
+    public H265CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h265", "hevc", "libx265", "hevc_nvenc", "hevc_qsv" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/H264CodecStrategy.cs
+```csharp
+internal sealed class H264CodecStrategy : MediaStrategyBase
+{
+}
+    public H264CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM, MediaFormat.FLV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.FLV, MediaFormat.HLS }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: 50_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h264", "avc", "libx264", "h264_nvenc", "h264_qsv" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/AiProcessingStrategies.cs
+```csharp
+internal sealed class OnnxInferenceStrategy : MediaStrategyBase
+{
+}
+    public OnnxInferenceStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WAV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "onnx-inference" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public OnnxModelInfo LoadModel(string modelName, string modelPath, string? version = null);
+    public OnnxModelInfo HotSwapModel(string modelName, string newModelPath, string newVersion);
+    public async Task<InferenceResult> RunInferenceAsync(string modelName, byte[] inputData, CancellationToken cancellationToken = default);
+    public IReadOnlyList<OnnxModelInfo> GetLoadedModels();;
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class AiUpscalingStrategy : MediaStrategyBase
+{
+}
+    public AiUpscalingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.PNG, MediaFormat.JPEG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "ai-upscale" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public void Configure(string modelPath, int scaleFactor = 2, int tileSize = 512, int tileOverlap = 32);
+    public async Task<UpscaleResult> UpscaleAsync(Stream inputImage, int scaleFactor, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class ObjectDetectionStrategy : MediaStrategyBase
+{
+}
+    public ObjectDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.MP4 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "yolo-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public void Configure(string modelPath, float confidenceThreshold = 0.5f, float iouThreshold = 0.45f, string[]? classLabels = null);
+    public async Task<DetectionResult> DetectObjectsAsync(Stream inputImage, CancellationToken cancellationToken = default);
+    public List<Detection> ApplyNms(List<Detection> detections, float iouThreshold);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class FaceDetectionStrategy : MediaStrategyBase
+{
+}
+    public FaceDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "face-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<FaceDetectionResult> DetectFacesAsync(Stream inputImage, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class SpeechToTextStrategy : MediaStrategyBase
+{
+}
+    public SpeechToTextStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.WAV, MediaFormat.MP3, MediaFormat.FLAC, MediaFormat.Opus, MediaFormat.AAC, MediaFormat.MP4, MediaFormat.MKV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.Unknown // Text output, not media
+ }, SupportsStreaming: true, SupportsAdaptiveBitrate: false, MaxResolution: default, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "whisper-stt" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<TranscriptionResult> TranscribeAsync(Stream audioStream, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+public sealed class OnnxModelInfo
+{
+}
+    public required string ModelName { get; init; }
+    public required string ModelPath { get; init; }
+    public required string Version { get; init; }
+    public required DateTime LoadedAt { get; init; }
+    public required long FileSizeBytes { get; init; }
+    public required bool UseMemoryMapping { get; init; }
+    public required string ExecutionProvider { get; init; }
+    public required int[] InputShape { get; init; }
+    public required int[] OutputShape { get; init; }
+    public required bool IsLoaded { get; init; }
+}
+```
+```csharp
+public sealed class InferenceResult
+{
+}
+    public required string ModelName { get; init; }
+    public required string ModelVersion { get; init; }
+    public required string ExecutionProvider { get; init; }
+    public required long InferenceTimeMs { get; init; }
+    public required byte[] OutputData { get; init; }
+    public required int[] OutputShape { get; init; }
+    public required float Confidence { get; init; }
+    public required string[] Labels { get; init; }
+}
+```
+```csharp
+public sealed class UpscaleResult
+{
+}
+    public required int ScaleFactor { get; init; }
+    public required int TilesProcessed { get; init; }
+    public required long ProcessingTimeMs { get; init; }
+    public required long OutputSizeBytes { get; init; }
+    public required string ModelUsed { get; init; }
+}
+```
+```csharp
+public sealed class DetectionResult
+{
+}
+    public required Detection[] Detections { get; init; }
+    public required long ProcessingTimeMs { get; init; }
+    public required string ModelUsed { get; init; }
+    public required float ConfidenceThreshold { get; init; }
+    public required float IouThreshold { get; init; }
+}
+```
+```csharp
+public sealed class Detection
+{
+}
+    public required BoundingBox BoundingBox { get; init; }
+    public required string ClassLabel { get; init; }
+    public required int ClassId { get; init; }
+    public required float Confidence { get; init; }
+}
+```
+```csharp
+public sealed class BoundingBox
+{
+}
+    public required float X { get; init; }
+    public required float Y { get; init; }
+    public required float Width { get; init; }
+    public required float Height { get; init; }
+}
+```
+```csharp
+public sealed class FaceDetectionResult
+{
+}
+    public required FaceInfo[] Faces { get; init; }
+    public required long ProcessingTimeMs { get; init; }
+    public required string ModelUsed { get; init; }
+    public required float ConfidenceThreshold { get; init; }
+}
+```
+```csharp
+public sealed class FaceInfo
+{
+}
+    public required BoundingBox BoundingBox { get; init; }
+    public required float Confidence { get; init; }
+    public FaceLandmarks? Landmarks { get; init; }
+}
+```
+```csharp
+public sealed class FaceLandmarks
+{
+}
+    public required (float X, float Y) LeftEye { get; init; }
+    public required (float X, float Y) RightEye { get; init; }
+    public required (float X, float Y) Nose { get; init; }
+    public required (float X, float Y) LeftMouth { get; init; }
+    public required (float X, float Y) RightMouth { get; init; }
+}
+```
+```csharp
+public sealed class TranscriptionResult
+{
+}
+    public required string Text { get; init; }
+    public required string Language { get; init; }
+    public required float LanguageConfidence { get; init; }
+    public required TranscriptionSegment[] Segments { get; init; }
+    public required long ProcessingTimeMs { get; init; }
+    public required long AudioDurationMs { get; init; }
+    public required string ModelUsed { get; init; }
+}
+```
+```csharp
+public sealed class TranscriptionSegment
+{
+}
+    public required string Text { get; init; }
+    public required long StartMs { get; init; }
+    public required long EndMs { get; init; }
+    public required float Confidence { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs
+```csharp
+internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
+{
+}
+    public Stereo3DVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<Stream> ConvertStereoFormatAsync(Stream input, StereoLayout inputLayout, StereoLayout outputLayout, CancellationToken cancellationToken = default);
+    public async Task<Stream> ExtractDepthMapAsync(Stream stereoInput, StereoLayout layout, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class Video360Strategy : MediaStrategyBase
+{
+}
+    public Video360Strategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: true, SupportsAdaptiveBitrate: true, MaxResolution: Resolution.EightK, // 360 video typically 4K-8K equirectangular
+ MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "vp9", "equirect", "cubemap" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<CubemapResult> ConvertToCubemapAsync(Stream equirectangularInput, int faceSize = 1024, CancellationToken cancellationToken = default);
+    public async Task<Stream> ExtractViewportAsync(Stream input360, float yawDegrees, float pitchDegrees, float fovDegrees = 90, Resolution? outputResolution = null, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class VrVideoStrategy : MediaStrategyBase
+{
+}
+    public VrVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: true, SupportsAdaptiveBitrate: true, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h265", "av1", "vr-viewport" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<VrFrameResult> RenderViewportFrameAsync(Stream vrInput, VrOrientation orientation, VrRenderConfig config, CancellationToken cancellationToken = default);
+    public FoveatedRegionMap GenerateFoveatedRegions(float gazeX, float gazeY, Resolution frameResolution);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+internal sealed class HdrToneMappingStrategy : MediaStrategyBase
+{
+}
+    public HdrToneMappingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "tone-map" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public async Task<ToneMappingResult> ToneMapAsync(Stream hdrInput, ToneMappingOperator toneMapOp, ToneMappingConfig? config = null, CancellationToken cancellationToken = default);
+    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
+    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
+    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
+}
+```
+```csharp
+public sealed class CubemapResult
+{
+}
+    public required int FaceSize { get; init; }
+    public required string Layout { get; init; }
+    public required string OutputFormat { get; init; }
+}
+```
+```csharp
+public sealed class VrOrientation
+{
+}
+    public required float Yaw { get; init; }
+    public required float Pitch { get; init; }
+    public required float Roll { get; init; }
+}
+```
+```csharp
+public sealed class VrRenderConfig
+{
+}
+    public bool EnableFoveation { get; init; };
+    public float TargetFrameRate { get; init; };
+    public float MaxMotionToPhotonMs { get; init; };
+    public Resolution EyeBufferResolution { get; init; };
+}
+```
+```csharp
+public sealed class VrFrameResult
+{
+}
+    public required byte[] FrameData { get; init; }
+    public required VrOrientation Orientation { get; init; }
+    public required long RenderTimeMs { get; init; }
+    public required long MotionToPhotonMs { get; init; }
+    public required int FoveatedRegions { get; init; }
+}
+```
+```csharp
+public sealed class FoveatedRegionMap
+{
+}
+    public required FoveatedRegion CenterRegion { get; init; }
+    public required FoveatedRegion MidRegion { get; init; }
+    public required float PeripheralQualityLevel { get; init; }
+}
+```
+```csharp
+public sealed class FoveatedRegion
+{
+}
+    public required float CenterX { get; init; }
+    public required float CenterY { get; init; }
+    public required float Radius { get; init; }
+    public required float QualityLevel { get; init; }
+}
+```
+```csharp
+public sealed class ToneMappingConfig
+{
+}
+    public float PeakLuminanceNits { get; init; };
+    public float DesaturationStrength { get; init; };
+    public float Exposure { get; init; };
+}
+```
+```csharp
+public sealed class ToneMappingResult
+{
+}
+    public required ToneMappingOperator Operator { get; init; }
+    public required string InputColorSpace { get; init; }
+    public required string OutputColorSpace { get; init; }
+    public required float PeakLuminanceNits { get; init; }
+    public required string FilterChain { get; init; }
 }
 ```
 
@@ -296,148 +817,6 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
 {
 }
     public KtxTextureStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.KTX, MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.DDS }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.KTX }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16384, 16384), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ktx", "ktx2", "basis-etc1s", "basis-uastc", "etc2", "astc", "pvrtc" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/AvifImageStrategy.cs
-```csharp
-internal sealed class AvifImageStrategy : MediaStrategyBase
-{
-}
-    public AvifImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(65536, 65536), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "avif", "av1", "avif-hdr", "avif-lossless" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/JpegImageStrategy.cs
-```csharp
-internal sealed class JpegImageStrategy : MediaStrategyBase
-{
-}
-    public JpegImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(65535, 65535), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "jpeg", "jpg", "jfif", "progressive-jpeg" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/PngImageStrategy.cs
-```csharp
-internal sealed class PngImageStrategy : MediaStrategyBase
-{
-}
-    public PngImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.WebP, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(2147483647, 2147483647), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "png", "apng", "png-interlaced" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/WebPImageStrategy.cs
-```csharp
-internal sealed class WebPImageStrategy : MediaStrategyBase
-{
-}
-    public WebPImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.WebP, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.WebP }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16383, 16383), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "webp", "webp-lossy", "webp-lossless", "webp-animated" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/ArwRawStrategy.cs
-```csharp
-internal sealed class ArwRawStrategy : MediaStrategyBase
-{
-}
-    public ArwRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.ARW }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(9504, 6336), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "arw", "sony-raw", "sr2" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/Cr2RawStrategy.cs
-```csharp
-internal sealed class Cr2RawStrategy : MediaStrategyBase
-{
-}
-    public Cr2RawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.CR2 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(8192, 5464), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "cr2", "canon-raw", "lossless-jpeg" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/DngRawStrategy.cs
-```csharp
-internal sealed class DngRawStrategy : MediaStrategyBase
-{
-}
-    public DngRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.DNG }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF, MediaFormat.DNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16384, 16384), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "dng", "linear-dng", "cinema-dng", "dng-1.7" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/NefRawStrategy.cs
-```csharp
-internal sealed class NefRawStrategy : MediaStrategyBase
-{
-}
-    public NefRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.NEF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(8256, 5504), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "nef", "nikon-raw", "nrw" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
@@ -499,6 +878,148 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
     protected override Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
     protected override async Task<Uri> StreamAsyncCore(Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/JpegImageStrategy.cs
+```csharp
+internal sealed class JpegImageStrategy : MediaStrategyBase
+{
+}
+    public JpegImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(65535, 65535), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "jpeg", "jpg", "jfif", "progressive-jpeg" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/AvifImageStrategy.cs
+```csharp
+internal sealed class AvifImageStrategy : MediaStrategyBase
+{
+}
+    public AvifImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(65536, 65536), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "avif", "av1", "avif-hdr", "avif-lossless" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/WebPImageStrategy.cs
+```csharp
+internal sealed class WebPImageStrategy : MediaStrategyBase
+{
+}
+    public WebPImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.WebP, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.WebP }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16383, 16383), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "webp", "webp-lossy", "webp-lossless", "webp-animated" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Image/PngImageStrategy.cs
+```csharp
+internal sealed class PngImageStrategy : MediaStrategyBase
+{
+}
+    public PngImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.WebP, MediaFormat.AVIF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(2147483647, 2147483647), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "png", "apng", "png-interlaced" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/Cr2RawStrategy.cs
+```csharp
+internal sealed class Cr2RawStrategy : MediaStrategyBase
+{
+}
+    public Cr2RawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.CR2 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(8192, 5464), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "cr2", "canon-raw", "lossless-jpeg" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/ArwRawStrategy.cs
+```csharp
+internal sealed class ArwRawStrategy : MediaStrategyBase
+{
+}
+    public ArwRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.ARW }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(9504, 6336), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "arw", "sony-raw", "sr2" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/NefRawStrategy.cs
+```csharp
+internal sealed class NefRawStrategy : MediaStrategyBase
+{
+}
+    public NefRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.NEF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(8256, 5504), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "nef", "nikon-raw", "nrw" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/RAW/DngRawStrategy.cs
+```csharp
+internal sealed class DngRawStrategy : MediaStrategyBase
+{
+}
+    public DngRawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.DNG }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF, MediaFormat.DNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16384, 16384), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "dng", "linear-dng", "cinema-dng", "dng-1.7" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
+    public override string StrategyId;;
+    public override string Name;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
 }
 ```
 
@@ -864,526 +1385,5 @@ private sealed class UsdSceneInfo
     public double AnimationEndFrame { get; set; }
     public int VariantSetCount { get; set; }
     public int SublayerCount { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs
-```csharp
-internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
-{
-}
-    public Stereo3DVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<Stream> ConvertStereoFormatAsync(Stream input, StereoLayout inputLayout, StereoLayout outputLayout, CancellationToken cancellationToken = default);
-    public async Task<Stream> ExtractDepthMapAsync(Stream stereoInput, StereoLayout layout, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class Video360Strategy : MediaStrategyBase
-{
-}
-    public Video360Strategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: true, SupportsAdaptiveBitrate: true, MaxResolution: Resolution.EightK, // 360 video typically 4K-8K equirectangular
- MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "vp9", "equirect", "cubemap" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<CubemapResult> ConvertToCubemapAsync(Stream equirectangularInput, int faceSize = 1024, CancellationToken cancellationToken = default);
-    public async Task<Stream> ExtractViewportAsync(Stream input360, float yawDegrees, float pitchDegrees, float fovDegrees = 90, Resolution? outputResolution = null, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class VrVideoStrategy : MediaStrategyBase
-{
-}
-    public VrVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: true, SupportsAdaptiveBitrate: true, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h265", "av1", "vr-viewport" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<VrFrameResult> RenderViewportFrameAsync(Stream vrInput, VrOrientation orientation, VrRenderConfig config, CancellationToken cancellationToken = default);
-    public FoveatedRegionMap GenerateFoveatedRegions(float gazeX, float gazeY, Resolution frameResolution);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class HdrToneMappingStrategy : MediaStrategyBase
-{
-}
-    public HdrToneMappingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "tone-map" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<ToneMappingResult> ToneMapAsync(Stream hdrInput, ToneMappingOperator toneMapOp, ToneMappingConfig? config = null, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-public sealed class CubemapResult
-{
-}
-    public required int FaceSize { get; init; }
-    public required string Layout { get; init; }
-    public required string OutputFormat { get; init; }
-}
-```
-```csharp
-public sealed class VrOrientation
-{
-}
-    public required float Yaw { get; init; }
-    public required float Pitch { get; init; }
-    public required float Roll { get; init; }
-}
-```
-```csharp
-public sealed class VrRenderConfig
-{
-}
-    public bool EnableFoveation { get; init; };
-    public float TargetFrameRate { get; init; };
-    public float MaxMotionToPhotonMs { get; init; };
-    public Resolution EyeBufferResolution { get; init; };
-}
-```
-```csharp
-public sealed class VrFrameResult
-{
-}
-    public required byte[] FrameData { get; init; }
-    public required VrOrientation Orientation { get; init; }
-    public required long RenderTimeMs { get; init; }
-    public required long MotionToPhotonMs { get; init; }
-    public required int FoveatedRegions { get; init; }
-}
-```
-```csharp
-public sealed class FoveatedRegionMap
-{
-}
-    public required FoveatedRegion CenterRegion { get; init; }
-    public required FoveatedRegion MidRegion { get; init; }
-    public required float PeripheralQualityLevel { get; init; }
-}
-```
-```csharp
-public sealed class FoveatedRegion
-{
-}
-    public required float CenterX { get; init; }
-    public required float CenterY { get; init; }
-    public required float Radius { get; init; }
-    public required float QualityLevel { get; init; }
-}
-```
-```csharp
-public sealed class ToneMappingConfig
-{
-}
-    public float PeakLuminanceNits { get; init; };
-    public float DesaturationStrength { get; init; };
-    public float Exposure { get; init; };
-}
-```
-```csharp
-public sealed class ToneMappingResult
-{
-}
-    public required ToneMappingOperator Operator { get; init; }
-    public required string InputColorSpace { get; init; }
-    public required string OutputColorSpace { get; init; }
-    public required float PeakLuminanceNits { get; init; }
-    public required string FilterChain { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/AiProcessingStrategies.cs
-```csharp
-internal sealed class OnnxInferenceStrategy : MediaStrategyBase
-{
-}
-    public OnnxInferenceStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WAV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "onnx-inference" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public OnnxModelInfo LoadModel(string modelName, string modelPath, string? version = null);
-    public OnnxModelInfo HotSwapModel(string modelName, string newModelPath, string newVersion);
-    public async Task<InferenceResult> RunInferenceAsync(string modelName, byte[] inputData, CancellationToken cancellationToken = default);
-    public IReadOnlyList<OnnxModelInfo> GetLoadedModels();;
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class AiUpscalingStrategy : MediaStrategyBase
-{
-}
-    public AiUpscalingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.PNG, MediaFormat.JPEG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "ai-upscale" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public void Configure(string modelPath, int scaleFactor = 2, int tileSize = 512, int tileOverlap = 32);
-    public async Task<UpscaleResult> UpscaleAsync(Stream inputImage, int scaleFactor, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class ObjectDetectionStrategy : MediaStrategyBase
-{
-}
-    public ObjectDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.MP4 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "yolo-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public void Configure(string modelPath, float confidenceThreshold = 0.5f, float iouThreshold = 0.45f, string[]? classLabels = null);
-    public async Task<DetectionResult> DetectObjectsAsync(Stream inputImage, CancellationToken cancellationToken = default);
-    public List<Detection> ApplyNms(List<Detection> detections, float iouThreshold);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class FaceDetectionStrategy : MediaStrategyBase
-{
-}
-    public FaceDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "face-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<FaceDetectionResult> DetectFacesAsync(Stream inputImage, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-internal sealed class SpeechToTextStrategy : MediaStrategyBase
-{
-}
-    public SpeechToTextStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.WAV, MediaFormat.MP3, MediaFormat.FLAC, MediaFormat.Opus, MediaFormat.AAC, MediaFormat.MP4, MediaFormat.MKV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.Unknown // Text output, not media
- }, SupportsStreaming: true, SupportsAdaptiveBitrate: false, MaxResolution: default, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "whisper-stt" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<TranscriptionResult> TranscribeAsync(Stream audioStream, CancellationToken cancellationToken = default);
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);;
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);;
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-public sealed class OnnxModelInfo
-{
-}
-    public required string ModelName { get; init; }
-    public required string ModelPath { get; init; }
-    public required string Version { get; init; }
-    public required DateTime LoadedAt { get; init; }
-    public required long FileSizeBytes { get; init; }
-    public required bool UseMemoryMapping { get; init; }
-    public required string ExecutionProvider { get; init; }
-    public required int[] InputShape { get; init; }
-    public required int[] OutputShape { get; init; }
-    public required bool IsLoaded { get; init; }
-}
-```
-```csharp
-public sealed class InferenceResult
-{
-}
-    public required string ModelName { get; init; }
-    public required string ModelVersion { get; init; }
-    public required string ExecutionProvider { get; init; }
-    public required long InferenceTimeMs { get; init; }
-    public required byte[] OutputData { get; init; }
-    public required int[] OutputShape { get; init; }
-    public required float Confidence { get; init; }
-    public required string[] Labels { get; init; }
-}
-```
-```csharp
-public sealed class UpscaleResult
-{
-}
-    public required int ScaleFactor { get; init; }
-    public required int TilesProcessed { get; init; }
-    public required long ProcessingTimeMs { get; init; }
-    public required long OutputSizeBytes { get; init; }
-    public required string ModelUsed { get; init; }
-}
-```
-```csharp
-public sealed class DetectionResult
-{
-}
-    public required Detection[] Detections { get; init; }
-    public required long ProcessingTimeMs { get; init; }
-    public required string ModelUsed { get; init; }
-    public required float ConfidenceThreshold { get; init; }
-    public required float IouThreshold { get; init; }
-}
-```
-```csharp
-public sealed class Detection
-{
-}
-    public required BoundingBox BoundingBox { get; init; }
-    public required string ClassLabel { get; init; }
-    public required int ClassId { get; init; }
-    public required float Confidence { get; init; }
-}
-```
-```csharp
-public sealed class BoundingBox
-{
-}
-    public required float X { get; init; }
-    public required float Y { get; init; }
-    public required float Width { get; init; }
-    public required float Height { get; init; }
-}
-```
-```csharp
-public sealed class FaceDetectionResult
-{
-}
-    public required FaceInfo[] Faces { get; init; }
-    public required long ProcessingTimeMs { get; init; }
-    public required string ModelUsed { get; init; }
-    public required float ConfidenceThreshold { get; init; }
-}
-```
-```csharp
-public sealed class FaceInfo
-{
-}
-    public required BoundingBox BoundingBox { get; init; }
-    public required float Confidence { get; init; }
-    public FaceLandmarks? Landmarks { get; init; }
-}
-```
-```csharp
-public sealed class FaceLandmarks
-{
-}
-    public required (float X, float Y) LeftEye { get; init; }
-    public required (float X, float Y) RightEye { get; init; }
-    public required (float X, float Y) Nose { get; init; }
-    public required (float X, float Y) LeftMouth { get; init; }
-    public required (float X, float Y) RightMouth { get; init; }
-}
-```
-```csharp
-public sealed class TranscriptionResult
-{
-}
-    public required string Text { get; init; }
-    public required string Language { get; init; }
-    public required float LanguageConfidence { get; init; }
-    public required TranscriptionSegment[] Segments { get; init; }
-    public required long ProcessingTimeMs { get; init; }
-    public required long AudioDurationMs { get; init; }
-    public required string ModelUsed { get; init; }
-}
-```
-```csharp
-public sealed class TranscriptionSegment
-{
-}
-    public required string Text { get; init; }
-    public required long StartMs { get; init; }
-    public required long EndMs { get; init; }
-    public required float Confidence { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/Av1CodecStrategy.cs
-```csharp
-internal sealed class Av1CodecStrategy : MediaStrategyBase
-{
-}
-    public Av1CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "av1", "libaom-av1", "libsvtav1" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs
-```csharp
-internal sealed class GpuAccelerationStrategy : MediaStrategyBase
-{
-}
-    public GpuAccelerationStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_qsv", "hevc_qsv", "av1_qsv", "h264_amf", "hevc_amf", "av1_amf", "h264", "h265", "av1" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public async Task<GpuDetectionResult> DetectGpuHardwareAsync(CancellationToken cancellationToken = default);
-    public bool CheckGpuMemory(long requiredBytes);
-    public GpuMemoryAllocation AllocateGpuMemory(long bytes, string purpose);
-    public void ReleaseGpuMemory(GpuMemoryAllocation allocation);
-    public string GetEncoderArgs(string codec);
-    public GpuHealthStats GetHealthStats();
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
-}
-```
-```csharp
-public sealed class GpuDetectionResult
-{
-}
-    public required List<GpuDeviceInfo> AvailableGpus { get; init; }
-    public required HardwareEncoder ActiveEncoder { get; init; }
-    public required int SelectedGpuIndex { get; init; }
-    public required bool IsCached { get; init; }
-}
-```
-```csharp
-public sealed class GpuDeviceInfo
-{
-}
-    public required int Index { get; init; }
-    public required string Name { get; init; }
-    public required GpuVendor Vendor { get; init; }
-    public required int TotalMemoryMb { get; init; }
-    public required int FreeMemoryMb { get; init; }
-    public required int Utilization { get; init; }
-    public required int Temperature { get; init; }
-    public required string[] SupportedEncoders { get; init; }
-}
-```
-```csharp
-public sealed class GpuMemoryAllocation
-{
-}
-    public required string AllocationId { get; init; }
-    public required long AllocatedBytes { get; init; }
-    public required string Purpose { get; init; }
-    public required bool IsCpuFallback { get; init; }
-    public required int GpuIndex { get; init; }
-}
-```
-```csharp
-public sealed class GpuHealthStats
-{
-}
-    public required HardwareEncoder ActiveEncoder { get; init; }
-    public required int SelectedGpuIndex { get; init; }
-    public required long MemoryAllocatedBytes { get; init; }
-    public required long MemoryLimitBytes { get; init; }
-    public required double MemoryUtilization { get; init; }
-    public required int GpuCount { get; init; }
-    public required List<GpuDeviceInfo> Gpus { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/H264CodecStrategy.cs
-```csharp
-internal sealed class H264CodecStrategy : MediaStrategyBase
-{
-}
-    public H264CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM, MediaFormat.FLV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.FLV, MediaFormat.HLS }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: 50_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h264", "avc", "libx264", "h264_nvenc", "h264_qsv" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/H265CodecStrategy.cs
-```csharp
-internal sealed class H265CodecStrategy : MediaStrategyBase
-{
-}
-    public H265CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h265", "hevc", "libx265", "hevc_nvenc", "hevc_qsv" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
-    public override string StrategyId;;
-    public override string Name;;
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/Vp9CodecStrategy.cs
-```csharp
-internal sealed class Vp9CodecStrategy : MediaStrategyBase
-{
-}
-    public Vp9CodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM, MediaFormat.FLV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.WebM, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: 50_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "vp9", "libvpx-vp9" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.Transcoding.Media/Strategies/Video/VvcCodecStrategy.cs
-```csharp
-internal sealed class VvcCodecStrategy : MediaStrategyBase
-{
-}
-    public VvcCodecStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: 100_000_000, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "vvc", "h266", "libvvenc" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
-    public override string StrategyId;;
-    public override string Name;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
-    protected override async Task<MediaMetadata> ExtractMetadataAsyncCore(Stream mediaStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
-    protected override Task<Uri> StreamAsyncCore(Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken);
 }
 ```

@@ -572,403 +572,6 @@ internal static class TimeSpanExtensions
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs
-```csharp
-public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public StandardCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), halfOpenSuccessThreshold: 2);
-    public StandardCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, int halfOpenSuccessThreshold);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public CircuitBreakerState State
-{
-    get
-    {
-        lock (_stateLock)
-        {
-            CheckTransitionFromOpen();
-            return _state;
-        }
-    }
-}
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class SlidingWindowCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public SlidingWindowCircuitBreakerStrategy() : this(windowDuration: TimeSpan.FromMinutes(1), failureRateThreshold: 0.5, minimumRequests: 10, openDuration: TimeSpan.FromSeconds(30));
-    public SlidingWindowCircuitBreakerStrategy(TimeSpan windowDuration, double failureRateThreshold, int minimumRequests, TimeSpan openDuration);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public CircuitBreakerState State
-{
-    get
-    {
-        lock (_stateLock)
-        {
-            CheckTransitions();
-            return _state;
-        }
-    }
-}
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class CountBasedCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public CountBasedCircuitBreakerStrategy() : this(failureThreshold: 5, successThreshold: 3, openDuration: TimeSpan.FromSeconds(30));
-    public CountBasedCircuitBreakerStrategy(int failureThreshold, int successThreshold, TimeSpan openDuration);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public TimeBasedCircuitBreakerStrategy() : this(bucketDuration: TimeSpan.FromSeconds(10), bucketsToTrack: 6, failureRateThreshold: 0.5, minimumRequests: 10, openDuration: TimeSpan.FromSeconds(30));
-    public TimeBasedCircuitBreakerStrategy(TimeSpan bucketDuration, int bucketsToTrack, double failureRateThreshold, int minimumRequests, TimeSpan openDuration);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public GradualRecoveryCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), initialPermitRate: 0.1, permitRateIncrement: 0.1, successesPerIncrement: 3);
-    public GradualRecoveryCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, double initialPermitRate, double permitRateIncrement, int successesPerIncrement);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class AdaptiveCircuitBreakerStrategy : ResilienceStrategyBase
-{
-}
-    public AdaptiveCircuitBreakerStrategy() : this(baseFailureThreshold: 0.5, minFailureThreshold: 0.2, maxFailureThreshold: 0.8, baseOpenDuration: TimeSpan.FromSeconds(30), minOpenDuration: TimeSpan.FromSeconds(10), maxOpenDuration: TimeSpan.FromMinutes(2), historyWindow: TimeSpan.FromMinutes(5), minimumRequests: 20, latencyThreshold: TimeSpan.FromSeconds(5));
-    public AdaptiveCircuitBreakerStrategy(double baseFailureThreshold, double minFailureThreshold, double maxFailureThreshold, TimeSpan baseOpenDuration, TimeSpan minOpenDuration, TimeSpan maxOpenDuration, TimeSpan historyWindow, int minimumRequests, TimeSpan latencyThreshold);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-    public override void Reset();
-}
-```
-```csharp
-public sealed class CircuitBreakerOpenException : Exception
-{
-}
-    public CircuitBreakerOpenException(string message) : base(message);
-    public CircuitBreakerOpenException(string message, Exception innerException) : base(message, innerException);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs
-```csharp
-public sealed class RaftConsensusStrategy : ResilienceStrategyBase
-{
-}
-    public RaftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], clusterNodes: new List<string>(), electionTimeout: TimeSpan.FromMilliseconds(Random.Shared.Next(150, 300)), heartbeatInterval: TimeSpan.FromMilliseconds(50));
-    public RaftConsensusStrategy(string nodeId, List<string> clusterNodes, TimeSpan electionTimeout, TimeSpan heartbeatInterval);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public RaftState State;;
-    public long CurrentTerm;;
-    public string? LeaderId;;
-    public bool IsLeader;;
-    public void AddNode(string nodeId);
-    public async Task<bool> StartElectionAsync(CancellationToken cancellationToken = default);
-    public async Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default);
-    public void ReceiveHeartbeat(string leaderId, long term);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
-{
-}
-    public PaxosConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
-    public PaxosConsensusStrategy(string nodeId, int quorumSize);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class PbftConsensusStrategy : ResilienceStrategyBase
-{
-}
-    public PbftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], totalNodes: 4, faultyNodes: 1);
-    public PbftConsensusStrategy(string nodeId, int totalNodes, int faultyNodes);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class ZabConsensusStrategy : ResilienceStrategyBase
-{
-}
-    public ZabConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
-    public ZabConsensusStrategy(string nodeId, int quorumSize);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public long Zxid;;
-    public long Epoch;;
-    public async Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default);
-    public void BecomeLeader();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
-{
-}
-    public ViewstampedReplicationStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], replicaCount: 3);
-    public ViewstampedReplicationStrategy(string nodeId, int replicaCount);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default);
-    public void BecomePrimary();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs
-```csharp
-public sealed class RecoveryPoint
-{
-}
-    public string Id { get; init; };
-    public DateTimeOffset Timestamp { get; init; };
-    public string? Description { get; init; }
-    public string Type { get; init; };
-    public Dictionary<string, object> Metadata { get; init; };
-    public bool IsValid { get; init; };
-    public long? SizeBytes { get; init; }
-}
-```
-```csharp
-public sealed class DisasterRecoveryResult
-{
-}
-    public bool Success { get; init; }
-    public DisasterRecoveryMode Mode { get; init; }
-    public string? Description { get; init; }
-    public TimeSpan Duration { get; init; }
-    public RecoveryPoint? RecoveryPoint { get; init; }
-    public Exception? Exception { get; init; }
-    public Dictionary<string, object> Metadata { get; init; };
-}
-```
-```csharp
-public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
-{
-}
-    public GeoReplicationFailoverStrategy() : this(healthCheckInterval: TimeSpan.FromSeconds(30), failureThreshold: 3);
-    public GeoReplicationFailoverStrategy(TimeSpan healthCheckInterval, int failureThreshold);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public DisasterRecoveryMode Mode;;
-    public string? ActiveRegionId;;
-    public GeoReplicationFailoverStrategy AddRegion(string regionId, string endpoint, int priority);
-    public async Task<DisasterRecoveryResult> FailoverAsync(CancellationToken cancellationToken = default);
-    public async Task<DisasterRecoveryResult> FailbackAsync(CancellationToken cancellationToken = default);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
-{
-}
-    public PointInTimeRecoveryStrategy() : this(maxRecoveryPoints: 100, retentionPeriod: TimeSpan.FromDays(7));
-    public PointInTimeRecoveryStrategy(int maxRecoveryPoints, TimeSpan retentionPeriod);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public IReadOnlyList<RecoveryPoint> RecoveryPoints;;
-    public RecoveryPoint? LastCheckpoint;;
-    public RecoveryPoint CreateCheckpoint(string? description = null, Dictionary<string, object>? metadata = null);
-    public RecoveryPoint CreateFullBackup(string? description = null, long? sizeBytes = null);
-    public IReadOnlyList<RecoveryPoint> FindRecoveryPoints(DateTimeOffset start, DateTimeOffset end);
-    public RecoveryPoint? FindClosestRecoveryPoint(DateTimeOffset targetTime);
-    public async Task<DisasterRecoveryResult> RestoreToPointAsync(string recoveryPointId, CancellationToken cancellationToken = default);
-    public async Task<DisasterRecoveryResult> RestoreToTimeAsync(DateTimeOffset targetTime, CancellationToken cancellationToken = default);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
-{
-}
-    public MultiRegionDisasterRecoveryStrategy() : this(activeActive: false, syncInterval: TimeSpan.FromSeconds(10));
-    public MultiRegionDisasterRecoveryStrategy(bool activeActive, TimeSpan syncInterval);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public DisasterRecoveryMode Mode;;
-    public string? PrimaryRegionId;;
-    public bool IsActiveActive;;
-    public MultiRegionDisasterRecoveryStrategy AddRegion(string regionId, string endpoint, bool isPrimary = false);
-    public void UpdateRegionHealth(string regionId, bool isHealthy, long? replicationLagMs = null);
-    public async Task<DisasterRecoveryResult> PromoteRegionAsync(string regionId, CancellationToken cancellationToken = default);
-    public Dictionary<string, object> GetReplicationStatus();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-private sealed class RegionState
-{
-}
-    public string RegionId { get; init; };
-    public string Endpoint { get; init; };
-    public bool IsPrimary { get; set; }
-    public bool IsHealthy { get; set; };
-    public DateTimeOffset LastSyncTime { get; set; };
-    public long ReplicationLagMs { get; set; }
-}
-```
-```csharp
-public sealed class StateCheckpointStrategy : ResilienceStrategyBase
-{
-}
-    public StateCheckpointStrategy() : this(maxCheckpoints: 50, stateSerializer: null, stateRestorer: null);
-    public StateCheckpointStrategy(int maxCheckpoints, Func<CancellationToken, Task<byte[]>>? stateSerializer, Func<byte[], CancellationToken, Task>? stateRestorer);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public int CheckpointCount;;
-    public async Task<RecoveryPoint> CreateCheckpointAsync(byte[]? stateData = null, CancellationToken cancellationToken = default);
-    public async Task<DisasterRecoveryResult> RestoreCheckpointAsync(string checkpointId, CancellationToken cancellationToken = default);
-    public (string? checkpointId, DateTimeOffset? timestamp) GetLatestCheckpoint();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    public override void Reset();
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
-{
-}
-    public DataCenterFailoverStrategy() : this(failoverTimeout: TimeSpan.FromMinutes(5));
-    public DataCenterFailoverStrategy(TimeSpan failoverTimeout);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public string? ActiveDataCenterId;;
-    public DisasterRecoveryMode Mode;;
-    public DataCenterFailoverStrategy AddDataCenter(string id, string name, string location, int priority, Dictionary<string, object>? capabilities = null);
-    public void UpdateHealth(string dataCenterId, bool isHealthy);
-    public async Task<DisasterRecoveryResult> FailoverAsync(CancellationToken cancellationToken = default);
-    public IReadOnlyList<Dictionary<string, object>> GetDataCenterStatus();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-private sealed class DataCenterInfo
-{
-}
-    public string Id { get; init; };
-    public string Name { get; init; };
-    public string Location { get; init; };
-    public int Priority { get; init; }
-    public bool IsHealthy { get; set; };
-    public DateTimeOffset LastHealthCheck { get; set; };
-    public Dictionary<string, object> Capabilities { get; init; };
-}
-```
-```csharp
-public sealed class BackupCoordinationStrategy : ResilienceStrategyBase
-{
-}
-    public BackupCoordinationStrategy() : this(backupInterval: TimeSpan.FromHours(1), retainBackups: 24);
-    public BackupCoordinationStrategy(TimeSpan backupInterval, int retainBackups);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public DateTimeOffset LastBackupTime;;
-    public int BackupCount;;
-    public string StartBackup(string type = "full");
-    public void CompleteBackup(string jobId, long? sizeBytes = null, string? error = null);
-    public bool IsBackupDue();
-    public IReadOnlyList<Dictionary<string, object>> GetBackupStatus();
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
-}
-```
-```csharp
-private sealed class BackupJob
-{
-}
-    public string Id { get; init; };
-    public DateTimeOffset StartTime { get; init; }
-    public DateTimeOffset? EndTime { get; set; }
-    public string Status { get; set; };
-    public string? Error { get; set; }
-    public long? SizeBytes { get; set; }
-    public string Type { get; init; };
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Fallback/FallbackStrategies.cs
 ```csharp
 public sealed class CacheFallbackStrategy<TResult> : ResilienceStrategyBase
@@ -1162,128 +765,210 @@ public sealed class HealthCheckFailedException : Exception
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/LoadBalancing/LoadBalancingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Timeout/TimeoutStrategies.cs
 ```csharp
-public sealed class LoadBalancerEndpoint
+public sealed class SimpleTimeoutStrategy : ResilienceStrategyBase
 {
 }
-    public required string EndpointId { get; init; }
-    public string? Name { get; init; }
-    public required string Address { get; init; }
-    public int Weight { get; set; };
-    public bool IsHealthy { get; set; };
-    public int ActiveConnections { get => _activeConnections; set => _activeConnections = value; }
-    public int IncrementConnections();;
-    public int DecrementConnections();;
-    public TimeSpan LastResponseTime { get; set; }
-    public Dictionary<string, object> Metadata { get; init; };
-}
-```
-```csharp
-public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
-{
-}
-    protected readonly List<LoadBalancerEndpoint> _endpoints = new();
-    protected readonly object _endpointsLock = new();
+    public SimpleTimeoutStrategy() : this(timeout: TimeSpan.FromSeconds(30));
+    public SimpleTimeoutStrategy(TimeSpan timeout);
+    public override string StrategyId;;
+    public override string StrategyName;;
     public override string Category;;
-    public virtual void AddEndpoint(LoadBalancerEndpoint endpoint);
-    public virtual bool RemoveEndpoint(string endpointId);
-    public virtual IReadOnlyList<LoadBalancerEndpoint> GetEndpoints();
-    protected virtual IReadOnlyList<LoadBalancerEndpoint> GetHealthyEndpoints();
-    public abstract LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);;
-}
-```
-```csharp
-public sealed class RoundRobinLoadBalancingStrategy : LoadBalancingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
-    protected override Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public override void AddEndpoint(LoadBalancerEndpoint endpoint);
-    public override bool RemoveEndpoint(string endpointId);
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class CascadingTimeoutStrategy : ResilienceStrategyBase
 {
 }
+    public CascadingTimeoutStrategy() : this(outerTimeout: TimeSpan.FromSeconds(60), innerTimeout: TimeSpan.FromSeconds(10), perStepTimeout: TimeSpan.FromSeconds(5));
+    public CascadingTimeoutStrategy(TimeSpan outerTimeout, TimeSpan innerTimeout, TimeSpan perStepTimeout);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
+    public TimeSpan GetRemainingTime(ResilienceContext? context);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class AdaptiveTimeoutStrategy : ResilienceStrategyBase
 {
 }
+    public AdaptiveTimeoutStrategy() : this(baseTimeout: TimeSpan.FromSeconds(10), minTimeout: TimeSpan.FromSeconds(1), maxTimeout: TimeSpan.FromSeconds(60), percentile: 0.99, multiplier: 1.5);
+    public AdaptiveTimeoutStrategy(TimeSpan baseTimeout, TimeSpan minTimeout, TimeSpan maxTimeout, double percentile, double multiplier);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
+    public TimeSpan CurrentTimeout
+{
+    get
+    {
+        lock (_adaptLock)
+        {
+            return _currentTimeout;
+        }
+    }
+}
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    public override void Reset();
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class PessimisticTimeoutStrategy : ResilienceStrategyBase
+{
+}
+    public PessimisticTimeoutStrategy() : this(timeout: TimeSpan.FromSeconds(30));
+    public PessimisticTimeoutStrategy(TimeSpan timeout);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class IpHashLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class OptimisticTimeoutStrategy : ResilienceStrategyBase
 {
 }
+    public OptimisticTimeoutStrategy() : this(hardTimeout: TimeSpan.FromSeconds(60), softTimeout: TimeSpan.FromSeconds(30));
+    public OptimisticTimeoutStrategy(TimeSpan hardTimeout, TimeSpan softTimeout);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class PerAttemptTimeoutStrategy : ResilienceStrategyBase
 {
 }
-    public ConsistentHashingLoadBalancingStrategy() : this(virtualNodes: 150);
-    public ConsistentHashingLoadBalancingStrategy(int virtualNodes);
+    public PerAttemptTimeoutStrategy() : this(attemptTimeout: TimeSpan.FromSeconds(10), totalTimeout: TimeSpan.FromSeconds(60));
+    public PerAttemptTimeoutStrategy(TimeSpan attemptTimeout, TimeSpan totalTimeout);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override void AddEndpoint(LoadBalancerEndpoint endpoint);
-    public override bool RemoveEndpoint(string endpointId);
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
+    public TimeSpan GetRemainingTotal(DateTimeOffset operationStart);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class TimeoutRejectedException : Exception
 {
 }
+    public TimeoutRejectedException(string message) : base(message);
+    public TimeoutRejectedException(string message, Exception innerException) : base(message, innerException);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/RetryPolicies/RetryStrategies.cs
+```csharp
+public sealed class ExponentialBackoffRetryStrategy : ResilienceStrategyBase
+{
+}
+    public ExponentialBackoffRetryStrategy() : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0);
+    public ExponentialBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, params Type[] retryableExceptions);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrategyBase
+public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
 {
 }
+    public JitteredExponentialBackoffStrategy() : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0, jitterFactor: 0.5);
+    public JitteredExponentialBackoffStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, double jitterFactor);
     public override string StrategyId;;
     public override string StrategyName;;
+    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class FixedDelayRetryStrategy : ResilienceStrategyBase
+{
+}
+    public FixedDelayRetryStrategy() : this(maxRetries: 3, delay: TimeSpan.FromSeconds(1));
+    public FixedDelayRetryStrategy(int maxRetries, TimeSpan delay);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class ImmediateRetryStrategy : ResilienceStrategyBase
+{
+}
+    public ImmediateRetryStrategy() : this(maxRetries: 3);
+    public ImmediateRetryStrategy(int maxRetries);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class RetryWithFallbackStrategy<TResult> : ResilienceStrategyBase
+{
+}
+    public RetryWithFallbackStrategy(Func<CancellationToken, Task<TResult>> fallback) : this(maxRetries: 3, delay: TimeSpan.FromSeconds(1), fallback);
+    public RetryWithFallbackStrategy(int maxRetries, TimeSpan delay, Func<CancellationToken, Task<TResult>> fallback);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class LinearBackoffRetryStrategy : ResilienceStrategyBase
+{
+}
+    public LinearBackoffRetryStrategy() : this(maxRetries: 5, initialDelay: TimeSpan.FromMilliseconds(500), delayIncrement: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(10));
+    public LinearBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan delayIncrement, TimeSpan maxDelay);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
+{
+}
+    public DecorrelatedJitterRetryStrategy() : this(maxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30));
+    public DecorrelatedJitterRetryStrategy(int maxRetries, TimeSpan baseDelay, TimeSpan maxDelay);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class AdaptiveRetryStrategy : ResilienceStrategyBase
+{
+}
+    public AdaptiveRetryStrategy() : this(baseMaxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30));
+    public AdaptiveRetryStrategy(int baseMaxRetries, TimeSpan baseDelay, TimeSpan maxDelay);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
@@ -1425,211 +1110,526 @@ public sealed class RateLimitExceededException : Exception
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/RetryPolicies/RetryStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/LoadBalancing/LoadBalancingStrategies.cs
 ```csharp
-public sealed class ExponentialBackoffRetryStrategy : ResilienceStrategyBase
+public sealed class LoadBalancerEndpoint
 {
 }
-    public ExponentialBackoffRetryStrategy() : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0);
-    public ExponentialBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, params Type[] retryableExceptions);
+    public required string EndpointId { get; init; }
+    public string? Name { get; init; }
+    public required string Address { get; init; }
+    public int Weight { get; set; };
+    public bool IsHealthy { get; set; };
+    public int ActiveConnections { get => _activeConnections; set => _activeConnections = value; }
+    public int IncrementConnections();;
+    public int DecrementConnections();;
+    public TimeSpan LastResponseTime { get; set; }
+    public Dictionary<string, object> Metadata { get; init; };
+}
+```
+```csharp
+public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
+{
+}
+    protected readonly List<LoadBalancerEndpoint> _endpoints = new();
+    protected readonly object _endpointsLock = new();
+    public override string Category;;
+    public virtual void AddEndpoint(LoadBalancerEndpoint endpoint);
+    public virtual bool RemoveEndpoint(string endpointId);
+    public virtual IReadOnlyList<LoadBalancerEndpoint> GetEndpoints();
+    protected virtual IReadOnlyList<LoadBalancerEndpoint> GetHealthyEndpoints();
+    public abstract LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);;
+}
+```
+```csharp
+public sealed class RoundRobinLoadBalancingStrategy : LoadBalancingStrategyBase
+{
+}
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
+    protected override Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public override void AddEndpoint(LoadBalancerEndpoint endpoint);
+    public override bool RemoveEndpoint(string endpointId);
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
+public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public JitteredExponentialBackoffStrategy() : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0, jitterFactor: 0.5);
-    public JitteredExponentialBackoffStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan maxDelay, double multiplier, double jitterFactor);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class FixedDelayRetryStrategy : ResilienceStrategyBase
+public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public FixedDelayRetryStrategy() : this(maxRetries: 3, delay: TimeSpan.FromSeconds(1));
-    public FixedDelayRetryStrategy(int maxRetries, TimeSpan delay);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class ImmediateRetryStrategy : ResilienceStrategyBase
+public sealed class IpHashLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public ImmediateRetryStrategy() : this(maxRetries: 3);
-    public ImmediateRetryStrategy(int maxRetries);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class RetryWithFallbackStrategy<TResult> : ResilienceStrategyBase
+public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public RetryWithFallbackStrategy(Func<CancellationToken, Task<TResult>> fallback) : this(maxRetries: 3, delay: TimeSpan.FromSeconds(1), fallback);
-    public RetryWithFallbackStrategy(int maxRetries, TimeSpan delay, Func<CancellationToken, Task<TResult>> fallback);
+    public ConsistentHashingLoadBalancingStrategy() : this(virtualNodes: 150);
+    public ConsistentHashingLoadBalancingStrategy(int virtualNodes);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override void AddEndpoint(LoadBalancerEndpoint endpoint);
+    public override bool RemoveEndpoint(string endpointId);
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class LinearBackoffRetryStrategy : ResilienceStrategyBase
+public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public LinearBackoffRetryStrategy() : this(maxRetries: 5, initialDelay: TimeSpan.FromMilliseconds(500), delayIncrement: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(10));
-    public LinearBackoffRetryStrategy(int maxRetries, TimeSpan initialDelay, TimeSpan delayIncrement, TimeSpan maxDelay);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
+public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrategyBase
 {
 }
-    public DecorrelatedJitterRetryStrategy() : this(maxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30));
-    public DecorrelatedJitterRetryStrategy(int maxRetries, TimeSpan baseDelay, TimeSpan maxDelay);
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class AdaptiveRetryStrategy : ResilienceStrategyBase
-{
-}
-    public AdaptiveRetryStrategy() : this(baseMaxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30));
-    public AdaptiveRetryStrategy(int baseMaxRetries, TimeSpan baseDelay, TimeSpan maxDelay);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
+    public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Timeout/TimeoutStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs
 ```csharp
-public sealed class SimpleTimeoutStrategy : ResilienceStrategyBase
+public sealed class RecoveryPoint
 {
 }
-    public SimpleTimeoutStrategy() : this(timeout: TimeSpan.FromSeconds(30));
-    public SimpleTimeoutStrategy(TimeSpan timeout);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    public string Id { get; init; };
+    public DateTimeOffset Timestamp { get; init; };
+    public string? Description { get; init; }
+    public string Type { get; init; };
+    public Dictionary<string, object> Metadata { get; init; };
+    public bool IsValid { get; init; };
+    public long? SizeBytes { get; init; }
 }
 ```
 ```csharp
-public sealed class CascadingTimeoutStrategy : ResilienceStrategyBase
+public sealed class DisasterRecoveryResult
 {
 }
-    public CascadingTimeoutStrategy() : this(outerTimeout: TimeSpan.FromSeconds(60), innerTimeout: TimeSpan.FromSeconds(10), perStepTimeout: TimeSpan.FromSeconds(5));
-    public CascadingTimeoutStrategy(TimeSpan outerTimeout, TimeSpan innerTimeout, TimeSpan perStepTimeout);
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Category;;
-    public override ResilienceCharacteristics Characteristics { get; };
-    public TimeSpan GetRemainingTime(ResilienceContext? context);
-    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    public bool Success { get; init; }
+    public DisasterRecoveryMode Mode { get; init; }
+    public string? Description { get; init; }
+    public TimeSpan Duration { get; init; }
+    public RecoveryPoint? RecoveryPoint { get; init; }
+    public Exception? Exception { get; init; }
+    public Dictionary<string, object> Metadata { get; init; };
 }
 ```
 ```csharp
-public sealed class AdaptiveTimeoutStrategy : ResilienceStrategyBase
+public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
 {
 }
-    public AdaptiveTimeoutStrategy() : this(baseTimeout: TimeSpan.FromSeconds(10), minTimeout: TimeSpan.FromSeconds(1), maxTimeout: TimeSpan.FromSeconds(60), percentile: 0.99, multiplier: 1.5);
-    public AdaptiveTimeoutStrategy(TimeSpan baseTimeout, TimeSpan minTimeout, TimeSpan maxTimeout, double percentile, double multiplier);
+    public GeoReplicationFailoverStrategy() : this(healthCheckInterval: TimeSpan.FromSeconds(30), failureThreshold: 3);
+    public GeoReplicationFailoverStrategy(TimeSpan healthCheckInterval, int failureThreshold);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public TimeSpan CurrentTimeout
-{
-    get
-    {
-        lock (_adaptLock)
-        {
-            return _currentTimeout;
-        }
-    }
+    public DisasterRecoveryMode Mode;;
+    public string? ActiveRegionId;;
+    public GeoReplicationFailoverStrategy AddRegion(string regionId, string endpoint, int priority);
+    public async Task<DisasterRecoveryResult> FailoverAsync(CancellationToken cancellationToken = default);
+    public async Task<DisasterRecoveryResult> FailbackAsync(CancellationToken cancellationToken = default);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
 }
+```
+```csharp
+public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
+{
+}
+    public PointInTimeRecoveryStrategy() : this(maxRecoveryPoints: 100, retentionPeriod: TimeSpan.FromDays(7));
+    public PointInTimeRecoveryStrategy(int maxRecoveryPoints, TimeSpan retentionPeriod);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public IReadOnlyList<RecoveryPoint> RecoveryPoints;;
+    public RecoveryPoint? LastCheckpoint;;
+    public RecoveryPoint CreateCheckpoint(string? description = null, Dictionary<string, object>? metadata = null);
+    public RecoveryPoint CreateFullBackup(string? description = null, long? sizeBytes = null);
+    public IReadOnlyList<RecoveryPoint> FindRecoveryPoints(DateTimeOffset start, DateTimeOffset end);
+    public RecoveryPoint? FindClosestRecoveryPoint(DateTimeOffset targetTime);
+    public async Task<DisasterRecoveryResult> RestoreToPointAsync(string recoveryPointId, CancellationToken cancellationToken = default);
+    public async Task<DisasterRecoveryResult> RestoreToTimeAsync(DateTimeOffset targetTime, CancellationToken cancellationToken = default);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
+{
+}
+    public MultiRegionDisasterRecoveryStrategy() : this(activeActive: false, syncInterval: TimeSpan.FromSeconds(10));
+    public MultiRegionDisasterRecoveryStrategy(bool activeActive, TimeSpan syncInterval);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public DisasterRecoveryMode Mode;;
+    public string? PrimaryRegionId;;
+    public bool IsActiveActive;;
+    public MultiRegionDisasterRecoveryStrategy AddRegion(string regionId, string endpoint, bool isPrimary = false);
+    public void UpdateRegionHealth(string regionId, bool isHealthy, long? replicationLagMs = null);
+    public async Task<DisasterRecoveryResult> PromoteRegionAsync(string regionId, CancellationToken cancellationToken = default);
+    public Dictionary<string, object> GetReplicationStatus();
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+private sealed class RegionState
+{
+}
+    public string RegionId { get; init; };
+    public string Endpoint { get; init; };
+    public bool IsPrimary { get; set; }
+    public bool IsHealthy { get; set; };
+    public DateTimeOffset LastSyncTime { get; set; };
+    public long ReplicationLagMs { get; set; }
+}
+```
+```csharp
+public sealed class StateCheckpointStrategy : ResilienceStrategyBase
+{
+}
+    public StateCheckpointStrategy() : this(maxCheckpoints: 50, stateSerializer: null, stateRestorer: null);
+    public StateCheckpointStrategy(int maxCheckpoints, Func<CancellationToken, Task<byte[]>>? stateSerializer, Func<byte[], CancellationToken, Task>? stateRestorer);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public int CheckpointCount;;
+    public async Task<RecoveryPoint> CreateCheckpointAsync(byte[]? stateData = null, CancellationToken cancellationToken = default);
+    public async Task<DisasterRecoveryResult> RestoreCheckpointAsync(string checkpointId, CancellationToken cancellationToken = default);
+    public (string? checkpointId, DateTimeOffset? timestamp) GetLatestCheckpoint();
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     public override void Reset();
     protected override string? GetCurrentState();;
 }
 ```
 ```csharp
-public sealed class PessimisticTimeoutStrategy : ResilienceStrategyBase
+public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
 {
 }
-    public PessimisticTimeoutStrategy() : this(timeout: TimeSpan.FromSeconds(30));
-    public PessimisticTimeoutStrategy(TimeSpan timeout);
+    public DataCenterFailoverStrategy() : this(failoverTimeout: TimeSpan.FromMinutes(5));
+    public DataCenterFailoverStrategy(TimeSpan failoverTimeout);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public string? ActiveDataCenterId;;
+    public DisasterRecoveryMode Mode;;
+    public DataCenterFailoverStrategy AddDataCenter(string id, string name, string location, int priority, Dictionary<string, object>? capabilities = null);
+    public void UpdateHealth(string dataCenterId, bool isHealthy);
+    public async Task<DisasterRecoveryResult> FailoverAsync(CancellationToken cancellationToken = default);
+    public IReadOnlyList<Dictionary<string, object>> GetDataCenterStatus();
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+private sealed class DataCenterInfo
+{
+}
+    public string Id { get; init; };
+    public string Name { get; init; };
+    public string Location { get; init; };
+    public int Priority { get; init; }
+    public bool IsHealthy { get; set; };
+    public DateTimeOffset LastHealthCheck { get; set; };
+    public Dictionary<string, object> Capabilities { get; init; };
+}
+```
+```csharp
+public sealed class BackupCoordinationStrategy : ResilienceStrategyBase
+{
+}
+    public BackupCoordinationStrategy() : this(backupInterval: TimeSpan.FromHours(1), retainBackups: 24);
+    public BackupCoordinationStrategy(TimeSpan backupInterval, int retainBackups);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public DateTimeOffset LastBackupTime;;
+    public int BackupCount;;
+    public string StartBackup(string type = "full");
+    public void CompleteBackup(string jobId, long? sizeBytes = null, string? error = null);
+    public bool IsBackupDue();
+    public IReadOnlyList<Dictionary<string, object>> GetBackupStatus();
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+private sealed class BackupJob
+{
+}
+    public string Id { get; init; };
+    public DateTimeOffset StartTime { get; init; }
+    public DateTimeOffset? EndTime { get; set; }
+    public string Status { get; set; };
+    public string? Error { get; set; }
+    public long? SizeBytes { get; set; }
+    public string Type { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs
+```csharp
+public sealed class RaftConsensusStrategy : ResilienceStrategyBase
+{
+}
+    public RaftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], clusterNodes: new List<string>(), electionTimeout: TimeSpan.FromMilliseconds(Random.Shared.Next(150, 300)), heartbeatInterval: TimeSpan.FromMilliseconds(50));
+    public RaftConsensusStrategy(string nodeId, List<string> clusterNodes, TimeSpan electionTimeout, TimeSpan heartbeatInterval);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public RaftState State;;
+    public long CurrentTerm;;
+    public string? LeaderId;;
+    public bool IsLeader;;
+    public void AddNode(string nodeId);
+    public async Task<bool> StartElectionAsync(CancellationToken cancellationToken = default);
+    public async Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default);
+    public void ReceiveHeartbeat(string leaderId, long term);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
+{
+}
+    public PaxosConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
+    public PaxosConsensusStrategy(string nodeId, int quorumSize);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public async Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class PbftConsensusStrategy : ResilienceStrategyBase
+{
+}
+    public PbftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], totalNodes: 4, faultyNodes: 1);
+    public PbftConsensusStrategy(string nodeId, int totalNodes, int faultyNodes);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public async Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default);
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class ZabConsensusStrategy : ResilienceStrategyBase
+{
+}
+    public ZabConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
+    public ZabConsensusStrategy(string nodeId, int quorumSize);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public long Zxid;;
+    public long Epoch;;
+    public async Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default);
+    public void BecomeLeader();
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+```csharp
+public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
+{
+}
+    public ViewstampedReplicationStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], replicaCount: 3);
+    public ViewstampedReplicationStrategy(string nodeId, int replicaCount);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public async Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default);
+    public void BecomePrimary();
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs
+```csharp
+public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
+{
+}
+    public StandardCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), halfOpenSuccessThreshold: 2);
+    public StandardCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, int halfOpenSuccessThreshold);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public CircuitBreakerState State
+{
+    get
+    {
+        lock (_stateLock)
+        {
+            CheckTransitionFromOpen();
+            return _state;
+        }
+    }
+}
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
+}
+```
+```csharp
+public sealed class SlidingWindowCircuitBreakerStrategy : ResilienceStrategyBase
+{
+}
+    public SlidingWindowCircuitBreakerStrategy() : this(windowDuration: TimeSpan.FromMinutes(1), failureRateThreshold: 0.5, minimumRequests: 10, openDuration: TimeSpan.FromSeconds(30));
+    public SlidingWindowCircuitBreakerStrategy(TimeSpan windowDuration, double failureRateThreshold, int minimumRequests, TimeSpan openDuration);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    public CircuitBreakerState State
+{
+    get
+    {
+        lock (_stateLock)
+        {
+            CheckTransitions();
+            return _state;
+        }
+    }
+}
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
+}
+```
+```csharp
+public sealed class CountBasedCircuitBreakerStrategy : ResilienceStrategyBase
+{
+}
+    public CountBasedCircuitBreakerStrategy() : this(failureThreshold: 5, successThreshold: 3, openDuration: TimeSpan.FromSeconds(30));
+    public CountBasedCircuitBreakerStrategy(int failureThreshold, int successThreshold, TimeSpan openDuration);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
 }
 ```
 ```csharp
-public sealed class OptimisticTimeoutStrategy : ResilienceStrategyBase
+public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
 {
 }
-    public OptimisticTimeoutStrategy() : this(hardTimeout: TimeSpan.FromSeconds(60), softTimeout: TimeSpan.FromSeconds(30));
-    public OptimisticTimeoutStrategy(TimeSpan hardTimeout, TimeSpan softTimeout);
+    public TimeBasedCircuitBreakerStrategy() : this(bucketDuration: TimeSpan.FromSeconds(10), bucketsToTrack: 6, failureRateThreshold: 0.5, minimumRequests: 10, openDuration: TimeSpan.FromSeconds(30));
+    public TimeBasedCircuitBreakerStrategy(TimeSpan bucketDuration, int bucketsToTrack, double failureRateThreshold, int minimumRequests, TimeSpan openDuration);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
 }
 ```
 ```csharp
-public sealed class PerAttemptTimeoutStrategy : ResilienceStrategyBase
+public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBase
 {
 }
-    public PerAttemptTimeoutStrategy() : this(attemptTimeout: TimeSpan.FromSeconds(10), totalTimeout: TimeSpan.FromSeconds(60));
-    public PerAttemptTimeoutStrategy(TimeSpan attemptTimeout, TimeSpan totalTimeout);
+    public GradualRecoveryCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), initialPermitRate: 0.1, permitRateIncrement: 0.1, successesPerIncrement: 3);
+    public GradualRecoveryCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, double initialPermitRate, double permitRateIncrement, int successesPerIncrement);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public TimeSpan GetRemainingTotal(DateTimeOffset operationStart);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
 }
 ```
 ```csharp
-public sealed class TimeoutRejectedException : Exception
+public sealed class AdaptiveCircuitBreakerStrategy : ResilienceStrategyBase
 {
 }
-    public TimeoutRejectedException(string message) : base(message);
-    public TimeoutRejectedException(string message, Exception innerException) : base(message, innerException);
+    public AdaptiveCircuitBreakerStrategy() : this(baseFailureThreshold: 0.5, minFailureThreshold: 0.2, maxFailureThreshold: 0.8, baseOpenDuration: TimeSpan.FromSeconds(30), minOpenDuration: TimeSpan.FromSeconds(10), maxOpenDuration: TimeSpan.FromMinutes(2), historyWindow: TimeSpan.FromMinutes(5), minimumRequests: 20, latencyThreshold: TimeSpan.FromSeconds(5));
+    public AdaptiveCircuitBreakerStrategy(double baseFailureThreshold, double minFailureThreshold, double maxFailureThreshold, TimeSpan baseOpenDuration, TimeSpan minOpenDuration, TimeSpan maxOpenDuration, TimeSpan historyWindow, int minimumRequests, TimeSpan latencyThreshold);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Category;;
+    public override ResilienceCharacteristics Characteristics { get; };
+    protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
+    protected override string? GetCurrentState();;
+    public override void Reset();
+}
+```
+```csharp
+public sealed class CircuitBreakerOpenException : Exception
+{
+}
+    public CircuitBreakerOpenException(string message) : base(message);
+    public CircuitBreakerOpenException(string message, Exception innerException) : base(message, innerException);
 }
 ```
 

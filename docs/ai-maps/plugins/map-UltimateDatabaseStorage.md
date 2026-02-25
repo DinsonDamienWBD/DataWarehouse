@@ -393,9 +393,9 @@ public sealed record CacheMetrics
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/BigtableStorageStrategy.cs
 ```csharp
-public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
+public sealed class BigtableStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -421,9 +421,9 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/HBaseStorageStrategy.cs
 ```csharp
-public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
+public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -449,17 +449,33 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 ```csharp
-private sealed class DruidScanResult
+private sealed class HBaseRowResponse
 {
 }
-    [JsonPropertyName("events")]
-public Dictionary<string, object>[]? Events { get; set; }
+    public HBaseRow[]? Row { get; set; }
+}
+```
+```csharp
+private sealed class HBaseRow
+{
+}
+    public string key { get; set; };
+    public HBaseCell[]? Cell { get; set; }
+}
+```
+```csharp
+private sealed class HBaseCell
+{
+}
+    public string column { get; set; };
+    public long timestamp { get; set; }
+    public string value { get; set; };
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/PrestoStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/CassandraStorageStrategy.cs
 ```csharp
-public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
+public sealed class CassandraStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -484,14 +500,394 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
     protected override async ValueTask DisposeAsyncCore();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/ScyllaDbStorageStrategy.cs
 ```csharp
-private sealed class PrestoQueryResult
+public sealed class ScyllaDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
-    [JsonPropertyName("nextUri")]
-public string? NextUri { get; set; }
-    [JsonPropertyName("data")]
-public List<List<object?>>? Data { get; set; }
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/FoundationDbStorageStrategy.cs
+```csharp
+public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class FdbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public FdbTransaction(IFdbTransaction transaction);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/EtcdStorageStrategy.cs
+```csharp
+public sealed class EtcdStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class EtcdTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public EtcdTransaction(EtcdClient client);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs
+```csharp
+public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public async Task<IDistributedLock> AcquireLockAsync(string lockKey, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+    public interface IDistributedLock : IAsyncDisposable;
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class ConsulTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public ConsulTransaction(ConsulClient client);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+```csharp
+public interface IDistributedLock : IAsyncDisposable
+{
+}
+    Task ReleaseAsync(CancellationToken ct = default);;
+}
+```
+```csharp
+private sealed class ConsulLock : IDistributedLock
+{
+}
+    public ConsulLock(Consul.IDistributedLock lockHandle);
+    public async Task ReleaseAsync(CancellationToken ct = default);
+    public async ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/LevelDbStorageStrategy.cs
+```csharp
+public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task ConnectCoreAsync(CancellationToken ct);
+    protected override Task DisconnectCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public void Compact();
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class LevelDbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public LevelDbTransaction(RocksDb db);
+    public Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/RocksDbStorageStrategy.cs
+```csharp
+public sealed class RocksDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task ConnectCoreAsync(CancellationToken ct);
+    protected override Task DisconnectCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public void Compact();
+    public string GetStatistics();
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class RocksDbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public RocksDbTransaction(RocksDb db, ColumnFamilyHandle dataHandle, ColumnFamilyHandle metadataHandle);
+    public Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/MemcachedStorageStrategy.cs
+```csharp
+public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/RedisStorageStrategy.cs
+```csharp
+public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public async Task SetExpirationAsync(string key, TimeSpan expiration, CancellationToken ct = default);
+    public async Task<TimeSpan?> GetExpirationAsync(string key, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class RedisTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public RedisTransaction(IDatabase database);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
 }
 ```
 
@@ -596,9 +992,9 @@ private sealed class SpannerDatabaseTransaction : IDatabaseTransaction
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/DerbyStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/YugabyteDbStorageStrategy.cs
 ```csharp
-public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
+public sealed class YugabyteDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -612,6 +1008,7 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
@@ -623,50 +1020,9 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/DuckDbStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/TiDbStorageStrategy.cs
 ```csharp
-public sealed class DuckDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task ConnectCoreAsync(CancellationToken ct);
-    protected override Task DisconnectCoreAsync(CancellationToken ct);
-    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public async Task ExportToParquetAsync(string filePath, CancellationToken ct = default);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class DuckDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public DuckDbTransaction(DuckDBTransaction transaction);
-    public Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/H2StorageStrategy.cs
-```csharp
-public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
+public sealed class TiDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -680,6 +1036,7 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
@@ -691,9 +1048,9 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/HsqlDbStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/CockroachDbStorageStrategy.cs
 ```csharp
-public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
+public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -707,6 +1064,7 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
@@ -718,9 +1076,143 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/LiteDbStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/VitessStorageStrategy.cs
 ```csharp
-public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
+public sealed class VitessStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphPartitioningStrategies.cs
+```csharp
+public abstract class GraphPartitioningStrategyBase
+{
+}
+    public abstract string StrategyId { get; }
+    public abstract string Name { get; }
+    public int PartitionCount { get; set; };
+    public abstract int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);;
+    public abstract IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);;
+    public virtual IEnumerable<int> GetQueryPartitions(string vertexId);
+    public IEnumerable<int> GetAllPartitions();
+}
+```
+```csharp
+public sealed class HashPartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public HashPartitionAlgorithm Algorithm { get; set; };
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+}
+```
+```csharp
+public sealed class RangePartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public void SetRangeBoundaries(IEnumerable<string> boundaries);
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+}
+```
+```csharp
+public sealed class EdgeCutPartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public double BalanceFactor { get; set; };
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+    public Dictionary<int, long> GetPartitionSizes();
+    public double GetImbalanceRatio();
+}
+```
+```csharp
+public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public int ReplicationThreshold { get; set; };
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> GetQueryPartitions(string vertexId);
+    public int GetVertexReplicationFactor(string vertexId);
+    public double GetAverageReplicationFactor();
+}
+```
+```csharp
+public sealed class CommunityPartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public CommunityDetectionAlgorithm Algorithm { get; set; };
+    public void AssignCommunity(string vertexId, int communityId);
+    public void SetCommunityAssignments(IDictionary<string, int> assignments);
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+    public int GetCommunity(string vertexId);
+}
+```
+```csharp
+public sealed class GridPartitioningStrategy : GraphPartitioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public int GridColumns { get; set; };
+    public int GridRows { get; set; };
+    public double MinLatitude { get; set; };
+    public double MaxLatitude { get; set; };
+    public double MinLongitude { get; set; };
+    public double MaxLongitude { get; set; };
+    public GridPartitioningStrategy();
+    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
+    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
+    public IEnumerable<int> GetAdjacentPartitions(int partition);
+}
+```
+```csharp
+public sealed class GraphPartitioningStrategyRegistry
+{
+}
+    public void Register(GraphPartitioningStrategyBase strategy);
+    public GraphPartitioningStrategyBase? Get(string strategyId);
+    public IEnumerable<GraphPartitioningStrategyBase> GetAll();
+    public static GraphPartitioningStrategyRegistry CreateDefault();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/Neo4jStorageStrategy.cs
+```csharp
+public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -743,39 +1235,19 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
     protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
     protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public async Task<StorageObjectMetadata> StoreLargeFileAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public async Task<Stream> RetrieveLargeFileAsync(string key, CancellationToken ct = default);
-    public async Task CompactAsync(CancellationToken ct = default);
-    public async Task CheckpointAsync(CancellationToken ct = default);
     protected override async ValueTask DisposeAsyncCore();
 }
 ```
 ```csharp
-private sealed class StorageDocument
-{
-}
-    public ObjectId Id { get; set; };
-    public string Key { get; set; };
-    public byte[]? Data { get; set; }
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? Metadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-    public bool IsLargeFile { get; set; }
-}
-```
-```csharp
-private sealed class LiteDbTransaction : IDatabaseTransaction
+private sealed class Neo4jTransaction : IDatabaseTransaction
 {
 }
     public string TransactionId { get; };
     public System.Data.IsolationLevel IsolationLevel;;
-    public LiteDbTransaction(LiteDatabaseAsync database, SemaphoreSlim writeLock);
+    public Neo4jTransaction(IAsyncSession session, IAsyncTransaction transaction);
     public async Task CommitAsync(CancellationToken ct = default);
     public async Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
+    public async ValueTask DisposeAsync();
 }
 ```
 
@@ -903,6 +1375,361 @@ private sealed class ArangoTransaction : IDatabaseTransaction
     public async Task CommitAsync(CancellationToken ct = default);
     public async Task RollbackAsync(CancellationToken ct = default);
     public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs
+```csharp
+public abstract class GraphAnalyticsAlgorithmBase
+{
+}
+    public abstract string AlgorithmId { get; }
+    public abstract string Name { get; }
+    public abstract GraphAnalyticsCategory Category { get; }
+    public abstract bool IsIterative { get; }
+}
+```
+```csharp
+public sealed class PageRankAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public double DampingFactor { get; set; };
+    public double Tolerance { get; set; };
+    public int MaxIterations { get; set; };
+    public PageRankResult Compute(IDictionary<string, IList<string>> adjacency, IDictionary<string, double>? personalizationVector = null);
+}
+```
+```csharp
+public sealed class PageRankResult
+{
+}
+    public required Dictionary<string, double> Scores { get; init; }
+    public int Iterations { get; init; }
+    public bool Converged { get; init; }
+    public double FinalDifference { get; init; }
+    public IEnumerable<(string Vertex, double Score)> GetTopN(int n);
+}
+```
+```csharp
+public sealed class BetweennessCentralityAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public bool Normalize { get; set; };
+    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class ClosenessCentralityAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public bool UseHarmonic { get; set; };
+    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class DegreeCentralityAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public DegreeType DegreeType { get; set; };
+    public bool Normalize { get; set; };
+    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency, IDictionary<string, IList<string>>? reverseAdjacency = null);
+}
+```
+```csharp
+public sealed class LouvainCommunityDetection : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public double MinModularityGain { get; set; };
+    public int MaxPasses { get; set; };
+    public CommunityDetectionResult Compute(IList<(string Source, string Target, double Weight)> edges);
+}
+```
+```csharp
+public sealed class CommunityDetectionResult
+{
+}
+    public required Dictionary<string, int> Communities { get; init; }
+    public int NumCommunities { get; init; }
+    public double Modularity { get; init; }
+    public int Iterations { get; init; }
+    public IEnumerable<string> GetCommunityMembers(int communityId);
+    public Dictionary<int, int> GetCommunitySizes();
+}
+```
+```csharp
+public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public int MaxIterations { get; set; };
+    public CommunityDetectionResult Compute(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class TriangleCountingAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public TriangleCountResult Compute(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class TriangleCountResult
+{
+}
+    public required Dictionary<string, int> VertexTriangleCounts { get; init; }
+    public long TotalTriangles { get; init; }
+    public Dictionary<string, double> ComputeClusteringCoefficients(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class ConnectedComponentsAlgorithm : GraphAnalyticsAlgorithmBase
+{
+}
+    public override string AlgorithmId;;
+    public override string Name;;
+    public override GraphAnalyticsCategory Category;;
+    public override bool IsIterative;;
+    public ConnectedComponentsResult Compute(IDictionary<string, IList<string>> adjacency);
+}
+```
+```csharp
+public sealed class ConnectedComponentsResult
+{
+}
+    public required Dictionary<string, int> Components { get; init; }
+    public int NumComponents { get; init; }
+    public IEnumerable<string> GetComponentMembers(int componentId);
+    public int GetLargestComponent();
+}
+```
+```csharp
+public sealed class GraphAnalyticsRegistry
+{
+}
+    public void Register(GraphAnalyticsAlgorithmBase algorithm);
+    public GraphAnalyticsAlgorithmBase? Get(string algorithmId);
+    public IEnumerable<GraphAnalyticsAlgorithmBase> GetAll();
+    public IEnumerable<GraphAnalyticsAlgorithmBase> GetByCategory(GraphAnalyticsCategory category);
+    public static GraphAnalyticsRegistry CreateDefault();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs
+```csharp
+public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphVisualizationExport.cs
+```csharp
+public static class GraphVisualizationExport
+{
+#endregion
+}
+    public static string ExportToD3Json(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, D3ExportOptions? options = null);
+    public static string ExportToCytoscapeJson(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, CytoscapeExportOptions? options = null);
+    public static string ExportToGraphML(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GraphMLExportOptions? options = null);
+    public static string ExportToDot(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, DotExportOptions? options = null);
+    public static string ExportToGexf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GexfExportOptions? options = null);
+    public static string ExportToJgf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, JgfExportOptions? options = null);
+    public static AdjacencyMatrixResult ExportToAdjacencyMatrix(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, AdjacencyMatrixOptions? options = null);
+    public static string ExportMatrixToCsv(AdjacencyMatrixResult matrix);
+}
+```
+```csharp
+public sealed class GraphVisualizationNode
+{
+}
+    public required string Id { get; set; }
+    public string? Label { get; set; }
+    public string? Group { get; set; }
+    public double? Size { get; set; }
+    public string? Color { get; set; }
+    public string? Shape { get; set; }
+    public double? X { get; set; }
+    public double? Y { get; set; }
+    public Dictionary<string, object>? Properties { get; set; }
+}
+```
+```csharp
+public sealed class GraphVisualizationEdge
+{
+}
+    public string? Id { get; set; }
+    public required string SourceId { get; set; }
+    public required string TargetId { get; set; }
+    public string? Label { get; set; }
+    public double? Weight { get; set; }
+    public string? Color { get; set; }
+    public Dictionary<string, object>? Properties { get; set; }
+}
+```
+```csharp
+public sealed class D3ExportOptions
+{
+}
+    public bool UseIndices { get; set; };
+    public bool IncludeProperties { get; set; };
+    public double DefaultNodeSize { get; set; };
+    public string DefaultNodeColor { get; set; };
+    public string DefaultEdgeColor { get; set; };
+}
+```
+```csharp
+public sealed class CytoscapeExportOptions
+{
+}
+    public bool IncludeProperties { get; set; };
+    public bool IncludePositions { get; set; };
+}
+```
+```csharp
+public sealed class GraphMLExportOptions
+{
+}
+    public string GraphId { get; set; };
+    public bool Directed { get; set; };
+}
+```
+```csharp
+public sealed class DotExportOptions
+{
+}
+    public string GraphName { get; set; };
+    public bool Directed { get; set; };
+    public string? RankDir { get; set; }
+    public string? Layout { get; set; }
+    public string DefaultNodeShape { get; set; };
+}
+```
+```csharp
+public sealed class GexfExportOptions
+{
+}
+    public bool Directed { get; set; };
+    public bool Dynamic { get; set; };
+    public bool IncludeAttributes { get; set; };
+    public string? Creator { get; set; }
+    public string? Description { get; set; }
+}
+```
+```csharp
+public sealed class JgfExportOptions
+{
+}
+    public bool Directed { get; set; };
+    public bool IncludeMetadata { get; set; };
+    public string? Type { get; set; }
+    public string? Label { get; set; }
+}
+```
+```csharp
+public sealed class AdjacencyMatrixOptions
+{
+}
+    public bool Directed { get; set; };
+    public double DefaultValue { get; set; };
+}
+```
+```csharp
+public sealed class AdjacencyMatrixResult
+{
+}
+    public required List<string> NodeIds { get; init; }
+    public required double[, ] Matrix { get; init; }
+}
+```
+```csharp
+internal sealed class D3Graph
+{
+}
+    [JsonPropertyName("nodes")]
+public required List<D3Node> Nodes { get; init; }
+    [JsonPropertyName("links")]
+public required List<D3Link> Links { get; init; }
+}
+```
+```csharp
+internal sealed class D3Node
+{
+}
+    [JsonPropertyName("id")]
+public required string Id { get; init; }
+    [JsonPropertyName("label")]
+public string? Label { get; init; }
+    [JsonPropertyName("group")]
+public string? Group { get; init; }
+    [JsonPropertyName("size")]
+public double Size { get; init; }
+    [JsonPropertyName("color")]
+public string? Color { get; init; }
+    [JsonPropertyName("properties")]
+public Dictionary<string, object>? Properties { get; init; }
+}
+```
+```csharp
+internal sealed class D3Link
+{
+}
+    [JsonPropertyName("source")]
+public required object Source { get; init; }
+    [JsonPropertyName("target")]
+public required object Target { get; init; }
+    [JsonPropertyName("value")]
+public double Value { get; init; }
+    [JsonPropertyName("label")]
+public string? Label { get; init; }
+    [JsonPropertyName("color")]
+public string? Color { get; init; }
 }
 ```
 
@@ -1141,1088 +1968,6 @@ public sealed class DistributedComputationResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs
-```csharp
-public abstract class GraphAnalyticsAlgorithmBase
-{
-}
-    public abstract string AlgorithmId { get; }
-    public abstract string Name { get; }
-    public abstract GraphAnalyticsCategory Category { get; }
-    public abstract bool IsIterative { get; }
-}
-```
-```csharp
-public sealed class PageRankAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public double DampingFactor { get; set; };
-    public double Tolerance { get; set; };
-    public int MaxIterations { get; set; };
-    public PageRankResult Compute(IDictionary<string, IList<string>> adjacency, IDictionary<string, double>? personalizationVector = null);
-}
-```
-```csharp
-public sealed class PageRankResult
-{
-}
-    public required Dictionary<string, double> Scores { get; init; }
-    public int Iterations { get; init; }
-    public bool Converged { get; init; }
-    public double FinalDifference { get; init; }
-    public IEnumerable<(string Vertex, double Score)> GetTopN(int n);
-}
-```
-```csharp
-public sealed class BetweennessCentralityAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public bool Normalize { get; set; };
-    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class ClosenessCentralityAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public bool UseHarmonic { get; set; };
-    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class DegreeCentralityAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public DegreeType DegreeType { get; set; };
-    public bool Normalize { get; set; };
-    public Dictionary<string, double> Compute(IDictionary<string, IList<string>> adjacency, IDictionary<string, IList<string>>? reverseAdjacency = null);
-}
-```
-```csharp
-public sealed class LouvainCommunityDetection : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public double MinModularityGain { get; set; };
-    public int MaxPasses { get; set; };
-    public CommunityDetectionResult Compute(IList<(string Source, string Target, double Weight)> edges);
-}
-```
-```csharp
-public sealed class CommunityDetectionResult
-{
-}
-    public required Dictionary<string, int> Communities { get; init; }
-    public int NumCommunities { get; init; }
-    public double Modularity { get; init; }
-    public int Iterations { get; init; }
-    public IEnumerable<string> GetCommunityMembers(int communityId);
-    public Dictionary<int, int> GetCommunitySizes();
-}
-```
-```csharp
-public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public int MaxIterations { get; set; };
-    public CommunityDetectionResult Compute(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class TriangleCountingAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public TriangleCountResult Compute(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class TriangleCountResult
-{
-}
-    public required Dictionary<string, int> VertexTriangleCounts { get; init; }
-    public long TotalTriangles { get; init; }
-    public Dictionary<string, double> ComputeClusteringCoefficients(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class ConnectedComponentsAlgorithm : GraphAnalyticsAlgorithmBase
-{
-}
-    public override string AlgorithmId;;
-    public override string Name;;
-    public override GraphAnalyticsCategory Category;;
-    public override bool IsIterative;;
-    public ConnectedComponentsResult Compute(IDictionary<string, IList<string>> adjacency);
-}
-```
-```csharp
-public sealed class ConnectedComponentsResult
-{
-}
-    public required Dictionary<string, int> Components { get; init; }
-    public int NumComponents { get; init; }
-    public IEnumerable<string> GetComponentMembers(int componentId);
-    public int GetLargestComponent();
-}
-```
-```csharp
-public sealed class GraphAnalyticsRegistry
-{
-}
-    public void Register(GraphAnalyticsAlgorithmBase algorithm);
-    public GraphAnalyticsAlgorithmBase? Get(string algorithmId);
-    public IEnumerable<GraphAnalyticsAlgorithmBase> GetAll();
-    public IEnumerable<GraphAnalyticsAlgorithmBase> GetByCategory(GraphAnalyticsCategory category);
-    public static GraphAnalyticsRegistry CreateDefault();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphPartitioningStrategies.cs
-```csharp
-public abstract class GraphPartitioningStrategyBase
-{
-}
-    public abstract string StrategyId { get; }
-    public abstract string Name { get; }
-    public int PartitionCount { get; set; };
-    public abstract int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);;
-    public abstract IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);;
-    public virtual IEnumerable<int> GetQueryPartitions(string vertexId);
-    public IEnumerable<int> GetAllPartitions();
-}
-```
-```csharp
-public sealed class HashPartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public HashPartitionAlgorithm Algorithm { get; set; };
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-}
-```
-```csharp
-public sealed class RangePartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public void SetRangeBoundaries(IEnumerable<string> boundaries);
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-}
-```
-```csharp
-public sealed class EdgeCutPartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public double BalanceFactor { get; set; };
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-    public Dictionary<int, long> GetPartitionSizes();
-    public double GetImbalanceRatio();
-}
-```
-```csharp
-public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public int ReplicationThreshold { get; set; };
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> GetQueryPartitions(string vertexId);
-    public int GetVertexReplicationFactor(string vertexId);
-    public double GetAverageReplicationFactor();
-}
-```
-```csharp
-public sealed class CommunityPartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public CommunityDetectionAlgorithm Algorithm { get; set; };
-    public void AssignCommunity(string vertexId, int communityId);
-    public void SetCommunityAssignments(IDictionary<string, int> assignments);
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-    public int GetCommunity(string vertexId);
-}
-```
-```csharp
-public sealed class GridPartitioningStrategy : GraphPartitioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public int GridColumns { get; set; };
-    public int GridRows { get; set; };
-    public double MinLatitude { get; set; };
-    public double MaxLatitude { get; set; };
-    public double MinLongitude { get; set; };
-    public double MaxLongitude { get; set; };
-    public GridPartitioningStrategy();
-    public override int AssignVertexPartition(string vertexId, IDictionary<string, object>? properties = null);
-    public override IEnumerable<int> AssignEdgePartitions(string edgeId, string sourceVertexId, string targetVertexId, IDictionary<string, object>? properties = null);
-    public IEnumerable<int> GetAdjacentPartitions(int partition);
-}
-```
-```csharp
-public sealed class GraphPartitioningStrategyRegistry
-{
-}
-    public void Register(GraphPartitioningStrategyBase strategy);
-    public GraphPartitioningStrategyBase? Get(string strategyId);
-    public IEnumerable<GraphPartitioningStrategyBase> GetAll();
-    public static GraphPartitioningStrategyRegistry CreateDefault();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/GraphVisualizationExport.cs
-```csharp
-public static class GraphVisualizationExport
-{
-#endregion
-}
-    public static string ExportToD3Json(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, D3ExportOptions? options = null);
-    public static string ExportToCytoscapeJson(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, CytoscapeExportOptions? options = null);
-    public static string ExportToGraphML(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GraphMLExportOptions? options = null);
-    public static string ExportToDot(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, DotExportOptions? options = null);
-    public static string ExportToGexf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GexfExportOptions? options = null);
-    public static string ExportToJgf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, JgfExportOptions? options = null);
-    public static AdjacencyMatrixResult ExportToAdjacencyMatrix(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, AdjacencyMatrixOptions? options = null);
-    public static string ExportMatrixToCsv(AdjacencyMatrixResult matrix);
-}
-```
-```csharp
-public sealed class GraphVisualizationNode
-{
-}
-    public required string Id { get; set; }
-    public string? Label { get; set; }
-    public string? Group { get; set; }
-    public double? Size { get; set; }
-    public string? Color { get; set; }
-    public string? Shape { get; set; }
-    public double? X { get; set; }
-    public double? Y { get; set; }
-    public Dictionary<string, object>? Properties { get; set; }
-}
-```
-```csharp
-public sealed class GraphVisualizationEdge
-{
-}
-    public string? Id { get; set; }
-    public required string SourceId { get; set; }
-    public required string TargetId { get; set; }
-    public string? Label { get; set; }
-    public double? Weight { get; set; }
-    public string? Color { get; set; }
-    public Dictionary<string, object>? Properties { get; set; }
-}
-```
-```csharp
-public sealed class D3ExportOptions
-{
-}
-    public bool UseIndices { get; set; };
-    public bool IncludeProperties { get; set; };
-    public double DefaultNodeSize { get; set; };
-    public string DefaultNodeColor { get; set; };
-    public string DefaultEdgeColor { get; set; };
-}
-```
-```csharp
-public sealed class CytoscapeExportOptions
-{
-}
-    public bool IncludeProperties { get; set; };
-    public bool IncludePositions { get; set; };
-}
-```
-```csharp
-public sealed class GraphMLExportOptions
-{
-}
-    public string GraphId { get; set; };
-    public bool Directed { get; set; };
-}
-```
-```csharp
-public sealed class DotExportOptions
-{
-}
-    public string GraphName { get; set; };
-    public bool Directed { get; set; };
-    public string? RankDir { get; set; }
-    public string? Layout { get; set; }
-    public string DefaultNodeShape { get; set; };
-}
-```
-```csharp
-public sealed class GexfExportOptions
-{
-}
-    public bool Directed { get; set; };
-    public bool Dynamic { get; set; };
-    public bool IncludeAttributes { get; set; };
-    public string? Creator { get; set; }
-    public string? Description { get; set; }
-}
-```
-```csharp
-public sealed class JgfExportOptions
-{
-}
-    public bool Directed { get; set; };
-    public bool IncludeMetadata { get; set; };
-    public string? Type { get; set; }
-    public string? Label { get; set; }
-}
-```
-```csharp
-public sealed class AdjacencyMatrixOptions
-{
-}
-    public bool Directed { get; set; };
-    public double DefaultValue { get; set; };
-}
-```
-```csharp
-public sealed class AdjacencyMatrixResult
-{
-}
-    public required List<string> NodeIds { get; init; }
-    public required double[, ] Matrix { get; init; }
-}
-```
-```csharp
-internal sealed class D3Graph
-{
-}
-    [JsonPropertyName("nodes")]
-public required List<D3Node> Nodes { get; init; }
-    [JsonPropertyName("links")]
-public required List<D3Link> Links { get; init; }
-}
-```
-```csharp
-internal sealed class D3Node
-{
-}
-    [JsonPropertyName("id")]
-public required string Id { get; init; }
-    [JsonPropertyName("label")]
-public string? Label { get; init; }
-    [JsonPropertyName("group")]
-public string? Group { get; init; }
-    [JsonPropertyName("size")]
-public double Size { get; init; }
-    [JsonPropertyName("color")]
-public string? Color { get; init; }
-    [JsonPropertyName("properties")]
-public Dictionary<string, object>? Properties { get; init; }
-}
-```
-```csharp
-internal sealed class D3Link
-{
-}
-    [JsonPropertyName("source")]
-public required object Source { get; init; }
-    [JsonPropertyName("target")]
-public required object Target { get; init; }
-    [JsonPropertyName("value")]
-public double Value { get; init; }
-    [JsonPropertyName("label")]
-public string? Label { get; init; }
-    [JsonPropertyName("color")]
-public string? Color { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs
-```csharp
-public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Graph/Neo4jStorageStrategy.cs
-```csharp
-public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class Neo4jTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public Neo4jTransaction(IAsyncSession session, IAsyncTransaction transaction);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public async Task RollbackAsync(CancellationToken ct = default);
-    public async ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs
-```csharp
-public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public async Task<IDistributedLock> AcquireLockAsync(string lockKey, CancellationToken ct = default);
-    protected override async ValueTask DisposeAsyncCore();
-    public interface IDistributedLock : IAsyncDisposable;
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class ConsulTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public ConsulTransaction(ConsulClient client);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-```csharp
-public interface IDistributedLock : IAsyncDisposable
-{
-}
-    Task ReleaseAsync(CancellationToken ct = default);;
-}
-```
-```csharp
-private sealed class ConsulLock : IDistributedLock
-{
-}
-    public ConsulLock(Consul.IDistributedLock lockHandle);
-    public async Task ReleaseAsync(CancellationToken ct = default);
-    public async ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/EtcdStorageStrategy.cs
-```csharp
-public sealed class EtcdStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class EtcdTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public EtcdTransaction(EtcdClient client);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/FoundationDbStorageStrategy.cs
-```csharp
-public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class FdbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public FdbTransaction(IFdbTransaction transaction);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/LevelDbStorageStrategy.cs
-```csharp
-public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task ConnectCoreAsync(CancellationToken ct);
-    protected override Task DisconnectCoreAsync(CancellationToken ct);
-    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public void Compact();
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class LevelDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public LevelDbTransaction(RocksDb db);
-    public Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/MemcachedStorageStrategy.cs
-```csharp
-public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/RedisStorageStrategy.cs
-```csharp
-public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public async Task SetExpirationAsync(string key, TimeSpan expiration, CancellationToken ct = default);
-    public async Task<TimeSpan?> GetExpirationAsync(string key, CancellationToken ct = default);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class RedisTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public RedisTransaction(IDatabase database);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/KeyValue/RocksDbStorageStrategy.cs
-```csharp
-public sealed class RocksDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override Task ConnectCoreAsync(CancellationToken ct);
-    protected override Task DisconnectCoreAsync(CancellationToken ct);
-    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    public void Compact();
-    public string GetStatistics();
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class RocksDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public RocksDbTransaction(RocksDb db, ColumnFamilyHandle dataHandle, ColumnFamilyHandle metadataHandle);
-    public Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/CockroachDbStorageStrategy.cs
-```csharp
-public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/TiDbStorageStrategy.cs
-```csharp
-public sealed class TiDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/VitessStorageStrategy.cs
-```csharp
-public sealed class VitessStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NewSQL/YugabyteDbStorageStrategy.cs
-```csharp
-public sealed class YugabyteDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs
-```csharp
-public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class StorageDocument
-{
-}
-    [System.Text.Json.Serialization.JsonPropertyName("id")]
-public string Id { get; set; };
-    [System.Text.Json.Serialization.JsonPropertyName("partitionKey")]
-public string PartitionKey { get; set; };
-    [System.Text.Json.Serialization.JsonPropertyName("data")]
-public string Data { get; set; };
-    [System.Text.Json.Serialization.JsonPropertyName("size")]
-public long Size { get; set; }
-    [System.Text.Json.Serialization.JsonPropertyName("contentType")]
-public string? ContentType { get; set; }
-    [System.Text.Json.Serialization.JsonPropertyName("eTag")]
-public string? ETag { get; set; }
-    [System.Text.Json.Serialization.JsonPropertyName("metadata")]
-public Dictionary<string, string>? Metadata { get; set; }
-    [System.Text.Json.Serialization.JsonPropertyName("createdAt")]
-public DateTime CreatedAt { get; set; }
-    [System.Text.Json.Serialization.JsonPropertyName("modifiedAt")]
-public DateTime ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class CosmosTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public CosmosTransaction(Container container);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs
-```csharp
-public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class DynamoDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public System.Data.IsolationLevel IsolationLevel;;
-    public DynamoDbTransaction(AmazonDynamoDBClient client, string tableName);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/MongoDbStorageStrategy.cs
 ```csharp
 public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
@@ -2293,6 +2038,47 @@ private sealed class MongoDbTransaction : IDatabaseTransaction
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs
+```csharp
+public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class DynamoDbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public DynamoDbTransaction(AmazonDynamoDBClient client, string tableName);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/RavenDbStorageStrategy.cs
 ```csharp
 public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
@@ -2348,9 +2134,9 @@ private sealed class RavenDbTransaction : IDatabaseTransaction
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/MySqlStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs
 ```csharp
-public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
+public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2359,82 +2145,8 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
     public override DatabaseCategory DatabaseCategory;;
     public override string Engine;;
     public override StorageCapabilities Capabilities;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryCoreAsync(string query, IDictionary<string, object>? parameters, CancellationToken ct);
-    protected override async Task<int> ExecuteNonQueryCoreAsync(string command, IDictionary<string, object>? parameters, CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
-}
-```
-```csharp
-private sealed class MySqlDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public IsolationLevel IsolationLevel;;
-    public MySqlDbTransaction(MySqlConnection connection, MySqlTransaction transaction);
-    public async Task CommitAsync(CancellationToken ct = default);
-    public async Task RollbackAsync(CancellationToken ct = default);
-    public async ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/OracleStorageStrategy.cs
-```csharp
-public sealed class OracleStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
-}
-```
-```csharp
-private sealed class OracleDbTransaction : IDatabaseTransaction
-{
-}
-    public string TransactionId { get; };
-    public IsolationLevel IsolationLevel;;
-    public OracleDbTransaction(OracleConnection connection, OracleTransaction transaction);
-    public Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
-    public ValueTask DisposeAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/PostgreSqlStorageStrategy.cs
-```csharp
-public sealed class PostgreSqlStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
@@ -2446,22 +2158,174 @@ public sealed class PostgreSqlStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
     protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryCoreAsync(string query, IDictionary<string, object>? parameters, CancellationToken ct);
-    protected override async Task<int> ExecuteNonQueryCoreAsync(string command, IDictionary<string, object>? parameters, CancellationToken ct);
-    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
     protected override async ValueTask DisposeAsyncCore();
 }
 ```
 ```csharp
-private sealed class PostgreSqlTransaction : IDatabaseTransaction
+private sealed class StorageDocument
+{
+}
+    [System.Text.Json.Serialization.JsonPropertyName("id")]
+public string Id { get; set; };
+    [System.Text.Json.Serialization.JsonPropertyName("partitionKey")]
+public string PartitionKey { get; set; };
+    [System.Text.Json.Serialization.JsonPropertyName("data")]
+public string Data { get; set; };
+    [System.Text.Json.Serialization.JsonPropertyName("size")]
+public long Size { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("contentType")]
+public string? ContentType { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("eTag")]
+public string? ETag { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("metadata")]
+public Dictionary<string, string>? Metadata { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("createdAt")]
+public DateTime CreatedAt { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("modifiedAt")]
+public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class CosmosTransaction : IDatabaseTransaction
 {
 }
     public string TransactionId { get; };
-    public IsolationLevel IsolationLevel;;
-    public PostgreSqlTransaction(NpgsqlConnection connection, NpgsqlTransaction transaction);
+    public System.Data.IsolationLevel IsolationLevel;;
+    public CosmosTransaction(Container container);
     public async Task CommitAsync(CancellationToken ct = default);
-    public async Task RollbackAsync(CancellationToken ct = default);
-    public async ValueTask DisposeAsync();
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs
+```csharp
+public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs
+```csharp
+public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class DruidScanResult
+{
+}
+    [JsonPropertyName("events")]
+public Dictionary<string, object>[]? Events { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Analytics/PrestoStorageStrategy.cs
+```csharp
+public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class PrestoQueryResult
+{
+}
+    [JsonPropertyName("nextUri")]
+public string? NextUri { get; set; }
+    [JsonPropertyName("data")]
+public List<List<object?>>? Data { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Spatial/PostGisStorageStrategy.cs
+```csharp
+public sealed class PostGisStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
 }
 ```
 
@@ -2547,9 +2411,9 @@ private sealed class SqlServerTransaction : IDatabaseTransaction
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/MySqlStorageStrategy.cs
 ```csharp
-public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
+public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2558,11 +2422,8 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
     public override DatabaseCategory DatabaseCategory;;
     public override string Engine;;
     public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
@@ -2571,28 +2432,27 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
     protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int maxResults = 100, CancellationToken ct = default);
-    protected override async ValueTask DisposeAsyncCore();
+    protected override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryCoreAsync(string query, IDictionary<string, object>? parameters, CancellationToken ct);
+    protected override async Task<int> ExecuteNonQueryCoreAsync(string command, IDictionary<string, object>? parameters, CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
 }
 ```
 ```csharp
-private sealed class StorageDocument
+private sealed class MySqlDbTransaction : IDatabaseTransaction
 {
 }
-    public string Key { get; set; };
-    public string Data { get; set; };
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? Metadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
+    public string TransactionId { get; };
+    public IsolationLevel IsolationLevel;;
+    public MySqlDbTransaction(MySqlConnection connection, MySqlTransaction transaction);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public async Task RollbackAsync(CancellationToken ct = default);
+    public async ValueTask DisposeAsync();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/MeilisearchStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/PostgreSqlStorageStrategy.cs
 ```csharp
-public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
+public sealed class PostgreSqlStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2601,8 +2461,6 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
     public override DatabaseCategory DatabaseCategory;;
     public override string Engine;;
     public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
@@ -2614,28 +2472,28 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
     protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int limit = 100, CancellationToken ct = default);
+    protected override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryCoreAsync(string query, IDictionary<string, object>? parameters, CancellationToken ct);
+    protected override async Task<int> ExecuteNonQueryCoreAsync(string command, IDictionary<string, object>? parameters, CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
     protected override async ValueTask DisposeAsyncCore();
 }
 ```
 ```csharp
-private sealed class StorageDocument
+private sealed class PostgreSqlTransaction : IDatabaseTransaction
 {
 }
-    public string Key { get; set; };
-    public string Data { get; set; };
-    public long Size { get; set; }
-    public string ContentType { get; set; };
-    public string? ETag { get; set; }
-    public string? Metadata { get; set; }
-    public long CreatedAt { get; set; }
-    public long ModifiedAt { get; set; }
+    public string TransactionId { get; };
+    public IsolationLevel IsolationLevel;;
+    public PostgreSqlTransaction(NpgsqlConnection connection, NpgsqlTransaction transaction);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public async Task RollbackAsync(CancellationToken ct = default);
+    public async ValueTask DisposeAsync();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/OpenSearchStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Relational/OracleStorageStrategy.cs
 ```csharp
-public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
+public sealed class OracleStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2644,11 +2502,8 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
     public override DatabaseCategory DatabaseCategory;;
     public override string Engine;;
     public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
@@ -2657,159 +2512,19 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
     protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(IsolationLevel isolationLevel, CancellationToken ct);
 }
 ```
 ```csharp
-private sealed class StorageDocument
+private sealed class OracleDbTransaction : IDatabaseTransaction
 {
 }
-    public string Key { get; set; };
-    public string Data { get; set; };
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? Metadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/TypesenseStorageStrategy.cs
-```csharp
-public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int limit = 100, CancellationToken ct = default);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class TypesenseDocument
-{
-}
-    [JsonPropertyName("id")]
-public string Id { get; set; };
-    [JsonPropertyName("key")]
-public string Key { get; set; };
-    [JsonPropertyName("data")]
-public string Data { get; set; };
-    [JsonPropertyName("size")]
-public long Size { get; set; }
-    [JsonPropertyName("contentType")]
-public string ContentType { get; set; };
-    [JsonPropertyName("etag")]
-public string? ETag { get; set; }
-    [JsonPropertyName("metadata")]
-public string? Metadata { get; set; }
-    [JsonPropertyName("createdAt")]
-public long CreatedAt { get; set; }
-    [JsonPropertyName("modifiedAt")]
-public long ModifiedAt { get; set; }
-}
-```
-```csharp
-private sealed class TypesenseSearchResult
-{
-}
-    [JsonPropertyName("hits")]
-public TypesenseHit[]? Hits { get; set; }
-}
-```
-```csharp
-private sealed class TypesenseHit
-{
-}
-    [JsonPropertyName("document")]
-public TypesenseDocument? Document { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Spatial/PostGisStorageStrategy.cs
-```csharp
-public sealed class PostGisStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Streaming/KafkaStorageStrategy.cs
-```csharp
-public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-```csharp
-private sealed class MetadataDocument
-{
-}
-    public string Key { get; set; };
-    public long Size { get; set; }
-    public string? ContentType { get; set; }
-    public string? ETag { get; set; }
-    public Dictionary<string, string>? CustomMetadata { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
+    public string TransactionId { get; };
+    public IsolationLevel IsolationLevel;;
+    public OracleDbTransaction(OracleConnection connection, OracleTransaction transaction);
+    public Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
 }
 ```
 
@@ -2856,6 +2571,47 @@ private sealed class PulsarProduceResult
 }
     [JsonPropertyName("messageId")]
 public string? MessageId { get; set; }
+}
+```
+```csharp
+private sealed class MetadataDocument
+{
+}
+    public string Key { get; set; };
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? CustomMetadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Streaming/KafkaStorageStrategy.cs
+```csharp
+public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
 }
 ```
 ```csharp
@@ -3024,65 +2780,9 @@ public object[]? Value { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/BigtableStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/OpenSearchStorageStrategy.cs
 ```csharp
-public sealed class BigtableStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/CassandraStorageStrategy.cs
-```csharp
-public sealed class CassandraStorageStrategy : DatabaseStorageStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageTier Tier;;
-    public override DatabaseCategory DatabaseCategory;;
-    public override string Engine;;
-    public override StorageCapabilities Capabilities;;
-    public override bool SupportsTransactions;;
-    public override bool SupportsSql;;
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
-    protected override async Task ConnectCoreAsync(CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(CancellationToken ct);
-    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
-    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
-    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
-    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
-    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
-    protected override async ValueTask DisposeAsyncCore();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/HBaseStorageStrategy.cs
-```csharp
-public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
+public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -3108,33 +2808,23 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
 }
 ```
 ```csharp
-private sealed class HBaseRowResponse
+private sealed class StorageDocument
 {
 }
-    public HBaseRow[]? Row { get; set; }
-}
-```
-```csharp
-private sealed class HBaseRow
-{
-}
-    public string key { get; set; };
-    public HBaseCell[]? Cell { get; set; }
-}
-```
-```csharp
-private sealed class HBaseCell
-{
-}
-    public string column { get; set; };
-    public long timestamp { get; set; }
-    public string value { get; set; };
+    public string Key { get; set; };
+    public string Data { get; set; };
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? Metadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/WideColumn/ScyllaDbStorageStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/MeilisearchStorageStrategy.cs
 ```csharp
-public sealed class ScyllaDbStorageStrategy : DatabaseStorageStrategyBase
+public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
@@ -3149,6 +2839,316 @@ public sealed class ScyllaDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int limit = 100, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class StorageDocument
+{
+}
+    public string Key { get; set; };
+    public string Data { get; set; };
+    public long Size { get; set; }
+    public string ContentType { get; set; };
+    public string? ETag { get; set; }
+    public string? Metadata { get; set; }
+    public long CreatedAt { get; set; }
+    public long ModifiedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs
+```csharp
+public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int maxResults = 100, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class StorageDocument
+{
+}
+    public string Key { get; set; };
+    public string Data { get; set; };
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? Metadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Search/TypesenseStorageStrategy.cs
+```csharp
+public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    public async Task<IEnumerable<StorageObjectMetadata>> SearchAsync(string query, int limit = 100, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class TypesenseDocument
+{
+}
+    [JsonPropertyName("id")]
+public string Id { get; set; };
+    [JsonPropertyName("key")]
+public string Key { get; set; };
+    [JsonPropertyName("data")]
+public string Data { get; set; };
+    [JsonPropertyName("size")]
+public long Size { get; set; }
+    [JsonPropertyName("contentType")]
+public string ContentType { get; set; };
+    [JsonPropertyName("etag")]
+public string? ETag { get; set; }
+    [JsonPropertyName("metadata")]
+public string? Metadata { get; set; }
+    [JsonPropertyName("createdAt")]
+public long CreatedAt { get; set; }
+    [JsonPropertyName("modifiedAt")]
+public long ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class TypesenseSearchResult
+{
+}
+    [JsonPropertyName("hits")]
+public TypesenseHit[]? Hits { get; set; }
+}
+```
+```csharp
+private sealed class TypesenseHit
+{
+}
+    [JsonPropertyName("document")]
+public TypesenseDocument? Document { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/H2StorageStrategy.cs
+```csharp
+public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/LiteDbStorageStrategy.cs
+```csharp
+public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public async Task<StorageObjectMetadata> StoreLargeFileAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public async Task<Stream> RetrieveLargeFileAsync(string key, CancellationToken ct = default);
+    public async Task CompactAsync(CancellationToken ct = default);
+    public async Task CheckpointAsync(CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class StorageDocument
+{
+}
+    public ObjectId Id { get; set; };
+    public string Key { get; set; };
+    public byte[]? Data { get; set; }
+    public long Size { get; set; }
+    public string? ContentType { get; set; }
+    public string? ETag { get; set; }
+    public Dictionary<string, string>? Metadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+    public bool IsLargeFile { get; set; }
+}
+```
+```csharp
+private sealed class LiteDbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public LiteDbTransaction(LiteDatabaseAsync database, SemaphoreSlim writeLock);
+    public async Task CommitAsync(CancellationToken ct = default);
+    public async Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/DuckDbStorageStrategy.cs
+```csharp
+public sealed class DuckDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task ConnectCoreAsync(CancellationToken ct);
+    protected override Task DisconnectCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override Task<IDatabaseTransaction> BeginTransactionCoreAsync(System.Data.IsolationLevel isolationLevel, CancellationToken ct);
+    public async Task ExportToParquetAsync(string filePath, CancellationToken ct = default);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class DuckDbTransaction : IDatabaseTransaction
+{
+}
+    public string TransactionId { get; };
+    public System.Data.IsolationLevel IsolationLevel;;
+    public DuckDbTransaction(DuckDBTransaction transaction);
+    public Task CommitAsync(CancellationToken ct = default);
+    public Task RollbackAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/HsqlDbStorageStrategy.cs
+```csharp
+public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/Embedded/DerbyStorageStrategy.cs
+```csharp
+public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);

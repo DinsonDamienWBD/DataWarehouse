@@ -525,19 +525,36 @@ public sealed class GridBalancingResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ConvergenceDetector.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs
 ```csharp
-public sealed class ConvergenceDetector
+public sealed class LocalTrainingCoordinator
 {
 }
-    public ConvergenceDetector(double lossThreshold = 0.001, int patience = 5);
-    public void RecordLoss(double loss);
-    public bool HasConverged();
-    public double[] GetLossHistory();
-    public int GetStableRounds();
-    public void Reset();
-    public double GetCurrentLoss();
-    public double GetImprovementRate();
+    public async Task<GradientUpdate> TrainLocalAsync(string nodeId, ModelWeights globalWeights, double[][] localData, double[][] localLabels, TrainingConfig config, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/GradientAggregator.cs
+```csharp
+public sealed class GradientAggregator
+{
+}
+    public async Task<ModelWeights> AggregateAsync(GradientUpdate[] updates, AggregationStrategy strategy, CancellationToken ct = default);
+    public ModelWeights ApplyGradients(ModelWeights currentWeights, Dictionary<string, double[]> gradients, double learningRate = 1.0);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ModelDistributor.cs
+```csharp
+public sealed class ModelDistributor
+{
+}
+    public async Task<Dictionary<string, bool>> DistributeAsync(ModelWeights weights, string[] nodeIds, CancellationToken ct = default);
+    public byte[] SerializeWeights(ModelWeights weights);
+    public ModelWeights DeserializeWeights(byte[] data);
+    public Task<ModelWeights?> GetLatestWeightsAsync(string nodeId, CancellationToken ct = default);
+    public void ClearNodeWeights(string nodeId);
+    public void ClearAllWeights();
 }
 ```
 
@@ -570,35 +587,18 @@ public sealed class FederatedLearningOrchestrator
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/GradientAggregator.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ConvergenceDetector.cs
 ```csharp
-public sealed class GradientAggregator
+public sealed class ConvergenceDetector
 {
 }
-    public async Task<ModelWeights> AggregateAsync(GradientUpdate[] updates, AggregationStrategy strategy, CancellationToken ct = default);
-    public ModelWeights ApplyGradients(ModelWeights currentWeights, Dictionary<string, double[]> gradients, double learningRate = 1.0);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs
-```csharp
-public sealed class LocalTrainingCoordinator
-{
-}
-    public async Task<GradientUpdate> TrainLocalAsync(string nodeId, ModelWeights globalWeights, double[][] localData, double[][] localLabels, TrainingConfig config, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ModelDistributor.cs
-```csharp
-public sealed class ModelDistributor
-{
-}
-    public async Task<Dictionary<string, bool>> DistributeAsync(ModelWeights weights, string[] nodeIds, CancellationToken ct = default);
-    public byte[] SerializeWeights(ModelWeights weights);
-    public ModelWeights DeserializeWeights(byte[] data);
-    public Task<ModelWeights?> GetLatestWeightsAsync(string nodeId, CancellationToken ct = default);
-    public void ClearNodeWeights(string nodeId);
-    public void ClearAllWeights();
+    public ConvergenceDetector(double lossThreshold = 0.001, int patience = 5);
+    public void RecordLoss(double loss);
+    public bool HasConverged();
+    public double[] GetLossHistory();
+    public int GetStableRounds();
+    public void Reset();
+    public double GetCurrentLoss();
+    public double GetImprovementRate();
 }
 ```

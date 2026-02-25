@@ -210,9 +210,105 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AccessControl/AccessControlStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/LivingCatalog/LivingCatalogStrategies.cs
 ```csharp
-public sealed class RoleBasedAccessControlStrategy : DataCatalogStrategyBase
+public sealed class SelfLearningCatalogStrategy : DataCatalogStrategyBase
+{
+}
+    internal record CatalogEntry(string AssetId, string Name, string Description, Dictionary<string, string> Metadata, DateTimeOffset LastUpdated, int Version);;
+    internal record FeedbackRecord(string FeedbackId, string AssetId, string FieldName, string OriginalValue, string CorrectedValue, DateTimeOffset Timestamp);;
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RegisterAsset(string assetId, string name, string description, Dictionary<string, string>? metadata);
+    public void RecordFeedback(string assetId, string fieldName, string originalValue, string correctedValue);
+    public void ApplyLearning(string assetId);
+    public double GetConfidence(string assetId);
+}
+```
+```csharp
+public sealed class AutoTaggingStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public IReadOnlySet<string> GenerateTags(string assetId, string name, string description, IReadOnlyList<string> columnNames);
+    public IReadOnlySet<string> GetTags(string assetId);
+}
+```
+```csharp
+public sealed class RelationshipDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public record DiscoveredRelationship(string SourceAssetId, string TargetAssetId, string SourceColumn, string TargetColumn, double Confidence, string RelationshipType);;
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RegisterColumns(string assetId, IReadOnlyList<string> columnNames);
+    public IReadOnlyList<DiscoveredRelationship> DiscoverRelationships(string assetId);
+}
+```
+```csharp
+public sealed class SchemaEvolutionTrackerStrategy : DataCatalogStrategyBase
+{
+}
+    public record SchemaVersion(int Version, Dictionary<string, string> Columns, DateTimeOffset CapturedAt);;
+    public record SchemaDiff(int FromVersion, int ToVersion, IReadOnlyList<string> AddedColumns, IReadOnlyList<string> RemovedColumns, IReadOnlyList<string> TypeChangedColumns);;
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RecordSchema(string assetId, Dictionary<string, string> columns);
+    public IReadOnlyList<SchemaVersion> GetHistory(string assetId);
+    public SchemaDiff? ComputeDiff(string assetId, int fromVersion, int toVersion);
+}
+```
+```csharp
+public sealed class UsagePatternLearnerStrategy : DataCatalogStrategyBase
+{
+}
+    public sealed class UsageProfile;
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RecordAccess(string assetId, string actorId, string operationType);
+    public void RecordCoAccess(string assetId1, string assetId2);
+    public IReadOnlyList<string> GetPopularAssets(int topK);
+    public IReadOnlyList<string> GetRecommendations(string assetId, int topK);
+    public UsageProfile? GetUsageProfile(string assetId);
+}
+```
+```csharp
+public sealed class UsageProfile
+{
+}
+    public long AccessCount;
+    public long QueryCount;
+    public DateTimeOffset LastAccessed;
+    public DateTimeOffset FirstAccessed;
+    public BoundedDictionary<string, int> AccessorCounts { get; };
+    public BoundedDictionary<string, int> OperationCounts { get; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/Documentation/DocumentationStrategies.cs
+```csharp
+public sealed class BusinessGlossaryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -224,7 +320,7 @@ public sealed class RoleBasedAccessControlStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class AttributeBasedAccessControlStrategy : DataCatalogStrategyBase
+public sealed class DataDictionaryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -236,7 +332,7 @@ public sealed class AttributeBasedAccessControlStrategy : DataCatalogStrategyBas
 }
 ```
 ```csharp
-public sealed class DataAccessPolicySyncStrategy : DataCatalogStrategyBase
+public sealed class AutomatedDocumentationGeneratorStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -248,7 +344,7 @@ public sealed class DataAccessPolicySyncStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class AccessRequestWorkflowStrategy : DataCatalogStrategyBase
+public sealed class DataQualityDocumentationStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -260,7 +356,7 @@ public sealed class AccessRequestWorkflowStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DataMaskingIntegrationStrategy : DataCatalogStrategyBase
+public sealed class UsageDocumentationStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -272,7 +368,7 @@ public sealed class DataMaskingIntegrationStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class RowLevelSecurityStrategy : DataCatalogStrategyBase
+public sealed class DataOwnershipDocumentationStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -284,7 +380,7 @@ public sealed class RowLevelSecurityStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class SsoIntegrationStrategy : DataCatalogStrategyBase
+public sealed class CollaborativeAnnotationStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -296,7 +392,7 @@ public sealed class SsoIntegrationStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class AccessAuditTrailStrategy : DataCatalogStrategyBase
+public sealed class DataClassificationStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -308,7 +404,7 @@ public sealed class AccessAuditTrailStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DataPrivacyComplianceStrategy : DataCatalogStrategyBase
+public sealed class DocumentationTemplateStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -320,7 +416,7 @@ public sealed class DataPrivacyComplianceStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class TemporaryAccessGrantStrategy : DataCatalogStrategyBase
+public sealed class DocumentationExportStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -332,9 +428,9 @@ public sealed class TemporaryAccessGrantStrategy : DataCatalogStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/AssetDiscoveryStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/SearchDiscovery/SearchDiscoveryStrategies.cs
 ```csharp
-public sealed class AutomatedCrawlerStrategy : DataCatalogStrategyBase
+public sealed class FullTextSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -346,7 +442,7 @@ public sealed class AutomatedCrawlerStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DatabaseSchemaScannerStrategy : DataCatalogStrategyBase
+public sealed class SemanticSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -358,7 +454,7 @@ public sealed class DatabaseSchemaScannerStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class FileSystemScannerStrategy : DataCatalogStrategyBase
+public sealed class FacetedSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -370,7 +466,7 @@ public sealed class FileSystemScannerStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class CloudStorageScannerStrategy : DataCatalogStrategyBase
+public sealed class ColumnSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -382,7 +478,7 @@ public sealed class CloudStorageScannerStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class ApiEndpointDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class TagBasedDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -394,7 +490,7 @@ public sealed class ApiEndpointDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class StreamingSourceDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class SimilarityBasedDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -406,7 +502,7 @@ public sealed class StreamingSourceDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DataLakeDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class RecommendationEngineStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -418,7 +514,7 @@ public sealed class DataLakeDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class MlModelRegistryDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class LineageBasedDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -430,7 +526,7 @@ public sealed class MlModelRegistryDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class FeatureStoreDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class NaturalLanguageQueryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -442,7 +538,7 @@ public sealed class FeatureStoreDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class IncrementalChangeDetectionStrategy : DataCatalogStrategyBase
+public sealed class SavedSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -451,115 +547,6 @@ public sealed class IncrementalChangeDetectionStrategy : DataCatalogStrategyBase
     public override DataCatalogCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/DarkDataDiscoveryStrategies.cs
-```csharp
-public sealed record DarkDataScanConfig(int MaxObjectsPerScan = 10000, int StaleDaysThreshold = 180, bool SkipAlreadyScored = true, string[]? IncludeStorageTiers = null, string[]? ExcludePatterns = null)
-{
-}
-    public string[] EffectiveExcludePatterns;;
-}
-```
-```csharp
-public sealed class UntaggedObjectScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, DarkDataScanConfig config, string scanScope = "default", CancellationToken ct = default);
-    public DateTime GetWatermark(string scanScope = "default");
-}
-```
-```csharp
-public sealed class OrphanedDataScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, DarkDataScanConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ShadowDataScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> registeredLocations, DarkDataScanConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DarkDataDiscoveryOrchestrator : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public UntaggedObjectScanStrategy UntaggedScanner;;
-    public OrphanedDataScanStrategy OrphanedScanner;;
-    public ShadowDataScanStrategy ShadowScanner;;
-    public IReadOnlyDictionary<DateTime, DarkDataScanResult> ScanHistory;;
-    public async Task<DarkDataScanResult> RunDiscoveryAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, DarkDataScanConfig config, CancellationToken ct = default);
-    public async Task<DarkDataScanResult> RunIncrementalAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/RetroactiveScoringStrategies.cs
-```csharp
-public sealed class RetroactiveBatchScoringStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public async Task<RescoringResult> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> objects, IConsciousnessScorer scorer, CancellationToken ct = default, Action<int, int>? progressCallback = null);
-}
-```
-```csharp
-public sealed class IncrementalRescoringStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public async Task<RescoringResult> RescoreChangedAsync(IReadOnlyList<(string objectId, Dictionary<string, object> currentMetadata, Dictionary<string, object> previousMetadata)> objects, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ScoreDecayRecalculationStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public IReadOnlyCollection<(string ObjectId, ConsciousnessGrade OldGrade, ConsciousnessGrade NewGrade, DateTime DecayedAt)> GradeBoundaryEvents;;
-    public async Task<RescoringResult> RecalculateDecayAsync(IReadOnlyList<ConsciousnessScore> existingScores, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
 }
 ```
 
@@ -807,9 +794,9 @@ public sealed class EmbeddedWidgetStrategy : DataCatalogStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/DataRelationships/DataRelationshipsStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/AssetDiscoveryStrategies.cs
 ```csharp
-public sealed class DataLineageGraphStrategy : DataCatalogStrategyBase
+public sealed class AutomatedCrawlerStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -821,7 +808,7 @@ public sealed class DataLineageGraphStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class ForeignKeyRelationshipStrategy : DataCatalogStrategyBase
+public sealed class DatabaseSchemaScannerStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -833,7 +820,7 @@ public sealed class ForeignKeyRelationshipStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class InferredRelationshipStrategy : DataCatalogStrategyBase
+public sealed class FileSystemScannerStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -845,7 +832,7 @@ public sealed class InferredRelationshipStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class KnowledgeGraphStrategy : DataCatalogStrategyBase
+public sealed class CloudStorageScannerStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -857,7 +844,7 @@ public sealed class KnowledgeGraphStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DataDomainMappingStrategy : DataCatalogStrategyBase
+public sealed class ApiEndpointDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -869,7 +856,7 @@ public sealed class DataDomainMappingStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class ApplicationDependencyStrategy : DataCatalogStrategyBase
+public sealed class StreamingSourceDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -881,7 +868,7 @@ public sealed class ApplicationDependencyStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class PipelineDependencyStrategy : DataCatalogStrategyBase
+public sealed class DataLakeDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -893,7 +880,7 @@ public sealed class PipelineDependencyStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class CrossDatasetJoinStrategy : DataCatalogStrategyBase
+public sealed class MlModelRegistryDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -905,7 +892,7 @@ public sealed class CrossDatasetJoinStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class BusinessProcessMappingStrategy : DataCatalogStrategyBase
+public sealed class FeatureStoreDiscoveryStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -917,129 +904,7 @@ public sealed class BusinessProcessMappingStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class DataContractStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/Documentation/DocumentationStrategies.cs
-```csharp
-public sealed class BusinessGlossaryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataDictionaryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AutomatedDocumentationGeneratorStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataQualityDocumentationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class UsageDocumentationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataOwnershipDocumentationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class CollaborativeAnnotationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataClassificationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DocumentationTemplateStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DocumentationExportStrategy : DataCatalogStrategyBase
+public sealed class IncrementalChangeDetectionStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1051,125 +916,112 @@ public sealed class DocumentationExportStrategy : DataCatalogStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/LivingCatalog/LivingCatalogStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/RetroactiveScoringStrategies.cs
 ```csharp
-public sealed class SelfLearningCatalogStrategy : DataCatalogStrategyBase
-{
-}
-    internal record CatalogEntry(string AssetId, string Name, string Description, Dictionary<string, string> Metadata, DateTimeOffset LastUpdated, int Version);;
-    internal record FeedbackRecord(string FeedbackId, string AssetId, string FieldName, string OriginalValue, string CorrectedValue, DateTimeOffset Timestamp);;
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RegisterAsset(string assetId, string name, string description, Dictionary<string, string>? metadata);
-    public void RecordFeedback(string assetId, string fieldName, string originalValue, string correctedValue);
-    public void ApplyLearning(string assetId);
-    public double GetConfidence(string assetId);
-}
-```
-```csharp
-public sealed class AutoTaggingStrategy : DataCatalogStrategyBase
+public sealed class RetroactiveBatchScoringStrategy : ConsciousnessStrategyBase
 {
 }
     public override string StrategyId;;
     public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public IReadOnlySet<string> GenerateTags(string assetId, string name, string description, IReadOnlyList<string> columnNames);
-    public IReadOnlySet<string> GetTags(string assetId);
+    public async Task<RescoringResult> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> objects, IConsciousnessScorer scorer, CancellationToken ct = default, Action<int, int>? progressCallback = null);
 }
 ```
 ```csharp
-public sealed class RelationshipDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class IncrementalRescoringStrategy : ConsciousnessStrategyBase
 {
 }
-    public record DiscoveredRelationship(string SourceAssetId, string TargetAssetId, string SourceColumn, string TargetColumn, double Confidence, string RelationshipType);;
     public override string StrategyId;;
     public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void RegisterColumns(string assetId, IReadOnlyList<string> columnNames);
-    public IReadOnlyList<DiscoveredRelationship> DiscoverRelationships(string assetId);
+    public async Task<RescoringResult> RescoreChangedAsync(IReadOnlyList<(string objectId, Dictionary<string, object> currentMetadata, Dictionary<string, object> previousMetadata)> objects, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class SchemaEvolutionTrackerStrategy : DataCatalogStrategyBase
+public sealed class ScoreDecayRecalculationStrategy : ConsciousnessStrategyBase
 {
 }
-    public record SchemaVersion(int Version, Dictionary<string, string> Columns, DateTimeOffset CapturedAt);;
-    public record SchemaDiff(int FromVersion, int ToVersion, IReadOnlyList<string> AddedColumns, IReadOnlyList<string> RemovedColumns, IReadOnlyList<string> TypeChangedColumns);;
     public override string StrategyId;;
     public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void RecordSchema(string assetId, Dictionary<string, string> columns);
-    public IReadOnlyList<SchemaVersion> GetHistory(string assetId);
-    public SchemaDiff? ComputeDiff(string assetId, int fromVersion, int toVersion);
-}
-```
-```csharp
-public sealed class UsagePatternLearnerStrategy : DataCatalogStrategyBase
-{
-}
-    public sealed class UsageProfile;
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RecordAccess(string assetId, string actorId, string operationType);
-    public void RecordCoAccess(string assetId1, string assetId2);
-    public IReadOnlyList<string> GetPopularAssets(int topK);
-    public IReadOnlyList<string> GetRecommendations(string assetId, int topK);
-    public UsageProfile? GetUsageProfile(string assetId);
-}
-```
-```csharp
-public sealed class UsageProfile
-{
-}
-    public long AccessCount;
-    public long QueryCount;
-    public DateTimeOffset LastAccessed;
-    public DateTimeOffset FirstAccessed;
-    public BoundedDictionary<string, int> AccessorCounts { get; };
-    public BoundedDictionary<string, int> OperationCounts { get; };
+    public IReadOnlyCollection<(string ObjectId, ConsciousnessGrade OldGrade, ConsciousnessGrade NewGrade, DateTime DecayedAt)> GradeBoundaryEvents;;
+    public async Task<RescoringResult> RecalculateDecayAsync(IReadOnlyList<ConsciousnessScore> existingScores, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/Marketplace/MarketplaceStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/DarkDataDiscoveryStrategies.cs
 ```csharp
-public sealed class DataMarketplaceStrategy : DataCatalogStrategyBase
+public sealed record DarkDataScanConfig(int MaxObjectsPerScan = 10000, int StaleDaysThreshold = 180, bool SkipAlreadyScored = true, string[]? IncludeStorageTiers = null, string[]? ExcludePatterns = null)
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public string[] EffectiveExcludePatterns;;
 }
 ```
 ```csharp
-public sealed class DataListingStrategy : DataCatalogStrategyBase
+public sealed class UntaggedObjectScanStrategy : ConsciousnessStrategyBase
 {
 }
     public override string StrategyId;;
     public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, DarkDataScanConfig config, string scanScope = "default", CancellationToken ct = default);
+    public DateTime GetWatermark(string scanScope = "default");
+}
+```
+```csharp
+public sealed class OrphanedDataScanStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, DarkDataScanConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ShadowDataScanStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> registeredLocations, DarkDataScanConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DarkDataDiscoveryOrchestrator : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public UntaggedObjectScanStrategy UntaggedScanner;;
+    public OrphanedDataScanStrategy OrphanedScanner;;
+    public ShadowDataScanStrategy ShadowScanner;;
+    public IReadOnlyDictionary<DateTime, DarkDataScanResult> ScanHistory;;
+    public async Task<DarkDataScanResult> RunDiscoveryAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, DarkDataScanConfig config, CancellationToken ct = default);
+    public async Task<DarkDataScanResult> RunIncrementalAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, CancellationToken ct = default);
 }
 ```
 
@@ -1295,9 +1147,9 @@ public sealed class SchemaGovernancePolicyStrategy : DataCatalogStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/SearchDiscovery/SearchDiscoveryStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/DataRelationships/DataRelationshipsStrategies.cs
 ```csharp
-public sealed class FullTextSearchStrategy : DataCatalogStrategyBase
+public sealed class DataLineageGraphStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1309,7 +1161,7 @@ public sealed class FullTextSearchStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class SemanticSearchStrategy : DataCatalogStrategyBase
+public sealed class ForeignKeyRelationshipStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1321,7 +1173,7 @@ public sealed class SemanticSearchStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class FacetedSearchStrategy : DataCatalogStrategyBase
+public sealed class InferredRelationshipStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1333,7 +1185,7 @@ public sealed class FacetedSearchStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class ColumnSearchStrategy : DataCatalogStrategyBase
+public sealed class KnowledgeGraphStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1345,7 +1197,7 @@ public sealed class ColumnSearchStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class TagBasedDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class DataDomainMappingStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1357,7 +1209,7 @@ public sealed class TagBasedDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class SimilarityBasedDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class ApplicationDependencyStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1369,7 +1221,7 @@ public sealed class SimilarityBasedDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class RecommendationEngineStrategy : DataCatalogStrategyBase
+public sealed class PipelineDependencyStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1381,7 +1233,7 @@ public sealed class RecommendationEngineStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class LineageBasedDiscoveryStrategy : DataCatalogStrategyBase
+public sealed class CrossDatasetJoinStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1393,7 +1245,7 @@ public sealed class LineageBasedDiscoveryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class NaturalLanguageQueryStrategy : DataCatalogStrategyBase
+public sealed class BusinessProcessMappingStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1405,7 +1257,155 @@ public sealed class NaturalLanguageQueryStrategy : DataCatalogStrategyBase
 }
 ```
 ```csharp
-public sealed class SavedSearchStrategy : DataCatalogStrategyBase
+public sealed class DataContractStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/Marketplace/MarketplaceStrategies.cs
+```csharp
+public sealed class DataMarketplaceStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataListingStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AccessControl/AccessControlStrategies.cs
+```csharp
+public sealed class RoleBasedAccessControlStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AttributeBasedAccessControlStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataAccessPolicySyncStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AccessRequestWorkflowStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataMaskingIntegrationStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RowLevelSecurityStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SsoIntegrationStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AccessAuditTrailStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataPrivacyComplianceStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TemporaryAccessGrantStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;

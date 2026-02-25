@@ -190,116 +190,6 @@ internal sealed class McpInterfaceStrategy : SdkInterface.InterfaceStrategyBase,
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotDashboardProvider.cs
-```csharp
-public sealed class MoonshotDashboardProvider : IMoonshotDashboardProvider
-{
-}
-    public MoonshotDashboardProvider(IMoonshotRegistry registry, MoonshotMetricsCollector metricsCollector, ILogger<MoonshotDashboardProvider> logger);
-    public Task<MoonshotDashboardSnapshot> GetSnapshotAsync(CancellationToken ct);
-    public Task<IReadOnlyList<MoonshotTrendPoint>> GetTrendsAsync(MoonshotId id, string metricName, DateTimeOffset from, DateTimeOffset to, CancellationToken ct);
-    public Task<MoonshotMetrics> GetMetricsAsync(MoonshotId id, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotDashboardStrategy.cs
-```csharp
-public sealed class MoonshotDashboardStrategy
-{
-}
-    public string Name;;
-    public string Description;;
-    public string Category;;
-    public MoonshotDashboardStrategy(MoonshotDashboardProvider provider, ILogger<MoonshotDashboardStrategy> logger);
-    public async Task<MoonshotDashboardRenderResult> RenderAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotMetricsCollector.cs
-```csharp
-public sealed class MoonshotMetricsCollector : IDisposable
-{
-}
-    public MoonshotMetricsCollector(IMessageBus messageBus, ILogger<MoonshotMetricsCollector> logger);
-    public Task StartCollectingAsync(CancellationToken ct);
-    public MoonshotMetrics GetMetrics(MoonshotId id);
-    public IReadOnlyList<MoonshotMetrics> GetAllMetrics();
-    public IReadOnlyList<MoonshotTrendPoint> GetTrends(MoonshotId id, string metricName, DateTimeOffset from, DateTimeOffset to);
-    public void Dispose();
-}
-```
-```csharp
-private sealed class MoonshotMetricState
-{
-}
-    public long TotalInvocations;
-    public long SuccessCount;
-    public long FailureCount;
-    public readonly ConcurrentQueue<double> LatencySamples = new();
-    public DateTimeOffset WindowStart = DateTimeOffset.UtcNow;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Services/Dashboard/DashboardAccessControlService.cs
-```csharp
-public sealed class DashboardAccessControlService
-{
-}
-    public void SetPermissions(string tenantId, string dashboardId, string ownerId, DashboardVisibility visibility = DashboardVisibility.Private);
-    public DashboardAccessGrant GrantAccess(string tenantId, string dashboardId, string granteeId, DashboardRole role, string grantedBy);
-    public bool RevokeAccess(string tenantId, string dashboardId, string granteeId, string revokedBy);
-    public DashboardAccessCheck CheckAccess(string tenantId, string dashboardId, string userId, DashboardRole requiredRole = DashboardRole.Viewer);
-    public IReadOnlyList<DashboardAccessAuditEntry> GetAuditLog(string tenantId, string dashboardId, int limit = 100);
-    public IReadOnlyList<DashboardAccessGrant> ListGrants(string tenantId, string dashboardId);
-}
-```
-```csharp
-public sealed record DashboardPermissions
-{
-}
-    public required string TenantId { get; init; }
-    public required string DashboardId { get; init; }
-    public required string OwnerId { get; init; }
-    public DashboardVisibility Visibility { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record DashboardAccessGrant
-{
-}
-    public required string GrantId { get; init; }
-    public required string TenantId { get; init; }
-    public required string DashboardId { get; init; }
-    public required string GranteeId { get; init; }
-    public DashboardRole Role { get; init; }
-    public required string GrantedBy { get; init; }
-    public DateTimeOffset GrantedAt { get; init; }
-    public DateTimeOffset? ExpiresAt { get; init; }
-}
-```
-```csharp
-public sealed record DashboardAccessCheck
-{
-}
-    public bool Allowed { get; init; }
-    public DashboardRole EffectiveRole { get; init; }
-    public required string Reason { get; init; }
-}
-```
-```csharp
-public sealed record DashboardAccessAuditEntry
-{
-}
-    public required string TenantId { get; init; }
-    public required string DashboardId { get; init; }
-    public required string UserId { get; init; }
-    public required string Action { get; init; }
-    public required string Details { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Services/Dashboard/DashboardDataSourceService.cs
 ```csharp
 public sealed class DashboardDataSourceService
@@ -555,9 +445,69 @@ public sealed record TemplateWidgetDefinition
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/ConvergenceChoiceDialogStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Services/Dashboard/DashboardAccessControlService.cs
 ```csharp
-internal sealed class ConvergenceChoiceDialogStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class DashboardAccessControlService
+{
+}
+    public void SetPermissions(string tenantId, string dashboardId, string ownerId, DashboardVisibility visibility = DashboardVisibility.Private);
+    public DashboardAccessGrant GrantAccess(string tenantId, string dashboardId, string granteeId, DashboardRole role, string grantedBy);
+    public bool RevokeAccess(string tenantId, string dashboardId, string granteeId, string revokedBy);
+    public DashboardAccessCheck CheckAccess(string tenantId, string dashboardId, string userId, DashboardRole requiredRole = DashboardRole.Viewer);
+    public IReadOnlyList<DashboardAccessAuditEntry> GetAuditLog(string tenantId, string dashboardId, int limit = 100);
+    public IReadOnlyList<DashboardAccessGrant> ListGrants(string tenantId, string dashboardId);
+}
+```
+```csharp
+public sealed record DashboardPermissions
+{
+}
+    public required string TenantId { get; init; }
+    public required string DashboardId { get; init; }
+    public required string OwnerId { get; init; }
+    public DashboardVisibility Visibility { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record DashboardAccessGrant
+{
+}
+    public required string GrantId { get; init; }
+    public required string TenantId { get; init; }
+    public required string DashboardId { get; init; }
+    public required string GranteeId { get; init; }
+    public DashboardRole Role { get; init; }
+    public required string GrantedBy { get; init; }
+    public DateTimeOffset GrantedAt { get; init; }
+    public DateTimeOffset? ExpiresAt { get; init; }
+}
+```
+```csharp
+public sealed record DashboardAccessCheck
+{
+}
+    public bool Allowed { get; init; }
+    public DashboardRole EffectiveRole { get; init; }
+    public required string Reason { get; init; }
+}
+```
+```csharp
+public sealed record DashboardAccessAuditEntry
+{
+}
+    public required string TenantId { get; init; }
+    public required string DashboardId { get; init; }
+    public required string UserId { get; init; }
+    public required string Action { get; init; }
+    public required string Details { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/SlackChannelStrategy.cs
+```csharp
+internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -573,9 +523,483 @@ internal sealed class ConvergenceChoiceDialogStrategy : SdkInterface.InterfaceSt
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/InstanceArrivalNotificationStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/ClaudeMcpStrategy.cs
 ```csharp
-internal sealed class InstanceArrivalNotificationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/SiriChannelStrategy.cs
+```csharp
+internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs
+```csharp
+internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/DiscordChannelStrategy.cs
+```csharp
+internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/AlexaChannelStrategy.cs
+```csharp
+internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/GoogleAssistantChannelStrategy.cs
+```csharp
+internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/GenericWebhookStrategy.cs
+```csharp
+internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/TeamsChannelStrategy.cs
+```csharp
+internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/CostAwareApiStrategy.cs
+```csharp
+internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class ClientBudget
+{
+}
+    public required string ClientId { get; init; }
+    public decimal TotalBudget { get; set; };
+    public decimal UsedBudget { get; set; }
+    public DateTimeOffset ResetAt { get; set; }
+    public List<CostEntry> CostHistory { get; };
+}
+```
+```csharp
+private sealed class CostEntry
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Operation { get; init; }
+    public required decimal Cost { get; init; }
+    public required Dictionary<string, decimal> CostBreakdown { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/AnomalyDetectionApiStrategy.cs
+```csharp
+internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class ClientBaseline
+{
+}
+    public required string ClientId { get; init; }
+    public List<RequestPattern> RecentRequests { get; };
+    public Dictionary<string, int> PathFrequency { get; };
+    public Dictionary<string, int> MethodFrequency { get; };
+    public Dictionary<int, int> HourOfDayFrequency { get; };
+    public RunningStats PayloadSizeStats { get; };
+    public RunningStats RequestIntervalStats { get; };
+    public DateTimeOffset? LastRequestTime { get; set; }
+    public int TotalRequests { get; set; }
+}
+```
+```csharp
+private sealed class RequestPattern
+{
+}
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Method { get; init; }
+    public required string Path { get; init; }
+    public required int PayloadSize { get; init; }
+}
+```
+```csharp
+private sealed class RunningStats
+{
+}
+    public void Add(double value);
+    public double Mean;;
+    public double StdDev
+{
+    get
+    {
+        if (_count < 2)
+            return 0;
+        var variance = (_sumOfSquares - (_sum * _sum / _count)) / (_count - 1);
+        return Math.Sqrt(Math.Max(0, variance));
+    }
+}
+    public double ZScore(double value);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/EdgeCachedApiStrategy.cs
+```csharp
+internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class CacheEntry
+{
+}
+    public required string ETag { get; init; }
+    public required DateTimeOffset LastModified { get; init; }
+    public required byte[] Body { get; init; }
+    public required DateTimeOffset ExpiresAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/SmartRateLimitStrategy.cs
+```csharp
+internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class RateLimitTier
+{
+}
+    public required int RequestsPerMinute { get; init; }
+    public required int RequestsPerHour { get; init; }
+    public required int BurstSize { get; init; }
+}
+```
+```csharp
+private sealed class ClientRateData
+{
+}
+    public required string ClientId { get; init; }
+    public required string Tier { get; init; }
+    public ConcurrentQueue<DateTimeOffset> RequestTimestamps { get; };
+    public int TotalRequests { get; set; }
+    public DateTimeOffset? BlockedUntil { get; set; }
+    public double AbuseScore { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/QuantumSafeApiStrategy.cs
+```csharp
+internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/ZeroTrustApiStrategy.cs
+```csharp
+internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/GrpcInterfaceStrategy.cs
+```csharp
+internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/TwirpStrategy.cs
+```csharp
+internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/GrpcWebStrategy.cs
+```csharp
+internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/JsonRpcStrategy.cs
+```csharp
+internal sealed class JsonRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/XmlRpcStrategy.cs
+```csharp
+internal sealed class XmlRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/ConnectRpcStrategy.cs
+```csharp
+internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/MergePreviewStrategy.cs
+```csharp
+internal sealed class MergePreviewStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/MergeStrategySelectionStrategy.cs
+```csharp
+internal sealed class MergeStrategySelectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -594,24 +1018,6 @@ internal sealed class InstanceArrivalNotificationStrategy : SdkInterface.Interfa
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/MasterInstanceSelectionStrategy.cs
 ```csharp
 internal sealed class MasterInstanceSelectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/MergePreviewStrategy.cs
-```csharp
-internal sealed class MergePreviewStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -663,9 +1069,27 @@ internal sealed class MergeResultsSummaryStrategy : SdkInterface.InterfaceStrate
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/MergeStrategySelectionStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/ConvergenceChoiceDialogStrategy.cs
 ```csharp
-internal sealed class MergeStrategySelectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class ConvergenceChoiceDialogStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Convergence/InstanceArrivalNotificationStrategy.cs
+```csharp
+internal sealed class InstanceArrivalNotificationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -699,9 +1123,82 @@ internal sealed class SchemaConflictResolutionUIStrategy : SdkInterface.Interfac
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/AlexaChannelStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/ApiVersioningStrategy.cs
 ```csharp
-internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class ApiVersioningStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class VersionInfo
+{
+}
+    public string Version { get; set; };
+    public VersionStatus Status { get; set; }
+    public DateTime ReleaseDate { get; set; }
+    public DateTime? SunsetDate { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/BreakingChangeDetectionStrategy.cs
+```csharp
+internal sealed class BreakingChangeDetectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class ApiSpec
+{
+}
+    public List<ApiEndpoint> Endpoints { get; set; };
+}
+```
+```csharp
+private sealed class ApiEndpoint
+{
+}
+    public string Path { get; set; };
+    public List<string> Methods { get; set; };
+    public List<string> Parameters { get; set; };
+}
+```
+```csharp
+private sealed class BreakingChange
+{
+}
+    public ChangeType Type { get; set; }
+    public ChangeSeverity Severity { get; set; }
+    public string Description { get; set; };
+    public string Path { get; set; };
+    public string Recommendation { get; set; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/InteractivePlaygroundStrategy.cs
+```csharp
+internal sealed class InteractivePlaygroundStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -717,9 +1214,9 @@ internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase,
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/InstantSdkGenerationStrategy.cs
 ```csharp
-internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class InstantSdkGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -735,9 +1232,83 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/ClaudeMcpStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/ChangelogGenerationStrategy.cs
 ```csharp
-internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class ChangelogGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class ChangelogVersion
+{
+}
+    public string Version { get; set; };
+    public DateTime ReleaseDate { get; set; }
+    public List<ChangeEntry> Changes { get; set; };
+}
+```
+```csharp
+private sealed class ChangeEntry
+{
+}
+    public ChangeType Type { get; set; }
+    public string Description { get; set; };
+    public string Impact { get; set; };
+    public string? Migration { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/MockServerStrategy.cs
+```csharp
+internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class MockResponse
+{
+}
+    public int StatusCode { get; set; }
+    public string ResponseBody { get; set; };
+    public int DelayMs { get; set; }
+}
+```
+```csharp
+private sealed class RecordedRequest
+{
+}
+    public string Method { get; set; };
+    public string Path { get; set; };
+    public DateTimeOffset Timestamp { get; set; }
+    public string Body { get; set; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/RestInterfaceStrategy.cs
+```csharp
+internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -753,9 +1324,59 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/DiscordChannelStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/FalcorStrategy.cs
 ```csharp
-internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private class FalcorRequest
+{
+}
+    public string? Method { get; set; }
+    public object[][]? Paths { get; set; }
+    public object? JsonGraphEnvelope { get; set; }
+    public object[]? CallPath { get; set; }
+    public object[]? Arguments { get; set; }
+    public object[]? PathSuffixes { get; set; }
+    public object[]? RefPaths { get; set; }
+    public object[]? ThisPaths { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/OpenApiStrategy.cs
+```csharp
+internal sealed class OpenApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/HateoasStrategy.cs
+```csharp
+internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -771,9 +1392,40 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/GenericWebhookStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/ODataStrategy.cs
 ```csharp
-internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private record ODataQueryOptions
+{
+}
+    public string? Filter { get; init; }
+    public string? Select { get; init; }
+    public string? OrderBy { get; init; }
+    public int Top { get; init; };
+    public int Skip { get; init; }
+    public bool Count { get; init; }
+    public string? Expand { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/JsonApiStrategy.cs
+```csharp
+internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -789,9 +1441,241 @@ internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBas
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/GoogleAssistantChannelStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/PostGraphileStrategy.cs
 ```csharp
-internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class PostGraphileRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/PrismaStrategy.cs
+```csharp
+internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class PrismaRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+```csharp
+private sealed class PrismaQueryArguments
+{
+}
+    public bool HasWhere { get; set; }
+    public bool HasSelect { get; set; }
+    public bool HasInclude { get; set; }
+    public bool HasOrderBy { get; set; }
+    public int? Take { get; set; }
+    public int? Skip { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/ApolloFederationStrategy.cs
+```csharp
+internal sealed class ApolloFederationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class FederationRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/HasuraStrategy.cs
+```csharp
+internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class HasuraRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+```csharp
+private sealed class HasuraQueryArguments
+{
+}
+    public bool HasWhere { get; set; }
+    public bool HasOrderBy { get; set; }
+    public int? Limit { get; set; }
+    public int? Offset { get; set; }
+    public bool HasDistinctOn { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/RelayStrategy.cs
+```csharp
+internal sealed class RelayStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class RelayRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+```csharp
+private sealed class PaginationArguments
+{
+}
+    public int? First { get; set; }
+    public string? After { get; set; }
+    public int? Last { get; set; }
+    public string? Before { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/SqlInterfaceStrategy.cs
+```csharp
+internal sealed class SqlInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class SqlRequest
+{
+}
+    public string? Query { get; set; }
+    public Dictionary<string, object>? Parameters { get; set; }
+}
+```
+```csharp
+private sealed class SqlResult
+{
+}
+    public int RowCount { get; set; }
+    public int ColumnCount { get; set; }
+    public string[] Columns { get; set; };
+    public object[] Rows { get; set; };
+    public long ExecutionTimeMs { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/GraphQLInterfaceStrategy.cs
+```csharp
+internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class GraphQLRequest
+{
+}
+    public string? Query { get; set; }
+    public string? OperationName { get; set; }
+    public Dictionary<string, object>? Variables { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/SocketIoStrategy.cs
+```csharp
+internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -806,10 +1690,134 @@ internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStr
     protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/SiriChannelStrategy.cs
 ```csharp
-internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+private sealed class SocketIoConnection : IDisposable
+{
+}
+    public string SessionId { get; }
+    public SocketIoConnection(string sessionId);
+    public void JoinNamespace(string ns);;
+    public void LeaveNamespace(string ns);
+    public void QueuePacket(string packet);
+    public void Dispose();
+}
+```
+```csharp
+private sealed class SocketIoNamespace
+{
+}
+    public string Name { get; }
+    public SocketIoNamespace(string name);
+    public void AddConnection(string sid);;
+    public void RemoveConnection(string sid);
+    public void BroadcastEvent(string eventName, string data, BoundedDictionary<string, SocketIoConnection> connections);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/LongPollingStrategy.cs
+```csharp
+internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public async Task PublishData(string topic, object data, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+private sealed class ClientState
+{
+}
+    public string ClientId { get; }
+    public ClientState(string clientId);
+    public void Notify();
+    public void Release();
+}
+```
+```csharp
+private sealed class DataQueue
+{
+}
+    public string Topic { get; }
+    public DataQueue(string topic);
+    public void Enqueue(string data);
+    public string? TryDequeue();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/ServerSentEventsStrategy.cs
+```csharp
+internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public async Task PublishEvent(string topic, string eventType, object data, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+private sealed class EventStream : IDisposable
+{
+}
+    public string StreamId { get; }
+    public string Topic { get; }
+    public string? Filter { get; }
+    public long LastEventId { get; set; }
+    public EventStream(string streamId, string topic, string? filter);
+    public bool MatchesFilter(string eventType);
+    public void QueueEvent(string sseMessage);
+    public void Dispose();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/WebSocketInterfaceStrategy.cs
+```csharp
+internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override async Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class WebSocketConnection : IDisposable
+{
+}
+    public string ConnectionId { get; }
+    public DateTimeOffset LastPingTime { get; set; }
+    public WebSocketConnection(string connectionId);
+    public void SendMessage(string message);
+    public void Dispose();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/SignalRStrategy.cs
+```csharp
+internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -824,40 +1832,33 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
     protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/SlackChannelStrategy.cs
 ```csharp
-internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+private sealed class SignalRConnection : IDisposable
 {
 }
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public string ConnectionId { get; }
+    public SignalRConnectionState State { get; set; }
+    public DateTimeOffset LastPingTime { get; set; }
+    public SignalRConnection(string connectionId);
+    public void QueueMessage(string message);
+    public void Dispose();
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/TeamsChannelStrategy.cs
 ```csharp
-internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+private sealed class SignalRHub
 {
 }
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public string Name { get; }
+    public SignalRHub(string name);
+}
+```
+```csharp
+private sealed class SignalRGroup
+{
+}
+    public string Name { get; }
+    public SignalRGroup(string name);
+    public void AddConnection(string connectionId);;
 }
 ```
 
@@ -999,236 +2000,6 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/ApiVersioningStrategy.cs
-```csharp
-internal sealed class ApiVersioningStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class VersionInfo
-{
-}
-    public string Version { get; set; };
-    public VersionStatus Status { get; set; }
-    public DateTime ReleaseDate { get; set; }
-    public DateTime? SunsetDate { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/BreakingChangeDetectionStrategy.cs
-```csharp
-internal sealed class BreakingChangeDetectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ApiSpec
-{
-}
-    public List<ApiEndpoint> Endpoints { get; set; };
-}
-```
-```csharp
-private sealed class ApiEndpoint
-{
-}
-    public string Path { get; set; };
-    public List<string> Methods { get; set; };
-    public List<string> Parameters { get; set; };
-}
-```
-```csharp
-private sealed class BreakingChange
-{
-}
-    public ChangeType Type { get; set; }
-    public ChangeSeverity Severity { get; set; }
-    public string Description { get; set; };
-    public string Path { get; set; };
-    public string Recommendation { get; set; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/ChangelogGenerationStrategy.cs
-```csharp
-internal sealed class ChangelogGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ChangelogVersion
-{
-}
-    public string Version { get; set; };
-    public DateTime ReleaseDate { get; set; }
-    public List<ChangeEntry> Changes { get; set; };
-}
-```
-```csharp
-private sealed class ChangeEntry
-{
-}
-    public ChangeType Type { get; set; }
-    public string Description { get; set; };
-    public string Impact { get; set; };
-    public string? Migration { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/InstantSdkGenerationStrategy.cs
-```csharp
-internal sealed class InstantSdkGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/InteractivePlaygroundStrategy.cs
-```csharp
-internal sealed class InteractivePlaygroundStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/DeveloperExperience/MockServerStrategy.cs
-```csharp
-internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class MockResponse
-{
-}
-    public int StatusCode { get; set; }
-    public string ResponseBody { get; set; };
-    public int DelayMs { get; set; }
-}
-```
-```csharp
-private sealed class RecordedRequest
-{
-}
-    public string Method { get; set; };
-    public string Path { get; set; };
-    public DateTimeOffset Timestamp { get; set; }
-    public string Body { get; set; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/AdaptiveApiStrategy.cs
-```csharp
-internal sealed class AdaptiveApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private class ClientProfile
-{
-}
-    public required string DeviceType { get; init; }
-    public required string Bandwidth { get; init; }
-    public required string DetailLevel { get; init; }
-    public required bool SupportsCompression { get; init; }
-    public required string[] AcceptedFormats { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/IntentBasedApiStrategy.cs
-```csharp
-internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/NaturalLanguageApiStrategy.cs
 ```csharp
 internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
@@ -1247,81 +2018,9 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/IntentBasedApiStrategy.cs
 ```csharp
-internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/ProtocolMorphingStrategy.cs
-```csharp
-internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/SelfDocumentingApiStrategy.cs
-```csharp
-internal sealed class SelfDocumentingApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/UnifiedApiStrategy.cs
-```csharp
-internal sealed class UnifiedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/VersionlessApiStrategy.cs
-```csharp
-internal sealed class VersionlessApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
     public override string StrategyId;;
@@ -1355,6 +2054,125 @@ internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/UnifiedApiStrategy.cs
+```csharp
+internal sealed class UnifiedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/SelfDocumentingApiStrategy.cs
+```csharp
+internal sealed class SelfDocumentingApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/VersionlessApiStrategy.cs
+```csharp
+internal sealed class VersionlessApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/ProtocolMorphingStrategy.cs
+```csharp
+internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/AdaptiveApiStrategy.cs
+```csharp
+internal sealed class AdaptiveApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+private class ClientProfile
+{
+}
+    public required string DeviceType { get; init; }
+    public required string Bandwidth { get; init; }
+    public required string DetailLevel { get; init; }
+    public required bool SupportsCompression { get; init; }
+    public required string[] AcceptedFormats { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs
+```csharp
+internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Innovation/ZeroConfigApiStrategy.cs
 ```csharp
 internal sealed class ZeroConfigApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
@@ -1370,97 +2188,6 @@ internal sealed class ZeroConfigApiStrategy : SdkInterface.InterfaceStrategyBase
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
     protected override Task StopAsyncCore(CancellationToken cancellationToken);
     protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/AmqpStrategy.cs
-```csharp
-internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-internal sealed class AmqpExchange
-{
-}
-    public required string Name { get; init; }
-    public required string Type { get; init; }
-    public bool Durable { get; init; }
-    public bool AutoDelete { get; init; }
-}
-```
-```csharp
-internal sealed class AmqpQueue
-{
-}
-    public required string Name { get; init; }
-    public bool Durable { get; init; }
-    public bool Exclusive { get; init; }
-    public bool AutoDelete { get; init; }
-    public List<AmqpMessage> Messages { get; };
-}
-```
-```csharp
-internal sealed class AmqpBinding
-{
-}
-    public required string Queue { get; init; }
-    public required string Exchange { get; init; }
-    public required string RoutingKey { get; init; }
-}
-```
-```csharp
-internal sealed class AmqpMessage
-{
-}
-    public required byte[] Body { get; init; }
-    public required string RoutingKey { get; init; }
-    public required AmqpMessageProperties Properties { get; init; }
-}
-```
-```csharp
-internal sealed class AmqpMessageProperties
-{
-}
-    public string ContentType { get; init; };
-    public string? CorrelationId { get; init; }
-    public string? ReplyTo { get; init; }
-    public string? Expiration { get; init; }
-    public byte Priority { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/CoApStrategy.cs
-```csharp
-[SdkCompatibility("3.0.0", Notes = "Phase 36: CoAP resource strategy (EDGE-03)")]
-internal sealed class CoApStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    public CoApStrategy(string serverUri = "coap://localhost:5683");
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override async Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-    public Task RegisterResourceAsync(string path, Func<byte[], Task<byte[]>> handler, CancellationToken ct = default);
-    public async Task<IReadOnlyList<string>> DiscoverResourcesAsync(CancellationToken ct = default);
 }
 ```
 
@@ -1571,6 +2298,75 @@ internal sealed class KafkaSubscribeRequest
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/AmqpStrategy.cs
+```csharp
+internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+internal sealed class AmqpExchange
+{
+}
+    public required string Name { get; init; }
+    public required string Type { get; init; }
+    public bool Durable { get; init; }
+    public bool AutoDelete { get; init; }
+}
+```
+```csharp
+internal sealed class AmqpQueue
+{
+}
+    public required string Name { get; init; }
+    public bool Durable { get; init; }
+    public bool Exclusive { get; init; }
+    public bool AutoDelete { get; init; }
+    public List<AmqpMessage> Messages { get; };
+}
+```
+```csharp
+internal sealed class AmqpBinding
+{
+}
+    public required string Queue { get; init; }
+    public required string Exchange { get; init; }
+    public required string RoutingKey { get; init; }
+}
+```
+```csharp
+internal sealed class AmqpMessage
+{
+}
+    public required byte[] Body { get; init; }
+    public required string RoutingKey { get; init; }
+    public required AmqpMessageProperties Properties { get; init; }
+}
+```
+```csharp
+internal sealed class AmqpMessageProperties
+{
+}
+    public string ContentType { get; init; };
+    public string? CorrelationId { get; init; }
+    public string? ReplyTo { get; init; }
+    public string? Expiration { get; init; }
+    public byte Priority { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/MqttStrategy.cs
 ```csharp
 internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
@@ -1621,6 +2417,79 @@ internal sealed class MqttSession
     public required DateTimeOffset CreatedAt { get; init; }
     public bool CleanSession { get; set; }
     public Dictionary<string, int> Subscriptions { get; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/CoApStrategy.cs
+```csharp
+[SdkCompatibility("3.0.0", Notes = "Phase 36: CoAP resource strategy (EDGE-03)")]
+internal sealed class CoApStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    public CoApStrategy(string serverUri = "coap://localhost:5683");
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override async Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public Task RegisterResourceAsync(string path, Func<byte[], Task<byte[]>> handler, CancellationToken ct = default);
+    public async Task<IReadOnlyList<string>> DiscoverResourcesAsync(CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/StompStrategy.cs
+```csharp
+internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+{
+}
+    public override string StrategyId;;
+    public string DisplayName;;
+    public string SemanticDescription;;
+    public InterfaceCategory Category;;
+    public string[] Tags;;
+    public override SdkInterface.InterfaceProtocol Protocol;;
+    public override SdkInterface.InterfaceCapabilities Capabilities;;
+    protected override Task StartAsyncCore(CancellationToken cancellationToken);
+    protected override Task StopAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+}
+```
+```csharp
+internal sealed class StompSubscription
+{
+}
+    public required string Id { get; init; }
+    public required string Destination { get; init; }
+    public required string SessionId { get; init; }
+    public required string AckMode { get; init; }
+    public DateTimeOffset SubscribedAt { get; init; }
+    public List<StompMessage> PendingMessages { get; };
+}
+```
+```csharp
+internal sealed class StompMessage
+{
+}
+    public required string MessageId { get; init; }
+    public required string Destination { get; init; }
+    public required byte[] Body { get; init; }
+    public required string ContentType { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public Dictionary<string, string> Headers { get; init; };
+}
+```
+```csharp
+internal sealed class StompTransaction
+{
+}
+    public required string Id { get; init; }
+    public DateTimeOffset StartedAt { get; init; }
+    public List<StompMessage> Messages { get; };
 }
 ```
 
@@ -1676,922 +2545,385 @@ internal sealed class NatsStream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Messaging/StompStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotMetricsCollector.cs
 ```csharp
-internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class MoonshotMetricsCollector : IDisposable
 {
 }
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-internal sealed class StompSubscription
-{
-}
-    public required string Id { get; init; }
-    public required string Destination { get; init; }
-    public required string SessionId { get; init; }
-    public required string AckMode { get; init; }
-    public DateTimeOffset SubscribedAt { get; init; }
-    public List<StompMessage> PendingMessages { get; };
-}
-```
-```csharp
-internal sealed class StompMessage
-{
-}
-    public required string MessageId { get; init; }
-    public required string Destination { get; init; }
-    public required byte[] Body { get; init; }
-    public required string ContentType { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-    public Dictionary<string, string> Headers { get; init; };
-}
-```
-```csharp
-internal sealed class StompTransaction
-{
-}
-    public required string Id { get; init; }
-    public DateTimeOffset StartedAt { get; init; }
-    public List<StompMessage> Messages { get; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/ApolloFederationStrategy.cs
-```csharp
-internal sealed class ApolloFederationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class FederationRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/GraphQLInterfaceStrategy.cs
-```csharp
-internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class GraphQLRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/HasuraStrategy.cs
-```csharp
-internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class HasuraRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-```csharp
-private sealed class HasuraQueryArguments
-{
-}
-    public bool HasWhere { get; set; }
-    public bool HasOrderBy { get; set; }
-    public int? Limit { get; set; }
-    public int? Offset { get; set; }
-    public bool HasDistinctOn { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/PostGraphileStrategy.cs
-```csharp
-internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class PostGraphileRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/PrismaStrategy.cs
-```csharp
-internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class PrismaRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-```csharp
-private sealed class PrismaQueryArguments
-{
-}
-    public bool HasWhere { get; set; }
-    public bool HasSelect { get; set; }
-    public bool HasInclude { get; set; }
-    public bool HasOrderBy { get; set; }
-    public int? Take { get; set; }
-    public int? Skip { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/RelayStrategy.cs
-```csharp
-internal sealed class RelayStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class RelayRequest
-{
-}
-    public string? Query { get; set; }
-    public string? OperationName { get; set; }
-    public Dictionary<string, object>? Variables { get; set; }
-}
-```
-```csharp
-private sealed class PaginationArguments
-{
-}
-    public int? First { get; set; }
-    public string? After { get; set; }
-    public int? Last { get; set; }
-    public string? Before { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Query/SqlInterfaceStrategy.cs
-```csharp
-internal sealed class SqlInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class SqlRequest
-{
-}
-    public string? Query { get; set; }
-    public Dictionary<string, object>? Parameters { get; set; }
-}
-```
-```csharp
-private sealed class SqlResult
-{
-}
-    public int RowCount { get; set; }
-    public int ColumnCount { get; set; }
-    public string[] Columns { get; set; };
-    public object[] Rows { get; set; };
-    public long ExecutionTimeMs { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/LongPollingStrategy.cs
-```csharp
-internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-    public async Task PublishData(string topic, object data, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-private sealed class ClientState
-{
-}
-    public string ClientId { get; }
-    public ClientState(string clientId);
-    public void Notify();
-    public void Release();
-}
-```
-```csharp
-private sealed class DataQueue
-{
-}
-    public string Topic { get; }
-    public DataQueue(string topic);
-    public void Enqueue(string data);
-    public string? TryDequeue();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/ServerSentEventsStrategy.cs
-```csharp
-internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-    public async Task PublishEvent(string topic, string eventType, object data, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-private sealed class EventStream : IDisposable
-{
-}
-    public string StreamId { get; }
-    public string Topic { get; }
-    public string? Filter { get; }
-    public long LastEventId { get; set; }
-    public EventStream(string streamId, string topic, string? filter);
-    public bool MatchesFilter(string eventType);
-    public void QueueEvent(string sseMessage);
-    public void Dispose();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/SignalRStrategy.cs
-```csharp
-internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class SignalRConnection : IDisposable
-{
-}
-    public string ConnectionId { get; }
-    public SignalRConnectionState State { get; set; }
-    public DateTimeOffset LastPingTime { get; set; }
-    public SignalRConnection(string connectionId);
-    public void QueueMessage(string message);
+    public MoonshotMetricsCollector(IMessageBus messageBus, ILogger<MoonshotMetricsCollector> logger);
+    public Task StartCollectingAsync(CancellationToken ct);
+    public MoonshotMetrics GetMetrics(MoonshotId id);
+    public IReadOnlyList<MoonshotMetrics> GetAllMetrics();
+    public IReadOnlyList<MoonshotTrendPoint> GetTrends(MoonshotId id, string metricName, DateTimeOffset from, DateTimeOffset to);
     public void Dispose();
 }
 ```
 ```csharp
-private sealed class SignalRHub
+private sealed class MoonshotMetricState
 {
 }
-    public string Name { get; }
-    public SignalRHub(string name);
-}
-```
-```csharp
-private sealed class SignalRGroup
-{
-}
-    public string Name { get; }
-    public SignalRGroup(string name);
-    public void AddConnection(string connectionId);;
+    public long TotalInvocations;
+    public long SuccessCount;
+    public long FailureCount;
+    public readonly ConcurrentQueue<double> LatencySamples = new();
+    public DateTimeOffset WindowStart = DateTimeOffset.UtcNow;
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/SocketIoStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotDashboardStrategy.cs
 ```csharp
-internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class MoonshotDashboardStrategy
 {
 }
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class SocketIoConnection : IDisposable
-{
-}
-    public string SessionId { get; }
-    public SocketIoConnection(string sessionId);
-    public void JoinNamespace(string ns);;
-    public void LeaveNamespace(string ns);
-    public void QueuePacket(string packet);
-    public void Dispose();
-}
-```
-```csharp
-private sealed class SocketIoNamespace
-{
-}
-    public string Name { get; }
-    public SocketIoNamespace(string name);
-    public void AddConnection(string sid);;
-    public void RemoveConnection(string sid);
-    public void BroadcastEvent(string eventName, string data, BoundedDictionary<string, SocketIoConnection> connections);
+    public string Name;;
+    public string Description;;
+    public string Category;;
+    public MoonshotDashboardStrategy(MoonshotDashboardProvider provider, ILogger<MoonshotDashboardStrategy> logger);
+    public async Task<MoonshotDashboardRenderResult> RenderAsync(CancellationToken ct);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RealTime/WebSocketInterfaceStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Moonshots/Dashboard/MoonshotDashboardProvider.cs
 ```csharp
-internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class MoonshotDashboardProvider : IMoonshotDashboardProvider
 {
 }
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override async Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class WebSocketConnection : IDisposable
-{
-}
-    public string ConnectionId { get; }
-    public DateTimeOffset LastPingTime { get; set; }
-    public WebSocketConnection(string connectionId);
-    public void SendMessage(string message);
-    public void Dispose();
+    public MoonshotDashboardProvider(IMoonshotRegistry registry, MoonshotMetricsCollector metricsCollector, ILogger<MoonshotDashboardProvider> logger);
+    public Task<MoonshotDashboardSnapshot> GetSnapshotAsync(CancellationToken ct);
+    public Task<IReadOnlyList<MoonshotTrendPoint>> GetTrendsAsync(MoonshotId id, string metricName, DateTimeOffset from, DateTimeOffset to, CancellationToken ct);
+    public Task<MoonshotMetrics> GetMetricsAsync(MoonshotId id, CancellationToken ct);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/FalcorStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/CloudNative/CloudNativeStrategies.cs
 ```csharp
-internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class AwsQuickSightStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
 }
 ```
 ```csharp
-private class FalcorRequest
+public sealed class GoogleDataStudioStrategy : DashboardStrategyBase
 {
 }
-    public string? Method { get; set; }
-    public object[][]? Paths { get; set; }
-    public object? JsonGraphEnvelope { get; set; }
-    public object[]? CallPath { get; set; }
-    public object[]? Arguments { get; set; }
-    public object[]? PathSuffixes { get; set; }
-    public object[]? RefPaths { get; set; }
-    public object[]? ThisPaths { get; set; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AzurePowerBiEmbeddedStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    public async Task<string> GetEmbedTokenAsync(string dashboardId, CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/HateoasStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/PowerBiStrategy.cs
 ```csharp
-internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class PowerBiStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    protected override int RateLimitPerSecond;;
+    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/JsonApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/LookerStrategy.cs
 ```csharp
-internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class LookerStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/ODataStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/QlikStrategy.cs
 ```csharp
-internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class QlikStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private record ODataQueryOptions
-{
-}
-    public string? Filter { get; init; }
-    public string? Select { get; init; }
-    public string? OrderBy { get; init; }
-    public int Top { get; init; };
-    public int Skip { get; init; }
-    public bool Count { get; init; }
-    public string? Expand { get; init; }
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/OpenApiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/TableauStrategy.cs
 ```csharp
-internal sealed class OpenApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class TableauStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override void Configure(DashboardConnectionConfig config);
+    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
+    protected override async Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/REST/RestInterfaceStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/EnterpriseBiStrategies.cs
 ```csharp
-internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class SapAnalyticsStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+}
+```
+```csharp
+public sealed class IbmCognosStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+}
+```
+```csharp
+public sealed class MicroStrategyStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+}
+```
+```csharp
+public sealed class SisenseStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/ConnectRpcStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/OpenSource/MetabaseStrategy.cs
 ```csharp
-internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class MetabaseStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
+    protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/GrpcInterfaceStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/OpenSource/OpenSourceStrategies.cs
 ```csharp
-internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class RedashStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/GrpcWebStrategy.cs
 ```csharp
-internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken ct);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/JsonRpcStrategy.cs
 ```csharp
-internal sealed class JsonRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class GrafanaDashboardsStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/TwirpStrategy.cs
 ```csharp
-internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
+public sealed class KibanaDashboardsStrategy : DashboardStrategyBase
 {
 }
     public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/RPC/XmlRpcStrategy.cs
-```csharp
-internal sealed class XmlRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);;
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);;
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/AnomalyDetectionApiStrategy.cs
-```csharp
-internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ClientBaseline
-{
-}
-    public required string ClientId { get; init; }
-    public List<RequestPattern> RecentRequests { get; };
-    public Dictionary<string, int> PathFrequency { get; };
-    public Dictionary<string, int> MethodFrequency { get; };
-    public Dictionary<int, int> HourOfDayFrequency { get; };
-    public RunningStats PayloadSizeStats { get; };
-    public RunningStats RequestIntervalStats { get; };
-    public DateTimeOffset? LastRequestTime { get; set; }
-    public int TotalRequests { get; set; }
-}
-```
-```csharp
-private sealed class RequestPattern
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required string Method { get; init; }
-    public required string Path { get; init; }
-    public required int PayloadSize { get; init; }
-}
-```
-```csharp
-private sealed class RunningStats
-{
-}
-    public void Add(double value);
-    public double Mean;;
-    public double StdDev
-{
-    get
-    {
-        if (_count < 2)
-            return 0;
-        var variance = (_sumOfSquares - (_sum * _sum / _count)) / (_count - 1);
-        return Math.Sqrt(Math.Max(0, variance));
-    }
-}
-    public double ZScore(double value);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/CostAwareApiStrategy.cs
-```csharp
-internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ClientBudget
-{
-}
-    public required string ClientId { get; init; }
-    public decimal TotalBudget { get; set; };
-    public decimal UsedBudget { get; set; }
-    public DateTimeOffset ResetAt { get; set; }
-    public List<CostEntry> CostHistory { get; };
-}
-```
-```csharp
-private sealed class CostEntry
-{
-}
-    public required DateTimeOffset Timestamp { get; init; }
-    public required string Operation { get; init; }
-    public required decimal Cost { get; init; }
-    public required Dictionary<string, decimal> CostBreakdown { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/EdgeCachedApiStrategy.cs
-```csharp
-internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class CacheEntry
-{
-}
-    public required string ETag { get; init; }
-    public required DateTimeOffset LastModified { get; init; }
-    public required byte[] Body { get; init; }
-    public required DateTimeOffset ExpiresAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/QuantumSafeApiStrategy.cs
-```csharp
-internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/SmartRateLimitStrategy.cs
-```csharp
-internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class RateLimitTier
-{
-}
-    public required int RequestsPerMinute { get; init; }
-    public required int RequestsPerHour { get; init; }
-    public required int BurstSize { get; init; }
-}
-```
-```csharp
-private sealed class ClientRateData
-{
-}
-    public required string ClientId { get; init; }
-    public required string Tier { get; init; }
-    public ConcurrentQueue<DateTimeOffset> RequestTimestamps { get; };
-    public int TotalRequests { get; set; }
-    public DateTimeOffset? BlockedUntil { get; set; }
-    public double AbuseScore { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Security/ZeroTrustApiStrategy.cs
-```csharp
-internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
-{
-}
-    public override string StrategyId;;
-    public string DisplayName;;
-    public string SemanticDescription;;
-    public InterfaceCategory Category;;
-    public string[] Tags;;
-    public override SdkInterface.InterfaceProtocol Protocol;;
-    public override SdkInterface.InterfaceCapabilities Capabilities;;
-    protected override Task StartAsyncCore(CancellationToken cancellationToken);
-    protected override Task StopAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
 }
 ```
 
@@ -2825,334 +3157,6 @@ public sealed class AppsmithStrategy : DashboardStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/CloudNative/CloudNativeStrategies.cs
-```csharp
-public sealed class AwsQuickSightStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
-}
-```
-```csharp
-public sealed class GoogleDataStudioStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AzurePowerBiEmbeddedStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    public async Task<string> GetEmbedTokenAsync(string dashboardId, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/Embedded/EmbeddedStrategies.cs
-```csharp
-public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
-    public string GenerateEmbedHtml(string dashboardId, int width = 800, int height = 600);
-}
-```
-```csharp
-public sealed class IframeIntegrationStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    public void SetEmbedUrl(string dashboardId, string url);
-    public string GenerateIframeHtml(string dashboardId, int width = 800, int height = 600);
-}
-```
-```csharp
-public sealed class ApiRenderingStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
-    public string RenderToJson(string dashboardId);
-}
-```
-```csharp
-public sealed class WhiteLabelStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
-    public object ApplyBranding(string dashboardId, BrandingOptions branding);
-}
-```
-```csharp
-public sealed record BrandingOptions
-{
-}
-    public string? PrimaryColor { get; init; }
-    public string? SecondaryColor { get; init; }
-    public string? LogoUrl { get; init; }
-    public string? FontFamily { get; init; }
-    public string? CustomCss { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/EnterpriseBiStrategies.cs
-```csharp
-public sealed class SapAnalyticsStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-```csharp
-public sealed class IbmCognosStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-```csharp
-public sealed class MicroStrategyStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-```csharp
-public sealed class SisenseStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/LookerStrategy.cs
-```csharp
-public sealed class LookerStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/PowerBiStrategy.cs
-```csharp
-public sealed class PowerBiStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    protected override int RateLimitPerSecond;;
-    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/QlikStrategy.cs
-```csharp
-public sealed class QlikStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/EnterpriseBi/TableauStrategy.cs
-```csharp
-public sealed class TableauStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override void Configure(DashboardConnectionConfig config);
-    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken cancellationToken);
-    protected override async Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken cancellationToken);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs
 ```csharp
 public sealed class PdfGenerationStrategy : DashboardStrategyBase
@@ -3341,107 +3345,6 @@ public sealed class EmailDeliveryResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/OpenSource/MetabaseStrategy.cs
-```csharp
-public sealed class MetabaseStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken cancellationToken = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken cancellationToken = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken cancellationToken);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken cancellationToken);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken cancellationToken);
-    protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/OpenSource/OpenSourceStrategies.cs
-```csharp
-public sealed class RedashStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-```csharp
-public sealed class ApacheSupersetStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-    protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class GrafanaDashboardsStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-```csharp
-public sealed class KibanaDashboardsStrategy : DashboardStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string VendorName;;
-    public override string Category;;
-    public override DashboardCapabilities Capabilities { get; };
-    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
-    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
-    public override async Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
-    protected override async Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
-    protected override async Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
-    protected override async Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/RealTime/RealTimeStrategies.cs
 ```csharp
 public sealed class LiveDashboardStrategy : DashboardStrategyBase
@@ -3546,5 +3449,102 @@ public sealed class DashboardEvent
     public required string TargetId { get; init; }
     public IReadOnlyList<IReadOnlyDictionary<string, object>>? Data { get; init; }
     public DateTimeOffset Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Dashboards/Embedded/EmbeddedStrategies.cs
+```csharp
+public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
+    public string GenerateEmbedHtml(string dashboardId, int width = 800, int height = 600);
+}
+```
+```csharp
+public sealed class IframeIntegrationStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    public void SetEmbedUrl(string dashboardId, string url);
+    public string GenerateIframeHtml(string dashboardId, int width = 800, int height = 600);
+}
+```
+```csharp
+public sealed class ApiRenderingStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override async Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override async Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
+    public string RenderToJson(string dashboardId);
+}
+```
+```csharp
+public sealed class WhiteLabelStrategy : DashboardStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string VendorName;;
+    public override string Category;;
+    public override DashboardCapabilities Capabilities { get; };
+    public override Task<bool> TestConnectionAsync(CancellationToken ct = default);
+    public override Task<DataPushResult> PushDataAsync(string targetId, IReadOnlyList<IReadOnlyDictionary<string, object>> data, CancellationToken ct = default);
+    public override Task<Dashboard> ProvisionDashboardAsync(Dashboard dashboard, DashboardProvisionOptions? options = null, CancellationToken ct = default);
+    protected override Task<Dashboard> CreateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> UpdateDashboardCoreAsync(Dashboard dashboard, CancellationToken ct);
+    protected override Task<Dashboard> GetDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct);
+    protected override Task<IReadOnlyList<Dashboard>> ListDashboardsCoreAsync(DashboardFilter? filter, CancellationToken ct);
+    protected override Task<Dashboard> CreateFromTemplateCoreAsync(string templateId, IReadOnlyDictionary<string, object>? parameters, CancellationToken ct);
+    public object ApplyBranding(string dashboardId, BrandingOptions branding);
+}
+```
+```csharp
+public sealed record BrandingOptions
+{
+}
+    public string? PrimaryColor { get; init; }
+    public string? SecondaryColor { get; init; }
+    public string? LogoUrl { get; init; }
+    public string? FontFamily { get; init; }
+    public string? CustomCss { get; init; }
 }
 ```

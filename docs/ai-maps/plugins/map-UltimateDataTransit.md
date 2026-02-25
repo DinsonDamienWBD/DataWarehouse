@@ -47,6 +47,22 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Scaling/TransitScalingMigration.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 88-13: DataTransit plugin BoundedCache migration")]
+public sealed class TransitScalingMigration : IDisposable
+{
+}
+    public TransitScalingMigration(ScalingLimits? limits = null);
+    public BoundedCache<string, byte[]> TransferState;;
+    public BoundedCache<string, byte[]> RouteCache;;
+    public BoundedCache<string, byte[]> QosState;;
+    public BoundedCache<string, byte[]> CostRoutingTable;;
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public void Dispose();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Audit/TransitAuditService.cs
 ```csharp
 internal sealed class TransitAuditService
@@ -58,66 +74,6 @@ internal sealed class TransitAuditService
     public IReadOnlyList<TransitAuditEntry> GetRecentEntries(int count);
     public long GetTotalEntries();
     public void PurgeOlderThan(DateTime cutoff);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Layers/CompressionInTransitLayer.cs
-```csharp
-internal sealed class CompressionInTransitLayer : IDataTransitStrategy
-{
-}
-    public CompressionInTransitLayer(IDataTransitStrategy inner, IMessageBus messageBus);
-    public string StrategyId;;
-    public string Name;;
-    public TransitCapabilities Capabilities;;
-    public async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public Task CancelTransferAsync(string transferId, CancellationToken ct = default);
-    public Task<TransitHealthStatus> GetHealthAsync(CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Layers/EncryptionInTransitLayer.cs
-```csharp
-internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
-{
-}
-    public EncryptionInTransitLayer(IDataTransitStrategy inner, IMessageBus messageBus);
-    public string StrategyId;;
-    public string Name;;
-    public TransitCapabilities Capabilities;;
-    public async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public Task CancelTransferAsync(string transferId, CancellationToken ct = default);
-    public Task<TransitHealthStatus> GetHealthAsync(CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/QoS/CostAwareRouter.cs
-```csharp
-internal sealed record TransitRoute
-{
-}
-    public string RouteId { get; init; };
-    public string StrategyId { get; init; };
-    public TransitEndpoint? Endpoint { get; init; }
-    public TransitCostProfile CostProfile { get; init; };
-    public double EstimatedLatencyMs { get; init; }
-    public double EstimatedThroughputBytesPerSec { get; init; }
-}
-```
-```csharp
-internal sealed class CostAwareRouter
-{
-}
-    public CostAwareRouter(RoutingPolicy defaultPolicy = RoutingPolicy.Balanced);
-    public void RegisterCostProfile(string strategyId, TransitCostProfile profile);
-    public TransitCostProfile? GetCostProfile(string strategyId);
-    public TransitRoute SelectRoute(IReadOnlyList<TransitRoute> candidates, TransitRequest request, RoutingPolicy? overridePolicy = null);
-    public decimal EstimateTransferCost(string strategyId, long sizeBytes);
-    public IReadOnlyList<(TransitRoute Route, decimal Cost)> RankRoutesByCost(IReadOnlyList<TransitRoute> routes, long sizeBytes);
 }
 ```
 
@@ -197,104 +153,63 @@ internal sealed class ThrottledStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Scaling/TransitScalingMigration.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/QoS/CostAwareRouter.cs
 ```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-13: DataTransit plugin BoundedCache migration")]
-public sealed class TransitScalingMigration : IDisposable
+internal sealed record TransitRoute
 {
 }
-    public TransitScalingMigration(ScalingLimits? limits = null);
-    public BoundedCache<string, byte[]> TransferState;;
-    public BoundedCache<string, byte[]> RouteCache;;
-    public BoundedCache<string, byte[]> QosState;;
-    public BoundedCache<string, byte[]> CostRoutingTable;;
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public void Dispose();
+    public string RouteId { get; init; };
+    public string StrategyId { get; init; };
+    public TransitEndpoint? Endpoint { get; init; }
+    public TransitCostProfile CostProfile { get; init; };
+    public double EstimatedLatencyMs { get; init; }
+    public double EstimatedThroughputBytesPerSec { get; init; }
+}
+```
+```csharp
+internal sealed class CostAwareRouter
+{
+}
+    public CostAwareRouter(RoutingPolicy defaultPolicy = RoutingPolicy.Balanced);
+    public void RegisterCostProfile(string strategyId, TransitCostProfile profile);
+    public TransitCostProfile? GetCostProfile(string strategyId);
+    public TransitRoute SelectRoute(IReadOnlyList<TransitRoute> candidates, TransitRequest request, RoutingPolicy? overridePolicy = null);
+    public decimal EstimateTransferCost(string strategyId, long sizeBytes);
+    public IReadOnlyList<(TransitRoute Route, decimal Cost)> RankRoutesByCost(IReadOnlyList<TransitRoute> routes, long sizeBytes);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Chunked/ChunkedResumableStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Layers/EncryptionInTransitLayer.cs
 ```csharp
-internal sealed class ChunkedResumableStrategy : DataTransitStrategyBase
+internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
 {
 }
-    public override string StrategyId;;
-    public override string Name;;
-    public override TransitCapabilities Capabilities;;
-    public ChunkedResumableStrategy();
-    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    internal sealed class ChunkManifest;
-    internal sealed class ChunkInfo;
-}
-```
-```csharp
-internal sealed class ChunkManifest
-{
-}
-    public required string TransferId { get; init; }
-    public required long TotalSize { get; init; }
-    public required int ChunkSizeBytes { get; init; }
-    public required List<ChunkInfo> Chunks { get; init; }
-    public TransitRequest? Request { get; set; }
-}
-```
-```csharp
-internal sealed class ChunkInfo
-{
-}
-    public required int Index { get; init; }
-    public required long Offset { get; init; }
-    public required int Size { get; init; }
-    public string? Sha256Hash { get; set; }
-    public bool Completed { get; set; }
+    public EncryptionInTransitLayer(IDataTransitStrategy inner, IMessageBus messageBus);
+    public string StrategyId;;
+    public string Name;;
+    public TransitCapabilities Capabilities;;
+    public async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public Task CancelTransferAsync(string transferId, CancellationToken ct = default);
+    public Task<TransitHealthStatus> GetHealthAsync(CancellationToken ct = default);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Chunked/DeltaDifferentialStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Layers/CompressionInTransitLayer.cs
 ```csharp
-internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
+internal sealed class CompressionInTransitLayer : IDataTransitStrategy
 {
 }
-    public override string StrategyId;;
-    public override string Name;;
-    public override TransitCapabilities Capabilities;;
-    public DeltaDifferentialStrategy();
-    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    internal sealed class RollingHashComputer;
-    internal sealed record BlockSignature(int Index, long Offset, int Size, uint WeakHash, byte[] StrongHash);;
-}
-```
-```csharp
-internal sealed class RollingHashComputer
-{
-}
-    public uint ComputeAdler32(ReadOnlySpan<byte> data);
-    public byte[] ComputeStrongHash(ReadOnlySpan<byte> data);
-    public uint RollHash(uint currentHash, byte removedByte, byte addedByte, int blockSize);
-}
-```
-```csharp
-private sealed class BlockSignatureDto
-{
-}
-    public int Index { get; set; }
-    public long Offset { get; set; }
-    public int Size { get; set; }
-    public uint WeakHash { get; set; }
-    public string StrongHash { get; set; };
-}
-```
-```csharp
-private sealed class DeltaInstruction
-{
-}
-    public required DeltaInstructionType Type { get; init; }
-    public int DestBlockIndex { get; init; }
-    public required int SourceOffset { get; init; }
-    public required int Length { get; init; }
+    public CompressionInTransitLayer(IDataTransitStrategy inner, IMessageBus messageBus);
+    public string StrategyId;;
+    public string Name;;
+    public TransitCapabilities Capabilities;;
+    public async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public Task CancelTransferAsync(string transferId, CancellationToken ct = default);
+    public Task<TransitHealthStatus> GetHealthAsync(CancellationToken ct = default);
 }
 ```
 
@@ -331,15 +246,28 @@ private sealed class FtpHashingStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/GrpcStreamingTransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/SftpTransitStrategy.cs
 ```csharp
-internal sealed class GrpcStreamingTransitStrategy : DataTransitStrategyBase
+internal sealed class SftpTransitStrategy : DataTransitStrategyBase
 {
 }
     public override string StrategyId;;
     public override string Name;;
     public override TransitCapabilities Capabilities;;
-    public GrpcStreamingTransitStrategy();
+    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/Http3TransitStrategy.cs
+```csharp
+internal sealed class Http3TransitStrategy : DataTransitStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override TransitCapabilities Capabilities;;
+    public Http3TransitStrategy();
     public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
     public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
 }
@@ -386,20 +314,6 @@ private sealed class HashingProgressStream : Stream
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/Http3TransitStrategy.cs
-```csharp
-internal sealed class Http3TransitStrategy : DataTransitStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override TransitCapabilities Capabilities;;
-    public Http3TransitStrategy();
-    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/ScpRsyncTransitStrategy.cs
 ```csharp
 internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
@@ -413,125 +327,17 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/SftpTransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Direct/GrpcStreamingTransitStrategy.cs
 ```csharp
-internal sealed class SftpTransitStrategy : DataTransitStrategyBase
+internal sealed class GrpcStreamingTransitStrategy : DataTransitStrategyBase
 {
 }
     public override string StrategyId;;
     public override string Name;;
     public override TransitCapabilities Capabilities;;
+    public GrpcStreamingTransitStrategy();
     public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
     public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Distributed/MultiPathParallelStrategy.cs
-```csharp
-internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override TransitCapabilities Capabilities;;
-    public MultiPathParallelStrategy();
-    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    internal sealed class PathInfo;
-    internal sealed class DataSegment;
-    internal sealed class TransferState;
-}
-```
-```csharp
-internal sealed class PathInfo
-{
-}
-    public required string PathId { get; init; }
-    public required string EndpointUri { get; init; }
-    public double LatencyMs { get; set; }
-    public double ThroughputBytesPerSec { get; set; }
-    public double ErrorRate { get; set; }
-    public double Score { get; set; }
-    public long BytesAssigned { get; set; }
-    public long BytesCompleted { get; set; }
-    public bool IsHealthy { get; set; }
-    public int Attempts { get; set; }
-    public int Failures { get; set; }
-    public object Lock { get; init; };
-}
-```
-```csharp
-internal sealed class DataSegment
-{
-}
-    public required int Index { get; init; }
-    public required long Offset { get; init; }
-    public required long Size { get; init; }
-    public required string AssignedPathId { get; set; }
-    public bool Completed { get; set; }
-}
-```
-```csharp
-internal sealed class TransferState
-{
-}
-    public required string TransferId { get; init; }
-    public required long TotalSize { get; init; }
-    public required List<PathInfo> Paths { get; set; }
-    public required List<DataSegment> Segments { get; init; }
-    public long BytesTransferred;
-    public TransitRequest? Request { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Distributed/P2PSwarmStrategy.cs
-```csharp
-internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override TransitCapabilities Capabilities;;
-    public P2PSwarmStrategy();
-    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
-    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
-    internal sealed record SwarmPeer(string PeerId, string EndpointUri, bool[] PieceBitmap, int ActiveDownloads, long BytesDownloaded, DateTime LastSeen);;
-    internal sealed record PieceInfo(int Index, long Offset, int Size, byte[] Sha256Hash, bool Downloaded);;
-    internal sealed class SwarmState;
-}
-```
-```csharp
-internal sealed class SwarmState
-{
-}
-    public required string TransferId { get; init; }
-    public required long TotalSize { get; init; }
-    public required int PieceSize { get; init; }
-    public required PieceInfo[] Pieces { get; init; }
-    public required BoundedDictionary<string, SwarmPeer> Peers { get; init; }
-    public required Channel<int> PieceQueue { get; set; }
-    public required int ConcurrentDownloadLimit { get; init; }
-    public TransitRequest? Request { get; init; }
-}
-```
-```csharp
-private sealed class TrackerResponse
-{
-}
-    public List<TrackerPeer>? Peers { get; set; }
-}
-```
-```csharp
-private sealed class TrackerPeer
-{
-}
-    public string PeerId { get; set; };
-    public string EndpointUri { get; set; };
-    public bool[]? PieceBitmap { get; set; }
 }
 ```
 
@@ -648,5 +454,199 @@ internal sealed record PackageEntry
     public long SizeBytes { get; init; }
     public string Sha256Hash { get; init; };
     public DateTime ModifiedAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Chunked/DeltaDifferentialStrategy.cs
+```csharp
+internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override TransitCapabilities Capabilities;;
+    public DeltaDifferentialStrategy();
+    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    internal sealed class RollingHashComputer;
+    internal sealed record BlockSignature(int Index, long Offset, int Size, uint WeakHash, byte[] StrongHash);;
+}
+```
+```csharp
+internal sealed class RollingHashComputer
+{
+}
+    public uint ComputeAdler32(ReadOnlySpan<byte> data);
+    public byte[] ComputeStrongHash(ReadOnlySpan<byte> data);
+    public uint RollHash(uint currentHash, byte removedByte, byte addedByte, int blockSize);
+}
+```
+```csharp
+private sealed class BlockSignatureDto
+{
+}
+    public int Index { get; set; }
+    public long Offset { get; set; }
+    public int Size { get; set; }
+    public uint WeakHash { get; set; }
+    public string StrongHash { get; set; };
+}
+```
+```csharp
+private sealed class DeltaInstruction
+{
+}
+    public required DeltaInstructionType Type { get; init; }
+    public int DestBlockIndex { get; init; }
+    public required int SourceOffset { get; init; }
+    public required int Length { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Chunked/ChunkedResumableStrategy.cs
+```csharp
+internal sealed class ChunkedResumableStrategy : DataTransitStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override TransitCapabilities Capabilities;;
+    public ChunkedResumableStrategy();
+    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    internal sealed class ChunkManifest;
+    internal sealed class ChunkInfo;
+}
+```
+```csharp
+internal sealed class ChunkManifest
+{
+}
+    public required string TransferId { get; init; }
+    public required long TotalSize { get; init; }
+    public required int ChunkSizeBytes { get; init; }
+    public required List<ChunkInfo> Chunks { get; init; }
+    public TransitRequest? Request { get; set; }
+}
+```
+```csharp
+internal sealed class ChunkInfo
+{
+}
+    public required int Index { get; init; }
+    public required long Offset { get; init; }
+    public required int Size { get; init; }
+    public string? Sha256Hash { get; set; }
+    public bool Completed { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Distributed/P2PSwarmStrategy.cs
+```csharp
+internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override TransitCapabilities Capabilities;;
+    public P2PSwarmStrategy();
+    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    internal sealed record SwarmPeer(string PeerId, string EndpointUri, bool[] PieceBitmap, int ActiveDownloads, long BytesDownloaded, DateTime LastSeen);;
+    internal sealed record PieceInfo(int Index, long Offset, int Size, byte[] Sha256Hash, bool Downloaded);;
+    internal sealed class SwarmState;
+}
+```
+```csharp
+internal sealed class SwarmState
+{
+}
+    public required string TransferId { get; init; }
+    public required long TotalSize { get; init; }
+    public required int PieceSize { get; init; }
+    public required PieceInfo[] Pieces { get; init; }
+    public required BoundedDictionary<string, SwarmPeer> Peers { get; init; }
+    public required Channel<int> PieceQueue { get; set; }
+    public required int ConcurrentDownloadLimit { get; init; }
+    public TransitRequest? Request { get; init; }
+}
+```
+```csharp
+private sealed class TrackerResponse
+{
+}
+    public List<TrackerPeer>? Peers { get; set; }
+}
+```
+```csharp
+private sealed class TrackerPeer
+{
+}
+    public string PeerId { get; set; };
+    public string EndpointUri { get; set; };
+    public bool[]? PieceBitmap { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataTransit/Strategies/Distributed/MultiPathParallelStrategy.cs
+```csharp
+internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override TransitCapabilities Capabilities;;
+    public MultiPathParallelStrategy();
+    public override async Task<bool> IsAvailableAsync(TransitEndpoint endpoint, CancellationToken ct = default);
+    public override async Task<TransitResult> TransferAsync(TransitRequest request, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    public override async Task<TransitResult> ResumeTransferAsync(string transferId, IProgress<TransitProgress>? progress = null, CancellationToken ct = default);
+    internal sealed class PathInfo;
+    internal sealed class DataSegment;
+    internal sealed class TransferState;
+}
+```
+```csharp
+internal sealed class PathInfo
+{
+}
+    public required string PathId { get; init; }
+    public required string EndpointUri { get; init; }
+    public double LatencyMs { get; set; }
+    public double ThroughputBytesPerSec { get; set; }
+    public double ErrorRate { get; set; }
+    public double Score { get; set; }
+    public long BytesAssigned { get; set; }
+    public long BytesCompleted { get; set; }
+    public bool IsHealthy { get; set; }
+    public int Attempts { get; set; }
+    public int Failures { get; set; }
+    public object Lock { get; init; };
+}
+```
+```csharp
+internal sealed class DataSegment
+{
+}
+    public required int Index { get; init; }
+    public required long Offset { get; init; }
+    public required long Size { get; init; }
+    public required string AssignedPathId { get; set; }
+    public bool Completed { get; set; }
+}
+```
+```csharp
+internal sealed class TransferState
+{
+}
+    public required string TransferId { get; init; }
+    public required long TotalSize { get; init; }
+    public required List<PathInfo> Paths { get; set; }
+    public required List<DataSegment> Segments { get; init; }
+    public long BytesTransferred;
+    public TransitRequest? Request { get; init; }
 }
 ```

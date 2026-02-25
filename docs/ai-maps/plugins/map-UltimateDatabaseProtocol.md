@@ -584,6 +584,283 @@ public static class ProtocolCompressionExtensions
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Specialized/SpecializedProtocolStrategies.cs
+```csharp
+public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+```csharp
+public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class DruidProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class PrestoProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs
+```csharp
+public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    public void RegisterTable(string tableName, VirtualTableSchema schema);
+    public bool UnregisterTable(string tableName);
+    public IReadOnlyList<string> ListTables();
+    public void SetFileReader(Func<string, CancellationToken, Task<Stream?>> fileReader);
+    public VirtualTableSchema InferCsvSchema(string tableName, string csvHeader, char delimiter = ',');
+    public VirtualTableSchema InferJsonSchema(string tableName, string sampleJson);
+    public long TotalQueriesExecuted;;
+    public long TotalBytesScanned;;
+    public long CacheHits;;
+    public long CacheMisses;;
+    public string SupportedSqlDialect;;
+    public IReadOnlyList<string> SupportedFileFormats;;
+    public sealed class VirtualTableSchema;
+    public sealed class VirtualColumn;
+}
+```
+```csharp
+public sealed class VirtualTableSchema
+{
+}
+    public string TableName { get; init; };
+    public string Format { get; init; };
+    public string? SourcePath { get; init; }
+    public List<VirtualColumn> Columns { get; init; };
+}
+```
+```csharp
+public sealed class VirtualColumn
+{
+}
+    public string Name { get; init; };
+    public string DataType { get; init; };
+    public bool IsNullable { get; init; };
+    public bool IsPartitionKey { get; init; }
+}
+```
+```csharp
+private sealed class CachedTableData
+{
+}
+    public List<Dictionary<string, object?>> Rows { get; init; };
+    public DateTime ExpiresAt { get; init; }
+}
+```
+```csharp
+private sealed class CachedQueryResult
+{
+}
+    public QueryResult Result { get; init; };
+    public DateTime ExpiresAt { get; init; }
+}
+```
+```csharp
+private sealed class PartitionMetadata
+{
+}
+    public string TableName { get; init; };
+    public List<string> PartitionKeys { get; init; };
+    public List<Dictionary<string, string>> Partitions { get; init; };
+}
+```
+```csharp
+private sealed class ParsedQuery
+{
+}
+    public string TableName { get; set; };
+    public List<string>? SelectedColumns { get; set; }
+    public string? WhereClause { get; set; }
+    public List<string>? GroupByColumns { get; set; }
+    public List<string>? OrderByColumns { get; set; }
+    public int Limit { get; set; }
+    public List<AggregationFunction>? AggregationFunctions { get; set; }
+}
+```
+```csharp
+private sealed class AggregationFunction
+{
+}
+    public string Function { get; init; };
+    public string Column { get; init; };
+    public string Alias { get; init; };
+}
+```
+```csharp
+private sealed class WhereCondition
+{
+}
+    public string Column { get; init; };
+    public string Operator { get; init; };
+    public string Value { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/NewSQL/NewSqlProtocolStrategies.cs
+```csharp
+public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+```csharp
+public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+```csharp
+public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/CloudDW/CloudDataWarehouseStrategies.cs
 ```csharp
 public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
@@ -679,180 +956,6 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Driver/DriverProtocolStrategies.cs
-```csharp
-public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-private class JdbcResponse
-{
-}
-    public bool Success { get; set; }
-    public string? Error { get; set; }
-    public string? SessionId { get; set; }
-    public string? TransactionId { get; set; }
-    public long RowsAffected { get; set; }
-}
-```
-```csharp
-private sealed class JdbcQueryResponse : JdbcResponse
-{
-}
-    public List<Dictionary<string, object?>>? Rows { get; set; }
-}
-```
-```csharp
-public sealed class OdbcDriverProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs
-```csharp
-public sealed class SqliteProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class DuckDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Graph/AdditionalGraphStrategies.cs
 ```csharp
 public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
@@ -909,6 +1012,27 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override async Task<bool> PingCoreAsync(CancellationToken ct);
     protected override Task CleanupConnectionAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Graph/Neo4jBoltProtocolStrategy.cs
+```csharp
+public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
 }
 ```
 
@@ -985,187 +1109,6 @@ public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBas
     protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override async Task<bool> PingCoreAsync(CancellationToken ct);
     protected override async Task CleanupConnectionAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Graph/Neo4jBoltProtocolStrategy.cs
-```csharp
-public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Messaging/MessageQueueProtocolStrategies.cs
-```csharp
-public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-```csharp
-public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-```csharp
-private sealed class AmqpFrame
-{
-}
-    public byte Type { get; init; }
-    public ushort Channel { get; init; }
-    public byte[] Payload { get; init; };
-}
-```
-```csharp
-public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/NewSQL/NewSqlProtocolStrategies.cs
-```csharp
-public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-```csharp
-public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-```csharp
-public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
 }
 ```
 
@@ -1266,6 +1209,147 @@ private sealed class RedisException : Exception
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Driver/DriverProtocolStrategies.cs
+```csharp
+public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+private class JdbcResponse
+{
+}
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public string? SessionId { get; set; }
+    public string? TransactionId { get; set; }
+    public long RowsAffected { get; set; }
+}
+```
+```csharp
+private sealed class JdbcQueryResponse : JdbcResponse
+{
+}
+    public List<Dictionary<string, object?>>? Rows { get; set; }
+}
+```
+```csharp
+public sealed class OdbcDriverProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL SQL integration (ECOS-02)")]
+public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
+{
+}
+    public char TransactionStatus;;
+    public PostgreSqlSqlEngineIntegration(IDataSourceProvider vdeDataSource, PostgreSqlCatalogProvider catalogProvider);
+    public async Task<PostgreSqlQueryResult> ExecuteSimpleQueryAsync(string sql, CancellationToken ct);
+    public async Task<PostgreSqlQueryResult> ExecuteExtendedQueryAsync(ParsedStatement parsed, BindParameters bind, int maxRows, CancellationToken ct);
+    public Task<PreparedStatementDescription> PrepareStatementAsync(string name, string sql, int[] paramOids, CancellationToken ct);
+    public ParsedStatement? GetPreparedStatement(string name);
+    public void ClosePreparedStatement(string name);
+    public Task BeginTransactionAsync();
+    public Task CommitTransactionAsync();
+    public Task RollbackTransactionAsync();
+    public IAsyncEnumerable<ColumnarBatch> GetTableData(string tableName, List<string>? columns, CancellationToken ct);
+    public TableStatistics? GetTableStatistics(string tableName);
+}
+```
+```csharp
+private sealed class VdeStatisticsProvider : ITableStatisticsProvider
+{
+}
+    public VdeStatisticsProvider(IDataSourceProvider source);;
+    public TableStatistics? GetStatistics(string tableName);;
+}
+```
+```csharp
+public sealed class PostgreSqlQueryResult
+{
+}
+    public required IReadOnlyList<PostgreSqlFieldDescription> RowDescription { get; init; }
+    public required IReadOnlyList<List<byte[]?>> DataRows { get; init; }
+    public required string CommandTag { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? ErrorCode { get; init; }
+    public bool PortalSuspended { get; init; }
+}
+```
+```csharp
+public sealed class BindParameters
+{
+}
+    public IReadOnlyList<object?> Values { get; init; };
+    public IReadOnlyList<short> FormatCodes { get; init; };
+    public IReadOnlyList<short> ResultFormatCodes { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlCatalogProvider.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL catalog provider (ECOS-02)")]
+public sealed class PostgreSqlCatalogProvider
+{
+}
+    public Func<CancellationToken, Task<IReadOnlyList<string>>>? GetTableNamesAsync { get; set; }
+    public Func<string, CancellationToken, Task<IReadOnlyList<CatalogColumnInfo>>>? GetTableColumnsAsync { get; set; }
+    public PostgreSqlCatalogProvider(IDataSourceProvider vdeDataSource);
+    public bool IsCatalogQuery(string sql);
+    public async Task<PostgreSqlQueryResult> HandleCatalogQuery(string sql, CancellationToken ct);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/MySqlProtocolStrategy.cs
 ```csharp
 public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
@@ -1281,6 +1365,61 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlTypeMapping.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL OID type mapping (ECOS-02)")]
+public static class PostgreSqlTypeMapping
+{
+}
+    public static int ToOid(ColumnDataType type);;
+    public static ColumnDataType FromOid(int oid);;
+    public static string ToPostgresTypeName(ColumnDataType type);;
+    public static short GetTypeSize(int oid);;
+    public static int GetTypeModifier(int oid);;
+    public static short GetFormatCode(int oid);;
+    public static byte[] SerializeValue(object? value, ColumnDataType type, bool binaryFormat);
+    public static object? DeserializeValue(ReadOnlySpan<byte> data, int oid, bool binaryFormat);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlProtocolStrategy.cs
+```csharp
+public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    public char TransactionStatus;;
+    public IReadOnlyDictionary<string, string> ServerParameters;;
+    public int BackendProcessId;;
+    protected override async Task NotifySslUpgradeAsync(CancellationToken ct);
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    public async Task SendCancelRequestAsync(string host, int port, CancellationToken ct);
+    public async Task<long> CopyInAsync(string copyCommand, Func<IAsyncEnumerable<byte[]>> dataProvider, CancellationToken ct);
+    public async IAsyncEnumerable<byte[]> CopyOutAsync(string copyCommand, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct);
+    public bool TryGetNotification(out PostgreSqlNotification? notification);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlWireVerification.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL wire verification (ECOS-01)")]
+public sealed class PostgreSqlWireVerification
+{
+}
+    public PostgreSqlProtocolCoverage GetProtocolCoverage();
+    public StartupSequenceVerification VerifyStartupSequence(Stream mockStream);
+    public ExtendedQuerySequenceVerification VerifyExtendedQuerySequence(Stream mockStream);
+    public IReadOnlyDictionary<string, string> GetCompatibilityMatrix();
 }
 ```
 
@@ -1338,125 +1477,6 @@ private sealed class DrdaObject
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlCatalogProvider.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL catalog provider (ECOS-02)")]
-public sealed class PostgreSqlCatalogProvider
-{
-}
-    public Func<CancellationToken, Task<IReadOnlyList<string>>>? GetTableNamesAsync { get; set; }
-    public Func<string, CancellationToken, Task<IReadOnlyList<CatalogColumnInfo>>>? GetTableColumnsAsync { get; set; }
-    public PostgreSqlCatalogProvider(IDataSourceProvider vdeDataSource);
-    public bool IsCatalogQuery(string sql);
-    public async Task<PostgreSqlQueryResult> HandleCatalogQuery(string sql, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlProtocolStrategy.cs
-```csharp
-public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    public char TransactionStatus;;
-    public IReadOnlyDictionary<string, string> ServerParameters;;
-    public int BackendProcessId;;
-    protected override async Task NotifySslUpgradeAsync(CancellationToken ct);
-    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    public async Task SendCancelRequestAsync(string host, int port, CancellationToken ct);
-    public async Task<long> CopyInAsync(string copyCommand, Func<IAsyncEnumerable<byte[]>> dataProvider, CancellationToken ct);
-    public async IAsyncEnumerable<byte[]> CopyOutAsync(string copyCommand, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct);
-    public bool TryGetNotification(out PostgreSqlNotification? notification);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL SQL integration (ECOS-02)")]
-public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
-{
-}
-    public char TransactionStatus;;
-    public PostgreSqlSqlEngineIntegration(IDataSourceProvider vdeDataSource, PostgreSqlCatalogProvider catalogProvider);
-    public async Task<PostgreSqlQueryResult> ExecuteSimpleQueryAsync(string sql, CancellationToken ct);
-    public async Task<PostgreSqlQueryResult> ExecuteExtendedQueryAsync(ParsedStatement parsed, BindParameters bind, int maxRows, CancellationToken ct);
-    public Task<PreparedStatementDescription> PrepareStatementAsync(string name, string sql, int[] paramOids, CancellationToken ct);
-    public ParsedStatement? GetPreparedStatement(string name);
-    public void ClosePreparedStatement(string name);
-    public Task BeginTransactionAsync();
-    public Task CommitTransactionAsync();
-    public Task RollbackTransactionAsync();
-    public IAsyncEnumerable<ColumnarBatch> GetTableData(string tableName, List<string>? columns, CancellationToken ct);
-    public TableStatistics? GetTableStatistics(string tableName);
-}
-```
-```csharp
-private sealed class VdeStatisticsProvider : ITableStatisticsProvider
-{
-}
-    public VdeStatisticsProvider(IDataSourceProvider source);;
-    public TableStatistics? GetStatistics(string tableName);;
-}
-```
-```csharp
-public sealed class PostgreSqlQueryResult
-{
-}
-    public required IReadOnlyList<PostgreSqlFieldDescription> RowDescription { get; init; }
-    public required IReadOnlyList<List<byte[]?>> DataRows { get; init; }
-    public required string CommandTag { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? ErrorCode { get; init; }
-    public bool PortalSuspended { get; init; }
-}
-```
-```csharp
-public sealed class BindParameters
-{
-}
-    public IReadOnlyList<object?> Values { get; init; };
-    public IReadOnlyList<short> FormatCodes { get; init; };
-    public IReadOnlyList<short> ResultFormatCodes { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlTypeMapping.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL OID type mapping (ECOS-02)")]
-public static class PostgreSqlTypeMapping
-{
-}
-    public static int ToOid(ColumnDataType type);;
-    public static ColumnDataType FromOid(int oid);;
-    public static string ToPostgresTypeName(ColumnDataType type);;
-    public static short GetTypeSize(int oid);;
-    public static int GetTypeModifier(int oid);;
-    public static short GetFormatCode(int oid);;
-    public static byte[] SerializeValue(object? value, ColumnDataType type, bool binaryFormat);
-    public static object? DeserializeValue(ReadOnlySpan<byte> data, int oid, bool binaryFormat);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlWireVerification.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 89: PostgreSQL wire verification (ECOS-01)")]
-public sealed class PostgreSqlWireVerification
-{
-}
-    public PostgreSqlProtocolCoverage GetProtocolCoverage();
-    public StartupSequenceVerification VerifyStartupSequence(Stream mockStream);
-    public ExtendedQuerySequenceVerification VerifyExtendedQuerySequence(Stream mockStream);
-    public IReadOnlyDictionary<string, string> GetCompatibilityMatrix();
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs
 ```csharp
 public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
@@ -1472,6 +1492,82 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs
+```csharp
+public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class QuestDbIlpProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+```csharp
+public sealed class TimescaleDbProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);;
+    protected override async Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
+}
+```
+```csharp
+public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
 }
 ```
 
@@ -1585,183 +1681,74 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Specialized/SpecializedProtocolStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Messaging/MessageQueueProtocolStrategies.cs
 ```csharp
-public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
+public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+}
+```
+```csharp
+public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
     protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-}
-```
-```csharp
-public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
     protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
     protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
     protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class DruidProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class PrestoProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
-    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override async Task CleanupConnectionAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs
-```csharp
-public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class QuestDbIlpProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override Task<bool> PingCoreAsync(CancellationToken ct);
 }
 ```
 ```csharp
-public sealed class TimescaleDbProtocolStrategy : DatabaseProtocolStrategyBase
+private sealed class AmqpFrame
+{
+}
+    public byte Type { get; init; }
+    public ushort Channel { get; init; }
+    public byte[] Payload { get; init; };
+}
+```
+```csharp
+public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
+    protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
     protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override Task<bool> PingCoreAsync(CancellationToken ct);;
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
     protected override async Task CleanupConnectionAsync();
 }
 ```
 ```csharp
-public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
+public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
 {
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-```csharp
-public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override ProtocolInfo ProtocolInfo;;
-    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);;
-    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
-    protected override Task CleanupConnectionAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs
-```csharp
-public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
-{
-#endregion
 }
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1770,95 +1757,108 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
     protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
-    public void RegisterTable(string tableName, VirtualTableSchema schema);
-    public bool UnregisterTable(string tableName);
-    public IReadOnlyList<string> ListTables();
-    public void SetFileReader(Func<string, CancellationToken, Task<Stream?>> fileReader);
-    public VirtualTableSchema InferCsvSchema(string tableName, string csvHeader, char delimiter = ',');
-    public VirtualTableSchema InferJsonSchema(string tableName, string sampleJson);
-    public long TotalQueriesExecuted;;
-    public long TotalBytesScanned;;
-    public long CacheHits;;
-    public long CacheMisses;;
-    public string SupportedSqlDialect;;
-    public IReadOnlyList<string> SupportedFileFormats;;
-    public sealed class VirtualTableSchema;
-    public sealed class VirtualColumn;
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override async Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs
+```csharp
+public sealed class SqliteProtocolStrategy : DatabaseProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
 }
 ```
 ```csharp
-public sealed class VirtualTableSchema
+public sealed class DuckDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
-    public string TableName { get; init; };
-    public string Format { get; init; };
-    public string? SourcePath { get; init; }
-    public List<VirtualColumn> Columns { get; init; };
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override async Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override async Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override async Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override async Task CleanupConnectionAsync();
 }
 ```
 ```csharp
-public sealed class VirtualColumn
+public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
-    public string Name { get; init; };
-    public string DataType { get; init; };
-    public bool IsNullable { get; init; };
-    public bool IsPartitionKey { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
 }
 ```
 ```csharp
-private sealed class CachedTableData
+public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
-    public List<Dictionary<string, object?>> Rows { get; init; };
-    public DateTime ExpiresAt { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
 }
 ```
 ```csharp
-private sealed class CachedQueryResult
+public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
-    public QueryResult Result { get; init; };
-    public DateTime ExpiresAt { get; init; }
-}
-```
-```csharp
-private sealed class PartitionMetadata
-{
-}
-    public string TableName { get; init; };
-    public List<string> PartitionKeys { get; init; };
-    public List<Dictionary<string, string>> Partitions { get; init; };
-}
-```
-```csharp
-private sealed class ParsedQuery
-{
-}
-    public string TableName { get; set; };
-    public List<string>? SelectedColumns { get; set; }
-    public string? WhereClause { get; set; }
-    public List<string>? GroupByColumns { get; set; }
-    public List<string>? OrderByColumns { get; set; }
-    public int Limit { get; set; }
-    public List<AggregationFunction>? AggregationFunctions { get; set; }
-}
-```
-```csharp
-private sealed class AggregationFunction
-{
-}
-    public string Function { get; init; };
-    public string Column { get; init; };
-    public string Alias { get; init; };
-}
-```
-```csharp
-private sealed class WhereCondition
-{
-}
-    public string Column { get; init; };
-    public string Operator { get; init; };
-    public string Value { get; init; };
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override ProtocolInfo ProtocolInfo;;
+    protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
+    protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
+    protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task<bool> PingCoreAsync(CancellationToken ct);
+    protected override Task CleanupConnectionAsync();
 }
 ```
