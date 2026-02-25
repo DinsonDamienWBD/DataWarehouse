@@ -1,0 +1,45 @@
+name: Auto-Update AI Architecture Maps
+
+on:
+  push:
+    branches:
+      - main # Change this if your default branch is 'master'
+    paths:
+      # Only trigger if C# code, the solution file, or the mapper itself changes
+      - '**/*.cs'
+      - 'DataWarehouse.slnx'
+      - 'AiArchitectureMapper/**'
+
+jobs:
+  generate-and-commit:
+    runs-on: ubuntu-latest
+    
+    # This permission allows the bot to push commits back to your repo
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Required to allow the auto-commit action to work properly
+          fetch-depth: 0 
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Matches your local preview SDK environment
+          dotnet-version: '10.0.x' 
+          include-prerelease: true
+
+      - name: Run Architecture Mapper
+        # ${{ github.workspace }} dynamically passes the root repository path as args[0]
+        run: dotnet run --project ./AiArchitectureMapper/AiArchitectureMapper.csproj -- "${{ github.workspace }}"
+
+      - name: Commit and Push Updated Maps
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(ai): auto-update architecture maps [skip ci]"
+          file_pattern: 'docs/ai-maps/**/*.md'
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
