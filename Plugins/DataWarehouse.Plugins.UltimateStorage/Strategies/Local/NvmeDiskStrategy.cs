@@ -134,12 +134,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 throw new ArgumentException("PowerState must be between 0-4", nameof(_powerState));
             }
 
-            // Update semaphore for queue depth
+            // Update semaphore for queue depth using atomic swap to avoid race window
             if (_queueDepth != DEFAULT_QUEUE_DEPTH)
             {
-                var oldLock = _ioLock;
-                _ioLock = new SemaphoreSlim(_queueDepth, _queueDepth);
-                oldLock.Dispose();
+                var newLock = new SemaphoreSlim(_queueDepth, _queueDepth);
+                var oldLock = Interlocked.Exchange(ref _ioLock, newLock);
+                oldLock?.Dispose();
             }
 
             // Ensure base path exists
@@ -157,8 +157,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 try { _controllerInfo = await IdentifyControllerAsync(ct); }
                 catch (PlatformNotSupportedException) { /* Controller info unavailable without native IOCTL */ }
 
-                // Query NVMe namespace information
-                _namespaceInfo = await IdentifyNamespaceAsync(_namespaceId, ct);
+                // Query NVMe namespace information (requires native IOCTL; unavailable without platform integration)
+                try { _namespaceInfo = await IdentifyNamespaceAsync(_namespaceId, ct); }
+                catch (PlatformNotSupportedException) { /* Namespace info unavailable without native IOCTL */ }
 
                 // Set optimal power state (requires native IOCTL; unavailable without platform integration)
                 if (_powerState > 0)
@@ -739,37 +740,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         private Task<NvmeNamespaceInfo> IdentifyNamespaceAsync(uint nsid, CancellationToken ct)
         {
-            // Real implementation would query actual namespace properties
-            // Placeholder with realistic default values
-
-            try
-            {
-                var driveInfo = new DriveInfo(Path.GetPathRoot(_basePath) ?? _basePath);
-
-                var info = new NvmeNamespaceInfo
-                {
-                    NamespaceId = nsid,
-                    CapacityBytes = driveInfo.IsReady ? driveInfo.TotalSize : 0,
-                    UtilizationBytes = driveInfo.IsReady
-                        ? driveInfo.TotalSize - driveInfo.AvailableFreeSpace
-                        : 0,
-                    BlockSize = (uint)_blockSize,
-                    SupportsWriteZeroes = false, // Requires NVMe Identify Namespace query (CNS=0x00)
-                    SupportsTrim = false,        // Requires NVMe Dataset Management command support check
-                    SupportsReservation = false
-                };
-
-                return Task.FromResult(info);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[NvmeDiskStrategy.IdentifyNamespaceAsync] {ex.GetType().Name}: {ex.Message}");
-                return Task.FromResult(new NvmeNamespaceInfo
-                {
-                    NamespaceId = nsid,
-                    BlockSize = (uint)_blockSize
-                });
-            }
+            // NVMe Identify Namespace requires platform-specific IOCTL:
+            // Windows: IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterProtocolSpecificProperty, CNS=0x00
+            // Linux: NVME_IOCTL_ADMIN_CMD with Identify command, CNS=0x00
+            throw new PlatformNotSupportedException(
+                "NVMe Identify Namespace requires native IOCTL integration. " +
+                "Use nvme-cli or platform-specific drivers for namespace identification.");
         }
 
         /// <summary>

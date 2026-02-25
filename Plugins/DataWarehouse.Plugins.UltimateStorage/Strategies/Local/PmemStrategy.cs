@@ -859,10 +859,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // PMEM mode detection requires platform-specific queries:
             // Linux: ndctl list / ipmctl show -dimm
             // Windows: Get-PmemDisk PowerShell cmdlet
-            // Default to AppDirect as the most common PMEM configuration.
+            // Cannot determine actual mode without native integration; return Unknown.
             System.Diagnostics.Debug.WriteLine(
-                "[PmemStrategy.DetectPmemMode] PMEM mode detection requires ndctl/ipmctl; defaulting to AppDirect");
-            return PmemMode.AppDirect;
+                "[PmemStrategy.DetectPmemMode] PMEM mode detection requires ndctl/ipmctl; returning Unknown");
+            return PmemMode.Unknown;
         }
 
         /// <summary>

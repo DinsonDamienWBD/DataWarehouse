@@ -73,6 +73,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalFabric/DataWarehouse.Plugins.UniversalFabric.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
   </Folder>
+  <Project Path="AiArchitectureMapper/AiArchitectureMapper.csproj" />
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
   <Project Path="DataWarehouse.Dashboard/DataWarehouse.Dashboard.csproj" />
