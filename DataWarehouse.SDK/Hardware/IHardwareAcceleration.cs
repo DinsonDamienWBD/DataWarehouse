@@ -1,6 +1,10 @@
 using System;
 using System.Threading.Tasks;
 
+// FUTURE: Hardware accelerator contracts -- interfaces preserved for pluggable hardware
+// acceleration (TPM2, HSM, QAT, GPU) per AD-06. These types have zero current implementations
+// but define contracts for future hardware-acceleration-capable plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Hardware
 {
     /// <summary>
@@ -41,7 +45,19 @@ namespace DataWarehouse.SDK.Hardware
         Tpm2 = 256,
 
         /// <summary>HSM PCIe - Hardware Security Module over PCIe for cryptographic operations.</summary>
-        HsmPcie = 512
+        HsmPcie = 512,
+
+        /// <summary>OpenCL - Cross-vendor GPU/CPU/FPGA compute acceleration.</summary>
+        OpenCL = 1024,
+
+        /// <summary>SYCL - Intel oneAPI heterogeneous compute (CPU+GPU+FPGA).</summary>
+        Sycl = 2048,
+
+        /// <summary>Triton - GPU kernel compilation for ML workloads.</summary>
+        Triton = 4096,
+
+        /// <summary>CANN - Huawei Ascend NPU acceleration.</summary>
+        Cann = 8192
     }
 
     /// <summary>
@@ -102,6 +118,12 @@ namespace DataWarehouse.SDK.Hardware
         /// Gets whether this accelerator is available on the current system.
         /// </summary>
         bool IsAvailable { get; }
+
+        /// <summary>
+        /// Gets whether this accelerator is using a CPU-based fallback implementation
+        /// rather than actual hardware acceleration.
+        /// </summary>
+        bool IsCpuFallback { get; }
 
         /// <summary>
         /// Initializes the hardware accelerator.
@@ -193,6 +215,15 @@ namespace DataWarehouse.SDK.Hardware
 
         /// <summary>OpenCL runtime (cross-vendor).</summary>
         OpenCL,
+
+        /// <summary>SYCL runtime (Intel oneAPI DPC++).</summary>
+        Sycl,
+
+        /// <summary>Triton GPU kernel compilation runtime.</summary>
+        Triton,
+
+        /// <summary>CANN runtime (Huawei Ascend NPU).</summary>
+        Cann,
 
         /// <summary>Apple Metal runtime.</summary>
         Metal

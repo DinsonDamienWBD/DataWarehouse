@@ -1,8 +1,8 @@
 using DataWarehouse.SDK.Contracts;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel.Storage;
 
@@ -23,7 +23,7 @@ public sealed class KernelStorageService : IKernelStorageService
     private readonly string _basePath;
 
     // Metadata index for efficient listing (persisted separately)
-    private readonly ConcurrentDictionary<string, StorageItemInfo> _metadataIndex = new();
+    private readonly BoundedDictionary<string, StorageItemInfo> _metadataIndex = new BoundedDictionary<string, StorageItemInfo>(1000);
     private readonly SemaphoreSlim _indexLock = new(1, 1);
 
     public KernelStorageService(
@@ -108,7 +108,9 @@ public sealed class KernelStorageService : IKernelStorageService
 
         using (stream)
         {
-            using var ms = new MemoryStream();
+            // Pre-allocate capacity if stream length is known
+            var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await stream.CopyToAsync(ms, ct);
             return ms.ToArray();
         }

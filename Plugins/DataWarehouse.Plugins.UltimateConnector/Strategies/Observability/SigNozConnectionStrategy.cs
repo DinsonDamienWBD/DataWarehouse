@@ -1,0 +1,17 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Observability;
+
+/// <summary>SigNoz connection strategy. HTTP OTLP endpoint. Open-source Datadog/New Relic alternative.</summary>
+public sealed class SigNozConnectionStrategy : ObservabilityConnectionStrategyBase
+{
+    public override string StrategyId => "signoz";public override string DisplayName => "SigNoz";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "SigNoz open-source observability platform. Metrics, traces, and logs in one place. OpenTelemetry-native.";public override string[] Tags => ["signoz", "open-source", "otlp", "observability", "unified"];
+    public SigNozConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "http://localhost:4318";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "SigNoz", ["BaseUrl"] = baseUrl });}
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct){try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/traces", ct); return true; } catch { return false; }}
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct){var sw = System.Diagnostics.Stopwatch.StartNew();sw.Stop();return new ConnectionHealth(true, "SigNoz ready", sw.Elapsed, DateTimeOffset.UtcNow);}
+    public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { resourceMetrics = metrics });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/v1/metrics", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { resourceLogs = logs });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/v1/logs", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { resourceSpans = traces });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/v1/traces", content, ct);response.EnsureSuccessStatusCode();}
+}

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Configuration;
 
@@ -334,8 +334,8 @@ public sealed class LoadBalancingConfig
 /// </summary>
 public sealed class LoadBalancingManager
 {
-    private readonly ConcurrentDictionary<string, NodeMetrics> _nodeMetrics = new();
-    private readonly ConcurrentDictionary<string, LoadBalancingConfig> _containerConfigs = new();
+    private readonly BoundedDictionary<string, NodeMetrics> _nodeMetrics = new BoundedDictionary<string, NodeMetrics>(1000);
+    private readonly BoundedDictionary<string, LoadBalancingConfig> _containerConfigs = new BoundedDictionary<string, LoadBalancingConfig>(1000);
     private LoadBalancingConfig _defaultConfig;
     private readonly object _lock = new();
 
@@ -343,7 +343,6 @@ public sealed class LoadBalancingManager
     private long _totalRequests;
     private long _requestsLastMinute;
     private DateTime _lastMetricsReset = DateTime.UtcNow;
-    private int _activeNodes;
 
     public LoadBalancingManager(LoadBalancingConfig? defaultConfig = null)
     {

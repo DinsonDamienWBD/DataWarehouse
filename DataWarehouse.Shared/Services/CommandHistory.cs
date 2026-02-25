@@ -110,7 +110,7 @@ public sealed class CommandHistory : IDisposable
             }
         }
 
-        SaveHistoryAsync();
+        _ = Task.Run(async () => await SaveHistoryAsync());
     }
 
     /// <summary>
@@ -193,7 +193,7 @@ public sealed class CommandHistory : IDisposable
             _entries.Clear();
         }
 
-        SaveHistoryAsync();
+        _ = Task.Run(async () => await SaveHistoryAsync());
     }
 
     /// <summary>
@@ -266,7 +266,7 @@ public sealed class CommandHistory : IDisposable
         }
     }
 
-    private async void SaveHistoryAsync()
+    private async Task SaveHistoryAsync()
     {
         try
         {
@@ -285,9 +285,10 @@ public sealed class CommandHistory : IDisposable
             var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(_historyPath, json);
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore save errors
+            // Log save errors but don't throw
+            System.Diagnostics.Debug.WriteLine($"CommandHistory save failed: {ex.Message}");
         }
     }
 

@@ -38,5 +38,27 @@ namespace DataWarehouse.SDK.Primitives
         /// Order of operations (e.g. Compress -> Encrypt)
         /// </summary>
         public List<string> TransformationOrder { get; set; } = [];
+
+        /// <summary>
+        /// Snapshot of pipeline stages that were executed when this blob was written.
+        /// Used on read to reconstruct the exact reverse pipeline.
+        /// </summary>
+        public List<DataWarehouse.SDK.Contracts.Pipeline.PipelineStageSnapshot> ExecutedStages { get; set; } = new();
+
+        /// <summary>
+        /// Policy ID that was active when this blob was written.
+        /// </summary>
+        public string PolicyId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Policy version that was active when this blob was written.
+        /// Used to detect stale blobs that need migration.
+        /// </summary>
+        public long PolicyVersion { get; set; }
+
+        /// <summary>
+        /// When this blob's pipeline was last applied.
+        /// </summary>
+        public DateTimeOffset WrittenAt { get; set; } = DateTimeOffset.UtcNow;
     }
 }

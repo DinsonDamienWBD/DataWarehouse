@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Middleware;
 
@@ -84,7 +84,7 @@ public sealed class RateLimitingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<RateLimitingMiddleware> _logger;
     private readonly RateLimitingOptions _options;
-    private readonly ConcurrentDictionary<string, ClientRateLimiter> _limiters = new();
+    private readonly BoundedDictionary<string, ClientRateLimiter> _limiters = new BoundedDictionary<string, ClientRateLimiter>(1000);
     private readonly Timer _cleanupTimer;
     private readonly HashSet<string> _whitelistedIPs;
 
@@ -240,7 +240,7 @@ internal sealed class ClientRateLimiter
     private readonly TimeSpan _windowDuration;
     private readonly int _burstLimit;
     private readonly Dictionary<string, EndpointRateLimit> _endpointLimits;
-    private readonly ConcurrentDictionary<string, EndpointTokenBucket> _endpointBuckets = new();
+    private readonly BoundedDictionary<string, EndpointTokenBucket> _endpointBuckets = new BoundedDictionary<string, EndpointTokenBucket>(1000);
     private readonly object _lock = new();
 
     private double _tokens;

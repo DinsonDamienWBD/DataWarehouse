@@ -1,0 +1,14 @@
+{
+  "mode": "yolo",
+  "depth": "comprehensive",
+  "parallelization": true,
+  "parallelization_notes": "Conservative parallelism — max 2-3 concurrent agents to avoid rate limit kills",
+  "commit_docs": true,
+  "model_profile": "balanced",
+  "model_notes": "Haiku for research/scanning, Sonnet for planning/implementation, Opus for complex architecture decisions",
+  "workflow": {
+    "research": false,
+    "plan_check": true,
+    "verifier": true
+  }
+}

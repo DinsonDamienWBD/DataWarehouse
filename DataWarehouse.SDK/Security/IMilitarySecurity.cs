@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+// FUTURE: Military security contracts -- interfaces preserved for two-person integrity, mandatory
+// access control, multi-level security per AD-06. These types have zero current implementations
+// but define contracts for future military-security-capable plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Security
 {
     /// <summary>

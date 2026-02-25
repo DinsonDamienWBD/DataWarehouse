@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DataWarehouse.Plugins.UltimateMicroservices</RootNamespace>
+    <AssemblyName>DataWarehouse.Plugins.UltimateMicroservices</AssemblyName>
+    <Description>T120: Ultimate Microservices Plugin - Comprehensive microservices architecture patterns including service discovery, inter-service communication, load balancing, circuit breakers, API gateways, orchestration, monitoring, and security.</Description>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+</Project>

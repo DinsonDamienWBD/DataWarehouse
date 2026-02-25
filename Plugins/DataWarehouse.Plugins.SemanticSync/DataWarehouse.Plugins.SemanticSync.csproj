@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DataWarehouse.Plugins.SemanticSync</RootNamespace>
+    <Description>Semantic Sync Protocol Plugin - Semantic conflict classification, summary-vs-raw routing, conflict resolution, bandwidth-aware fidelity control, and edge inference integration for distributed data synchronization.</Description>
+    <PackageTags>semantic-sync;conflict-resolution;routing;fidelity;edge-inference;replication</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+</Project>

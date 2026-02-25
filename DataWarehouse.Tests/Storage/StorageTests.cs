@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentAssertions;
 using Xunit;
 
 namespace DataWarehouse.Tests.Storage
@@ -194,7 +195,7 @@ namespace DataWarehouse.Tests.Storage
 
             // Act
             using var stream = await storage.OpenReadStreamAsync("stream/test.bin");
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(data.Length);
             await stream.CopyToAsync(ms);
 
             // Assert
@@ -222,8 +223,12 @@ namespace DataWarehouse.Tests.Storage
             // Arrange
             var storage = new InMemoryTestStorage();
 
-            // Act & Assert (should not throw)
+            // Act
             await storage.DeleteAsync("nonexistent/path");
+
+            // Assert - delete completed without throwing, storage remains functional
+            var exists = await storage.ExistsAsync("nonexistent/path");
+            exists.Should().BeFalse("non-existent path should still not exist after delete");
         }
 
         #endregion

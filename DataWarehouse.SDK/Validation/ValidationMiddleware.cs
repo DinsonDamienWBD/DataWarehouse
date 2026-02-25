@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Validation;
 
@@ -20,7 +20,7 @@ namespace DataWarehouse.SDK.Validation;
 public sealed class ValidationMiddleware
 {
     private readonly List<IValidationFilter> _filters = new();
-    private readonly ConcurrentDictionary<string, ValidationMetrics> _metrics = new();
+    private readonly BoundedDictionary<string, ValidationMetrics> _metrics = new BoundedDictionary<string, ValidationMetrics>(1000);
     private readonly ValidationMiddlewareConfig _config;
     private long _totalValidations;
     private long _failedValidations;
@@ -182,7 +182,7 @@ public sealed class ValidationMiddleware
         return result;
     }
 
-    private readonly ConcurrentDictionary<Type, List<ITypeValidator>> _typeValidators = new();
+    private readonly BoundedDictionary<Type, List<ITypeValidator>> _typeValidators = new BoundedDictionary<Type, List<ITypeValidator>>(1000);
 
     /// <summary>
     /// Registers a type-specific validator.

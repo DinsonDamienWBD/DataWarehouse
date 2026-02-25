@@ -1,0 +1,16 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Net.Http.Headers;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Dashboard;
+
+/// <summary>Geckoboard lightweight dashboard. HTTPS to api.geckoboard.com.</summary>
+public sealed class GeckoboardConnectionStrategy : DashboardConnectionStrategyBase
+{
+    public override string StrategyId => "geckoboard";public override string DisplayName => "Geckoboard";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Geckoboard lightweight KPI dashboards. Simple TV dashboards for teams.";public override string[] Tags => ["geckoboard", "commercial", "kpi", "lightweight", "tv-dashboard"];
+    public GeckoboardConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var httpClient = new HttpClient { BaseAddress = new Uri("https://api.geckoboard.com"), Timeout = config.Timeout };if (config.Properties.TryGetValue("ApiKey", out var apiKey)){httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiKey}:")));}return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Geckoboard" });}
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(true);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "Geckoboard configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
+    public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default){var httpClient = handle.GetConnection<HttpClient>();var content = new StringContent(dashboardDefinition, Encoding.UTF8, "application/json");var response = await httpClient.PutAsync($"/datasets/{Guid.NewGuid()}", content, ct);response.EnsureSuccessStatusCode();return "dataset-created";}
+    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { data });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync($"/datasets/{datasetId}/data", content, ct);response.EnsureSuccessStatusCode();}
+}

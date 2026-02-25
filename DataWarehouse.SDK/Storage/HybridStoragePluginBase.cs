@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.SDK.Storage;
 
@@ -105,7 +104,7 @@ public class StorageConfigBase
 /// - Role-based instance selection (Primary, Cache, Index, Archive, etc.)
 /// </summary>
 /// <typeparam name="TConfig">Configuration type extending StorageConfigBase.</typeparam>
-public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginBase, IAsyncDisposable
+public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginBase
     where TConfig : StorageConfigBase, new()
 {
     /// <summary>
@@ -121,7 +120,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// <summary>
     /// Instance health cache for quick lookups.
     /// </summary>
-    protected readonly ConcurrentDictionary<string, InstanceHealthStatus> _healthCache = new();
+    protected readonly BoundedDictionary<string, InstanceHealthStatus> _healthCache = new BoundedDictionary<string, InstanceHealthStatus>(1000);
 
     /// <summary>
     /// Health monitoring timer.
@@ -549,9 +548,9 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     #region Disposal
 
     /// <summary>
-    /// Disposes the plugin and all its resources.
+    /// Performs async cleanup of storage connections and health monitor.
     /// </summary>
-    public async ValueTask DisposeAsync()
+    protected override async ValueTask DisposeAsyncCore()
     {
         if (_disposed) return;
         _disposed = true;
@@ -559,7 +558,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         _healthMonitorTimer?.Dispose();
         await _connectionRegistry.DisposeAsync();
 
-        GC.SuppressFinalize(this);
+        await base.DisposeAsyncCore();
     }
 
     #endregion

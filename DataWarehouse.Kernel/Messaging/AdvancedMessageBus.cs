@@ -8,11 +8,13 @@ namespace DataWarehouse.Kernel.Messaging
     /// <summary>
     /// Thread-safe subscription list that ensures atomic operations.
     /// Wraps a List with proper synchronization to avoid race conditions.
+    /// Uses read-copy-update pattern to cache array snapshot for hot-path reads.
     /// </summary>
     internal sealed class ThreadSafeSubscriptionList<T>
     {
         private readonly List<T> _handlers = new();
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
+        private volatile T[] _cachedArray = Array.Empty<T>();
 
         public int Count
         {
@@ -27,22 +29,33 @@ namespace DataWarehouse.Kernel.Messaging
         public void Add(T handler)
         {
             _lock.EnterWriteLock();
-            try { _handlers.Add(handler); }
+            try
+            {
+                _handlers.Add(handler);
+                _cachedArray = _handlers.ToArray(); // Update cache on write
+            }
             finally { _lock.ExitWriteLock(); }
         }
 
         public bool Remove(T handler)
         {
             _lock.EnterWriteLock();
-            try { return _handlers.Remove(handler); }
+            try
+            {
+                bool removed = _handlers.Remove(handler);
+                if (removed)
+                {
+                    _cachedArray = _handlers.ToArray(); // Update cache on write
+                }
+                return removed;
+            }
             finally { _lock.ExitWriteLock(); }
         }
 
         public T[] ToArray()
         {
-            _lock.EnterReadLock();
-            try { return _handlers.ToArray(); }
-            finally { _lock.ExitReadLock(); }
+            // Hot path: return cached array without locking
+            return _cachedArray;
         }
 
         public T? FirstOrDefault()
@@ -55,7 +68,11 @@ namespace DataWarehouse.Kernel.Messaging
         public void Clear()
         {
             _lock.EnterWriteLock();
-            try { _handlers.Clear(); }
+            try
+            {
+                _handlers.Clear();
+                _cachedArray = Array.Empty<T>(); // Update cache on write
+            }
             finally { _lock.ExitWriteLock(); }
         }
     }
@@ -64,16 +81,17 @@ namespace DataWarehouse.Kernel.Messaging
     /// Bounded concurrent dictionary that enforces a maximum capacity.
     /// When capacity is reached, oldest entries are evicted.
     /// </summary>
-    internal sealed class BoundedConcurrentDictionary<TKey, TValue> where TKey : notnull
+    internal sealed class BoundedBoundedDictionary<TKey, TValue> where TKey : notnull
     {
-        private readonly ConcurrentDictionary<TKey, TValue> _dictionary = new();
+        private readonly BoundedDictionary<TKey, TValue> _dictionary;
         private readonly ConcurrentQueue<TKey> _keyOrder = new();
         private readonly int _maxCapacity;
         private readonly object _evictionLock = new();
 
-        public BoundedConcurrentDictionary(int maxCapacity)
+        public BoundedBoundedDictionary(int maxCapacity)
         {
             _maxCapacity = maxCapacity > 0 ? maxCapacity : int.MaxValue;
+            _dictionary = new BoundedDictionary<TKey, TValue>(_maxCapacity);
         }
 
         public int Count => _dictionary.Count;
@@ -90,9 +108,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
 
-        public ICollection<TValue> Values => _dictionary.Values;
+        public IEnumerable<TValue> Values => _dictionary.Values;
 
-        public ICollection<TKey> Keys => _dictionary.Keys;
+        public IEnumerable<TKey> Keys => _dictionary.Keys;
 
         public void AddOrUpdate(TKey key, TValue value)
         {
@@ -154,15 +172,18 @@ namespace DataWarehouse.Kernel.Messaging
     /// </summary>
     public class AdvancedMessageBus : MessageBusBase, IAdvancedMessageBus
     {
-        private readonly BoundedConcurrentDictionary<string, PendingMessage> _pendingMessages;
-        private readonly BoundedConcurrentDictionary<string, MessageGroup> _messageGroups;
-        private readonly ConcurrentDictionary<string, FilteredSubscription> _filteredSubscriptions = new();
+        private readonly BoundedBoundedDictionary<string, PendingMessage> _pendingMessages;
+        private readonly BoundedBoundedDictionary<string, MessageGroup> _messageGroups;
+        private readonly BoundedDictionary<string, FilteredSubscription> _filteredSubscriptions = new BoundedDictionary<string, FilteredSubscription>(1000);
         private readonly MessageBusStatistics _statistics = new();
         private readonly IKernelContext _context;
         private readonly AdvancedMessageBusConfig _config;
         private readonly Timer _retryTimer;
         private readonly Timer _cleanupTimer;
         private readonly object _statsLock = new();
+
+        // BUS-03: Per-publisher rate limiting to prevent flooding DoS
+        private readonly BoundedDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new BoundedDictionary<string, SlidingWindowRateLimiter>(1000);
 
         // Thread-safe subscription storage - uses ThreadSafeSubscriptionList for atomic operations
         private readonly ConcurrentDictionary<string, ThreadSafeSubscriptionList<Func<PluginMessage, Task>>> _subscriptions = new();
@@ -173,8 +194,8 @@ namespace DataWarehouse.Kernel.Messaging
             _config = config ?? new AdvancedMessageBusConfig();
 
             // Initialize bounded collections with configured limits
-            _pendingMessages = new BoundedConcurrentDictionary<string, PendingMessage>(_config.MaxPendingMessages);
-            _messageGroups = new BoundedConcurrentDictionary<string, MessageGroup>(_config.MaxMessageGroups);
+            _pendingMessages = new BoundedBoundedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
+            _messageGroups = new BoundedBoundedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
 
             // Start background timers
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
@@ -185,6 +206,21 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
+            // BUS-03: Per-publisher rate limiting
+            var publisherId = message.Identity?.ActorId ?? message.Source ?? "anonymous";
+            var limiter = _rateLimiters.GetOrAdd(publisherId,
+                _ => new SlidingWindowRateLimiter(_config.RateLimitPerSecond, TimeSpan.FromSeconds(1)));
+
+            if (!limiter.TryAcquire())
+            {
+                _context.LogWarning($"[MessageBus] Rate limit exceeded for publisher '{publisherId}' on topic '{topic}'");
+                RecordStatistic(s => s.TotalFailed++);
+                throw new InvalidOperationException($"Rate limit exceeded for publisher '{publisherId}'. Max {_config.RateLimitPerSecond} messages/second.");
+            }
+
             if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
                 // Get a snapshot of handlers for thread-safe iteration
@@ -218,6 +254,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
             if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
                 var handler = handlerList.FirstOrDefault();
@@ -240,6 +279,9 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
         {
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
             // GetOrAdd with ThreadSafeSubscriptionList is atomic
             var handlerList = _subscriptions.GetOrAdd(topic, _ => new ThreadSafeSubscriptionList<Func<PluginMessage, Task>>());
             handlerList.Add(handler);
@@ -814,7 +856,7 @@ namespace DataWarehouse.Kernel.Messaging
         {
             public string MessageId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
-            public PluginMessage Message { get; set; } = null!;
+            public required PluginMessage Message { get; set; }
             public ReliablePublishOptions Options { get; set; } = new();
             public DateTime CreatedAt { get; set; }
             public DateTime? DeliveredAt { get; set; }
@@ -829,8 +871,8 @@ namespace DataWarehouse.Kernel.Messaging
         {
             public string SubscriptionId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
-            public Func<PluginMessage, bool> Filter { get; set; } = null!;
-            public Action<PluginMessage> Handler { get; set; } = null!;
+            public required Func<PluginMessage, bool> Filter { get; set; }
+            public required Action<PluginMessage> Handler { get; set; }
         }
 
         private class MessageGroup
@@ -845,7 +887,7 @@ namespace DataWarehouse.Kernel.Messaging
         private class GroupedMessage
         {
             public string Topic { get; set; } = string.Empty;
-            public PluginMessage Message { get; set; } = null!;
+            public required PluginMessage Message { get; set; }
             public DateTime AddedAt { get; set; }
         }
 
@@ -924,6 +966,12 @@ namespace DataWarehouse.Kernel.Messaging
         public TimeSpan MessageRetention { get; set; } = TimeSpan.FromHours(24);
         public int MaxPendingMessages { get; set; } = 100000;
         public int MaxMessageGroups { get; set; } = 1000;
+
+        /// <summary>
+        /// Maximum messages per second per publisher (BUS-03: rate limiting).
+        /// Default: 1000 messages/second.
+        /// </summary>
+        public int RateLimitPerSecond { get; set; } = 1000;
     }
 
     /// <summary>

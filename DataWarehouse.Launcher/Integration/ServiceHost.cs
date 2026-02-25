@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -18,6 +19,7 @@ public sealed class ServiceHost : IAsyncDisposable
     private readonly ILogger<ServiceHost> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly AdapterRunner _runner;
+    private LauncherHttpServer? _httpServer;
     private bool _disposed;
 
     /// <summary>
@@ -43,6 +45,7 @@ public sealed class ServiceHost : IAsyncDisposable
         _logger.LogInformation("Starting DataWarehouse service");
         _logger.LogInformation("Kernel ID: {KernelId}", options.KernelId);
         _logger.LogInformation("Kernel Mode: {KernelMode}", options.KernelMode);
+        _logger.LogInformation("Service Profile: {Profile}", options.Profile);
         _logger.LogInformation("Plugin Path: {PluginPath}", options.PluginPath);
 
         // Configure adapter options for service mode
@@ -55,12 +58,36 @@ public sealed class ServiceHost : IAsyncDisposable
             CustomConfig =
             {
                 ["RunAsService"] = true,
-                ["KernelMode"] = options.KernelMode
+                ["KernelMode"] = options.KernelMode,
+                ["ServiceProfile"] = options.Profile
             }
         };
 
-        // Run the adapter (blocks until shutdown)
-        return await _runner.RunAsync(adapterOptions, "DataWarehouse", cancellationToken);
+        // Start HTTP server if enabled
+        var httpPort = options.HttpPort > 0 ? options.HttpPort : 8080;
+        if (options.EnableHttp)
+        {
+            _httpServer = new LauncherHttpServer(_runner, _loggerFactory);
+            // API key will be generated automatically if not provided
+            await _httpServer.StartAsync(httpPort, apiKey: null, cancellationToken);
+            _logger.LogInformation("HTTP API available at http://0.0.0.0:{Port}/api/v1/", httpPort);
+        }
+
+        try
+        {
+            // Run the adapter (blocks until shutdown)
+            return await _runner.RunAsync(adapterOptions, "DataWarehouse", cancellationToken);
+        }
+        finally
+        {
+            // Stop HTTP server when kernel shuts down
+            if (_httpServer != null)
+            {
+                await _httpServer.StopAsync();
+                await _httpServer.DisposeAsync();
+                _httpServer = null;
+            }
+        }
     }
 
     /// <summary>
@@ -78,6 +105,12 @@ public sealed class ServiceHost : IAsyncDisposable
         _disposed = true;
 
         _logger.LogInformation("Disposing service host");
+
+        if (_httpServer != null)
+        {
+            await _httpServer.DisposeAsync();
+        }
+
         await _runner.DisposeAsync();
     }
 }

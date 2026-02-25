@@ -1,0 +1,633 @@
+// DataWarehouse Canonical Protobuf Service Definitions
+// =====================================================
+// This file is the SINGLE SOURCE OF TRUTH for all DataWarehouse gRPC service
+// definitions. Multi-language SDKs (Go, Python, Java, Rust, etc.) are generated
+// from this file using protoc. The companion C# mirror types in
+// ProtoServiceDefinitions.cs enable runtime gRPC serving WITHOUT build-time
+// protoc codegen for the .NET host.
+//
+// This file is NOT compiled by the C# build (it is a specification artifact).
+// Field numbers in reserved ranges (100-199) are held for future evolution.
+//
+// Version: 1.0.0
+// Phase: 89 - Ecosystem Compatibility (ECOS-12)
+
+syntax = "proto3";
+
+package datawarehouse.v1;
+
+option csharp_namespace = "DataWarehouse.SDK.Contracts.Ecosystem.Proto";
+option go_package = "github.com/datawarehouse/sdk/proto/v1;dwv1";
+option java_package = "com.datawarehouse.sdk.proto.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 1: StorageService
+// Core object storage operations (Store, Retrieve, Delete, Exists, Metadata, List)
+// ─────────────────────────────────────────────────────────────────────────────
+
+service StorageService {
+  // Stores an object with metadata and optional TTL.
+  rpc Store(StoreRequest) returns (StoreResponse);
+
+  // Retrieves an object as a stream of chunks for large payload support.
+  rpc Retrieve(RetrieveRequest) returns (stream RetrieveChunk);
+
+  // Deletes an object by key with optional hard-delete semantics.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Checks whether an object exists without retrieving its data.
+  rpc Exists(ExistsRequest) returns (ExistsResponse);
+
+  // Retrieves metadata for an object without its data payload.
+  rpc GetMetadata(GetMetadataRequest) returns (MetadataResponse);
+
+  // Lists objects matching a prefix, streamed for large result sets.
+  rpc List(ListRequest) returns (stream ListEntry);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 2: QueryService
+// SQL-like query execution with prepared statement support
+// ─────────────────────────────────────────────────────────────────────────────
+
+service QueryService {
+  // Executes a query and streams result batches in columnar format.
+  rpc Execute(QueryRequest) returns (stream QueryResultBatch);
+
+  // Prepares a parameterized query for repeated execution.
+  rpc Prepare(PrepareRequest) returns (PrepareResponse);
+
+  // Executes a previously prepared statement by handle.
+  rpc ExecutePrepared(ExecutePreparedRequest) returns (stream QueryResultBatch);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 3: TagService
+// Metadata tagging operations for objects
+// ─────────────────────────────────────────────────────────────────────────────
+
+service TagService {
+  // Sets or overwrites tags on an object.
+  rpc SetTags(SetTagsRequest) returns (TagResponse);
+
+  // Retrieves all tags for an object.
+  rpc GetTags(GetTagsRequest) returns (TagResponse);
+
+  // Removes specific tags from an object.
+  rpc RemoveTags(RemoveTagsRequest) returns (TagResponse);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 4: SearchService
+// Full-text and tag-based search
+// ─────────────────────────────────────────────────────────────────────────────
+
+service SearchService {
+  // Full-text search across object content and metadata.
+  rpc Search(SearchRequest) returns (stream SearchResult);
+
+  // Searches objects by tag key-value predicates.
+  rpc SearchByTags(TagSearchRequest) returns (stream SearchResult);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 5: StreamService
+// Streaming data ingestion and event subscription
+// ─────────────────────────────────────────────────────────────────────────────
+
+service StreamService {
+  // Client-streaming store: sends chunks and receives a single response.
+  rpc StreamStore(stream StoreChunk) returns (StoreResponse);
+
+  // Server-streaming retrieve: sends a request and receives data chunks.
+  rpc StreamRetrieve(RetrieveRequest) returns (stream RetrieveChunk);
+
+  // Subscribes to real-time events (object changes, system events).
+  rpc Subscribe(SubscribeRequest) returns (stream Event);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service 6: AdminService
+// Health, capabilities, plugin management, and metrics
+// ─────────────────────────────────────────────────────────────────────────────
+
+service AdminService {
+  // Returns the health status of the DataWarehouse instance.
+  rpc GetHealth(HealthRequest) returns (HealthResponse);
+
+  // Returns available capabilities and feature flags.
+  rpc GetCapabilities(CapabilitiesRequest) returns (CapabilitiesResponse);
+
+  // Manages plugin lifecycle (enable, disable, configure).
+  rpc ManagePlugin(PluginRequest) returns (PluginResponse);
+
+  // Returns operational metrics and statistics.
+  rpc GetMetrics(MetricsRequest) returns (MetricsResponse);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Message Definitions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── StorageService Messages ─────────────────────────────────────────────────
+
+message StoreRequest {
+  // Unique object key (e.g., "dw://bucket/path/key").
+  string key = 1;
+  // Object data payload.
+  bytes data = 2;
+  // Content type (MIME, e.g., "application/octet-stream").
+  string content_type = 3;
+  // User-defined metadata key-value pairs.
+  map<string, string> metadata = 4;
+  // Expected version for compare-and-swap (-1 = unconditional).
+  int64 expected_version = 5;
+  // Time-to-live in seconds (0 = no expiry).
+  int64 ttl_seconds = 6;
+  // Reserved for future extension fields.
+  reserved 100 to 199;
+}
+
+message StoreResponse {
+  // Assigned object version after store.
+  int64 version = 1;
+  // SHA-256 checksum of stored data (hex-encoded).
+  string checksum = 2;
+  // Timestamp when the object was stored.
+  google.protobuf.Timestamp stored_at = 3;
+  // Size of stored data in bytes.
+  int64 size_bytes = 4;
+  reserved 100 to 199;
+}
+
+message RetrieveRequest {
+  // Object key to retrieve.
+  string key = 1;
+  // Specific version to retrieve (0 = latest).
+  int64 version = 2;
+  // Whether to include metadata in the response.
+  bool include_metadata = 3;
+  // Optional byte range start (inclusive).
+  int64 range_start = 4;
+  // Optional byte range end (exclusive, 0 = end of object).
+  int64 range_end = 5;
+  reserved 100 to 199;
+}
+
+message RetrieveChunk {
+  // Chunk data bytes.
+  bytes data = 1;
+  // Chunk sequence number (0-indexed).
+  int32 chunk_index = 2;
+  // Total number of chunks (0 if unknown).
+  int32 total_chunks = 3;
+  // Object metadata (populated in first chunk only if requested).
+  map<string, string> metadata = 4;
+  // Object version.
+  int64 version = 5;
+  // Content type.
+  string content_type = 6;
+  // Total object size in bytes.
+  int64 total_size_bytes = 7;
+  reserved 100 to 199;
+}
+
+message DeleteRequest {
+  // Object key to delete.
+  string key = 1;
+  // Expected version for CAS delete (-1 = unconditional).
+  int64 expected_version = 2;
+  // Hard-delete (true) vs soft-delete/tombstone (false).
+  bool hard_delete = 3;
+  reserved 100 to 199;
+}
+
+message DeleteResponse {
+  // Whether the object was deleted (false = not found).
+  bool deleted = 1;
+  // Tombstone version if soft-deleted.
+  int64 tombstone_version = 2;
+  reserved 100 to 199;
+}
+
+message ExistsRequest {
+  // Object key to check.
+  string key = 1;
+  reserved 100 to 199;
+}
+
+message ExistsResponse {
+  // Whether the object exists.
+  bool exists = 1;
+  // Current version if it exists.
+  int64 version = 2;
+  // Object size in bytes (0 if not found).
+  int64 size_bytes = 3;
+  reserved 100 to 199;
+}
+
+message GetMetadataRequest {
+  // Object key.
+  string key = 1;
+  // Specific version (0 = latest).
+  int64 version = 2;
+  reserved 100 to 199;
+}
+
+message MetadataResponse {
+  // Object key.
+  string key = 1;
+  // Object version.
+  int64 version = 2;
+  // Object size in bytes.
+  int64 size_bytes = 3;
+  // Content type.
+  string content_type = 4;
+  // User-defined metadata.
+  map<string, string> metadata = 5;
+  // Creation timestamp.
+  google.protobuf.Timestamp created_at = 6;
+  // Last modification timestamp.
+  google.protobuf.Timestamp modified_at = 7;
+  // SHA-256 checksum.
+  string checksum = 8;
+  reserved 100 to 199;
+}
+
+message ListRequest {
+  // URI prefix to list.
+  string prefix = 1;
+  // Delimiter for hierarchical listing (e.g., "/").
+  string delimiter = 2;
+  // Maximum entries to return (0 = unlimited).
+  int32 max_entries = 3;
+  // Continuation token for pagination.
+  string continuation_token = 4;
+  reserved 100 to 199;
+}
+
+message ListEntry {
+  // Object key.
+  string key = 1;
+  // Object size in bytes.
+  int64 size_bytes = 2;
+  // Last modification timestamp.
+  google.protobuf.Timestamp last_modified = 3;
+  // Whether this is a common prefix (directory-like entry).
+  bool is_prefix = 4;
+  // Continuation token if more results available.
+  string continuation_token = 5;
+  reserved 100 to 199;
+}
+
+// ─── QueryService Messages ───────────────────────────────────────────────────
+
+message QueryRequest {
+  // SQL-like query string.
+  string query = 1;
+  // Query parameters for parameterized queries.
+  map<string, string> parameters = 2;
+  // Maximum result rows (0 = unlimited).
+  int32 max_results = 3;
+  // Timeout in milliseconds (0 = default).
+  int32 timeout_ms = 4;
+  // Batch size for streaming (rows per batch).
+  int32 batch_size = 5;
+  reserved 100 to 199;
+}
+
+message QueryResultBatch {
+  // Column descriptors (populated in first batch only).
+  repeated ColumnDescriptor columns = 1;
+  // Row data as serialized columnar arrays.
+  repeated RowData rows = 2;
+  // Batch sequence number.
+  int32 batch_index = 3;
+  // Whether this is the last batch.
+  bool is_last = 4;
+  // Total row count (0 if unknown until final batch).
+  int64 total_rows = 5;
+  reserved 100 to 199;
+}
+
+message ColumnDescriptor {
+  // Column name.
+  string name = 1;
+  // Column data type.
+  ColumnType data_type = 2;
+  // Whether the column is nullable.
+  bool nullable = 3;
+  reserved 100 to 199;
+}
+
+// Column data types mapping to SDK ColumnDataType enum.
+enum ColumnType {
+  COLUMN_TYPE_INT32 = 0;
+  COLUMN_TYPE_INT64 = 1;
+  COLUMN_TYPE_FLOAT64 = 2;
+  COLUMN_TYPE_STRING = 3;
+  COLUMN_TYPE_BOOL = 4;
+  COLUMN_TYPE_BINARY = 5;
+  COLUMN_TYPE_DECIMAL = 6;
+  COLUMN_TYPE_DATETIME = 7;
+  COLUMN_TYPE_NULL = 8;
+}
+
+message RowData {
+  // Serialized column values for this row.
+  repeated bytes values = 1;
+  // Null bitmap (one bit per column, LSB first).
+  bytes null_bitmap = 2;
+}
+
+message PrepareRequest {
+  // SQL-like query string with parameter placeholders.
+  string query = 1;
+  // Parameter type hints.
+  map<string, string> parameter_types = 2;
+  reserved 100 to 199;
+}
+
+message PrepareResponse {
+  // Handle for the prepared statement.
+  string statement_handle = 1;
+  // Expected parameter names.
+  repeated string parameter_names = 2;
+  // Result column descriptors (if known at prepare time).
+  repeated ColumnDescriptor columns = 3;
+  reserved 100 to 199;
+}
+
+message ExecutePreparedRequest {
+  // Handle from PrepareResponse.
+  string statement_handle = 1;
+  // Parameter values.
+  map<string, string> parameters = 2;
+  // Maximum result rows.
+  int32 max_results = 3;
+  // Batch size for streaming.
+  int32 batch_size = 4;
+  reserved 100 to 199;
+}
+
+// ─── TagService Messages ─────────────────────────────────────────────────────
+
+message SetTagsRequest {
+  // Object key to tag.
+  string key = 1;
+  // Tags to set (key-value pairs).
+  map<string, string> tags = 2;
+  // Whether to merge with existing tags (true) or replace all (false).
+  bool merge = 3;
+  reserved 100 to 199;
+}
+
+message GetTagsRequest {
+  // Object key.
+  string key = 1;
+  reserved 100 to 199;
+}
+
+message RemoveTagsRequest {
+  // Object key.
+  string key = 1;
+  // Tag keys to remove.
+  repeated string tag_keys = 2;
+  reserved 100 to 199;
+}
+
+message TagResponse {
+  // Object key.
+  string key = 1;
+  // Current tags after operation.
+  map<string, string> tags = 2;
+  // Number of tags affected by the operation.
+  int32 tags_affected = 3;
+  reserved 100 to 199;
+}
+
+// ─── SearchService Messages ──────────────────────────────────────────────────
+
+message SearchRequest {
+  // Full-text search query string.
+  string query = 1;
+  // Maximum results to return.
+  int32 max_results = 2;
+  // Offset for pagination.
+  int32 offset = 3;
+  // Optional filter expression for narrowing results.
+  string filter = 4;
+  // Sort order ("relevance", "date_asc", "date_desc", "size_asc", "size_desc").
+  string sort_by = 5;
+  reserved 100 to 199;
+}
+
+message TagSearchRequest {
+  // Tag predicates (all must match).
+  map<string, string> required_tags = 1;
+  // Optional tags (at least one must match).
+  map<string, string> optional_tags = 2;
+  // Maximum results.
+  int32 max_results = 3;
+  // Offset for pagination.
+  int32 offset = 4;
+  reserved 100 to 199;
+}
+
+message SearchResult {
+  // Object key.
+  string key = 1;
+  // Relevance score (0.0 to 1.0).
+  double score = 2;
+  // Object metadata snippet.
+  map<string, string> metadata = 3;
+  // Content snippet with search term highlighting.
+  string snippet = 4;
+  // Object size in bytes.
+  int64 size_bytes = 5;
+  // Last modification timestamp.
+  google.protobuf.Timestamp last_modified = 6;
+  reserved 100 to 199;
+}
+
+// ─── StreamService Messages ──────────────────────────────────────────────────
+
+message StoreChunk {
+  // Object key (must be the same in all chunks).
+  string key = 1;
+  // Chunk data.
+  bytes data = 2;
+  // Chunk sequence number.
+  int32 chunk_index = 3;
+  // Whether this is the final chunk.
+  bool is_last = 4;
+  // Content type (set in first chunk).
+  string content_type = 5;
+  // Object metadata (set in first chunk).
+  map<string, string> metadata = 6;
+  reserved 100 to 199;
+}
+
+message SubscribeRequest {
+  // Event topics to subscribe to (e.g., "object.created", "object.deleted").
+  repeated string topics = 1;
+  // Filter expression for event matching.
+  string filter = 2;
+  // Key prefix filter.
+  string key_prefix = 3;
+  // Whether to receive historical events from a given timestamp.
+  bool include_history = 4;
+  // Start timestamp for historical events.
+  google.protobuf.Timestamp history_from = 5;
+  reserved 100 to 199;
+}
+
+message Event {
+  // Event ID (unique).
+  string event_id = 1;
+  // Event topic.
+  string topic = 2;
+  // Affected object key.
+  string key = 3;
+  // Event timestamp.
+  google.protobuf.Timestamp timestamp = 4;
+  // Event payload as key-value pairs.
+  map<string, string> payload = 5;
+  // Event sequence number for ordering.
+  int64 sequence_number = 6;
+  reserved 100 to 199;
+}
+
+// ─── AdminService Messages ───────────────────────────────────────────────────
+
+message HealthRequest {
+  // Whether to include detailed component health.
+  bool include_details = 1;
+  reserved 100 to 199;
+}
+
+message HealthResponse {
+  // Overall health status.
+  HealthStatus status = 1;
+  // Instance uptime in seconds.
+  int64 uptime_seconds = 2;
+  // DataWarehouse version string.
+  string version = 3;
+  // Per-component health details.
+  map<string, ComponentHealth> components = 4;
+  // Health check timestamp.
+  google.protobuf.Timestamp checked_at = 5;
+  reserved 100 to 199;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_HEALTHY = 0;
+  HEALTH_STATUS_DEGRADED = 1;
+  HEALTH_STATUS_UNHEALTHY = 2;
+}
+
+message ComponentHealth {
+  // Component name.
+  string name = 1;
+  // Component health status.
+  HealthStatus status = 2;
+  // Status message.
+  string message = 3;
+  // Last check timestamp.
+  google.protobuf.Timestamp last_checked = 4;
+}
+
+message CapabilitiesRequest {
+  // Optional category filter.
+  string category = 1;
+  reserved 100 to 199;
+}
+
+message CapabilitiesResponse {
+  // Available capabilities.
+  repeated Capability capabilities = 1;
+  // Total plugin count.
+  int32 plugin_count = 2;
+  // Total strategy count.
+  int32 strategy_count = 3;
+  reserved 100 to 199;
+}
+
+message Capability {
+  // Capability identifier.
+  string id = 1;
+  // Display name.
+  string display_name = 2;
+  // Description.
+  string description = 3;
+  // Category.
+  string category = 4;
+  // Whether the capability is currently available.
+  bool is_available = 5;
+  // Tags for discovery.
+  repeated string tags = 6;
+}
+
+message PluginRequest {
+  // Plugin identifier.
+  string plugin_id = 1;
+  // Action to perform.
+  PluginAction action = 2;
+  // Configuration values (for Configure action).
+  map<string, string> configuration = 3;
+  reserved 100 to 199;
+}
+
+enum PluginAction {
+  PLUGIN_ACTION_ENABLE = 0;
+  PLUGIN_ACTION_DISABLE = 1;
+  PLUGIN_ACTION_CONFIGURE = 2;
+  PLUGIN_ACTION_RESTART = 3;
+  PLUGIN_ACTION_STATUS = 4;
+}
+
+message PluginResponse {
+  // Plugin identifier.
+  string plugin_id = 1;
+  // Current plugin status.
+  string status = 2;
+  // Status message.
+  string message = 3;
+  // Current configuration.
+  map<string, string> configuration = 4;
+  reserved 100 to 199;
+}
+
+message MetricsRequest {
+  // Optional metric name filter (empty = all metrics).
+  string filter = 1;
+  // Time range start.
+  google.protobuf.Timestamp from = 2;
+  // Time range end.
+  google.protobuf.Timestamp to = 3;
+  reserved 100 to 199;
+}
+
+message MetricsResponse {
+  // Metric entries.
+  repeated MetricEntry metrics = 1;
+  // Collection timestamp.
+  google.protobuf.Timestamp collected_at = 2;
+  reserved 100 to 199;
+}
+
+message MetricEntry {
+  // Metric name.
+  string name = 1;
+  // Metric value.
+  double value = 2;
+  // Metric unit (e.g., "bytes", "ms", "ops/sec").
+  string unit = 3;
+  // Metric labels/dimensions.
+  map<string, string> labels = 4;
+  // Collection timestamp.
+  google.protobuf.Timestamp timestamp = 5;
+}

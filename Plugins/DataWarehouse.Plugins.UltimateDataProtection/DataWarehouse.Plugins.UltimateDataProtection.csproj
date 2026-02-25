@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateDataProtection</RootNamespace>
+    <Description>Ultimate Data Protection plugin - 40+ backup and recovery strategies including full, incremental, CDP, snapshots, archives, cloud backup, disaster recovery, database-aware backup, and Kubernetes workload protection with Intelligence-driven optimization</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,3 +1,7 @@
+// FUTURE: Low-latency storage contracts -- interfaces preserved for RDMA and kernel-bypass I/O per AD-06.
+// These types have zero current implementations but define contracts for future
+// low-latency storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Performance;
 
 /// <summary>

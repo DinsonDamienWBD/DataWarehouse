@@ -252,6 +252,87 @@ Original Data
 - **IAccessLogProvider**: Access logging and audit trails
 - **IPipelineOrchestrator**: User transformation pipeline
 
+## Advanced Features
+
+### Shard-Level Integrity Verification
+
+The read pipeline performs integrity verification at the individual shard level before reconstruction:
+
+```csharp
+// Load with detailed shard verification
+var result = await ReadPhaseHandlers.LoadAndReconstructShardsWithVerificationAsync(
+    manifest,
+    dataStorage,
+    logger,
+    cancellationToken);
+
+// Check detailed shard status
+foreach (var shardResult in result.ShardResults)
+{
+    Console.WriteLine($"Shard {shardResult.ShardIndex}: {(shardResult.Valid ? "Valid" : "Invalid")}");
+}
+
+// Get problematic shard information
+Console.WriteLine($"Corrupted: {result.CorruptedShards.Count}");
+Console.WriteLine($"Missing: {result.MissingShards.Count}");
+Console.WriteLine($"Reconstructed: {result.ReconstructedShards.Count}");
+```
+
+### Targeted Shard Recovery
+
+For efficiency, the recovery service can recover only corrupted shards instead of the entire object:
+
+```csharp
+// Check shard integrity first
+var integrityCheck = await recoveryService.VerifyShardIntegrityAsync(manifest, ct);
+
+if (integrityCheck.OverallHealth != ShardHealthStatus.Healthy)
+{
+    // Attempt targeted recovery of only corrupted shards
+    var recoveryResult = await recoveryService.RecoverCorruptedShardsAsync(
+        manifest,
+        integrityCheck.CorruptedShards,
+        ct);
+}
+```
+
+### Version Index for Fast Latest Version Lookup
+
+The plugin maintains a version index for each object, enabling fast retrieval of the latest version:
+
+```csharp
+// Version index is automatically maintained on writes
+// Reads can quickly find the latest version without scanning
+
+var latestRead = await tamperProofPlugin.ExecuteReadPipelineAsync(
+    objectId: myObjectId,
+    version: null,  // Efficiently finds latest via index
+    readMode: ReadMode.Verified,
+    ct);
+```
+
+### Message Bus Integration
+
+The plugin integrates with Ultimate plugins (T93-T95) via message bus for:
+
+- **Encryption/Decryption** (UltimateEncryption T93)
+- **Key Management** (UltimateKeyManagement T94)
+- **WORM Access Control** (UltimateAccessControl T95)
+- **Tamper Alert Publishing**
+- **Recovery Notifications**
+
+```csharp
+// Example: Request encryption via message bus
+var encryptionResult = await messageBusService.RequestEncryptionAsync(
+    data: myData,
+    keyId: "tamperproof-encryption-key",
+    algorithmHint: "AES256-GCM",
+    ct);
+
+// Example: Publish tamper alert
+await messageBusService.PublishTamperAlertAsync(tamperIncident, ct);
+```
+
 ## Compliance
 
 - **WORM**: Supports SEC 17a-4, FINRA 4511, HIPAA, and other regulations

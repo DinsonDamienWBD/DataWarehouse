@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -13,7 +14,7 @@ namespace DataWarehouse.SDK.Infrastructure;
 /// <typeparam name="TConfig">Configuration type for the connection (e.g., S3Config, RelationalDbConfig).</typeparam>
 public class StorageConnectionRegistry<TConfig> : IAsyncDisposable where TConfig : class
 {
-    private readonly ConcurrentDictionary<string, StorageConnectionInstance<TConfig>> _instances = new();
+    private readonly BoundedDictionary<string, StorageConnectionInstance<TConfig>> _instances = new BoundedDictionary<string, StorageConnectionInstance<TConfig>>(1000);
     private readonly SemaphoreSlim _registryLock = new(1, 1);
     private readonly Func<TConfig, Task<object>>? _defaultConnectionFactory;
     private volatile bool _disposed;
@@ -617,7 +618,20 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
     {
         if (connection is IAsyncDisposable asyncDisposable)
         {
-            asyncDisposable.DisposeAsync().AsTask().Wait();
+            // Fire-and-forget — prefer DisposeConnectionAsync for proper async disposal
+            asyncDisposable.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskContinuationOptions.ExecuteSynchronously);
+        }
+        else if (connection is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+
+    private static async ValueTask DisposeConnectionAsync(object connection)
+    {
+        if (connection is IAsyncDisposable asyncDisposable)
+        {
+            await asyncDisposable.DisposeAsync();
         }
         else if (connection is IDisposable disposable)
         {
@@ -638,14 +652,14 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
         // Dispose primary connection
         if (_primaryConnection != null)
         {
-            DisposeConnection(_primaryConnection);
+            await DisposeConnectionAsync(_primaryConnection);
             _primaryConnection = null;
         }
 
         // Dispose all pooled connections
         while (_connectionPool.TryDequeue(out var connection))
         {
-            DisposeConnection(connection);
+            await DisposeConnectionAsync(connection);
         }
 
         _poolSemaphore.Dispose();

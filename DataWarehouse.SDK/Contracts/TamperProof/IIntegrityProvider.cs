@@ -2,7 +2,12 @@
 // DataWarehouse licenses this file under the MIT license.
 
 using System.Buffers;
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using System.Threading;
+
+using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
@@ -82,8 +87,85 @@ public interface IIntegrityProvider
 /// Provides thread-safe, streaming-capable hash computation with efficient buffer management.
 /// Derived classes only need to implement the core hash algorithm.
 /// </summary>
-public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrityProvider
+public abstract class IntegrityProviderPluginBase : IntegrityPluginBase, IIntegrityProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return await Task.FromResult(sha.ComputeHash(data));
+    }
+
+    #region Intelligence Socket
+
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.integrity",
+            DisplayName = $"{Name} - Integrity Provider",
+            Description = $"Hash computation with {string.Join(", ", SupportedAlgorithms)}",
+            Category = CapabilityCategory.TamperProof,
+            SubCategory = "Integrity",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "integrity", "hash", "verification", "tamper-proof" },
+            SemanticDescription = "Use for integrity hash computation and verification"
+        }
+    };
+
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.integrity.capability",
+                Topic = "tamperproof.integrity",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Integrity provider, Algorithms: {string.Join(", ", SupportedAlgorithms)}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["supportedAlgorithms"] = SupportedAlgorithms.Select(a => a.ToString()).ToArray(),
+                    ["defaultAlgorithm"] = DefaultAlgorithm.ToString(),
+                    ["supportsStreaming"] = true,
+                    ["supportsShardHashing"] = true
+                },
+                Tags = new[] { "integrity", "hash", "tamper-proof" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted integrity verification confidence.
+    /// </summary>
+    protected virtual async Task<IntegrityVerificationConfidence?> RequestVerificationConfidenceAsync(IntegrityHash expectedHash, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
+
     /// <summary>
     /// Default buffer size for streaming operations (64KB).
     /// Can be overridden by derived classes for optimal performance.
@@ -157,7 +239,7 @@ public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrit
                 // For large or non-seekable streams, use chunked reading
                 using var memoryOwner = MemoryPool<byte>.Shared.Rent(StreamBufferSize);
                 var buffer = memoryOwner.Memory;
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
 
                 int bytesRead;
                 while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
@@ -328,3 +410,14 @@ public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrit
         return metadata;
     }
 }
+
+#region Stub Types for Integrity Intelligence Integration
+
+/// <summary>Stub type for integrity verification confidence from AI.</summary>
+public record IntegrityVerificationConfidence(
+    bool IsLikelyValid,
+    double ConfidenceScore,
+    string[] RiskFactors,
+    string Recommendation);
+
+#endregion

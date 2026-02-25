@@ -20,16 +20,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.3" />
     <PackageReference Include="Spectre.Console" Version="0.54.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
   </ItemGroup>
 
   <!-- Exclude old Commands folder - business logic moved to DataWarehouse.Shared -->
   <ItemGroup>
     <Compile Remove="Commands\**" />
+    <!-- Re-include VDE commands (CLI-only, uses Spectre.Console for rich output) -->
+    <Compile Include="Commands\VdeCommands.cs" />
   </ItemGroup>
 
   <ItemGroup>

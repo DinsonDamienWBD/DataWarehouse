@@ -1,0 +1,16 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Dashboard;
+
+/// <summary>Perses connection strategy. HTTP to Perses API. Modern Prometheus dashboard alternative to Grafana.</summary>
+public sealed class PersesConnectionStrategy : DashboardConnectionStrategyBase
+{
+    public override string StrategyId => "perses";public override string DisplayName => "Perses";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Perses modern Prometheus dashboarding. Simplified Grafana alternative for Prometheus metrics.";public override string[] Tags => ["perses", "prometheus", "dashboard", "open-source", "cncf"];
+    public PersesConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "http://localhost:8080";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Perses", ["BaseUrl"] = baseUrl });}
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct){try { var response = await handle.GetConnection<HttpClient>().GetAsync("/api/v1/projects", ct); return response.IsSuccessStatusCode; } catch { return false; }}
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct){var sw = System.Diagnostics.Stopwatch.StartNew();try { var response = await handle.GetConnection<HttpClient>().GetAsync("/api/health", ct); sw.Stop(); return new ConnectionHealth(response.IsSuccessStatusCode, "Perses ready", sw.Elapsed, DateTimeOffset.UtcNow); }catch (Exception ex) { sw.Stop(); return new ConnectionHealth(false, ex.Message, sw.Elapsed, DateTimeOffset.UtcNow); }}
+    public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default){var httpClient = handle.GetConnection<HttpClient>();var content = new StringContent(dashboardDefinition, Encoding.UTF8, "application/json");var response = await httpClient.PostAsync("/api/v1/dashboards", content, ct);response.EnsureSuccessStatusCode();var result = await response.Content.ReadAsStringAsync(ct);var json = JsonDocument.Parse(result);return json.RootElement.GetProperty("metadata").GetProperty("name").GetString() ?? "";}
+    public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default) => throw new NotSupportedException("Perses queries Prometheus datasources.");
+}

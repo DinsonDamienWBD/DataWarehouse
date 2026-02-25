@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Validation;
 
@@ -180,7 +180,7 @@ public sealed class ValidationException : Exception
 /// </summary>
 public sealed class InputValidator : IInputValidator
 {
-    private readonly ConcurrentDictionary<Type, object> _validators = new();
+    private readonly BoundedDictionary<Type, object> _validators = new BoundedDictionary<Type, object>(1000);
     private readonly InputValidatorConfig _config;
 
     public InputValidator(InputValidatorConfig? config = null)
@@ -455,7 +455,7 @@ public static class SecurityRules
 
         if (options.HasFlag(SanitizationOptions.RemoveScriptTags))
         {
-            result = Regex.Replace(result, @"<script[^>]*>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            result = Regex.Replace(result, @"<script[^>]*>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
         }
 
         if (options.HasFlag(SanitizationOptions.RemoveNullBytes))

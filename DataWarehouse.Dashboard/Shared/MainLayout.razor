@@ -40,7 +40,12 @@
         var uri = NavigationManager?.Uri;
         if (uri != null)
         {
-            if (uri.Contains("/plugins")) _pageTitle = "Plugin Management";
+            if (uri.Contains("/system-overview")) _pageTitle = "System Overview";
+            else if (uri.Contains("/plugin-manager")) _pageTitle = "Plugin Manager";
+            else if (uri.Contains("/query-explorer")) _pageTitle = "Query Explorer";
+            else if (uri.Contains("/security-dashboard")) _pageTitle = "Security Dashboard";
+            else if (uri.Contains("/cluster-status")) _pageTitle = "Cluster Status";
+            else if (uri.Contains("/plugins")) _pageTitle = "Plugin Management";
             else if (uri.Contains("/storage")) _pageTitle = "Storage Management";
             else if (uri.Contains("/monitoring")) _pageTitle = "Monitoring";
             else if (uri.Contains("/configuration")) _pageTitle = "Configuration";

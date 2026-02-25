@@ -4,7 +4,6 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 // Use SDK's MessageTopics
 using static DataWarehouse.SDK.Contracts.MessageTopics;
@@ -32,7 +31,7 @@ namespace DataWarehouse.Kernel.Pipeline
         private readonly DefaultMessageBus _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
         private readonly ILogger? _logger = logger;
         private readonly IDistributedTracing? _tracing = tracing;
-        private readonly ConcurrentDictionary<string, IDataTransformation> _stages = new();
+        private readonly BoundedDictionary<string, IDataTransformation> _stages = new BoundedDictionary<string, IDataTransformation>(1000);
         private readonly Lock _configLock = new();
 
         private PipelineConfiguration _currentConfig = PipelineConfiguration.CreateDefault();
@@ -125,7 +124,7 @@ namespace DataWarehouse.Kernel.Pipeline
             return [.. _stages.Select(kvp =>
             {
                 var plugin = kvp.Value as IPlugin;
-                var pipelinePlugin = kvp.Value as PipelinePluginBase;
+                var pipelinePlugin = kvp.Value as DataWarehouse.SDK.Contracts.Hierarchy.DataPipelinePluginBase;
 
                 return new PipelineStageInfo
                 {
@@ -133,10 +132,10 @@ namespace DataWarehouse.Kernel.Pipeline
                     Name = plugin?.Name ?? kvp.Key,
                     SubCategory = kvp.Value.SubCategory,
                     QualityLevel = kvp.Value.QualityLevel,
-                    DefaultOrder = pipelinePlugin?.DefaultOrder ?? 100,
+                    DefaultOrder = pipelinePlugin?.DefaultPipelineOrder ?? 100,
                     AllowBypass = pipelinePlugin?.AllowBypass ?? false,
-                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages ?? [],
-                    IncompatibleStages = pipelinePlugin?.IncompatibleStages ?? [],
+                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages?.ToArray() ?? [],
+                    IncompatibleStages = pipelinePlugin?.IncompatibleStages?.ToArray() ?? [],
                     Description = plugin?.Name ?? "Pipeline stage"
                 };
             })];

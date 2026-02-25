@@ -100,30 +100,32 @@ public class InMemoryStoragePluginTests
     [Fact]
     public async Task SaveAsync_ShouldEvictLruItemWhenMemoryLimitExceeded()
     {
-        // Arrange - 100 byte limit
-        var config = new InMemoryStorageConfig { MaxMemoryBytes = 100 };
+        // Arrange - 150 byte limit (large enough to keep one 50-byte item + one 40-byte item)
+        var config = new InMemoryStorageConfig { MaxMemoryBytes = 150 };
         var plugin = new InMemoryStoragePlugin(config);
 
-        // Save 50 bytes
+        // Save 50 bytes (uri1)
         var uri1 = new Uri("memory:///first.txt");
         await plugin.SaveAsync(uri1, new MemoryStream(new byte[50]));
 
-        // Access first item to set its last access time
-        await plugin.LoadAsync(uri1);
-
-        // Save another 50 bytes
+        // Save another 50 bytes (uri2) -- total = 100
         var uri2 = new Uri("memory:///second.txt");
         await plugin.SaveAsync(uri2, new MemoryStream(new byte[50]));
-        await Task.Delay(10); // Ensure different timestamps
 
-        // Act - Save 60 bytes, should evict LRU item (second)
+        // Wait then access uri1 to make it more recently used than uri2
+        await Task.Delay(20);
+        await plugin.LoadAsync(uri1);
+
+        // Act - Save 60 bytes, total would be 160 > 150, so LRU eviction kicks in.
+        // uri2 is LRU (oldest LastAccessedAt, lowest AccessCount=0).
+        // After evicting uri2 (50 bytes), total=50+60=110 <= 150, fits.
         var uri3 = new Uri("memory:///third.txt");
         await plugin.SaveAsync(uri3, new MemoryStream(new byte[60]));
 
-        // Assert - second should be evicted (least recently used)
-        (await plugin.ExistsAsync(uri1)).Should().BeTrue();
-        (await plugin.ExistsAsync(uri2)).Should().BeFalse();
-        (await plugin.ExistsAsync(uri3)).Should().BeTrue();
+        // Assert - uri2 should be evicted (least recently used)
+        (await plugin.ExistsAsync(uri1)).Should().BeTrue("uri1 was recently accessed");
+        (await plugin.ExistsAsync(uri2)).Should().BeFalse("uri2 was the LRU item");
+        (await plugin.ExistsAsync(uri3)).Should().BeTrue("uri3 was just saved");
     }
 
     [Fact]

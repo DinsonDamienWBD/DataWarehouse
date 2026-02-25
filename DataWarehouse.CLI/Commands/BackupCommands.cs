@@ -1,4 +1,8 @@
 using Spectre.Console;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Commands;
 
@@ -7,6 +11,29 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class BackupCommands
 {
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-backup")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
+
     public static async Task CreateBackupAsync(string name, string? destination, bool incremental, bool compress, bool encrypt)
     {
         var backupId = $"backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
@@ -73,8 +100,6 @@ public static class BackupCommands
 
         AnsiConsole.MarkupLine($"\n[green]Backup completed successfully![/]");
         AnsiConsole.MarkupLine($"  Backup ID: [cyan]{backupId}[/]");
-        AnsiConsole.MarkupLine($"  Size: [cyan]2.3 GB[/]");
-        AnsiConsole.MarkupLine($"  Duration: [cyan]45 seconds[/]");
     }
 
     public static async Task ListBackupsAsync()
@@ -82,23 +107,54 @@ public static class BackupCommands
         await AnsiConsole.Status()
             .StartAsync("Loading backups...", async ctx =>
             {
-                await Task.Delay(300);
+                try
+                {
+                    var kernel = await GetKernelAsync();
+                    var request = new PluginMessage
+                    {
+                        Type = "dataprotection.backup.list",
+                        SourcePluginId = "cli",
+                        Source = "CLI"
+                    };
 
-                var table = new Table()
-                    .Border(TableBorder.Rounded)
-                    .AddColumn("ID")
-                    .AddColumn("Name")
-                    .AddColumn("Type")
-                    .AddColumn("Size")
-                    .AddColumn("Created")
-                    .AddColumn("Status");
+                    var response = await kernel.MessageBus.SendAsync(
+                        "dataprotection.backup.list", request, TimeSpan.FromSeconds(5));
 
-                table.AddRow("backup-20260118-030000", "Daily Backup", "Full", "5.2 GB", "2026-01-18 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260117-030000", "Daily Backup", "Full", "5.1 GB", "2026-01-17 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260116-030000", "Daily Backup", "Full", "5.0 GB", "2026-01-16 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260115-120000", "Pre-Update", "Full", "4.9 GB", "2026-01-15 12:00", "[green]Verified[/]");
+                    if (response.Success && response.Payload is IEnumerable<object> backups)
+                    {
+                        var table = new Table()
+                            .Border(TableBorder.Rounded)
+                            .AddColumn("ID")
+                            .AddColumn("Name")
+                            .AddColumn("Created")
+                            .AddColumn("Size")
+                            .AddColumn("Type");
 
-                AnsiConsole.Write(table);
+                        foreach (var backup in backups)
+                        {
+                            if (backup is Dictionary<string, object> b)
+                            {
+                                table.AddRow(
+                                    b.GetValueOrDefault("Id", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Created", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Size", "")?.ToString() ?? "",
+                                    b.GetValueOrDefault("Type", "")?.ToString() ?? ""
+                                );
+                            }
+                        }
+
+                        AnsiConsole.Write(table);
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine("[yellow]No backup data available - DataProtection plugin not loaded.[/]");
+                    }
+                }
+                catch (Exception)
+                {
+                    AnsiConsole.MarkupLine("[yellow]No backup data available - DataProtection plugin not loaded.[/]");
+                }
             });
     }
 
@@ -170,9 +226,6 @@ public static class BackupCommands
             });
 
         AnsiConsole.MarkupLine($"\n[green]Backup verification passed![/]");
-        AnsiConsole.MarkupLine("  Files checked: [cyan]12,456[/]");
-        AnsiConsole.MarkupLine("  Checksum: [cyan]SHA256:a1b2c3d4...[/]");
-        AnsiConsole.MarkupLine("  Integrity: [green]100%[/]");
     }
 
     public static async Task DeleteBackupAsync(string id, bool force)

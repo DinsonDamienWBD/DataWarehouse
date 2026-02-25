@@ -1,4 +1,8 @@
 using Spectre.Console;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Commands;
 
@@ -7,6 +11,29 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class HealthCommands
 {
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-health")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
+
     public static async Task ShowStatusAsync()
     {
         await AnsiConsole.Status()
@@ -77,7 +104,7 @@ public static class HealthCommands
             {
                 await Task.Delay(200);
 
-                var alerts = GetAlerts(includeAcknowledged);
+                var alerts = await GetAlertsAsync(includeAcknowledged);
 
                 if (alerts.Count == 0)
                 {
@@ -184,15 +211,56 @@ public static class HealthCommands
         }
     }
 
-    private static List<AlertInfo> GetAlerts(bool includeAcknowledged)
+    /// <summary>
+    /// Queries the kernel message bus for active alerts from the observability plugin.
+    /// Returns an empty list if the kernel or observability plugin is unavailable.
+    /// </summary>
+    private static async Task<List<AlertInfo>> GetAlertsAsync(bool includeAcknowledged)
     {
-        var alerts = new List<AlertInfo>
+        try
         {
-            new() { Severity = "Warning", Title = "High disk usage on pool-002", Time = "10:30:00", IsAcknowledged = false },
-            new() { Severity = "Info", Title = "Scheduled backup completed", Time = "03:00:00", IsAcknowledged = true },
-        };
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "observability.alert.list",
+                SourcePluginId = "cli",
+                Source = "CLI",
+                Payload = new Dictionary<string, object>
+                {
+                    ["IncludeAcknowledged"] = includeAcknowledged
+                }
+            };
 
-        return includeAcknowledged ? alerts : alerts.Where(a => !a.IsAcknowledged).ToList();
+            var response = await kernel.MessageBus.SendAsync(
+                "observability.alert.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> alertList)
+            {
+                var result = new List<AlertInfo>();
+                foreach (var item in alertList)
+                {
+                    if (item is Dictionary<string, object> a)
+                    {
+                        result.Add(new AlertInfo
+                        {
+                            Severity = a.GetValueOrDefault("Severity", "")?.ToString() ?? "",
+                            Title = a.GetValueOrDefault("Title", "")?.ToString() ?? "",
+                            Time = a.GetValueOrDefault("Time", "")?.ToString() ?? "",
+                            IsAcknowledged = a.GetValueOrDefault("IsAcknowledged") is true
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No alert data available - Observability plugin not responding.[/]");
+            return new List<AlertInfo>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No alert data available - kernel context not accessible.[/]");
+            return new List<AlertInfo>();
+        }
     }
 
     private record AlertInfo

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateCompression</RootNamespace>
+    <Description>Ultimate Compression plugin - 50+ compression algorithms as strategies including LZ-family, transform-based, context mixing, entropy coders, delta encoding, domain-specific, archive formats, and emerging algorithms</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="K4os.Compression.LZ4" Version="1.3.8" />
+    <PackageReference Include="K4os.Compression.LZ4.Streams" Version="1.3.8" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
+    <PackageReference Include="SharpCompress" Version="0.45.1" />
+    <PackageReference Include="Snappier" Version="1.3.0" />
+  </ItemGroup>
+
+</Project>

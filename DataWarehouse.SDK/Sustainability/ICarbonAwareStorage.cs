@@ -1,5 +1,9 @@
 using DataWarehouse.SDK.Contracts;
 
+// FUTURE: Carbon-aware scheduling -- interfaces preserved for carbon-aware storage scheduling per AD-06.
+// These types have zero current implementations but define contracts for future
+// carbon-aware storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Sustainability;
 
 /// <summary>

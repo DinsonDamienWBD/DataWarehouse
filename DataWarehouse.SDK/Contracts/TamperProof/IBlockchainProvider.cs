@@ -1,7 +1,12 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using System.Threading;
+
+using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
@@ -373,8 +378,84 @@ public class BlockInfo
 /// Provides common functionality for implementing blockchain anchoring.
 /// Derived classes implement provider-specific blockchain operations.
 /// </summary>
-public abstract class BlockchainProviderPluginBase : FeaturePluginBase, IBlockchainProvider
+public abstract class BlockchainProviderPluginBase : IntegrityPluginBase, IBlockchainProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return await Task.FromResult(sha.ComputeHash(data));
+    }
+
+    #region Intelligence Socket
+
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.blockchain",
+            DisplayName = $"{Name} - Blockchain Provider",
+            Description = "Blockchain anchoring for tamper-proof audit trails",
+            Category = CapabilityCategory.TamperProof,
+            SubCategory = "Blockchain",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "blockchain", "anchoring", "tamper-proof", "audit" },
+            SemanticDescription = "Use for blockchain-based integrity anchoring"
+        }
+    };
+
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.blockchain.capability",
+                Topic = "tamperproof.blockchain",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = "Blockchain provider for tamper-proof anchoring",
+                Payload = new Dictionary<string, object>
+                {
+                    ["supportsBatchAnchoring"] = true,
+                    ["supportsMerkleProofs"] = true,
+                    ["supportsChainValidation"] = true
+                },
+                Tags = new[] { "blockchain", "anchoring", "tamper-proof" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted anchor timing recommendation.
+    /// </summary>
+    protected virtual async Task<AnchorTimingRecommendation?> RequestAnchorTimingAsync(int pendingAnchors, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
+
     /// <summary>
     /// Anchor a single object to the blockchain.
     /// Default implementation uses batch anchoring with a single item.
@@ -657,3 +738,15 @@ public abstract class BlockchainProviderPluginBase : FeaturePluginBase, IBlockch
         return metadata;
     }
 }
+
+#region Stub Types for Blockchain Intelligence Integration
+
+/// <summary>Stub type for anchor timing recommendation from AI.</summary>
+public record AnchorTimingRecommendation(
+    bool ShouldAnchorNow,
+    int RecommendedBatchSize,
+    TimeSpan RecommendedDelay,
+    string Rationale,
+    double ConfidenceScore);
+
+#endregion

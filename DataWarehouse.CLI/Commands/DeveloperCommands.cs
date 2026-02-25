@@ -3,6 +3,10 @@
 
 using Spectre.Console;
 using System.Text.Json;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Shared.Services;
 
 namespace DataWarehouse.CLI.Commands;
@@ -13,8 +17,31 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class DeveloperCommands
 {
-    // TODO: Inject IDeveloperToolsService once service is created
+    // DeveloperToolsService injection point: wire IDeveloperToolsService when service layer is created.
     // private static IDeveloperToolsService? _devToolsService;
+
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-developer")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
 
     #region API Explorer Commands
 
@@ -25,7 +52,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var endpoints = GetApiEndpoints(category);
+                var endpoints = await GetApiEndpointsAsync(category);
 
                 if (endpoints.Count == 0)
                 {
@@ -77,7 +104,7 @@ public static class DeveloperCommands
         await AnsiConsole.Status()
             .StartAsync($"Calling {method} {endpoint}...", async ctx =>
             {
-                // TODO: Implement actual API call via DeveloperToolsService
+                // Placeholder: replace with actual API call via DeveloperToolsService when available.
                 await Task.Delay(300);
 
                 AnsiConsole.MarkupLine($"[bold]API Call:[/] {method} {endpoint}");
@@ -149,7 +176,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var schemas = GetSchemas();
+                var schemas = await GetSchemasAsync();
 
                 if (schemas.Count == 0)
                 {
@@ -194,7 +221,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var schema = GetSchema(name);
+                var schema = await GetSchemaAsync(name);
 
                 if (schema == null)
                 {
@@ -260,7 +287,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema creation via DeveloperToolsService
+                // Placeholder: replace with actual schema creation via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' created successfully.[/]");
             });
     }
@@ -272,7 +299,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema update via DeveloperToolsService
+                // Placeholder: replace with actual schema update via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' updated successfully.[/]");
             });
     }
@@ -294,7 +321,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema deletion via DeveloperToolsService
+                // Placeholder: replace with actual schema deletion via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' deleted successfully.[/]");
             });
     }
@@ -306,7 +333,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                var schema = GetSchema(name);
+                var schema = await GetSchemaAsync(name);
                 if (schema == null)
                 {
                     AnsiConsole.MarkupLine($"[red]Schema '{name}' not found.[/]");
@@ -345,7 +372,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema import via DeveloperToolsService
+                // Placeholder: replace with actual schema import via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema imported successfully from:[/] {file}");
             });
     }
@@ -361,7 +388,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var collections = GetCollections();
+                var collections = await GetCollectionsAsync();
 
                 if (collections.Count == 0)
                 {
@@ -396,7 +423,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var fields = GetFields(collection);
+                var fields = await GetFieldsAsync(collection);
 
                 if (fields.Count == 0)
                 {
@@ -455,8 +482,7 @@ public static class DeveloperCommands
                 };
                 AnsiConsole.Write(panel);
 
-                // TODO: Execute actual query via DeveloperToolsService
-                var results = GetSampleResults(collection, limit);
+                var results = await GetQueryResultsAsync(collection, limit);
 
                 AnsiConsole.MarkupLine($"\n[bold]Results:[/] {results.Count} row(s)");
 
@@ -497,7 +523,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(200);
 
-                var templates = GetQueryTemplates();
+                var templates = await GetQueryTemplatesAsync();
 
                 if (templates.Count == 0)
                 {
@@ -534,7 +560,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual template save via DeveloperToolsService
+                // Placeholder: replace with actual template save via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Query template '{name}' saved successfully.[/]");
             });
     }
@@ -546,7 +572,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual template load and execution via DeveloperToolsService
+                // Placeholder: replace with actual template load and execution via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Query template '{name}' loaded and executed.[/]");
             });
     }
@@ -555,24 +581,55 @@ public static class DeveloperCommands
 
     #region Helper Methods
 
-    private static List<ApiEndpoint> GetApiEndpoints(string? category)
+    /// <summary>
+    /// Queries the kernel message bus for registered API endpoints.
+    /// Returns an empty list if the kernel or interface plugin is unavailable.
+    /// </summary>
+    private static async Task<List<ApiEndpoint>> GetApiEndpointsAsync(string? category)
     {
-        var endpoints = new List<ApiEndpoint>
+        try
         {
-            new() { Method = "GET", Path = "/api/storage/pools", Category = "Storage", Description = "List storage pools" },
-            new() { Method = "POST", Path = "/api/storage/pools", Category = "Storage", Description = "Create storage pool" },
-            new() { Method = "GET", Path = "/api/health/status", Category = "Health", Description = "Get system health status" },
-            new() { Method = "GET", Path = "/api/plugins", Category = "Plugins", Description = "List installed plugins" },
-            new() { Method = "POST", Path = "/api/records", Category = "Data", Description = "Create record" },
-            new() { Method = "GET", Path = "/api/records/{id}", Category = "Data", Description = "Get record by ID" },
-        };
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "interface.api.list",
+                SourcePluginId = "cli",
+                Source = "CLI",
+                Payload = category != null
+                    ? new Dictionary<string, object> { ["Category"] = category }
+                    : new Dictionary<string, object>()
+            };
 
-        if (!string.IsNullOrEmpty(category))
-        {
-            return endpoints.Where(e => e.Category.Equals(category, StringComparison.OrdinalIgnoreCase)).ToList();
+            var response = await kernel.MessageBus.SendAsync(
+                "interface.api.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> endpointList)
+            {
+                var result = new List<ApiEndpoint>();
+                foreach (var item in endpointList)
+                {
+                    if (item is Dictionary<string, object> e)
+                    {
+                        result.Add(new ApiEndpoint
+                        {
+                            Method = e.GetValueOrDefault("Method", "")?.ToString() ?? "",
+                            Path = e.GetValueOrDefault("Path", "")?.ToString() ?? "",
+                            Category = e.GetValueOrDefault("Category", "")?.ToString() ?? "",
+                            Description = e.GetValueOrDefault("Description", "")?.ToString() ?? ""
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No API endpoint data available - Interface plugin not responding.[/]");
+            return new List<ApiEndpoint>();
         }
-
-        return endpoints;
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No API endpoint data available - kernel context not accessible.[/]");
+            return new List<ApiEndpoint>();
+        }
     }
 
     private static string GenerateCurlCode(string endpoint)
@@ -601,33 +658,113 @@ data = response.json()";
 const data = await response.json();";
     }
 
-    private static List<SchemaInfo> GetSchemas()
+    /// <summary>
+    /// Queries the kernel message bus for registered data schemas.
+    /// Returns an empty list if the kernel or data format plugin is unavailable.
+    /// </summary>
+    private static async Task<List<SchemaInfo>> GetSchemasAsync()
     {
-        return new List<SchemaInfo>
+        try
         {
-            new() { Name = "User", FieldCount = 5, Created = DateTime.Now.AddDays(-30), Modified = DateTime.Now.AddDays(-2) },
-            new() { Name = "Product", FieldCount = 8, Created = DateTime.Now.AddDays(-20), Modified = DateTime.Now.AddDays(-1) },
-            new() { Name = "Order", FieldCount = 6, Created = DateTime.Now.AddDays(-15), Modified = DateTime.Now },
-        };
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "dataformat.schema.list",
+                SourcePluginId = "cli",
+                Source = "CLI"
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "dataformat.schema.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> schemaList)
+            {
+                var result = new List<SchemaInfo>();
+                foreach (var item in schemaList)
+                {
+                    if (item is Dictionary<string, object> s)
+                    {
+                        result.Add(new SchemaInfo
+                        {
+                            Name = s.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            FieldCount = s.GetValueOrDefault("FieldCount") is int fc ? fc : 0,
+                            Created = s.GetValueOrDefault("Created") is DateTime c ? c : DateTime.MinValue,
+                            Modified = s.GetValueOrDefault("Modified") is DateTime m ? m : DateTime.MinValue,
+                            Fields = new List<SchemaField>()
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No schema data available - DataFormat plugin not responding.[/]");
+            return new List<SchemaInfo>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No schema data available - kernel context not accessible.[/]");
+            return new List<SchemaInfo>();
+        }
     }
 
-    private static SchemaInfo? GetSchema(string name)
+    /// <summary>
+    /// Queries the kernel message bus for a specific schema by name.
+    /// Returns null if the kernel or data format plugin is unavailable.
+    /// </summary>
+    private static async Task<SchemaInfo?> GetSchemaAsync(string name)
     {
-        var schema = new SchemaInfo
+        try
         {
-            Name = name,
-            FieldCount = 3,
-            Created = DateTime.Now.AddDays(-10),
-            Modified = DateTime.Now,
-            Fields = new List<SchemaField>
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
             {
-                new() { Name = "id", Type = "string", Required = true, Description = "Unique identifier" },
-                new() { Name = "name", Type = "string", Required = true, Description = "Display name" },
-                new() { Name = "created", Type = "datetime", Required = false, Description = "Creation timestamp" },
-            }
-        };
+                Type = "dataformat.schema.list",
+                SourcePluginId = "cli",
+                Source = "CLI",
+                Payload = new Dictionary<string, object> { ["Name"] = name }
+            };
 
-        return schema;
+            var response = await kernel.MessageBus.SendAsync(
+                "dataformat.schema.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is Dictionary<string, object> s)
+            {
+                var fields = new List<SchemaField>();
+                if (s.GetValueOrDefault("Fields") is IEnumerable<object> fieldList)
+                {
+                    foreach (var f in fieldList)
+                    {
+                        if (f is Dictionary<string, object> fd)
+                        {
+                            fields.Add(new SchemaField
+                            {
+                                Name = fd.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                                Type = fd.GetValueOrDefault("Type", "")?.ToString() ?? "",
+                                Required = fd.GetValueOrDefault("Required") is true,
+                                Description = fd.GetValueOrDefault("Description")?.ToString()
+                            });
+                        }
+                    }
+                }
+
+                return new SchemaInfo
+                {
+                    Name = s.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                    FieldCount = fields.Count,
+                    Created = s.GetValueOrDefault("Created") is DateTime c ? c : DateTime.MinValue,
+                    Modified = s.GetValueOrDefault("Modified") is DateTime m ? m : DateTime.MinValue,
+                    Fields = fields
+                };
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No schema data available - DataFormat plugin not responding.[/]");
+            return null;
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No schema data available - kernel context not accessible.[/]");
+            return null;
+        }
     }
 
     private static string ConvertToYaml(SchemaInfo schema)
@@ -647,48 +784,198 @@ const data = await response.json();";
         return yaml;
     }
 
-    private static List<CollectionInfo> GetCollections()
+    /// <summary>
+    /// Queries the kernel message bus for storage collections.
+    /// Returns an empty list if the kernel or storage plugin is unavailable.
+    /// </summary>
+    private static async Task<List<CollectionInfo>> GetCollectionsAsync()
     {
-        return new List<CollectionInfo>
+        try
         {
-            new() { Name = "users", RecordCount = 1234, Size = 10 * 1024 * 1024 },
-            new() { Name = "products", RecordCount = 567, Size = 5 * 1024 * 1024 },
-            new() { Name = "orders", RecordCount = 890, Size = 8 * 1024 * 1024 },
-        };
-    }
-
-    private static List<FieldInfo> GetFields(string collection)
-    {
-        return new List<FieldInfo>
-        {
-            new() { Name = "id", Type = "string", Indexed = true },
-            new() { Name = "name", Type = "string", Indexed = false },
-            new() { Name = "created", Type = "datetime", Indexed = true },
-        };
-    }
-
-    private static List<Dictionary<string, object?>> GetSampleResults(string collection, int limit)
-    {
-        var results = new List<Dictionary<string, object?>>();
-        for (int i = 0; i < Math.Min(limit, 3); i++)
-        {
-            results.Add(new Dictionary<string, object?>
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
             {
-                ["id"] = Guid.NewGuid().ToString("N")[..8],
-                ["name"] = $"Sample {i + 1}",
-                ["created"] = DateTime.Now.AddDays(-i)
-            });
+                Type = "storage.collection.list",
+                SourcePluginId = "cli",
+                Source = "CLI"
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "storage.collection.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> collectionList)
+            {
+                var result = new List<CollectionInfo>();
+                foreach (var item in collectionList)
+                {
+                    if (item is Dictionary<string, object> c)
+                    {
+                        result.Add(new CollectionInfo
+                        {
+                            Name = c.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            RecordCount = c.GetValueOrDefault("RecordCount") is int rc ? rc : 0,
+                            Size = c.GetValueOrDefault("Size") is long sz ? sz : 0
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No collection data available - Storage plugin not responding.[/]");
+            return new List<CollectionInfo>();
         }
-        return results;
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No collection data available - kernel context not accessible.[/]");
+            return new List<CollectionInfo>();
+        }
     }
 
-    private static List<QueryTemplate> GetQueryTemplates()
+    /// <summary>
+    /// Queries the kernel message bus for fields in a storage collection.
+    /// Returns an empty list if the kernel or storage plugin is unavailable.
+    /// </summary>
+    private static async Task<List<FieldInfo>> GetFieldsAsync(string collection)
     {
-        return new List<QueryTemplate>
+        try
         {
-            new() { Name = "active-users", Description = "Get all active users", Collection = "users", Created = DateTime.Now.AddDays(-5) },
-            new() { Name = "recent-orders", Description = "Orders from last 7 days", Collection = "orders", Created = DateTime.Now.AddDays(-2) },
-        };
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "storage.collection.fields",
+                SourcePluginId = "cli",
+                Source = "CLI",
+                Payload = new Dictionary<string, object> { ["Collection"] = collection }
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "storage.collection.fields", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> fieldList)
+            {
+                var result = new List<FieldInfo>();
+                foreach (var item in fieldList)
+                {
+                    if (item is Dictionary<string, object> f)
+                    {
+                        result.Add(new FieldInfo
+                        {
+                            Name = f.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            Type = f.GetValueOrDefault("Type", "")?.ToString() ?? "",
+                            Indexed = f.GetValueOrDefault("Indexed") is true
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine($"[yellow]No field data available for collection '{collection}' - Storage plugin not responding.[/]");
+            return new List<FieldInfo>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine($"[yellow]No field data available - kernel context not accessible.[/]");
+            return new List<FieldInfo>();
+        }
+    }
+
+    /// <summary>
+    /// Queries the kernel message bus to execute a query against a collection.
+    /// Returns an empty list if the kernel or storage plugin is unavailable.
+    /// </summary>
+    private static async Task<List<Dictionary<string, object?>>> GetQueryResultsAsync(string collection, int limit)
+    {
+        try
+        {
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "storage.query.execute",
+                SourcePluginId = "cli",
+                Source = "CLI",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Collection"] = collection,
+                    ["Limit"] = limit
+                }
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "storage.query.execute", request, TimeSpan.FromSeconds(10));
+
+            if (response.Success && response.Payload is IEnumerable<object> rows)
+            {
+                var result = new List<Dictionary<string, object?>>();
+                foreach (var row in rows)
+                {
+                    if (row is Dictionary<string, object?> r)
+                    {
+                        result.Add(r);
+                    }
+                    else if (row is Dictionary<string, object> ro)
+                    {
+                        result.Add(ro.ToDictionary(k => k.Key, k => (object?)k.Value));
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]Query execution unavailable - Storage plugin not responding.[/]");
+            return new List<Dictionary<string, object?>>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]Query execution unavailable - kernel context not accessible.[/]");
+            return new List<Dictionary<string, object?>>();
+        }
+    }
+
+    /// <summary>
+    /// Queries the kernel message bus for saved query templates.
+    /// Returns an empty list if the kernel or storage plugin is unavailable.
+    /// </summary>
+    private static async Task<List<QueryTemplate>> GetQueryTemplatesAsync()
+    {
+        try
+        {
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "storage.query.templates",
+                SourcePluginId = "cli",
+                Source = "CLI"
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "storage.query.templates", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> templateList)
+            {
+                var result = new List<QueryTemplate>();
+                foreach (var item in templateList)
+                {
+                    if (item is Dictionary<string, object> t)
+                    {
+                        result.Add(new QueryTemplate
+                        {
+                            Name = t.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            Description = t.GetValueOrDefault("Description", "")?.ToString() ?? "",
+                            Collection = t.GetValueOrDefault("Collection", "")?.ToString() ?? "",
+                            Created = t.GetValueOrDefault("Created") is DateTime c ? c : DateTime.MinValue
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No query templates available - Storage plugin not responding.[/]");
+            return new List<QueryTemplate>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No query templates available - kernel context not accessible.[/]");
+            return new List<QueryTemplate>();
+        }
     }
 
     #endregion

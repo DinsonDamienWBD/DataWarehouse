@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Ultimate Replication plugin for DataWarehouse providing 8 comprehensive replication strategies including CRDT-based replication, multi-master sync, real-time sync, delta sync, geo-replication, cross-region replication, federation, and federated query capabilities with vector clock management, conflict detection/resolution, replication lag tracking, and anti-entropy protocols.</Description>
+    <Authors>DataWarehouse Team</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Replication Plugin</Product>
+    <Copyright>Copyright (c) DataWarehouse. All rights reserved.</Copyright>
+    <Version>1.0.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>

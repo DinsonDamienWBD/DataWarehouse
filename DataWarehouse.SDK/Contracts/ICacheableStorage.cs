@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 
 namespace DataWarehouse.SDK.Contracts;
 
@@ -85,6 +86,30 @@ public interface ICacheableStorage : IStorageProvider
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if item was touched, false if not found.</returns>
     Task<bool> TouchAsync(Uri uri, CancellationToken ct = default);
+
+    #region StorageAddress Overloads (HAL-05)
+
+    /// <summary>Save data with TTL using a StorageAddress. Default: delegates via ToUri().</summary>
+    Task SaveWithTtlAsync(StorageAddress address, Stream data, TimeSpan ttl, CancellationToken ct = default)
+        => SaveWithTtlAsync(address.ToUri(), data, ttl, ct);
+
+    /// <summary>Get remaining TTL using a StorageAddress. Default: delegates via ToUri().</summary>
+    Task<TimeSpan?> GetTtlAsync(StorageAddress address, CancellationToken ct = default)
+        => GetTtlAsync(address.ToUri(), ct);
+
+    /// <summary>Set TTL using a StorageAddress. Default: delegates via ToUri().</summary>
+    Task<bool> SetTtlAsync(StorageAddress address, TimeSpan ttl, CancellationToken ct = default)
+        => SetTtlAsync(address.ToUri(), ttl, ct);
+
+    /// <summary>Remove TTL using a StorageAddress. Default: delegates via ToUri().</summary>
+    Task<bool> RemoveTtlAsync(StorageAddress address, CancellationToken ct = default)
+        => RemoveTtlAsync(address.ToUri(), ct);
+
+    /// <summary>Touch an item using a StorageAddress. Default: delegates via ToUri().</summary>
+    Task<bool> TouchAsync(StorageAddress address, CancellationToken ct = default)
+        => TouchAsync(address.ToUri(), ct);
+
+    #endregion
 }
 
 /// <summary>
@@ -258,10 +283,10 @@ public enum CacheEvictionPolicy
 public class CacheEntryMetadata
 {
     /// <summary>URI of the cached item.</summary>
-    public Uri Uri { get; set; } = null!;
+    public Uri? Uri { get; set; }
 
     /// <summary>String key for the cached item (alternative to Uri).</summary>
-    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null! : new Uri(value); }
+    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null : new Uri(value); }
 
     /// <summary>Size of the cached data in bytes.</summary>
     public long SizeBytes { get; set; }

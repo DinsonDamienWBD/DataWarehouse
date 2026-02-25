@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -450,28 +450,27 @@ public sealed class {pluginName}Plugin : {baseClass}
     private string GenerateStorageImplementation()
     {
         return @"
+    private readonly Dictionary<string, byte[]> _storage = new();
+
     public Task SaveAsync(string key, byte[] data, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage save
-        throw new NotImplementedException();
+        _storage[key] = data;
+        return Task.CompletedTask;
     }
 
     public Task<byte[]?> LoadAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage load
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.TryGetValue(key, out var data) ? data : null);
     }
 
     public Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage delete
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.Remove(key));
     }
 
     public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage exists check
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.ContainsKey(key));
     }";
     }
 
@@ -484,13 +483,13 @@ public sealed class {pluginName}Plugin : {baseClass}
 
     protected override Stream OnWrite(Stream input)
     {
-        // TODO: Implement write transformation
+        // Implement write transformation here.
         return input;
     }
 
     protected override Stream OnRead(Stream input)
     {
-        // TODO: Implement read transformation
+        // Implement read transformation here.
         return input;
     }";
     }
@@ -500,14 +499,20 @@ public sealed class {pluginName}Plugin : {baseClass}
         return @"
     public Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement AI generation
-        throw new NotImplementedException();
+        // Simple echo implementation - replace with actual AI service integration
+        return Task.FromResult($""Echo: {prompt}"");
     }
 
     public Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement text embedding
-        throw new NotImplementedException();
+        // Simple hash-based embedding - replace with actual embedding service
+        var hash = text.GetHashCode();
+        var embedding = new float[384]; // Common embedding dimension
+        for (int i = 0; i < embedding.Length; i++)
+        {
+            embedding[i] = (float)((hash + i) % 1000) / 1000f;
+        }
+        return Task.FromResult(embedding);
     }";
     }
 
@@ -516,13 +521,13 @@ public sealed class {pluginName}Plugin : {baseClass}
         return @"
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: Implement plugin startup
+        // Implement plugin startup logic here.
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: Implement plugin shutdown
+        // Implement plugin shutdown logic here.
         return Task.CompletedTask;
     }";
     }
@@ -925,8 +930,8 @@ public sealed class ConfigCommand : ICliCommand
 /// </summary>
 public sealed class GraphQLGateway : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, GraphQLService> _services = new();
-    private readonly ConcurrentDictionary<string, GraphQLType> _types = new();
+    private readonly BoundedDictionary<string, GraphQLService> _services = new BoundedDictionary<string, GraphQLService>(1000);
+    private readonly BoundedDictionary<string, GraphQLType> _types = new BoundedDictionary<string, GraphQLType>(1000);
     private readonly GraphQLGatewayOptions _options;
     private readonly IGraphQLMetrics? _metrics;
     private volatile bool _disposed;

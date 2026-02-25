@@ -3,8 +3,8 @@
     <!-- Enable nullable reference types across all projects -->
     <Nullable>enable</Nullable>
 
-    <!-- Treat nullable warnings as errors for production readiness -->
-    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <!-- Treat ALL warnings as errors for production readiness (BUILD-01, BUILD-05) -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <!-- Enable latest C# language features -->
     <LangVersion>latest</LangVersion>
@@ -14,9 +14,40 @@
 
     <!-- Enable analyzers for code quality -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
 
     <!-- Enforce code analysis -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- NuGet lock files for reproducible builds -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
+    <!-- NU1608: Dependency constraint violations from upstream NuGet packages
+         (e.g., Nethereum requires older M.E.L.Abstractions,
+          AWSSDK.SecurityToken requires AWSSDK.Core <4.0)
+         All other CS/CA diagnostics have been resolved — zero suppressions needed. -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn Analyzers: build-time only, NOT shipped with output -->
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SecurityCodeScan.VS2019" Version="5.6.7">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.19.0.132793">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.txt')" />
+  </ItemGroup>
 </Project>

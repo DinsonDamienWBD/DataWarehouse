@@ -2,14 +2,14 @@ using DataWarehouse.Kernel.Configuration;
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.Kernel.Pipeline;
 using DataWarehouse.Kernel.Plugins;
+using DataWarehouse.Kernel.Registry;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Services;
+using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
-using System.Reflection;
-
 // Use SDK's MessageTopics (not Kernel's removed duplicate)
 using static DataWarehouse.SDK.Contracts.MessageTopics;
 
@@ -31,16 +31,35 @@ namespace DataWarehouse.Kernel
         private readonly KernelConfiguration _config;
         private readonly PluginRegistry _registry;
         private readonly DefaultMessageBus _messageBus;
+        private readonly IMessageBus _enforcedMessageBus;
+        private readonly AccessVerificationMatrix _accessMatrix;
         private readonly DefaultPipelineOrchestrator _pipelineOrchestrator;
+        private readonly PluginCapabilityRegistry _capabilityRegistry;
         private readonly ILogger<DataWarehouseKernel>? _logger;
         private readonly CancellationTokenSource _shutdownCts = new();
-        private readonly ConcurrentDictionary<string, Task> _backgroundJobs = new();
+        private readonly BoundedDictionary<string, Task> _backgroundJobs = new BoundedDictionary<string, Task>(1000);
         private readonly SemaphoreSlim _initLock = new(1, 1);
 
+        private readonly PluginLoader _pluginLoader;
         private IStorageProvider? _primaryStorage;
         private IStorageProvider? _cacheStorage;
         private bool _isInitialized;
         private bool _isDisposed;
+
+        /// <summary>Default path for the unified configuration file.</summary>
+        private const string DefaultConfigPath = "./config/datawarehouse-config.xml";
+
+        /// <summary>Default path for the configuration audit log.</summary>
+        private const string AuditLogPath = "./config/config-audit.log";
+
+        /// <summary>The unified configuration loaded at startup.</summary>
+        private DataWarehouseConfiguration? _currentConfiguration;
+
+        /// <summary>Audit log for configuration changes.</summary>
+        private ConfigurationAuditLog? _auditLog;
+
+        /// <summary>Gets the current unified configuration.</summary>
+        public DataWarehouseConfiguration CurrentConfiguration => _currentConfiguration ?? ConfigurationPresets.CreateStandard();
 
         /// <summary>
         /// Unique identifier for this kernel instance.
@@ -73,6 +92,12 @@ namespace DataWarehouse.Kernel
         public PluginRegistry Plugins => _registry;
 
         /// <summary>
+        /// Capability registry for dynamic capability discovery.
+        /// Enables dynamic endpoint generation and capability-based routing.
+        /// </summary>
+        public IPluginCapabilityRegistry CapabilityRegistry => _capabilityRegistry;
+
+        /// <summary>
         /// Creates a new DataWarehouse Kernel instance.
         /// Use KernelBuilder for fluent configuration.
         /// </summary>
@@ -86,7 +111,43 @@ namespace DataWarehouse.Kernel
             _registry.SetOperatingMode(config.OperatingMode);
 
             _messageBus = new DefaultMessageBus(logger);
+
+            // Build the access verification matrix with default production policies
+            _accessMatrix = BuildDefaultAccessMatrix();
+
+            // Wrap the raw bus with access enforcement for plugin-facing communication.
+            // The raw _messageBus is retained for kernel-internal use (system lifecycle topics).
+            _enforcedMessageBus = _messageBus.WithAccessEnforcement(
+                _accessMatrix,
+                onDenied: verdict => logger?.LogWarning(
+                    "Access DENIED: Principal={Principal}, Topic={Topic}, Action={Action}, Rule={Rule}, Reason={Reason}",
+                    verdict.Identity.EffectivePrincipalId, verdict.Resource, verdict.Action,
+                    verdict.RuleId, verdict.Reason),
+                onAllowed: null);
+
             _pipelineOrchestrator = new DefaultPipelineOrchestrator(_registry, _messageBus, logger);
+
+            // Create capability registry with message bus integration
+            _capabilityRegistry = new PluginCapabilityRegistry(_messageBus);
+
+            // Create secure plugin loader with production-safe defaults (ISO-02, INFRA-01, ISO-05)
+            // RequireSignedAssemblies defaults to true for production security.
+            // Set to false only in development via KernelConfiguration.
+            var pluginSecurityConfig = new PluginSecurityConfig
+            {
+                RequireSignedAssemblies = config.RequireSignedPluginAssemblies,
+                EnableSecurityAuditLog = true,
+                MaxAssemblySize = 50 * 1024 * 1024 // 50MB
+            };
+            var kernelContext = new LoggerKernelContext(
+                logger,
+                config.RootPath ?? Environment.CurrentDirectory,
+                config.OperatingMode);
+            _pluginLoader = new PluginLoader(
+                _registry,
+                kernelContext,
+                pluginDirectory: null,
+                securityConfig: pluginSecurityConfig);
         }
 
         /// <summary>
@@ -100,6 +161,22 @@ namespace DataWarehouse.Kernel
                 if (_isInitialized) return;
 
                 _logger?.LogInformation("Initializing DataWarehouse Kernel {KernelId}", KernelId);
+
+                // Load unified configuration from file (or create default if missing)
+                _currentConfiguration = ConfigurationSerializer.LoadFromFile(DefaultConfigPath);
+                _auditLog = new ConfigurationAuditLog(AuditLogPath);
+                _logger?.LogInformation("Configuration loaded from {Path}, preset: {Preset}",
+                    DefaultConfigPath, _currentConfiguration.PresetName);
+
+                // INFRA-02: Validate and audit environment variable configuration overrides
+                await ValidateEnvironmentOverridesAsync();
+
+                // INFRA-03: Audit kernel startup event
+                await _auditLog.LogChangeAsync("System", "kernel.lifecycle.startup", null, KernelId,
+                    $"Kernel initialized in {OperatingMode} mode");
+
+                // Subscribe to config change and plugin lifecycle events for audit logging
+                SubscribeToAuditableEvents();
 
                 // Publish startup event
                 await _messageBus.PublishAsync(SystemStartup, new PluginMessage
@@ -161,6 +238,18 @@ namespace DataWarehouse.Kernel
 
             if (response.Success)
             {
+                // Inject kernel services so plugins can use IMessageBus, IStorageEngine, etc.
+                if (plugin is PluginBase pluginBase)
+                {
+                    pluginBase.InjectKernelServices(_enforcedMessageBus, _capabilityRegistry, null);
+
+                    // Inject unified configuration
+                    if (_currentConfiguration != null)
+                    {
+                        pluginBase.InjectConfiguration(_currentConfiguration);
+                    }
+                }
+
                 _registry.Register(plugin);
 
                 // Register with pipeline if it's a transformation plugin
@@ -173,6 +262,13 @@ namespace DataWarehouse.Kernel
                 if (plugin is IFeaturePlugin feature && _config.AutoStartFeatures)
                 {
                     _ = StartFeatureInBackgroundAsync(feature, ct);
+                }
+
+                // INFRA-03: Audit plugin registration
+                if (_auditLog != null)
+                {
+                    _ = _auditLog.LogChangeAsync("System", "kernel.plugin.load",
+                        null, plugin.Id, $"Plugin {plugin.Name} ({plugin.Category}) registered");
                 }
 
                 // Publish plugin loaded event
@@ -299,7 +395,10 @@ namespace DataWarehouse.Kernel
                 {
                     await job(linkedCts.Token);
                 }
-                catch (OperationCanceledException) { }
+                catch (OperationCanceledException)
+                {
+                    /* Cancellation is expected during shutdown */
+                }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Background job {JobId} failed", jobId);
@@ -345,6 +444,11 @@ namespace DataWarehouse.Kernel
             }
         }
 
+        /// <summary>
+        /// Loads plugins from configured paths using the secure PluginLoader.
+        /// All assembly loading goes through PluginLoader with hash/signature validation (ISO-02, INFRA-01).
+        /// Assembly.LoadFrom is never called directly -- all loading uses isolated AssemblyLoadContext.
+        /// </summary>
         private async Task LoadPluginsFromPathsAsync(IEnumerable<string> paths, CancellationToken ct)
         {
             foreach (var path in paths)
@@ -358,6 +462,15 @@ namespace DataWarehouse.Kernel
                 var assemblies = Directory.GetFiles(path, "*.dll", SearchOption.AllDirectories);
                 foreach (var assemblyPath in assemblies)
                 {
+                    // Skip common runtime/SDK DLLs (same filter as PluginLoader.LoadAllPluginsAsync)
+                    var fileName = Path.GetFileName(assemblyPath);
+                    if (fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+                        fileName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
+                        fileName.StartsWith("DataWarehouse.SDK", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         await LoadPluginsFromAssemblyAsync(assemblyPath, ct);
@@ -370,26 +483,59 @@ namespace DataWarehouse.Kernel
             }
         }
 
+        /// <summary>
+        /// Loads plugins from a single assembly using the secure PluginLoader pipeline.
+        /// Replaces direct Assembly.LoadFrom with validated, isolated loading (ISO-02, INFRA-01).
+        /// Security validation includes: size limits, blocklist, hash verification, signature checks.
+        /// </summary>
         private async Task LoadPluginsFromAssemblyAsync(string assemblyPath, CancellationToken ct)
         {
-            var assembly = Assembly.LoadFrom(assemblyPath);
-            var pluginTypes = assembly.GetTypes()
-                .Where(t => typeof(IPlugin).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface);
+            // Route all assembly loading through PluginLoader for security validation
+            // PluginLoader performs: hash verification, signature check, size limits, blocklist,
+            // and loads into a collectible AssemblyLoadContext for isolation
+            var result = await _pluginLoader.LoadPluginAsync(assemblyPath, ct);
 
-            foreach (var type in pluginTypes)
+            if (!result.Success)
             {
-                try
+                _logger?.LogWarning("PluginLoader rejected assembly {Assembly}: {Error}",
+                    assemblyPath, result.Error);
+                return;
+            }
+
+            // PluginLoader already registered plugins with the registry.
+            // Now inject kernel services (message bus, capability registry, configuration)
+            // for each loaded plugin, since PluginLoader doesn't have access to these.
+            if (result.PluginIds != null)
+            {
+                foreach (var pluginId in result.PluginIds)
                 {
-                    if (Activator.CreateInstance(type) is IPlugin plugin)
+                    var plugin = _registry.GetAllPlugins().FirstOrDefault(p => p.Id == pluginId);
+                    if (plugin is PluginBase pluginBase)
                     {
-                        await RegisterPluginAsync(plugin, ct);
+                        pluginBase.InjectKernelServices(_enforcedMessageBus, _capabilityRegistry, null);
+
+                        if (_currentConfiguration != null)
+                        {
+                            pluginBase.InjectConfiguration(_currentConfiguration);
+                        }
+                    }
+
+                    // Start feature plugins
+                    if (plugin is IFeaturePlugin feature && _config.AutoStartFeatures)
+                    {
+                        _ = StartFeatureInBackgroundAsync(feature, ct);
+                    }
+
+                    // Register with pipeline if transformation
+                    if (plugin is IDataTransformation transformation)
+                    {
+                        _pipelineOrchestrator.RegisterStage(transformation);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to instantiate plugin {Type}", type.FullName);
-                }
             }
+
+            _logger?.LogInformation("Loaded {Count} plugin(s) from {Assembly} via secure PluginLoader",
+                result.PluginIds?.Length ?? 0, Path.GetFileName(assemblyPath));
         }
 
         private async Task InitializeStorageAsync(CancellationToken ct)
@@ -420,12 +566,375 @@ namespace DataWarehouse.Kernel
             }, $"feature-{((IPlugin)feature).Id}");
         }
 
+        /// <summary>
+        /// Builds the default access verification matrix with production-ready policies.
+        /// Fail-closed: no rules = DENY. System/kernel/security topics restricted.
+        /// </summary>
+        private static AccessVerificationMatrix BuildDefaultAccessMatrix()
+        {
+            var matrix = new AccessVerificationMatrix();
+
+            // --- System-level rules (apply globally) ---
+
+            // Allow system:kernel principal to access ALL resources (kernel needs full access)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-kernel-allow-all",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "system:*",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Kernel and system services have full access"
+            });
+
+            // Allow any authenticated principal to publish/subscribe to general collaboration topics
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-storage-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "storage.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access storage topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-pipeline-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "pipeline.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access pipeline topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-intelligence-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "intelligence.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access intelligence topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-compliance-allow-authenticated",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "compliance.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can access compliance topics"
+            });
+
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-config-subscribe-allow",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "config.*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Any authenticated principal can subscribe to config topics"
+            });
+
+            // Deny non-system principals from kernel.* topics (users and AI agents)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-kernel-topics-users",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "kernel.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "User principals denied access to kernel topics"
+            });
+
+            // Deny non-system principals from security.* topics
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-security-topics-users",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "security.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "User principals denied access to security topics"
+            });
+
+            // Deny non-system principals from system.* topics
+            // (defense-in-depth — interceptor also has bypass list for kernel-internal system topics)
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-deny-system-topics-users",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                PrincipalPattern = "user:*",
+                Resource = "system.*",
+                Action = "*",
+                Decision = LevelDecision.Deny,
+                Description = "User principals denied access to system topics"
+            });
+
+            // --- Tenant-level rules for tenant isolation (AUTH-09) ---
+            // Tenant isolation is enforced by the hierarchy: when a message carries
+            // a CommandIdentity with TenantId, the matrix evaluates at the Tenant level
+            // using that TenantId as the scopeId. Since we use default-deny and only
+            // system-level allows exist (which match scopeId="system"), tenant-scoped
+            // operations will require explicit tenant-level rules to be provisioned
+            // when tenants are created. This prevents cross-tenant access by default.
+
+            // Allow tenant-scoped principals to access resources within their own tenant
+            // The wildcard scopeId="*" means this rule applies to any tenant,
+            // but the matrix evaluates with the identity's TenantId as scopeId,
+            // so only messages from that tenant's principals will match.
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "tenant-allow-own-resources",
+                Level = HierarchyLevel.Tenant,
+                ScopeId = "*",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Tenant principals can access resources within their own tenant scope (AUTH-09)"
+            });
+
+            // Allow general topic access for any authenticated identity
+            // This is the catch-all that enables inter-plugin communication.
+            // The AccessEnforcementInterceptor rejects null-identity messages (fail-closed).
+            // Deny rules above take absolute precedence over this allow.
+            matrix.AddRule(new HierarchyAccessRule
+            {
+                RuleId = "sys-allow-authenticated-general",
+                Level = HierarchyLevel.System,
+                ScopeId = "system",
+                Resource = "*",
+                Action = "*",
+                Decision = LevelDecision.Allow,
+                Description = "Authenticated principals can access general topics (identity required)"
+            });
+
+            return matrix;
+        }
+
+        /// <summary>
+        /// INFRA-02: Security-sensitive configuration keys that cannot be overridden
+        /// via environment variables in production mode.
+        /// </summary>
+        private static readonly HashSet<string> ProtectedConfigKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "DATAWAREHOUSE_REQUIRE_SIGNED_ASSEMBLIES",
+            "DATAWAREHOUSE_VERIFY_SSL",
+            "DATAWAREHOUSE_VERIFY_SSL_CERTIFICATES",
+            "DATAWAREHOUSE_DISABLE_AUTH",
+            "DATAWAREHOUSE_DISABLE_ENCRYPTION",
+            "DATAWAREHOUSE_ALLOW_UNSIGNED_PLUGINS"
+        };
+
+        /// <summary>
+        /// INFRA-02: Configuration keys that trigger a warning when set via environment variables.
+        /// </summary>
+        private static readonly HashSet<string> WarningConfigKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "DATAWAREHOUSE_CREATE_DEFAULT_ADMIN",
+            "DATAWAREHOUSE_DEBUG_MODE",
+            "DATAWAREHOUSE_DISABLE_RATE_LIMITING"
+        };
+
+        /// <summary>
+        /// INFRA-02: Validates environment variable configuration overrides.
+        /// Blocks security-sensitive overrides in production and logs all env var config usage.
+        /// </summary>
+        private async Task ValidateEnvironmentOverridesAsync()
+        {
+            if (_auditLog == null) return;
+
+            var isProduction = _config.OperatingMode == OperatingMode.Server ||
+                               _config.OperatingMode == OperatingMode.Hyperscale;
+
+            var envVars = Environment.GetEnvironmentVariables();
+            foreach (var key in envVars.Keys)
+            {
+                var keyStr = key?.ToString();
+                if (keyStr == null || !keyStr.StartsWith("DATAWAREHOUSE_", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var value = envVars[key!]?.ToString();
+
+                // Block protected keys in production
+                if (isProduction && ProtectedConfigKeys.Contains(keyStr))
+                {
+                    _logger?.LogError(
+                        "SECURITY: Environment variable {Key} cannot override security configuration in production mode (INFRA-02)",
+                        keyStr);
+                    await _auditLog.LogChangeAsync("System", $"env.override.blocked.{keyStr}",
+                        null, "[BLOCKED]",
+                        "Security-sensitive env var override blocked in production mode (INFRA-02)");
+                    continue;
+                }
+
+                // Warn about sensitive keys
+                if (WarningConfigKeys.Contains(keyStr))
+                {
+                    _logger?.LogWarning(
+                        "SECURITY: Environment variable {Key} is overriding configuration. Review for security implications (INFRA-02)",
+                        keyStr);
+                }
+
+                // Audit all DATAWAREHOUSE_ env var overrides
+                await _auditLog.LogChangeAsync("System", $"env.override.{keyStr}",
+                    null, value ?? "[empty]",
+                    "Configuration set via environment variable");
+            }
+        }
+
+        /// <summary>
+        /// INFRA-03: Subscribe to message bus topics for audit logging.
+        /// Logs config changes, plugin load/unload, and security events.
+        /// INFRA-06: Extended to cover all 9 auditable operation classes identified in pentest.
+        /// </summary>
+        private void SubscribeToAuditableEvents()
+        {
+            // 1. Audit config changes (INFRA-03)
+            _messageBus.Subscribe(ConfigChanged, async msg =>
+            {
+                if (_auditLog == null) return;
+                var path = msg.Payload.TryGetValue("SettingPath", out var p) ? p?.ToString() : "unknown";
+                var oldVal = msg.Payload.TryGetValue("OldValue", out var o) ? o?.ToString() : null;
+                var newVal = msg.Payload.TryGetValue("NewValue", out var n) ? n?.ToString() : null;
+                var user = msg.Payload.TryGetValue("User", out var u) ? u?.ToString() : "System";
+                await _auditLog.LogChangeAsync(user ?? "System", path ?? "config.unknown", oldVal, newVal,
+                    "Configuration change via message bus");
+            });
+
+            // 2. Audit plugin unloads (INFRA-03)
+            _messageBus.Subscribe(PluginUnloaded, async msg =>
+            {
+                if (_auditLog == null) return;
+                var pluginId = msg.Payload.TryGetValue("PluginId", out var id) ? id?.ToString() : "unknown";
+                await _auditLog.LogChangeAsync("System", "kernel.plugin.unload",
+                    pluginId, null, $"Plugin {pluginId} unloaded");
+            });
+
+            // INFRA-06: Audit breadcrumbs for remaining unaudited operation classes
+
+            // 3. Security policy changes -- ACL/AccessVerificationMatrix modifications
+            _messageBus.Subscribe(SecurityACL, async msg =>
+            {
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "System";
+                var action = msg.Payload.TryGetValue("Action", out var a) ? a?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- {Detail}",
+                    "SecurityPolicyChange", identity, DateTimeOffset.UtcNow, action);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", "security.policy.change",
+                        null, action, "Security policy modification");
+            });
+
+            // 4. Key rotation events
+            _messageBus.Subscribe(AuthKeyRotated, async msg =>
+            {
+                var keyType = msg.Payload.TryGetValue("KeyType", out var kt) ? kt?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- KeyType={KeyType}",
+                    "KeyRotation", "System", DateTimeOffset.UtcNow, keyType);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.key.rotation",
+                        null, keyType, $"Key rotation: {keyType}");
+            });
+
+            // 5. Signing key changes
+            _messageBus.Subscribe(AuthSigningKeyChanged, async msg =>
+            {
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp}",
+                    "SigningKeyChanged", "System", DateTimeOffset.UtcNow);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.signing.change",
+                        null, null, "Signing key changed");
+            });
+
+            // 6. Replay attack detection (credential access monitoring)
+            _messageBus.Subscribe(AuthReplayDetected, async msg =>
+            {
+                var source = msg.Payload.TryGetValue("Source", out var s) ? s?.ToString() : "unknown";
+                _logger?.LogWarning(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Source={Source}",
+                    "ReplayAttackDetected", "System", DateTimeOffset.UtcNow, source);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync("System", "security.replay.detected",
+                        null, source, $"Replay attack detected from {source}");
+            });
+
+            // 7. Security audit events (credential access, auth events)
+            _messageBus.Subscribe(SecurityAudit, async msg =>
+            {
+                var eventType = msg.Payload.TryGetValue("EventType", out var et) ? et?.ToString() : "audit";
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "System";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp}",
+                    eventType, identity, DateTimeOffset.UtcNow);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", $"security.audit.{eventType}",
+                        null, null, $"Security audit: {eventType}");
+            });
+
+            // 8. Capability changes (includes message bus subscription changes)
+            _messageBus.Subscribe(CapabilityChanged, async msg =>
+            {
+                var capName = msg.Payload.TryGetValue("Capability", out var c) ? c?.ToString() : "unknown";
+                var pluginId = msg.Payload.TryGetValue("PluginId", out var pid) ? pid?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Capability={Capability}",
+                    "CapabilityChanged", pluginId, DateTimeOffset.UtcNow, capName);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(pluginId ?? "System", "capability.change",
+                        null, capName, $"Capability changed: {capName} by {pluginId}");
+            });
+
+            // 9. Security authentication events (covers cluster/federation membership implicitly)
+            _messageBus.Subscribe(SecurityAuth, async msg =>
+            {
+                var authAction = msg.Payload.TryGetValue("Action", out var a) ? a?.ToString() : "auth";
+                var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "unknown";
+                _logger?.LogInformation(
+                    "Security event: {EventType} by {Identity} at {Timestamp} -- Action={Action}",
+                    "Authentication", identity, DateTimeOffset.UtcNow, authAction);
+                if (_auditLog != null)
+                    await _auditLog.LogChangeAsync(identity ?? "System", "security.auth",
+                        null, authAction, $"Authentication event: {authAction}");
+            });
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
             _isDisposed = true;
 
             _logger?.LogInformation("Shutting down DataWarehouse Kernel {KernelId}", KernelId);
+
+            // INFRA-03: Audit kernel shutdown event
+            if (_auditLog != null)
+            {
+                try
+                {
+                    _ = _auditLog.LogChangeAsync("System", "kernel.lifecycle.shutdown",
+                        KernelId, null, "Kernel shutting down");
+                }
+                catch
+                {
+                    // Best-effort audit during shutdown
+                }
+            }
 
             // Signal shutdown
             _shutdownCts.Cancel();
@@ -448,16 +957,27 @@ namespace DataWarehouse.Kernel
                 // Best-effort shutdown notification - ignore failures during disposal
             }
 
-            // Stop all feature plugins
+            // Stop all feature plugins with timeout (ISO-04, CVSS 7.1)
+            // Each plugin gets 30 seconds to shut down gracefully. If a plugin exceeds
+            // the timeout, it is logged as a warning and shutdown continues for other plugins.
+            // This prevents a malicious or buggy plugin from blocking kernel shutdown indefinitely.
             foreach (var feature in _registry.GetPlugins<IFeaturePlugin>())
             {
+                var pluginId = (feature as IPlugin)?.Id ?? "unknown";
                 try
                 {
-                    await feature.StopAsync();
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await feature.StopAsync().WaitAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogWarning(
+                        "Plugin {PluginId} exceeded 30-second shutdown timeout -- forcibly continuing (ISO-04)",
+                        pluginId);
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Error stopping feature plugin");
+                    _logger?.LogError(ex, "Error stopping feature plugin {PluginId}", pluginId);
                 }
             }
 
@@ -471,7 +991,63 @@ namespace DataWarehouse.Kernel
             _shutdownCts.Dispose();
             _initLock.Dispose();
 
+            _pluginLoader.Dispose();
+
             _logger?.LogInformation("DataWarehouse Kernel {KernelId} shut down", KernelId);
         }
+    }
+
+    /// <summary>
+    /// Adapts ILogger to SDK IKernelContext for PluginLoader compatibility.
+    /// Implements the SDK's IKernelContext (DataWarehouse.SDK.Contracts.IKernelContext) which is
+    /// required by PluginLoader. Provides logging, plugin access stubs, and storage stubs.
+    /// </summary>
+    internal sealed class LoggerKernelContext : DataWarehouse.SDK.Contracts.IKernelContext
+    {
+        private readonly ILogger? _logger;
+        private readonly PluginRegistry? _registry;
+
+        public string RootPath { get; }
+        public OperatingMode Mode { get; }
+        public IKernelStorageService Storage { get; }
+
+        public LoggerKernelContext(
+            ILogger? logger,
+            string rootPath,
+            OperatingMode mode,
+            PluginRegistry? registry = null)
+        {
+            _logger = logger;
+            _registry = registry;
+            RootPath = rootPath;
+            Mode = mode;
+            Storage = new NullKernelStorageService();
+        }
+
+        public T? GetPlugin<T>() where T : class, IPlugin => _registry?.GetPlugin<T>();
+        public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => _registry?.GetPlugins<T>() ?? [];
+
+        public void LogInfo(string message) => _logger?.LogInformation("{Message}", message);
+        public void LogError(string message, Exception? ex = null) => _logger?.LogError(ex, "{Message}", message);
+        public void LogWarning(string message) => _logger?.LogWarning("{Message}", message);
+        public void LogDebug(string message) => _logger?.LogDebug("{Message}", message);
+    }
+
+    /// <summary>
+    /// No-op storage service for kernel context adapter.
+    /// Plugin loading does not require kernel storage access.
+    /// </summary>
+    internal sealed class NullKernelStorageService : IKernelStorageService
+    {
+        public Task SaveAsync(string path, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SaveAsync(string path, byte[] data, IDictionary<string, string>? metadata = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<Stream?> LoadAsync(string path, CancellationToken ct = default) => Task.FromResult<Stream?>(null);
+        public Task<byte[]?> LoadBytesAsync(string path, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
+        public Task<bool> DeleteAsync(string path, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<bool> ExistsAsync(string path, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<IReadOnlyList<StorageItemInfo>> ListAsync(string prefix, int limit = 100, int offset = 0, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<StorageItemInfo>>(Array.Empty<StorageItemInfo>());
+        public Task<IDictionary<string, string>?> GetMetadataAsync(string path, CancellationToken ct = default) =>
+            Task.FromResult<IDictionary<string, string>?>(null);
     }
 }

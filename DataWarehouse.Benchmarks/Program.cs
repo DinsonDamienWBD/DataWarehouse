@@ -38,10 +38,10 @@ public static class Program
 [RankColumn]
 public class StorageBenchmarks
 {
-    private byte[] _smallData = null!;
-    private byte[] _mediumData = null!;
-    private byte[] _largeData = null!;
-    private ConcurrentDictionary<string, byte[]> _storage = null!;
+    private byte[] _smallData = null!; // Initialized in [GlobalSetup]
+    private byte[] _mediumData = null!; // Initialized in [GlobalSetup]
+    private byte[] _largeData = null!; // Initialized in [GlobalSetup]
+    private ConcurrentDictionary<string, byte[]> _storage = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -120,9 +120,9 @@ public class StorageBenchmarks
 [RankColumn]
 public class CryptoBenchmarks
 {
-    private byte[] _data1MB = null!;
-    private byte[] _key = null!;
-    private byte[] _iv = null!;
+    private byte[] _data1MB = null!; // Initialized in [GlobalSetup]
+    private byte[] _key = null!; // Initialized in [GlobalSetup]
+    private byte[] _iv = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -189,9 +189,9 @@ public class CryptoBenchmarks
 [RankColumn]
 public class SerializationBenchmarks
 {
-    private TestObject _simpleObject = null!;
-    private TestObject[] _objectArray = null!;
-    private string _jsonString = null!;
+    private TestObject _simpleObject = null!; // Initialized in [GlobalSetup]
+    private TestObject[] _objectArray = null!; // Initialized in [GlobalSetup]
+    private string _jsonString = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -246,7 +246,7 @@ public class SerializationBenchmarks
     public byte[] MessagePackSerialize()
     {
         // Using manual serialization as MessagePack NuGet may not be available
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
         writer.Write(_simpleObject.Id.ToByteArray());
         writer.Write(_simpleObject.Name ?? "");
@@ -273,9 +273,9 @@ public class SerializationBenchmarks
 [RankColumn]
 public class ConcurrencyBenchmarks
 {
-    private ConcurrentDictionary<int, int> _concurrentDict = null!;
-    private ConcurrentQueue<int> _concurrentQueue = null!;
-    private ConcurrentBag<int> _concurrentBag = null!;
+    private ConcurrentDictionary<int, int> _concurrentDict = null!; // Initialized in [GlobalSetup]
+    private ConcurrentQueue<int> _concurrentQueue = null!; // Initialized in [GlobalSetup]
+    private ConcurrentBag<int> _concurrentBag = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -364,7 +364,7 @@ public class ConcurrencyBenchmarks
 [RankColumn]
 public class MemoryBenchmarks
 {
-    private ArrayPool<byte> _arrayPool = null!;
+    private ArrayPool<byte> _arrayPool = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -438,8 +438,8 @@ public class MemoryBenchmarks
 [RankColumn]
 public class CompressionBenchmarks
 {
-    private byte[] _compressibleData = null!;
-    private byte[] _randomData = null!;
+    private byte[] _compressibleData = null!; // Initialized in [GlobalSetup]
+    private byte[] _randomData = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -459,7 +459,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "GZip Compress 1MB (compressible)")]
     public byte[] GzipCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             gzip.Write(_compressibleData);
@@ -470,7 +470,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "GZip Compress 1MB (random)")]
     public byte[] GzipCompressRandom()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             gzip.Write(_randomData);
@@ -481,7 +481,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "Brotli Compress 1MB (compressible)")]
     public byte[] BrotliCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var brotli = new System.IO.Compression.BrotliStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             brotli.Write(_compressibleData);
@@ -492,7 +492,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "Deflate Compress 1MB (compressible)")]
     public byte[] DeflateCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var deflate = new System.IO.Compression.DeflateStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             deflate.Write(_compressibleData);

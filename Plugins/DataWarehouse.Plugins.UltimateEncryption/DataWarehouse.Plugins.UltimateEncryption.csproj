@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Description>Ultimate Encryption Plugin - Comprehensive encryption strategies including AES, ChaCha20, Serpent, Twofish, post-quantum, homomorphic, and format-preserving encryption</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Encryption</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core cryptography -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+
+    <!-- Argon2 for key derivation -->
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Infrastructure
 {
@@ -57,7 +57,19 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// A resource (memory, connections, etc.) has been exhausted.
         /// </summary>
-        ResourceExhausted = 1009
+        ResourceExhausted = 1009,
+
+        /// <summary>
+        /// Data corruption detected - integrity verification failed.
+        /// Used for tamper-proof storage when corruption is detected.
+        /// </summary>
+        DataCorruption = 1010,
+
+        /// <summary>
+        /// Block or shard has been sealed and is inaccessible.
+        /// Used when FailClosed recovery behavior has been triggered.
+        /// </summary>
+        BlockSealed = 1011
     }
 
     /// <summary>
@@ -81,7 +93,7 @@ namespace DataWarehouse.SDK.Infrastructure
             RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(100));
 
-        private readonly ConcurrentDictionary<string, object> _context;
+        private readonly BoundedDictionary<string, object> _context;
 
         /// <summary>
         /// Gets the error code associated with this exception.
@@ -116,7 +128,7 @@ namespace DataWarehouse.SDK.Infrastructure
             ErrorCode = errorCode;
             CorrelationId = correlationId ?? GenerateCorrelationId();
             Timestamp = DateTimeOffset.UtcNow;
-            _context = new ConcurrentDictionary<string, object>();
+            _context = new BoundedDictionary<string, object>(1000);
         }
 
         /// <summary>
@@ -132,7 +144,7 @@ namespace DataWarehouse.SDK.Infrastructure
             ErrorCode = errorCode;
             CorrelationId = correlationId ?? GenerateCorrelationId();
             Timestamp = DateTimeOffset.UtcNow;
-            _context = new ConcurrentDictionary<string, object>();
+            _context = new BoundedDictionary<string, object>(1000);
         }
 
         /// <summary>

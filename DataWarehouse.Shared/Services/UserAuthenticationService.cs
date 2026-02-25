@@ -1,10 +1,10 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.Shared.Models;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Shared.Services;
 
@@ -15,25 +15,36 @@ namespace DataWarehouse.Shared.Services;
 public sealed class UserAuthenticationService : IUserAuthenticationService, IDisposable
 {
     // Session storage: sessionId -> session
-    private readonly ConcurrentDictionary<string, UserSession> _sessions = new();
+    private readonly BoundedDictionary<string, UserSession> _sessions = new BoundedDictionary<string, UserSession>(1000);
 
     // User storage: userId -> user info (for demo purposes)
-    private readonly ConcurrentDictionary<string, StoredUser> _users = new();
+    private readonly BoundedDictionary<string, StoredUser> _users = new BoundedDictionary<string, StoredUser>(1000);
 
     // API key storage: apiKey hash -> userId
-    private readonly ConcurrentDictionary<string, string> _apiKeys = new();
+    private readonly BoundedDictionary<string, string> _apiKeys = new BoundedDictionary<string, string>(1000);
 
     // Current session per context (thread-local for multi-threaded scenarios)
     private readonly AsyncLocal<UserSession?> _currentSession = new();
 
     // Impersonation stack per session
-    private readonly ConcurrentDictionary<string, Stack<UserSession>> _impersonationStack = new();
+    private readonly BoundedDictionary<string, Stack<UserSession>> _impersonationStack = new BoundedDictionary<string, Stack<UserSession>>(1000);
 
     // Rate limiting: userId -> (attempt count, window start)
-    private readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new();
+    private readonly BoundedDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new BoundedDictionary<string, (int Count, DateTime WindowStart)>(1000);
+
+    /// <summary>
+    /// D04 (CVSS 3.7): PBKDF2 iteration count per NIST SP 800-63B minimum recommendation.
+    /// Increased from 100,000 to 600,000 for resistance against GPU-accelerated brute force.
+    /// </summary>
+    private const int Pbkdf2Iterations = 600_000;
+
+    /// <summary>
+    /// Legacy iteration count for backward compatibility during hash migration.
+    /// </summary>
+    private const int LegacyPbkdf2Iterations = 100_000;
 
     // SSO provider handlers
-    private readonly ConcurrentDictionary<string, ISsoProviderHandler> _ssoProviders = new();
+    private readonly BoundedDictionary<string, ISsoProviderHandler> _ssoProviders = new BoundedDictionary<string, ISsoProviderHandler>(1000);
 
     // Configuration
     private readonly AuthenticationServiceConfig _config;
@@ -65,10 +76,12 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
-        // Add default admin user for development
+        // Security: Do NOT create default admin user with hardcoded password.
+        // In production, admin users must be explicitly configured.
         if (_config.CreateDefaultAdminUser)
         {
-            AddUser("admin", "Admin User", "admin@localhost", "admin", new[] { "admin" });
+            throw new InvalidOperationException(
+                "CreateDefaultAdminUser is disabled for security. Configure admin users explicitly via secure configuration.");
         }
     }
 
@@ -513,10 +526,11 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(salt);
 
+        // D04: Use NIST-recommended 600K iterations
         var hash = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
-            100000,
+            Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             32);
 
@@ -525,14 +539,28 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
 
     private static bool VerifyPassword(string password, byte[] storedHash, byte[] salt)
     {
+        // D04: Try current iteration count first
         var hash = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
-            100000,
+            Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             32);
 
-        return CryptographicOperations.FixedTimeEquals(hash, storedHash);
+        if (CryptographicOperations.FixedTimeEquals(hash, storedHash))
+            return true;
+
+        // Backward compatibility: try legacy 100K iterations for hashes
+        // created before the NIST upgrade. On next password change,
+        // the hash will be auto-upgraded to 600K iterations.
+        var legacyHash = Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(password),
+            salt,
+            LegacyPbkdf2Iterations,
+            HashAlgorithmName.SHA256,
+            32);
+
+        return CryptographicOperations.FixedTimeEquals(legacyHash, storedHash);
     }
 
     private static string HashApiKey(string apiKey)

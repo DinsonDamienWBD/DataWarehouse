@@ -1,5 +1,12 @@
+using DataWarehouse.SDK.Hosting;
+using DataWarehouse.Shared.Commands;
+using DataWarehouse.Shared.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace DataWarehouse.Launcher.Integration;
 
@@ -11,29 +18,8 @@ namespace DataWarehouse.Launcher.Integration;
 /// 2. Connect - Connect to an existing instance (local or remote)
 /// 3. Embedded - Run a lightweight embedded instance
 /// 4. Service - Run as Windows service or Linux daemon
-///
-/// Usage Pattern (copy this pattern to your host applications):
-/// <code>
-/// // Create host
-/// var host = new DataWarehouseHost(loggerFactory);
-///
-/// // Mode 1: Install
-/// await host.InstallAsync(new InstallConfiguration { InstallPath = "C:/DataWarehouse" });
-///
-/// // Mode 2: Connect to existing
-/// await host.ConnectAsync(ConnectionTarget.Remote("192.168.1.100", 8080));
-///
-/// // Mode 3: Run embedded
-/// await host.RunEmbeddedAsync(new EmbeddedConfiguration());
-///
-/// // Mode 4: Run as service
-/// await host.RunServiceAsync();
-/// </code>
-///
-/// The CLI and GUI applications should use this host as their foundation,
-/// ensuring consistent behavior and code reuse.
 /// </summary>
-public sealed class DataWarehouseHost : IAsyncDisposable
+public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
 {
     private readonly ILogger<DataWarehouseHost> _logger;
     private readonly ILoggerFactory _loggerFactory;
@@ -41,6 +27,9 @@ public sealed class DataWarehouseHost : IAsyncDisposable
     private OperatingMode _currentMode = OperatingMode.Embedded;
     private IInstanceConnection? _connection;
     private bool _disposed;
+    private CancellationTokenSource? _embeddedCts;
+    private Task? _embeddedTask;
+    private ServerHostStatus? _status;
 
     /// <summary>
     /// Creates a new DataWarehouse host.
@@ -71,6 +60,83 @@ public sealed class DataWarehouseHost : IAsyncDisposable
     /// Gets the capabilities of the connected instance.
     /// </summary>
     public InstanceCapabilities? Capabilities => _connection?.Capabilities;
+
+    #region IServerHost Implementation
+
+    /// <inheritdoc />
+    bool IServerHost.IsRunning => _embeddedTask != null && !_embeddedTask.IsCompleted;
+
+    /// <inheritdoc />
+    ServerHostStatus? IServerHost.Status => _status;
+
+    /// <inheritdoc />
+    async Task IServerHost.StartAsync(EmbeddedConfiguration config, CancellationToken cancellationToken)
+    {
+        _embeddedCts = new CancellationTokenSource();
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _embeddedCts.Token);
+
+        _status = new ServerHostStatus
+        {
+            Port = config.HttpPort,
+            Mode = "Embedded",
+            ProcessId = Environment.ProcessId,
+            StartTime = DateTime.UtcNow,
+            DataPath = config.DataPath,
+            PersistData = config.PersistData
+        };
+
+        _embeddedTask = Task.Run(async () =>
+        {
+            await RunEmbeddedAsync(config, linkedCts.Token);
+        }, linkedCts.Token);
+
+        // Wait briefly for startup
+        await Task.Delay(500, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    async Task IServerHost.StopAsync(CancellationToken cancellationToken)
+    {
+        _embeddedCts?.Cancel();
+        if (_embeddedTask != null)
+        {
+            try
+            {
+                await _embeddedTask.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("Embedded instance did not stop within timeout");
+            }
+            catch (OperationCanceledException)
+            {
+                /* Cancellation is expected during shutdown */
+            }
+        }
+        _embeddedTask = null;
+        _embeddedCts?.Dispose();
+        _embeddedCts = null;
+        _status = null;
+    }
+
+    /// <inheritdoc />
+    async Task<ServerInstallResult> IServerHost.InstallAsync(
+        InstallConfiguration config,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        var result = await InstallAsync(config, new Progress<InstallProgress>(p =>
+            progress?.Report(p.Message)), cancellationToken);
+
+        return new ServerInstallResult
+        {
+            Success = result.Success,
+            InstallPath = result.InstallPath,
+            Message = result.Message
+        };
+    }
+
+    #endregion
 
     #region Mode 1: Install
 
@@ -137,7 +203,8 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         {
             _logger.LogError(ex, "Installation failed");
             result.Success = false;
-            result.Message = $"Installation failed: {ex.Message}";
+            // RECON-09: Sanitize error messages -- do not expose internal details
+            result.Message = "Installation failed. Check server logs for details.";
             result.Exception = ex;
         }
 
@@ -165,7 +232,6 @@ public sealed class DataWarehouseHost : IAsyncDisposable
 
         try
         {
-            // Create appropriate connection based on type
             _connection = target.Type switch
             {
                 ConnectionType.Local => new LocalInstanceConnection(_loggerFactory),
@@ -174,10 +240,7 @@ public sealed class DataWarehouseHost : IAsyncDisposable
                 _ => throw new ArgumentException($"Unknown connection type: {target.Type}")
             };
 
-            // Connect
             await _connection.ConnectAsync(target, cancellationToken);
-
-            // Discover capabilities
             var capabilities = await _connection.DiscoverCapabilitiesAsync(cancellationToken);
 
             result.Success = true;
@@ -192,7 +255,8 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         {
             _logger.LogError(ex, "Connection failed");
             result.Success = false;
-            result.Message = $"Connection failed: {ex.Message}";
+            // RECON-09: Sanitize error messages -- do not expose internal details
+            result.Message = "Connection failed. Check server logs for details.";
             result.Exception = ex;
 
             if (_connection != null)
@@ -234,7 +298,6 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         _currentMode = OperatingMode.Embedded;
         _logger.LogInformation("Starting embedded instance");
 
-        // Configure adapter options for embedded mode
         var options = new AdapterOptions
         {
             KernelId = $"embedded-{Guid.NewGuid():N}"[..20],
@@ -251,7 +314,6 @@ public sealed class DataWarehouseHost : IAsyncDisposable
             }
         };
 
-        // Run the adapter
         return await _runner.RunAsync(options, "Embedded", cancellationToken);
     }
 
@@ -278,7 +340,6 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         _currentMode = OperatingMode.Service;
         _logger.LogInformation("Starting as service/daemon");
 
-        // Configure adapter options for service mode
         var options = new AdapterOptions
         {
             KernelId = $"service-{Environment.MachineName.ToLowerInvariant()}",
@@ -290,7 +351,6 @@ public sealed class DataWarehouseHost : IAsyncDisposable
             }
         };
 
-        // Run the adapter
         return await _runner.RunAsync(options, "DataWarehouse", cancellationToken);
     }
 
@@ -305,9 +365,7 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (_connection == null)
-        {
             throw new InvalidOperationException("Not connected to an instance.");
-        }
 
         return await _connection.GetConfigurationAsync(cancellationToken);
     }
@@ -320,9 +378,7 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (_connection == null)
-        {
             throw new InvalidOperationException("Not connected to an instance.");
-        }
 
         await _connection.UpdateConfigurationAsync(config, cancellationToken);
         _logger.LogInformation("Configuration updated for instance: {InstanceId}", _connection.InstanceId);
@@ -336,21 +392,17 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (_connection == null)
-        {
             throw new InvalidOperationException("Not connected to an instance.");
-        }
 
         var config = await _connection.GetConfigurationAsync(cancellationToken);
-
-        // Save to profile
         var profilePath = GetProfilePath(profileName);
-        var json = System.Text.Json.JsonSerializer.Serialize(new SavedProfile
+        var json = JsonSerializer.Serialize(new SavedProfile
         {
             Name = profileName,
             InstanceId = _connection.InstanceId,
             Configuration = config,
             SavedAt = DateTime.UtcNow
-        }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }, new JsonSerializerOptions { WriteIndented = true });
 
         Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
         await File.WriteAllTextAsync(profilePath, json, cancellationToken);
@@ -366,14 +418,11 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         var profilePath = GetProfilePath(profileName);
-
         if (!File.Exists(profilePath))
-        {
             return null;
-        }
 
         var json = await File.ReadAllTextAsync(profilePath, cancellationToken);
-        return System.Text.Json.JsonSerializer.Deserialize<SavedProfile>(json);
+        return JsonSerializer.Deserialize<SavedProfile>(json);
     }
 
     /// <summary>
@@ -383,9 +432,7 @@ public sealed class DataWarehouseHost : IAsyncDisposable
     {
         var profileDir = GetProfileDirectory();
         if (!Directory.Exists(profileDir))
-        {
             return Enumerable.Empty<string>();
-        }
 
         return Directory.GetFiles(profileDir, "*.json")
             .Select(f => Path.GetFileNameWithoutExtension(f));
@@ -398,14 +445,10 @@ public sealed class DataWarehouseHost : IAsyncDisposable
     private void ValidateInstallConfig(InstallConfiguration config)
     {
         if (string.IsNullOrEmpty(config.InstallPath))
-        {
             throw new ArgumentException("InstallPath is required.");
-        }
 
         if (config.CreateDefaultAdmin && string.IsNullOrEmpty(config.AdminPassword))
-        {
             throw new ArgumentException("AdminPassword is required when CreateDefaultAdmin is true.");
-        }
     }
 
     private Task CreateDirectoriesAsync(InstallConfiguration config, CancellationToken ct)
@@ -424,11 +467,63 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    private Task CopyFilesAsync(InstallConfiguration config, CancellationToken ct)
+    /// <summary>
+    /// Copies actual binaries, DLLs, and configs from the source directory to the install path.
+    /// </summary>
+    private async Task CopyFilesAsync(InstallConfiguration config, CancellationToken ct)
     {
-        // In a real implementation, this would copy binaries, configs, etc.
-        // For now, we just ensure the structure is in place
-        return Task.CompletedTask;
+        var sourceDir = AppContext.BaseDirectory;
+        var targetDir = config.InstallPath;
+
+        _logger.LogInformation("Copying files from {Source} to {Target}", sourceDir, targetDir);
+
+        var filesCopied = new int[1]; // Array wrapper to allow mutation in async methods
+        var extensions = new[] { ".exe", ".dll", ".json", ".pdb", ".runtimeconfig.json", ".deps.json" };
+        var skipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "obj", "bin", ".git" };
+
+        await CopyDirectoryAsync(sourceDir, targetDir, extensions, skipDirs, filesCopied, ct);
+
+        // Copy appsettings files to config subdirectory
+        var configDir = Path.Combine(targetDir, "config");
+        foreach (var file in Directory.GetFiles(sourceDir, "appsettings*.json"))
+        {
+            var destFile = Path.Combine(configDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+            filesCopied[0]++;
+        }
+
+        _logger.LogInformation("Copied {Count} files to {Target}", filesCopied[0], targetDir);
+    }
+
+    private async Task CopyDirectoryAsync(
+        string sourceDir, string targetDir,
+        string[] extensions, HashSet<string> skipDirs,
+        int[] filesCopied, CancellationToken ct)
+    {
+        Directory.CreateDirectory(targetDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            ct.ThrowIfCancellationRequested();
+            var ext = Path.GetExtension(file);
+            if (extensions.Any(e => ext.Equals(e, StringComparison.OrdinalIgnoreCase)))
+            {
+                var destFile = Path.Combine(targetDir, Path.GetFileName(file));
+                File.Copy(file, destFile, overwrite: true);
+                filesCopied[0]++;
+                _logger.LogDebug("Copied: {File}", Path.GetFileName(file));
+            }
+        }
+
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var dirName = Path.GetFileName(dir);
+            if (!skipDirs.Contains(dirName))
+            {
+                var destDir = Path.Combine(targetDir, dirName);
+                await CopyDirectoryAsync(dir, destDir, extensions, skipDirs, filesCopied, ct);
+            }
+        }
     }
 
     private async Task InitializeConfigurationAsync(InstallConfiguration config, CancellationToken ct)
@@ -449,49 +544,174 @@ public sealed class DataWarehouseHost : IAsyncDisposable
             defaultConfig[kv.Key] = kv.Value;
         }
 
-        var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig,
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(defaultConfig,
+            new JsonSerializerOptions { WriteIndented = true });
 
         await File.WriteAllTextAsync(configPath, json, ct);
     }
 
+    /// <summary>
+    /// Copies plugin DLLs from the source plugins directory to the target plugins directory.
+    /// </summary>
     private Task InitializePluginsAsync(InstallConfiguration config, CancellationToken ct)
     {
-        // Initialize/copy configured plugins
         var pluginPath = Path.Combine(config.InstallPath, "plugins");
+        var sourcePluginPath = Path.Combine(AppContext.BaseDirectory, "plugins");
+
+        var initialized = 0;
+        var skipped = 0;
 
         foreach (var plugin in config.IncludedPlugins)
         {
+            ct.ThrowIfCancellationRequested();
             var pluginDir = Path.Combine(pluginPath, plugin);
             Directory.CreateDirectory(pluginDir);
-            // In real impl: copy plugin files
+
+            // Search for plugin DLLs in source
+            if (Directory.Exists(sourcePluginPath))
+            {
+                var sourcePluginDir = Path.Combine(sourcePluginPath, plugin);
+                if (Directory.Exists(sourcePluginDir))
+                {
+                    foreach (var file in Directory.GetFiles(sourcePluginDir, "*.*", SearchOption.AllDirectories))
+                    {
+                        var relativePath = Path.GetRelativePath(sourcePluginDir, file);
+                        var destFile = Path.Combine(pluginDir, relativePath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                        File.Copy(file, destFile, overwrite: true);
+                    }
+                    initialized++;
+                }
+                else
+                {
+                    _logger.LogWarning("Plugin '{Plugin}' not found in source plugins directory", plugin);
+                    skipped++;
+                }
+            }
+            else
+            {
+                skipped++;
+            }
         }
+
+        _logger.LogInformation("Initialized {Initialized} plugins, {Skipped} skipped (not found in source)",
+            initialized, skipped);
 
         return Task.CompletedTask;
     }
 
-    private Task CreateAdminUserAsync(InstallConfiguration config, CancellationToken ct)
+    /// <summary>
+    /// Creates a real admin user with hashed password written to security.json.
+    /// </summary>
+    private async Task CreateAdminUserAsync(InstallConfiguration config, CancellationToken ct)
     {
-        // In real implementation: create admin user in security store
+        var securityPath = Path.Combine(config.InstallPath, "config", "security.json");
+
+        // Validate admin password is configured
+        if (string.IsNullOrWhiteSpace(config.AdminPassword))
+        {
+            throw new ArgumentException("AdminPassword must be configured and cannot be empty.", nameof(config));
+        }
+
+        // Generate salt and hash password using PBKDF2
+        var salt = new byte[32];
+        RandomNumberGenerator.Fill(salt);
+        var saltBase64 = Convert.ToBase64String(salt);
+
+        var passwordBytes = Encoding.UTF8.GetBytes(config.AdminPassword);
+
+        // D04 (CVSS 3.7): Use PBKDF2 with SHA256, 600000 iterations per NIST SP 800-63B
+        var hashBytes = Rfc2898DeriveBytes.Pbkdf2(
+            passwordBytes,
+            salt,
+            600_000,
+            HashAlgorithmName.SHA256,
+            32);
+        var hashBase64 = Convert.ToBase64String(hashBytes);
+
+        // Wipe password from memory
+        CryptographicOperations.ZeroMemory(passwordBytes);
+        CryptographicOperations.ZeroMemory(hashBytes);
+
+        var securityConfig = new Dictionary<string, object>
+        {
+            ["users"] = new[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["id"] = Guid.NewGuid().ToString("N"),
+                    ["username"] = config.AdminUsername,
+                    ["passwordHash"] = hashBase64,
+                    ["salt"] = saltBase64,
+                    ["role"] = "admin",
+                    ["createdAt"] = DateTime.UtcNow.ToString("O")
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(securityConfig,
+            new JsonSerializerOptions { WriteIndented = true });
+
+        await File.WriteAllTextAsync(securityPath, json, ct);
         _logger.LogInformation("Created admin user: {Username}", config.AdminUsername);
-        return Task.CompletedTask;
     }
 
-    private Task RegisterServiceAsync(InstallConfiguration config, CancellationToken ct)
+    /// <summary>
+    /// Registers a platform-specific system service by delegating to PlatformServiceManager.
+    /// This ensures a single source of truth for service management logic, accessible
+    /// to both the Launcher and CLI.
+    /// </summary>
+    private async Task RegisterServiceAsync(InstallConfiguration config, CancellationToken ct)
     {
-        // Platform-specific service registration
-        if (OperatingSystem.IsWindows())
+        var exePath = OperatingSystem.IsWindows()
+            ? Path.Combine(config.InstallPath, "DataWarehouse.Launcher.exe")
+            : Path.Combine(config.InstallPath, "DataWarehouse.Launcher");
+
+        _logger.LogInformation("Registering system service via PlatformServiceManager...");
+
+        var registration = new ServiceRegistration
         {
-            _logger.LogInformation("Registering Windows service...");
-            // sc create, etc.
-        }
-        else if (OperatingSystem.IsLinux())
+            Name = OperatingSystem.IsMacOS() ? "com.datawarehouse" : "DataWarehouse",
+            DisplayName = "DataWarehouse Service",
+            ExecutablePath = exePath,
+            WorkingDirectory = config.InstallPath,
+            AutoStart = config.AutoStart,
+            Description = "DataWarehouse data management service"
+        };
+
+        await PlatformServiceManager.RegisterServiceAsync(registration, ct);
+        _logger.LogInformation("System service registered successfully");
+    }
+
+    /// <summary>
+    /// Runs a process and waits for it to exit. Throws on non-zero exit code.
+    /// </summary>
+    private async Task RunProcessAsync(string fileName, string arguments, CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
         {
-            _logger.LogInformation("Creating systemd service file...");
-            // systemd unit file
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            UseShellExecute = false
+        };
+
+        using var process = Process.Start(psi);
+        if (process == null)
+        {
+            throw new InvalidOperationException($"Failed to start process: {fileName}");
         }
 
-        return Task.CompletedTask;
+        await process.WaitForExitAsync(ct);
+
+        if (process.ExitCode != 0)
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(ct);
+            throw new InvalidOperationException(
+                $"Process '{fileName} {arguments}' failed with exit code {process.ExitCode}: {stderr}");
+        }
     }
 
     private static string GetProfileDirectory()
@@ -514,12 +734,15 @@ public sealed class DataWarehouseHost : IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
 
+        _embeddedCts?.Cancel();
+
         if (_connection != null)
         {
             await _connection.DisposeAsync();
         }
 
         await _runner.DisposeAsync();
+        _embeddedCts?.Dispose();
     }
 }
 

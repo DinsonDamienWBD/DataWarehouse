@@ -4,6 +4,7 @@ using Serilog;
 using Serilog.Events;
 using DataWarehouse.Launcher.Integration;
 using DataWarehouse.Launcher.Adapters;
+using DataWarehouse.SDK.Hosting;
 
 namespace DataWarehouse.Launcher;
 
@@ -23,6 +24,7 @@ namespace DataWarehouse.Launcher;
 /// Options:
 ///   --kernel-mode &lt;mode&gt;    Kernel operating mode: Laptop, Workstation, Server, Hyperscale (default: Server)
 ///   --kernel-id &lt;id&gt;        Unique kernel identifier (default: auto-generated)
+///   --profile &lt;profile&gt;     Service profile: server, client, auto (default: auto)
 ///   --plugin-path &lt;path&gt;    Path to plugins directory (default: ./plugins)
 ///   --config &lt;path&gt;         Path to configuration file (default: appsettings.json)
 ///   --log-level &lt;level&gt;     Log level: Debug, Info, Warning, Error (default: Info)
@@ -80,9 +82,10 @@ public static class Program
         try
         {
             Log.Information("=== SERVICE MODE ===");
-            Log.Information("Starting as {OS} service/daemon",
+            Log.Information("Starting as {OS} service/daemon with profile {Profile}",
                 OperatingSystem.IsWindows() ? "Windows" :
-                OperatingSystem.IsLinux() ? "Linux" : "system");
+                OperatingSystem.IsLinux() ? "Linux" : "system",
+                options.Profile);
 
             var result = await host.RunAsync(options, cts.Token);
 
@@ -146,7 +149,7 @@ public static class Program
         Console.ResetColor();
 
         Console.WriteLine($"  Version 2.0.0 | .NET {Environment.Version}");
-        Console.WriteLine("  Mode: Service (daemon)");
+        Console.WriteLine($"  Mode: Service (daemon) | Profile: {options.Profile}");
         Console.WriteLine();
     }
 
@@ -192,6 +195,10 @@ USAGE:
 OPTIONS:
     --kernel-mode <mode>    Kernel mode: Laptop, Workstation, Server, Hyperscale (default: Server)
     --kernel-id <id>        Unique kernel identifier
+    --profile <profile>     Service profile: server, client, auto (default: auto)
+                            server  - Load full server plugin set (dispatchers, storage, intelligence)
+                            client  - Load minimal client set (courier, watchdog, policy)
+                            auto    - Auto-detect from available plugins and configuration
     --plugin-path <path>    Path to plugins directory (default: ./plugins)
     --config <path>         Path to configuration file
     --log-level <level>     Log level: Debug, Info, Warning, Error (default: Info)
@@ -203,8 +210,14 @@ NOTE:
     The Launcher is exclusively for running DataWarehouse as a service/daemon.
 
 EXAMPLES:
-    # Run as service (default)
-    DataWarehouse.Launcher
+    # Run as server daemon (default)
+    DataWarehouse.Launcher --profile server
+
+    # Run as client daemon
+    DataWarehouse.Launcher --profile client
+
+    # Auto-detect profile from available plugins
+    DataWarehouse.Launcher --profile auto
 
     # Run with custom configuration
     DataWarehouse.Launcher --kernel-mode Hyperscale --log-level Debug
@@ -259,6 +272,25 @@ public sealed class ServiceOptions
     public bool ShowHelp { get; set; }
 
     /// <summary>
+    /// Whether to enable the HTTP API server.
+    /// </summary>
+    public bool EnableHttp { get; set; } = true;
+
+    /// <summary>
+    /// Port for the HTTP API server.
+    /// Configurable via appsettings.json ("Http:Port"), command-line ("--http-port"),
+    /// or environment variable ("DW_HTTP_PORT").
+    /// </summary>
+    public int HttpPort { get; set; } = 8080;
+
+    /// <summary>
+    /// Service profile type for plugin loading.
+    /// Determines which plugins are loaded at startup based on deployment role.
+    /// Configurable via command-line ("--profile"), appsettings.json ("Profile"), or env ("DW_PROFILE").
+    /// </summary>
+    public ServiceProfileType Profile { get; set; } = ServiceProfileType.Auto;
+
+    /// <summary>
     /// Creates options from configuration.
     /// </summary>
     public static ServiceOptions FromConfiguration(IConfiguration configuration)
@@ -286,6 +318,21 @@ public sealed class ServiceOptions
                 "error" => LogEventLevel.Error,
                 "fatal" or "critical" => LogEventLevel.Fatal,
                 _ => LogEventLevel.Information
+            };
+        }
+
+        // Parse service profile
+        var profileStr = configuration["profile"] ?? configuration["Profile"];
+        if (!string.IsNullOrEmpty(profileStr))
+        {
+            options.Profile = profileStr.ToLowerInvariant() switch
+            {
+                "server" => ServiceProfileType.Server,
+                "client" => ServiceProfileType.Client,
+                "both" => ServiceProfileType.Both,
+                "auto" => ServiceProfileType.Auto,
+                "none" => ServiceProfileType.None,
+                _ => ServiceProfileType.Auto
             };
         }
 

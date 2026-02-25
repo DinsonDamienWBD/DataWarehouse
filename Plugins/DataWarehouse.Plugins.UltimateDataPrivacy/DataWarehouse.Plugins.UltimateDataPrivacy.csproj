@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Ultimate Data Privacy Plugin (T124) - Comprehensive data privacy framework with 70+ strategies including anonymization, pseudonymization, tokenization, data masking, differential privacy, consent management, privacy-preserving analytics, and privacy compliance</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>

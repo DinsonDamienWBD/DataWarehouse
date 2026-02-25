@@ -1,7 +1,7 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Plugins
 {
@@ -22,7 +22,7 @@ namespace DataWarehouse.Kernel.Plugins
     /// </summary>
     public sealed class InMemoryStoragePlugin : StorageProviderPluginBase, IListableStorage
     {
-        private readonly ConcurrentDictionary<string, StoredBlob> _storage = new();
+        private readonly BoundedDictionary<string, StoredBlob> _storage = new BoundedDictionary<string, StoredBlob>(1000);
         private readonly object _evictionLock = new();
         private readonly InMemoryStorageConfig _config;
         private readonly List<Action<EvictionEvent>> _evictionCallbacks = new();
@@ -103,6 +103,162 @@ namespace DataWarehouse.Kernel.Plugins
         }
 
         /// <summary>
+        /// Declared capabilities for automatic registration with the Capability Registry.
+        /// Allows the Kernel to function as a minimal but complete DataWarehouse.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+        {
+            get
+            {
+                return new List<RegisteredCapability>
+                {
+                    new()
+                    {
+                        CapabilityId = "storage.memory",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "In-Memory Storage",
+                        Description = "Volatile in-memory storage with LRU eviction. Fast, thread-safe, suitable for testing, caching, and ephemeral workloads.",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Memory",
+                        Tags = ["storage", "memory", "volatile", "cache", "lru", "testing", "kernel"],
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["volatile"] = true,
+                            ["evictionPolicy"] = "LRU",
+                            ["supportsConcurrency"] = true,
+                            ["supportsListing"] = true,
+                            ["maxMemoryBytes"] = _config.MaxMemoryBytes ?? -1,
+                            ["maxItemCount"] = _config.MaxItemCount ?? -1
+                        }
+                    },
+                    new()
+                    {
+                        CapabilityId = "storage.memory.save",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "Memory Save",
+                        Description = "Store data in memory with automatic LRU eviction when limits exceeded",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Operations",
+                        Tags = ["storage", "save", "write", "memory"]
+                    },
+                    new()
+                    {
+                        CapabilityId = "storage.memory.load",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "Memory Load",
+                        Description = "Retrieve data from memory storage",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Operations",
+                        Tags = ["storage", "load", "read", "memory"]
+                    },
+                    new()
+                    {
+                        CapabilityId = "storage.memory.delete",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "Memory Delete",
+                        Description = "Remove data from memory storage",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Operations",
+                        Tags = ["storage", "delete", "remove", "memory"]
+                    },
+                    new()
+                    {
+                        CapabilityId = "storage.memory.list",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "Memory List",
+                        Description = "Enumerate all items in memory storage",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Operations",
+                        Tags = ["storage", "list", "enumerate", "memory"]
+                    },
+                    new()
+                    {
+                        CapabilityId = "storage.memory.eviction",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "LRU Eviction",
+                        Description = "Automatic eviction of least-recently-used items when memory limits exceeded",
+                        Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Management",
+                        Tags = ["storage", "eviction", "lru", "memory-management"]
+                    }
+                }.AsReadOnly();
+            }
+        }
+
+        /// <summary>
+        /// Static knowledge about this storage plugin for AI and discovery.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new List<KnowledgeObject>
+            {
+                new()
+                {
+                    Id = $"{Id}:overview",
+                    Topic = "storage.kernel",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Kernel's built-in in-memory storage provides volatile, fast storage for testing " +
+                                "and development. Data is lost on shutdown. Features include LRU eviction, memory " +
+                                "pressure detection, configurable limits, and thread-safe concurrent access. " +
+                                "This allows the Kernel to function as a minimal but complete DataWarehouse " +
+                                "without requiring external storage plugins.",
+                    Tags = ["storage", "memory", "kernel", "volatile", "testing", "development", "lru", "cache"],
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["purpose"] = "Built-in volatile storage for kernel self-sufficiency",
+                        ["volatile"] = true,
+                        ["evictionPolicy"] = "LRU",
+                        ["features"] = new[]
+                        {
+                            "Thread-safe concurrent access",
+                            "Configurable memory limits",
+                            "LRU eviction policy",
+                            "Memory pressure detection",
+                            "Eviction callbacks",
+                            "Item listing support"
+                        },
+                        ["useCases"] = new[]
+                        {
+                            "Development and testing",
+                            "Caching layers",
+                            "Session storage",
+                            "Ephemeral workloads",
+                            "Kernel self-test mode"
+                        },
+                        ["limitations"] = new[]
+                        {
+                            "Data lost on shutdown",
+                            "Limited by available RAM",
+                            "No persistence",
+                            "No replication"
+                        },
+                        ["currentStats"] = new Dictionary<string, object>
+                        {
+                            ["itemCount"] = Count,
+                            ["totalSizeBytes"] = TotalSizeBytes,
+                            ["memoryUtilization"] = MemoryUtilization,
+                            ["isUnderPressure"] = IsUnderMemoryPressure
+                        }
+                    }
+                }
+            };
+        }
+
+        /// <summary>
         /// Registers a callback to be invoked when items are evicted.
         /// </summary>
         public void OnEviction(Action<EvictionEvent> callback)
@@ -123,7 +279,9 @@ namespace DataWarehouse.Kernel.Plugins
 
             var key = GetKey(uri);
 
-            using var ms = new MemoryStream();
+            // Pre-allocate capacity if stream length is known
+            var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await data.CopyToAsync(ms);
             var bytes = ms.ToArray();
             var newSize = bytes.LongLength;
@@ -272,7 +430,8 @@ namespace DataWarehouse.Kernel.Plugins
             if (_config.MaxMemoryBytes.HasValue && TotalSizeBytes >= _config.MaxMemoryBytes.Value * 0.95)
                 return EvictionReason.MemoryLimit;
 
-            if (_config.MaxItemCount.HasValue && _storage.Count >= _config.MaxItemCount.Value)
+            // Check item count limit; use Count + 1 because the evicted item was already removed
+            if (_config.MaxItemCount.HasValue && (_storage.Count + 1) >= _config.MaxItemCount.Value)
                 return EvictionReason.ItemCountLimit;
 
             if (IsUnderMemoryPressure)
@@ -447,6 +606,7 @@ namespace DataWarehouse.Kernel.Plugins
         public void Clear()
         {
             _storage.Clear();
+            Interlocked.Exchange(ref _currentSizeBytes, 0);
         }
 
         /// <summary>
@@ -473,7 +633,7 @@ namespace DataWarehouse.Kernel.Plugins
         private sealed class StoredBlob
         {
             public string Key { get; init; } = string.Empty;
-            public Uri Uri { get; init; } = null!;
+            public required Uri Uri { get; init; }
             public byte[] Data { get; init; } = [];
             public DateTime CreatedAt { get; init; }
             public DateTime LastAccessedAt { get; set; }
@@ -557,7 +717,7 @@ namespace DataWarehouse.Kernel.Plugins
     public class EvictionEvent
     {
         public string Key { get; init; } = string.Empty;
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public long SizeBytes { get; init; }
         public EvictionReason Reason { get; init; }
         public DateTime EvictedAt { get; init; }

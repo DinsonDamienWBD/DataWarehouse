@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Validation;
 
@@ -50,7 +51,7 @@ public sealed class SqlSecurityAnalyzer
         @"(--[^\r\n]*)|(/\*[\s\S]*?\*/)",
         RegexOptions.Compiled);
 
-    private readonly ConcurrentDictionary<string, SqlAnalysisResult> _analysisCache = new();
+    private readonly BoundedDictionary<string, SqlAnalysisResult> _analysisCache = new BoundedDictionary<string, SqlAnalysisResult>(1000);
     private readonly int _cacheMaxSize;
 
     public SqlSecurityAnalyzer(int cacheMaxSize = 10000)
@@ -201,7 +202,7 @@ public sealed class SqlSecurityAnalyzer
         var threats = new List<SqlThreat>();
 
         // Check for URL encoding
-        if (Regex.IsMatch(query, @"%[0-9a-fA-F]{2}"))
+        if (Regex.IsMatch(query, @"%[0-9a-fA-F]{2}", RegexOptions.None, TimeSpan.FromMilliseconds(100)))
         {
             threats.Add(new SqlThreat
             {
@@ -212,7 +213,7 @@ public sealed class SqlSecurityAnalyzer
         }
 
         // Check for Unicode encoding
-        if (Regex.IsMatch(query, @"\\u[0-9a-fA-F]{4}"))
+        if (Regex.IsMatch(query, @"\\u[0-9a-fA-F]{4}", RegexOptions.None, TimeSpan.FromMilliseconds(100)))
         {
             threats.Add(new SqlThreat
             {
@@ -223,7 +224,7 @@ public sealed class SqlSecurityAnalyzer
         }
 
         // Check for hex encoding
-        if (Regex.IsMatch(query, @"0x[0-9a-fA-F]{2,}"))
+        if (Regex.IsMatch(query, @"0x[0-9a-fA-F]{2,}", RegexOptions.None, TimeSpan.FromMilliseconds(100)))
         {
             threats.Add(new SqlThreat
             {
@@ -238,12 +239,12 @@ public sealed class SqlSecurityAnalyzer
 
     private bool ContainsUnionInjection(string query)
     {
-        return Regex.IsMatch(query, @"(?i)\bUNION\b\s+(ALL\s+)?\bSELECT\b");
+        return Regex.IsMatch(query, @"(?i)\bUNION\b\s+(ALL\s+)?\bSELECT\b", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
     private string RemoveStringLiterals(string query)
     {
-        return Regex.Replace(query, @"'[^']*'", " ");
+        return Regex.Replace(query, @"'[^']*'", " ", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
     /// <summary>
@@ -299,7 +300,7 @@ public static class SqlSanitizer
         }
 
         // Only allow alphanumeric and underscore
-        if (!Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+        if (!Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.None, TimeSpan.FromMilliseconds(100)))
         {
             throw new ArgumentException($"Invalid identifier: '{identifier}'", nameof(identifier));
         }
@@ -324,7 +325,7 @@ public static class SqlSanitizer
         }
 
         // Remove all non-numeric characters except decimal point and minus
-        var sanitized = Regex.Replace(input, @"[^0-9.\-]", "");
+        var sanitized = Regex.Replace(input, @"[^0-9.\-]", "", RegexOptions.None, TimeSpan.FromMilliseconds(100));
 
         // Validate it's a valid number
         if (!double.TryParse(sanitized, out _))

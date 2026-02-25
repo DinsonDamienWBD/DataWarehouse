@@ -10,6 +10,117 @@ namespace DataWarehouse.Kernel.Messaging
     // Import with: using static DataWarehouse.SDK.Contracts.MessageTopics;
 
     /// <summary>
+    /// Lightweight sliding-window rate limiter for per-publisher message throttling.
+    /// Uses a lock-free design with ConcurrentQueue for high throughput.
+    /// </summary>
+    internal sealed class SlidingWindowRateLimiter
+    {
+        private readonly int _maxMessages;
+        private readonly TimeSpan _window;
+        private readonly ConcurrentQueue<long> _timestamps = new();
+        private long _count;
+
+        public SlidingWindowRateLimiter(int maxMessagesPerWindow, TimeSpan window)
+        {
+            _maxMessages = maxMessagesPerWindow;
+            _window = window;
+        }
+
+        /// <summary>
+        /// Attempts to acquire a permit. Returns true if within rate limit, false if exceeded.
+        /// </summary>
+        public bool TryAcquire()
+        {
+            var now = Environment.TickCount64;
+            var windowStart = now - (long)_window.TotalMilliseconds;
+
+            // Evict expired timestamps
+            while (_timestamps.TryPeek(out var oldest) && oldest < windowStart)
+            {
+                if (_timestamps.TryDequeue(out _))
+                {
+                    Interlocked.Decrement(ref _count);
+                }
+            }
+
+            // Check if under limit
+            if (Interlocked.Read(ref _count) >= _maxMessages)
+            {
+                return false;
+            }
+
+            // Record this request
+            _timestamps.Enqueue(now);
+            Interlocked.Increment(ref _count);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Validates message bus topic names to prevent injection attacks (BUS-06).
+    /// </summary>
+    internal static partial class TopicValidator
+    {
+        // Topic names: alphanumeric start, then alphanumeric, dots, hyphens, underscores. Max 256 chars.
+        [GeneratedRegex(@"^[a-zA-Z0-9][a-zA-Z0-9._\-]{0,255}$", RegexOptions.Compiled)]
+        private static partial Regex TopicNameRegex();
+
+        // Pattern topics allow * and ? for glob matching
+        [GeneratedRegex(@"^[a-zA-Z0-9*?][a-zA-Z0-9._\-*?]{0,255}$", RegexOptions.Compiled)]
+        private static partial Regex TopicPatternRegex();
+
+        /// <summary>
+        /// Validates a topic name. Rejects names with path traversal, control chars, whitespace.
+        /// </summary>
+        public static void ValidateTopic(string topic)
+        {
+            ArgumentNullException.ThrowIfNull(topic);
+
+            if (string.IsNullOrWhiteSpace(topic))
+                throw new ArgumentException("Topic name cannot be empty or whitespace.", nameof(topic));
+
+            if (topic.Contains(".."))
+                throw new ArgumentException($"Topic name '{topic}' contains path traversal pattern '..'.", nameof(topic));
+
+            if (topic.Contains('/') || topic.Contains('\\'))
+                throw new ArgumentException($"Topic name '{topic}' contains path separator characters.", nameof(topic));
+
+            if (topic.Any(c => char.IsControl(c)))
+                throw new ArgumentException($"Topic name '{topic}' contains control characters.", nameof(topic));
+
+            if (!TopicNameRegex().IsMatch(topic))
+                throw new ArgumentException(
+                    $"Topic name '{topic}' is invalid. Must match pattern: alphanumeric start, " +
+                    "then alphanumeric, dots, hyphens, or underscores. Max 256 characters.", nameof(topic));
+        }
+
+        /// <summary>
+        /// Validates a topic pattern (allows * and ? wildcards).
+        /// </summary>
+        public static void ValidateTopicPattern(string pattern)
+        {
+            ArgumentNullException.ThrowIfNull(pattern);
+
+            if (string.IsNullOrWhiteSpace(pattern))
+                throw new ArgumentException("Topic pattern cannot be empty or whitespace.", nameof(pattern));
+
+            if (pattern.Contains(".."))
+                throw new ArgumentException($"Topic pattern '{pattern}' contains path traversal pattern '..'.", nameof(pattern));
+
+            if (pattern.Contains('/') || pattern.Contains('\\'))
+                throw new ArgumentException($"Topic pattern '{pattern}' contains path separator characters.", nameof(pattern));
+
+            if (pattern.Any(c => char.IsControl(c)))
+                throw new ArgumentException($"Topic pattern '{pattern}' contains control characters.", nameof(pattern));
+
+            if (!TopicPatternRegex().IsMatch(pattern))
+                throw new ArgumentException(
+                    $"Topic pattern '{pattern}' is invalid. Must match pattern: alphanumeric or wildcard start, " +
+                    "then alphanumeric, dots, hyphens, underscores, or wildcards. Max 256 characters.", nameof(pattern));
+        }
+    }
+
+    /// <summary>
     /// Default implementation of the message bus for inter-plugin communication.
     ///
     /// Features:
@@ -18,23 +129,48 @@ namespace DataWarehouse.Kernel.Messaging
     /// - Topic-based and pattern-based routing
     /// - Async-first design
     /// - Non-blocking operations
+    /// - Per-publisher rate limiting (BUS-03)
+    /// - Topic name validation (BUS-06)
     /// </summary>
     public sealed class DefaultMessageBus(ILogger? logger = null) : IMessageBus
     {
-        private readonly ConcurrentDictionary<string, List<Subscription>> _subscriptions = new();
-        private readonly ConcurrentDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new();
-        private readonly ConcurrentDictionary<string, PatternSubscription> _patternSubscriptions = new();
+        private readonly BoundedDictionary<string, List<Subscription>> _subscriptions = new BoundedDictionary<string, List<Subscription>>(1000);
+        private readonly BoundedDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new BoundedDictionary<string, List<ResponseSubscription>>(1000);
+        private readonly BoundedDictionary<string, PatternSubscription> _patternSubscriptions = new BoundedDictionary<string, PatternSubscription>(1000);
         private readonly ILogger? _logger = logger;
         private readonly Lock _subscriptionLock = new();
         private long _subscriptionIdCounter;
 
+        // BUS-03: Per-publisher rate limiting to prevent flooding DoS
+        private readonly BoundedDictionary<string, SlidingWindowRateLimiter> _rateLimiters = new BoundedDictionary<string, SlidingWindowRateLimiter>(1000);
+
+        /// <summary>
+        /// Maximum messages per second per publisher. Default: 1000.
+        /// </summary>
+        public int RateLimitPerSecond { get; init; } = 1000;
+
         /// <summary>
         /// Publish a message to all subscribers (fire and forget).
+        /// Validates topic name and enforces per-publisher rate limiting.
         /// </summary>
         public async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(message);
+
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
+            // BUS-03: Per-publisher rate limiting
+            var publisherId = message.Identity?.ActorId ?? message.Source ?? "anonymous";
+            var limiter = _rateLimiters.GetOrAdd(publisherId,
+                _ => new SlidingWindowRateLimiter(RateLimitPerSecond, TimeSpan.FromSeconds(1)));
+
+            if (!limiter.TryAcquire())
+            {
+                _logger?.LogWarning("Rate limit exceeded for publisher {Publisher} on topic {Topic}", publisherId, topic);
+                throw new InvalidOperationException($"Rate limit exceeded for publisher '{publisherId}'. Max {RateLimitPerSecond} messages/second.");
+            }
 
             var handlers = GetHandlersForTopic(topic);
             if (handlers.Count == 0) return;
@@ -60,11 +196,26 @@ namespace DataWarehouse.Kernel.Messaging
 
         /// <summary>
         /// Publish a message and wait for all handlers to complete.
+        /// Validates topic name and enforces per-publisher rate limiting.
         /// </summary>
         public async Task PublishAndWaitAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(message);
+
+            // BUS-06: Validate topic name against injection patterns
+            TopicValidator.ValidateTopic(topic);
+
+            // BUS-03: Per-publisher rate limiting
+            var publisherId = message.Identity?.ActorId ?? message.Source ?? "anonymous";
+            var limiter = _rateLimiters.GetOrAdd(publisherId,
+                _ => new SlidingWindowRateLimiter(RateLimitPerSecond, TimeSpan.FromSeconds(1)));
+
+            if (!limiter.TryAcquire())
+            {
+                _logger?.LogWarning("Rate limit exceeded for publisher {Publisher} on topic {Topic}", publisherId, topic);
+                throw new InvalidOperationException($"Rate limit exceeded for publisher '{publisherId}'. Max {RateLimitPerSecond} messages/second.");
+            }
 
             var handlers = GetHandlersForTopic(topic);
             if (handlers.Count == 0) return;
@@ -88,11 +239,26 @@ namespace DataWarehouse.Kernel.Messaging
 
         /// <summary>
         /// Send a message and wait for a response.
+        /// Validates topic name and enforces per-publisher rate limiting.
         /// </summary>
         public async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(message);
+
+            // BUS-06: Validate topic name
+            TopicValidator.ValidateTopic(topic);
+
+            // BUS-03: Per-publisher rate limiting
+            var publisherId = message.Identity?.ActorId ?? message.Source ?? "anonymous";
+            var limiter = _rateLimiters.GetOrAdd(publisherId,
+                _ => new SlidingWindowRateLimiter(RateLimitPerSecond, TimeSpan.FromSeconds(1)));
+
+            if (!limiter.TryAcquire())
+            {
+                _logger?.LogWarning("Rate limit exceeded for publisher {Publisher} on topic {Topic}", publisherId, topic);
+                return MessageResponse.Error($"Rate limit exceeded for publisher '{publisherId}'", "RATE_LIMITED");
+            }
 
             // Find a response handler
             List<ResponseSubscription>? responseHandlers;
@@ -142,11 +308,15 @@ namespace DataWarehouse.Kernel.Messaging
 
         /// <summary>
         /// Subscribe to messages on a topic.
+        /// Validates topic name against injection patterns.
         /// </summary>
         public IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(handler);
+
+            // BUS-06: Validate topic name
+            TopicValidator.ValidateTopic(topic);
 
             var subscriptionId = Interlocked.Increment(ref _subscriptionIdCounter);
             var subscription = new Subscription(subscriptionId, topic, handler);
@@ -180,11 +350,15 @@ namespace DataWarehouse.Kernel.Messaging
 
         /// <summary>
         /// Subscribe to messages on a topic with response capability.
+        /// Validates topic name against injection patterns.
         /// </summary>
         public IDisposable Subscribe(string topic, Func<PluginMessage, Task<MessageResponse>> handler)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(handler);
+
+            // BUS-06: Validate topic name
+            TopicValidator.ValidateTopic(topic);
 
             var subscriptionId = Interlocked.Increment(ref _subscriptionIdCounter);
             var subscription = new ResponseSubscription(subscriptionId, topic, handler);
@@ -218,11 +392,15 @@ namespace DataWarehouse.Kernel.Messaging
 
         /// <summary>
         /// Subscribe to messages matching a pattern (e.g., "storage.*", "*.error").
+        /// Validates pattern against injection attacks.
         /// </summary>
         public IDisposable SubscribePattern(string pattern, Func<PluginMessage, Task> handler)
         {
             ArgumentNullException.ThrowIfNull(pattern);
             ArgumentNullException.ThrowIfNull(handler);
+
+            // BUS-06: Validate topic pattern
+            TopicValidator.ValidateTopicPattern(pattern);
 
             var subscriptionId = Interlocked.Increment(ref _subscriptionIdCounter);
 

@@ -19,6 +19,8 @@ public sealed class DialogService
         _logger = logger;
     }
 
+    private static Page? GetMainPage() => Application.Current?.Windows.FirstOrDefault()?.Page;
+
     /// <summary>
     /// Shows an alert dialog (convenience alias for ShowAlertAsync).
     /// </summary>
@@ -45,9 +47,9 @@ public sealed class DialogService
     {
         try
         {
-            if (Application.Current?.MainPage != null)
+            if (GetMainPage() != null)
             {
-                await Application.Current.MainPage.DisplayAlert(title, message, cancel);
+                await GetMainPage()!.DisplayAlertAsync(title, message, cancel);
             }
             else
             {
@@ -72,9 +74,9 @@ public sealed class DialogService
     {
         try
         {
-            if (Application.Current?.MainPage != null)
+            if (GetMainPage() != null)
             {
-                return await Application.Current.MainPage.DisplayAlert(title, message, accept, cancel);
+                return await GetMainPage()!.DisplayAlertAsync(title, message, accept, cancel);
             }
             else
             {
@@ -101,9 +103,9 @@ public sealed class DialogService
     {
         try
         {
-            if (Application.Current?.MainPage != null)
+            if (GetMainPage() != null)
             {
-                return await Application.Current.MainPage.DisplayActionSheet(title, cancel, destruction, buttons);
+                return await GetMainPage()!.DisplayActionSheetAsync(title, cancel, destruction, buttons);
             }
             else
             {
@@ -142,9 +144,9 @@ public sealed class DialogService
     {
         try
         {
-            if (Application.Current?.MainPage != null)
+            if (GetMainPage() != null)
             {
-                return await Application.Current.MainPage.DisplayPromptAsync(
+                return await GetMainPage()!.DisplayPromptAsync(
                     title,
                     message,
                     accept,

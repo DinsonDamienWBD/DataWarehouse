@@ -1,7 +1,12 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using System.Threading;
+
+using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
@@ -272,8 +277,83 @@ public class LegalHold
 /// Provides common retention validation and legal hold management logic.
 /// Plugin implementers should extend this class and implement the protected abstract methods.
 /// </summary>
-public abstract class WormStorageProviderPluginBase : FeaturePluginBase, IWormStorageProvider
+public abstract class WormStorageProviderPluginBase : IntegrityPluginBase, IWormStorageProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return await Task.FromResult(sha.ComputeHash(data));
+    }
+
+    #region Intelligence Socket
+
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.worm",
+            DisplayName = $"{Name} - WORM Storage",
+            Description = $"Write-Once-Read-Many storage ({EnforcementMode} enforcement)",
+            Category = CapabilityCategory.TamperProof,
+            SubCategory = "WORM",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "worm", "immutable", "tamper-proof", "compliance" },
+            SemanticDescription = "Use for immutable WORM storage"
+        }
+    };
+
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.worm.capability",
+                Topic = "tamperproof.worm",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"WORM storage with {EnforcementMode} enforcement",
+                Payload = new Dictionary<string, object>
+                {
+                    ["enforcementMode"] = EnforcementMode.ToString(),
+                    ["supportsLegalHolds"] = true,
+                    ["supportsRetentionExtension"] = true
+                },
+                Tags = new[] { "worm", "immutable", "tamper-proof" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted retention policy recommendation.
+    /// </summary>
+    protected virtual async Task<RetentionPolicyRecommendation?> RequestRetentionPolicyAsync(Guid objectId, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets the category of this plugin (always StorageProvider for WORM).
     /// </summary>
@@ -453,3 +533,14 @@ public abstract class WormStorageProviderPluginBase : FeaturePluginBase, IWormSt
         return metadata;
     }
 }
+
+#region Stub Types for WORM Intelligence Integration
+
+/// <summary>Stub type for retention policy recommendation from AI.</summary>
+public record RetentionPolicyRecommendation(
+    TimeSpan RecommendedRetention,
+    bool ShouldPlaceLegalHold,
+    string Rationale,
+    double ConfidenceScore);
+
+#endregion

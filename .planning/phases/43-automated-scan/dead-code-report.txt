@@ -1,0 +1,126 @@
+=== Dead Code Detection Scan ===
+Date: Tue, Feb 17, 2026 10:54:53 PM
+
+## File Statistics
+Total .cs files: 3277
+
+## Commented-Out Code Blocks (>10 consecutive lines)
+Found 1523 large commented code blocks
+
+File: ./DataWarehouse.GUI/Services/DialogService.cs
+  Lines 121-132: 12 commented lines
+
+File: ./DataWarehouse.Kernel/DataWarehouseKernel.cs
+  Lines 19-29: 11 commented lines
+
+File: ./DataWarehouse.Kernel/Pipeline/EnhancedPipelineOrchestrator.cs
+  Lines 12-22: 11 commented lines
+
+File: ./DataWarehouse.Kernel/Pipeline/PipelineMigrationEngine.cs
+  Lines 10-23: 14 commented lines
+
+File: ./DataWarehouse.Kernel/Pipeline/PipelineOrchestrator.cs
+  Lines 14-24: 11 commented lines
+
+File: ./DataWarehouse.Kernel/Pipeline/PipelinePolicyManager.cs
+  Lines 8-23: 16 commented lines
+  Lines 44-54: 11 commented lines
+  Lines 169-179: 11 commented lines
+
+File: ./DataWarehouse.Kernel/Plugins/InMemoryStoragePlugin.cs
+  Lines 9-23: 15 commented lines
+
+File: ./DataWarehouse.Kernel/Plugins/PluginLoader.cs
+  Lines 75-85: 11 commented lines
+
+File: ./DataWarehouse.Launcher/Integration/AdapterFactory.cs
+  Lines 3-15: 13 commented lines
+
+File: ./DataWarehouse.Launcher/Integration/AdapterRunner.cs
+  Lines 6-21: 16 commented lines
+
+File: ./DataWarehouse.Launcher/Integration/IKernelAdapter.cs
+  Lines 5-19: 15 commented lines
+
+File: ./DataWarehouse.Launcher/PluginProfileLoader.cs
+  Lines 10-25: 16 commented lines
+
+File: ./DataWarehouse.Launcher/Program.cs
+  Lines 11-40: 30 commented lines
+
+File: ./DataWarehouse.SDK/AI/KnowledgeObject.cs
+  Lines 7-18: 12 commented lines
+  Lines 26-37: 12 commented lines
+  Lines 60-70: 11 commented lines
+
+File: ./DataWarehouse.SDK/Compliance/IComplianceAutomation.cs
+  Lines 73-84: 12 commented lines
+  Lines 96-107: 12 commented lines
+  Lines 409-419: 11 commented lines
+
+File: ./DataWarehouse.SDK/Connectors/ConnectionStrategyBase.cs
+  Lines 13-28: 16 commented lines
+  Lines 113-134: 22 commented lines
+  Lines 324-342: 19 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/AedsPluginBases.cs
+  Lines 6-18: 13 commented lines
+  Lines 151-163: 13 commented lines
+  Lines 312-324: 13 commented lines
+  Lines 540-551: 12 commented lines
+  Lines 640-651: 12 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Compute/ComputeCapabilities.cs
+  Lines 3-71: 69 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Compute/ComputeTypes.cs
+  Lines 3-55: 53 commented lines
+  Lines 92-102: 11 commented lines
+  Lines 117-164: 48 commented lines
+  Lines 228-238: 11 commented lines
+  Lines 293-332: 40 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Compute/IComputeRuntimeStrategy.cs
+  Lines 3-27: 25 commented lines
+  Lines 56-109: 54 commented lines
+  Lines 112-136: 25 commented lines
+  Lines 139-160: 22 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Compute/PipelineComputeStrategy.cs
+  Lines 11-26: 16 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Dashboards/DashboardCapabilities.cs
+  Lines 3-34: 32 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Dashboards/DashboardTypes.cs
+  Lines 3-23: 21 commented lines
+  Lines 79-91: 13 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Dashboards/IDashboardStrategy.cs
+  Lines 3-19: 17 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Distributed/FederatedMessageBusBase.cs
+  Lines 9-21: 13 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Distribution/DistributionCapabilities.cs
+  Lines 3-76: 74 commented lines
+
+File: ./DataWarehouse.SDK/Contracts/Distribution/DistributionTypes.cs
+
+## Commented Using Statements
+Found 5 commented using statements
+./Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:        // using var results = _session.Run(inputs);
+./Plugins/DataWarehouse.Plugins.UltimateInterface/Strategies/Conversational/GenericWebhookStrategy.cs:        // using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+./Plugins/DataWarehouse.Plugins.UltimateKeyManagement/Strategies/Hardware/YubikeyStrategy.cs:                // using device serial number as seed
+./Plugins/DataWarehouse.Plugins.UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:            // using EC point arithmetic
+./Plugins/DataWarehouse.Plugins.UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:            // using Confluent.Kafka.ConsumerBuilder
+
+## Orphaned .cs Files
+Checking for .cs files not referenced in any .csproj...
+Total .cs files: 3277
+Note: Full orphaned file detection requires XML parsing of all .csproj files
+
+## Summary
+Total .cs files: 3277
+Large commented blocks: 1523
+Commented using statements: 5

@@ -45,7 +45,57 @@ namespace DataWarehouse.SDK.Connectors
         /// <summary>
         /// Legacy system connectors (Mainframe, AS/400, Tape libraries).
         /// </summary>
-        Legacy
+        Legacy,
+
+        /// <summary>
+        /// IoT device connectors (MQTT, OPC-UA, Modbus, BACnet).
+        /// </summary>
+        IoT,
+
+        /// <summary>
+        /// Healthcare system connectors (HL7, FHIR, DICOM).
+        /// </summary>
+        Healthcare,
+
+        /// <summary>
+        /// Blockchain network connectors (Ethereum, Solana, IPFS).
+        /// </summary>
+        Blockchain,
+
+        /// <summary>
+        /// File system connectors (NFS, SMB, FUSE).
+        /// </summary>
+        FileSystem,
+
+        /// <summary>
+        /// Industrial system connectors (OPC-UA, SCADA, Modbus).
+        /// </summary>
+        Industrial,
+
+        /// <summary>
+        /// Protocol connectors (gRPC, GraphQL, WebSocket, REST).
+        /// </summary>
+        Protocol,
+
+        /// <summary>
+        /// DevOps platform connectors (Jenkins, GitHub, GitLab CI).
+        /// </summary>
+        DevOps,
+
+        /// <summary>
+        /// Observability platform connectors (Prometheus, Datadog, Grafana).
+        /// </summary>
+        Observability,
+
+        /// <summary>
+        /// Dashboard and BI connectors (Tableau, PowerBI, Metabase).
+        /// </summary>
+        Dashboard,
+
+        /// <summary>
+        /// AI and ML platform connectors (OpenAI, Anthropic, Ollama, Bedrock).
+        /// </summary>
+        AI
     }
 
     /// <summary>

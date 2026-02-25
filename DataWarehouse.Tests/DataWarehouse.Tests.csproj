@@ -6,11 +6,24 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Suppress xUnit analyzer warnings that are informational:
+         xUnit1051: Use TestContext.Current.CancellationToken (not needed for unit tests)
+         xUnit1031: Do not use blocking task operations in test method
+         xUnit2002: Do not use null check on value type
+         xUnit2031: Do not use Assert.Null() on value types -->
+    <!-- Suppress obsolete warnings for tests that exercise [Obsolete] registries retained
+         for typed lookups (UNIQUE category). The plugins themselves deprecated these registries
+         in favour of base-class dispatch; the tests validate the retained typed-lookup path. -->
+    <NoWarn>$(NoWarn);xUnit1051;xUnit1031;xUnit2002;xUnit2031;CS0612;CS0618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.BedrockAgentRuntime" Version="4.0.8.8" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3.13" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -21,36 +34,69 @@
     </PackageReference>
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Encryption\DataWarehouse.Plugins.Encryption.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.LocalStorage\DataWarehouse.Plugins.LocalStorage.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AIAgents\DataWarehouse.Plugins.AIAgents.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compression\DataWarehouse.Plugins.Compression.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.EmbeddedDatabaseStorage\DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.RelationalDatabaseStorage\DataWarehouse.Plugins.RelationalDatabaseStorage.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.GeoReplication\DataWarehouse.Plugins.GeoReplication.csproj" />
-  </ItemGroup>
+    <ProjectReference Include="..\DataWarehouse.Shared\DataWarehouse.Shared.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompliance\DataWarehouse.Plugins.UltimateCompliance.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateEncryption\DataWarehouse.Plugins.UltimateEncryption.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompression\DataWarehouse.Plugins.UltimateCompression.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorage\DataWarehouse.Plugins.UltimateStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRAID\DataWarehouse.Plugins.UltimateRAID.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateReplication\DataWarehouse.Plugins.UltimateReplication.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateConsensus\DataWarehouse.Plugins.UltimateConsensus.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateKeyManagement\DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateInterface\DataWarehouse.Plugins.UltimateInterface.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIntelligence\DataWarehouse.Plugins.UltimateIntelligence.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.TamperProof\DataWarehouse.Plugins.TamperProof.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Transcoding.Media\DataWarehouse.Plugins.Transcoding.Media.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateFilesystem\DataWarehouse.Plugins.UltimateFilesystem.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalObservability\DataWarehouse.Plugins.UniversalObservability.csproj" />
+    <!-- UniversalDashboards merged into UltimateInterface (Phase 82-02) -->
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AedsCore\DataWarehouse.Plugins.AedsCore.csproj" />
 
-  <!-- Exclude test files for removed functionality to fix build errors -->
-  <ItemGroup>
-    <Compile Remove="Infrastructure\CircuitBreakerPolicyTests.cs" />
-    <Compile Remove="Infrastructure\MetricsCollectorTests.cs" />
-    <Compile Remove="Infrastructure\TokenBucketRateLimiterTests.cs" />
-    <Compile Remove="Infrastructure\SdkInfrastructureTests.cs" />
-    <Compile Remove="Telemetry\DistributedTracingTests.cs" />
-    <Compile Remove="Hyperscale\ErasureCodingTests.cs" />
-    <Compile Remove="Storage\DurableStateTests.cs" />
-    <Compile Remove="Kernel\DataWarehouseKernelTests.cs" />
-    <Compile Remove="Database\RelationalDatabasePluginTests.cs" />
-    <Compile Remove="Integration\KernelIntegrationTests.cs" />
-    <Compile Remove="Messaging\AdvancedMessageBusTests.cs" />
-    <Compile Remove="PluginTests.cs" />
-    <Compile Remove="Pipeline\PipelineOrchestratorTests.cs" />
-    <Compile Remove="Replication\GeoReplicationPluginTests.cs" />
+
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.PluginMarketplace\DataWarehouse.Plugins.PluginMarketplace.csproj" />
+
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateBlockchain\DataWarehouse.Plugins.UltimateBlockchain.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompute\DataWarehouse.Plugins.UltimateCompute.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateConnector\DataWarehouse.Plugins.UltimateConnector.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDatabaseProtocol\DataWarehouse.Plugins.UltimateDatabaseProtocol.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDatabaseStorage\DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataCatalog\DataWarehouse.Plugins.UltimateDataCatalog.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataFormat\DataWarehouse.Plugins.UltimateDataFormat.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataIntegration\DataWarehouse.Plugins.UltimateDataIntegration.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataIntegrity\DataWarehouse.Plugins.UltimateDataIntegrity.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataLake\DataWarehouse.Plugins.UltimateDataLake.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataLineage\DataWarehouse.Plugins.UltimateDataLineage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataManagement\DataWarehouse.Plugins.UltimateDataManagement.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataMesh\DataWarehouse.Plugins.UltimateDataMesh.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataPrivacy\DataWarehouse.Plugins.UltimateDataPrivacy.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataProtection\DataWarehouse.Plugins.UltimateDataProtection.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataQuality\DataWarehouse.Plugins.UltimateDataQuality.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataTransit\DataWarehouse.Plugins.UltimateDataTransit.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDataGovernance\DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDeployment\DataWarehouse.Plugins.UltimateDeployment.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateDocGen\DataWarehouse.Plugins.UltimateDocGen.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateEdgeComputing\DataWarehouse.Plugins.UltimateEdgeComputing.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIoTIntegration\DataWarehouse.Plugins.UltimateIoTIntegration.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateMicroservices\DataWarehouse.Plugins.UltimateMicroservices.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateMultiCloud\DataWarehouse.Plugins.UltimateMultiCloud.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateResilience\DataWarehouse.Plugins.UltimateResilience.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateResourceManager\DataWarehouse.Plugins.UltimateResourceManager.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRTOSBridge\DataWarehouse.Plugins.UltimateRTOSBridge.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateServerless\DataWarehouse.Plugins.UltimateServerless.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateSDKPorts\DataWarehouse.Plugins.UltimateSDKPorts.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorageProcessing\DataWarehouse.Plugins.UltimateStorageProcessing.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStreamingData\DataWarehouse.Plugins.UltimateStreamingData.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateSustainability\DataWarehouse.Plugins.UltimateSustainability.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateWorkflow\DataWarehouse.Plugins.UltimateWorkflow.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.SemanticSync\DataWarehouse.Plugins.SemanticSync.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalFabric\DataWarehouse.Plugins.UniversalFabric.csproj" />
   </ItemGroup>
 
 </Project>

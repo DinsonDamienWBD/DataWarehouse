@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.SDK.Infrastructure;
@@ -6,7 +7,9 @@ namespace DataWarehouse.Dashboard.Hubs;
 
 /// <summary>
 /// SignalR hub for real-time dashboard updates.
+/// Requires authentication for all connections (AUTH-04).
 /// </summary>
+[Authorize]
 public class DashboardHub : Hub
 {
     private readonly ISystemHealthService _healthService;
@@ -255,18 +258,22 @@ public class DashboardBroadcastService : BackgroundService
         _logger.LogInformation("Dashboard broadcast service stopped");
     }
 
-    private async void OnAuditEntryLogged(object? sender, AuditLogEntry entry)
+    private void OnAuditEntryLogged(object? sender, AuditLogEntry entry)
     {
-        try
+        // Event handlers must be void, so we use Task.Run to handle async work
+        _ = Task.Run(async () =>
         {
-            await _retryPolicy.ExecuteAsync(async ct =>
+            try
             {
-                await _hubContext.Clients.Group("audit").SendAsync("NewAuditEntry", entry, ct);
-            }, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to broadcast audit entry after retries");
-        }
+                await _retryPolicy.ExecuteAsync(async ct =>
+                {
+                    await _hubContext.Clients.Group("audit").SendAsync("NewAuditEntry", entry, ct);
+                }, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast audit entry after retries");
+            }
+        });
     }
 }

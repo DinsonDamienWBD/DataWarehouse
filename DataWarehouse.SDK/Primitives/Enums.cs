@@ -145,7 +145,22 @@ namespace DataWarehouse.SDK.Primitives
         /// Represents diagnostic information, such as errors, warnings, or informational messages, produced during
         /// processing or analysis.
         /// </summary>
-        Diagnostic
+        Diagnostic,
+
+        /// <summary>
+        /// Represents infrastructure-level capabilities such as hardware acceleration, RDMA, io_uring, NUMA, and hypervisor integration.
+        /// </summary>
+        Infrastructure,
+
+        /// <summary>
+        /// Represents compliance-related capabilities such as audit logging, policy enforcement, and regulatory controls.
+        /// </summary>
+        Compliance,
+
+        /// <summary>
+        /// Represents tamper-proof capabilities such as blockchain, immutable storage, and cryptographic verification.
+        /// </summary>
+        TamperProof
     }
 
     /// <summary>

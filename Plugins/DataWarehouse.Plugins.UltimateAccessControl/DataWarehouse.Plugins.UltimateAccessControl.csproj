@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateAccessControl</RootNamespace>
+    <Description>Ultimate Access Control plugin providing comprehensive security strategies including honeypot canaries, steganography, ephemeral sharing, watermarking, RBAC, ABAC, and zero-trust verification</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Image processing for steganography -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <!-- Cryptographic operations -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <!-- LDAP directory services -->
+    <PackageReference Include="System.DirectoryServices.Protocols" Version="10.0.3" />
+    <!-- XML signature verification for SAML -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.3" />
+  </ItemGroup>
+
+</Project>

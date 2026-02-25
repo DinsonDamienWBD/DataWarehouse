@@ -1,29 +1,8 @@
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace DataWarehouse.Shared;
-
-/// <summary>
-/// Connection target for DataWarehouse instance
-/// </summary>
-public class ConnectionTarget
-{
-    public string Name { get; set; } = string.Empty;
-    public ConnectionType Type { get; set; }
-    public string Address { get; set; } = string.Empty;
-    public int Port { get; set; }
-    public Dictionary<string, string> Metadata { get; set; } = new();
-}
-
-/// <summary>
-/// Type of connection to instance
-/// </summary>
-public enum ConnectionType
-{
-    Local,
-    Remote,
-    InProcess
-}
 
 /// <summary>
 /// Connection profile for saving/loading connections
@@ -93,8 +72,8 @@ public class InstanceManager
             if (capabilitiesResponse?.Data != null &&
                 capabilitiesResponse.Data.ContainsKey("capabilities"))
             {
-                var capabilitiesJson = JsonConvert.SerializeObject(capabilitiesResponse.Data["capabilities"]);
-                var capabilities = JsonConvert.DeserializeObject<InstanceCapabilities>(capabilitiesJson);
+                var capabilitiesJson = JsonSerializer.Serialize(capabilitiesResponse.Data["capabilities"]);
+                var capabilities = JsonSerializer.Deserialize<InstanceCapabilities>(capabilitiesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                 if (capabilities != null)
                 {
@@ -145,18 +124,8 @@ public class InstanceManager
     {
         if (!_isConnected)
         {
-            // For demo/development mode, return mock response
-            return new Message
-            {
-                Id = Guid.NewGuid().ToString(),
-                Type = MessageType.Response,
-                Command = command,
-                Data = new Dictionary<string, object>
-                {
-                    ["success"] = true,
-                    ["message"] = $"Command '{command}' executed (development mode)"
-                }
-            };
+            throw new InvalidOperationException(
+                "Not connected to a DataWarehouse instance. Use 'dw connect' to connect to an instance first.");
         }
 
         var message = new Message
@@ -183,7 +152,7 @@ public class InstanceManager
         {
             Name = $"Remote ({host}:{port})",
             Type = ConnectionType.Remote,
-            Address = host,
+            Host = host,
             Port = port
         });
     }
@@ -199,7 +168,7 @@ public class InstanceManager
         {
             Name = $"Local ({path})",
             Type = ConnectionType.Local,
-            Address = path,
+            Host = path,
             Port = 0
         });
     }
@@ -214,7 +183,7 @@ public class InstanceManager
         {
             Name = "In-Process",
             Type = ConnectionType.InProcess,
-            Address = "localhost",
+            Host = "localhost",
             Port = 0
         });
     }
@@ -233,7 +202,7 @@ public class InstanceManager
         Directory.CreateDirectory(profilesDir);
 
         var profilePath = Path.Combine(profilesDir, $"{profile.Id}.json");
-        var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
+        var json = JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(profilePath, json);
     }
 
@@ -257,7 +226,7 @@ public class InstanceManager
             try
             {
                 var json = File.ReadAllText(file);
-                var profile = JsonConvert.DeserializeObject<ConnectionProfile>(json);
+                var profile = JsonSerializer.Deserialize<ConnectionProfile>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (profile != null)
                     profiles.Add(profile);
             }

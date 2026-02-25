@@ -1,8 +1,17 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Hardware;
 using DataWarehouse.SDK.Primitives;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
+// FUTURE: Hardware acceleration -- interfaces preserved for TPM2, HSM, QAT, and GPU acceleration per AD-06.
+// These types have zero current implementations but define contracts for future
+// hardware-acceleration-capable storage plugins. Do NOT delete during dead code cleanup.
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -10,13 +19,100 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for hardware accelerator plugins.
     /// Provides common implementation for lifecycle management and statistics tracking.
     /// </summary>
-    public abstract class HardwareAcceleratorPluginBase : FeaturePluginBase, IHardwareAccelerator
+    public abstract class HardwareAcceleratorPluginBase : ComputePluginBase, IHardwareAccelerator, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string RuntimeType => "HardwareAccelerator";
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-hardware-accelerator" });
+
         private bool _initialized;
         private long _operationsCompleted;
         private long _totalBytesProcessed;
         private DateTime _startTime;
         private TimeSpan _totalProcessingTime;
+
+        #region Intelligence Socket
+
+        /// <summary>
+        /// Gets whether Universal Intelligence (T90) is available for AI-assisted optimization.
+        /// </summary>
+        public new bool IsIntelligenceAvailable { get; protected set; }
+
+        /// <summary>
+        /// Gets the available Intelligence capabilities.
+        /// </summary>
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        /// <summary>
+        /// Discovers Intelligence availability.
+        /// </summary>
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        /// <summary>
+        /// Declared capabilities for hardware acceleration.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.acceleration",
+                DisplayName = $"{Name} - Hardware Acceleration",
+                Description = $"Hardware-accelerated operations via {Type}",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "Acceleration",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "acceleration", "hardware", Type.ToString().ToLowerInvariant() },
+                SemanticDescription = "Use for hardware-accelerated compression, encryption, or compute"
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge about hardware acceleration capabilities.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.accelerator.capability",
+                    Topic = "hardware.acceleration",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Hardware accelerator: {Type}, Available: {IsAvailable}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["acceleratorType"] = Type.ToString(),
+                        ["isAvailable"] = IsAvailable,
+                        ["isInitialized"] = IsInitialized
+                    },
+                    Tags = new[] { "hardware", "acceleration" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted accelerator optimization recommendations.
+        /// </summary>
+        protected virtual async Task<AcceleratorOptimizationHint?> RequestOptimizationAsync(AcceleratorStatistics stats, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         /// <summary>
         /// Gets the category of this plugin. Always returns OrchestrationProvider for hardware accelerators.
@@ -33,6 +129,9 @@ namespace DataWarehouse.SDK.Contracts
         /// Implementation should check for hardware presence and driver availability.
         /// </summary>
         public abstract bool IsAvailable { get; }
+
+        /// <inheritdoc/>
+        public virtual bool IsCpuFallback => false;
 
         /// <summary>
         /// Gets whether the accelerator has been initialized.
@@ -169,6 +268,49 @@ namespace DataWarehouse.SDK.Contracts
         public override AcceleratorType Type => AcceleratorType.IntelQAT;
 
         /// <summary>
+        /// Extended capabilities for QAT acceleration.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.qat.compression",
+                DisplayName = $"{Name} - QAT Compression",
+                Description = "Intel QAT hardware-accelerated compression/decompression",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "Compression",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "qat", "compression", "hardware" },
+                SemanticDescription = "Use for high-throughput compression with Intel QAT"
+            },
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.qat.encryption",
+                DisplayName = $"{Name} - QAT Encryption",
+                Description = "Intel QAT hardware-accelerated encryption/decryption",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Encryption",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "qat", "encryption", "hardware" },
+                SemanticDescription = "Use for hardware-accelerated AES encryption with Intel QAT"
+            }
+        };
+
+        /// <summary>
+        /// Requests AI-assisted QAT workload optimization.
+        /// </summary>
+        protected virtual async Task<QatWorkloadHint?> RequestQatOptimizationAsync(long dataSize, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        /// <summary>
         /// Compresses data using Intel QAT hardware.
         /// </summary>
         /// <param name="data">Data to compress.</param>
@@ -289,6 +431,76 @@ namespace DataWarehouse.SDK.Contracts
         public abstract int DeviceCount { get; }
 
         /// <summary>
+        /// Extended capabilities for GPU acceleration.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.gpu.compute",
+                DisplayName = $"{Name} - GPU Compute",
+                Description = $"GPU-accelerated compute via {Runtime}",
+                Category = CapabilityCategory.AI,
+                SubCategory = "Compute",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "gpu", "compute", Runtime.ToString().ToLowerInvariant() },
+                SemanticDescription = "Use for GPU-accelerated matrix operations and embeddings"
+            },
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.gpu.embeddings",
+                DisplayName = $"{Name} - GPU Embeddings",
+                Description = "GPU-accelerated embedding computation",
+                Category = CapabilityCategory.AI,
+                SubCategory = "Embeddings",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "gpu", "embeddings", "ai" },
+                SemanticDescription = "Use for computing vector embeddings on GPU"
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge about GPU capabilities.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.gpu.capability",
+                    Topic = "hardware.gpu",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"GPU accelerator: {Runtime}, Devices: {DeviceCount}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["runtime"] = Runtime.ToString(),
+                        ["deviceCount"] = DeviceCount,
+                        ["supportsVectorOps"] = true,
+                        ["supportsEmbeddings"] = true
+                    },
+                    Tags = new[] { "gpu", "compute" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted GPU workload distribution.
+        /// </summary>
+        protected virtual async Task<GpuWorkloadHint?> RequestGpuOptimizationAsync(int batchSize, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        /// <summary>
         /// Performs element-wise vector multiplication on GPU.
         /// </summary>
         /// <param name="a">First vector.</param>
@@ -372,8 +584,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for TPM 2.0 provider plugins.
     /// Provides secure key storage and cryptographic operations using Trusted Platform Module.
     /// </summary>
-    public abstract class Tpm2ProviderPluginBase : FeaturePluginBase, ITpm2Provider
+    public abstract class Tpm2ProviderPluginBase : SecurityPluginBase, ITpm2Provider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "TPM2";
+
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for TPM plugins.
         /// </summary>
@@ -384,6 +599,84 @@ namespace DataWarehouse.SDK.Contracts
         /// Implementation should check for TPM presence and version.
         /// </summary>
         public abstract bool IsAvailable { get; }
+
+        #region Intelligence Socket
+
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.tpm.keys",
+                DisplayName = $"{Name} - TPM Key Storage",
+                Description = "Hardware-protected key storage via TPM 2.0",
+                Category = CapabilityCategory.Security,
+                SubCategory = "KeyManagement",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "tpm", "security", "keys" },
+                SemanticDescription = "Use for hardware-protected cryptographic key operations"
+            },
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.tpm.attestation",
+                DisplayName = $"{Name} - TPM Attestation",
+                Description = "Remote attestation via TPM 2.0",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Attestation",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "tpm", "attestation", "security" },
+                SemanticDescription = "Use for hardware-backed system attestation"
+            }
+        };
+
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.tpm.capability",
+                    Topic = "security.tpm",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"TPM 2.0 provider, Available: {IsAvailable}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["isAvailable"] = IsAvailable,
+                        ["supportsKeyStorage"] = true,
+                        ["supportsSigning"] = true,
+                        ["supportsEncryption"] = true
+                    },
+                    Tags = new[] { "tpm", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted key rotation recommendation.
+        /// </summary>
+        protected virtual async Task<KeyRotationHint?> RequestKeyRotationAdviceAsync(string keyId, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         /// <summary>
         /// Creates a new key in the TPM.
@@ -499,8 +792,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for HSM provider plugins.
     /// Provides PKCS#11-based access to Hardware Security Modules.
     /// </summary>
-    public abstract class HsmProviderPluginBase : FeaturePluginBase, IHsmProvider
+    public abstract class HsmProviderPluginBase : SecurityPluginBase, IHsmProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "HSM";
+
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for HSM plugins.
         /// </summary>
@@ -515,6 +811,83 @@ namespace DataWarehouse.SDK.Contracts
         /// Gets whether the HSM is currently connected.
         /// </summary>
         public bool IsConnected => ConnectedSlot != null;
+
+        #region Intelligence Socket
+
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.hsm.keys",
+                DisplayName = $"{Name} - HSM Key Management",
+                Description = "PKCS#11-based HSM key storage and operations",
+                Category = CapabilityCategory.Security,
+                SubCategory = "KeyManagement",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "hsm", "pkcs11", "keys" },
+                SemanticDescription = "Use for enterprise-grade hardware security module operations"
+            },
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.hsm.crypto",
+                DisplayName = $"{Name} - HSM Cryptography",
+                Description = "Hardware-backed cryptographic operations via HSM",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Cryptography",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "hsm", "encryption", "signing" },
+                SemanticDescription = "Use for HSM-backed signing and encryption"
+            }
+        };
+
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.hsm.capability",
+                    Topic = "security.hsm",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"HSM provider, Connected: {IsConnected}, Slot: {ConnectedSlot ?? "None"}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["isConnected"] = IsConnected,
+                        ["connectedSlot"] = ConnectedSlot ?? "None",
+                        ["supportsPKCS11"] = true
+                    },
+                    Tags = new[] { "hsm", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted HSM key policy recommendation.
+        /// </summary>
+        protected virtual async Task<HsmKeyPolicyHint?> RequestKeyPolicyAdviceAsync(string keyLabel, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         /// <summary>
         /// Connects to the HSM with the specified slot and PIN.
@@ -676,4 +1049,98 @@ namespace DataWarehouse.SDK.Contracts
             return metadata;
         }
     }
+
+    #region Intelligence Stub Types
+
+    /// <summary>
+    /// AI optimization hint for hardware accelerators.
+    /// </summary>
+    public record AcceleratorOptimizationHint
+    {
+        /// <summary>Recommended batch size for optimal throughput.</summary>
+        public int RecommendedBatchSize { get; init; }
+
+        /// <summary>Recommended concurrency level.</summary>
+        public int RecommendedConcurrency { get; init; }
+
+        /// <summary>Expected throughput improvement ratio.</summary>
+        public double ExpectedImprovementRatio { get; init; }
+
+        /// <summary>Reason for the recommendation.</summary>
+        public string? Reason { get; init; }
+    }
+
+    /// <summary>
+    /// AI workload hint for Intel QAT accelerator.
+    /// </summary>
+    public record QatWorkloadHint
+    {
+        /// <summary>Recommended compression level.</summary>
+        public int RecommendedCompressionLevel { get; init; }
+
+        /// <summary>Whether to use QAT for this workload.</summary>
+        public bool UseQat { get; init; }
+
+        /// <summary>Expected speedup ratio vs software.</summary>
+        public double ExpectedSpeedupRatio { get; init; }
+
+        /// <summary>Reason for the recommendation.</summary>
+        public string? Reason { get; init; }
+    }
+
+    /// <summary>
+    /// AI workload hint for GPU accelerator.
+    /// </summary>
+    public record GpuWorkloadHint
+    {
+        /// <summary>Recommended GPU device index.</summary>
+        public int RecommendedDeviceIndex { get; init; }
+
+        /// <summary>Recommended batch size.</summary>
+        public int RecommendedBatchSize { get; init; }
+
+        /// <summary>Whether to use GPU for this workload.</summary>
+        public bool UseGpu { get; init; }
+
+        /// <summary>Expected speedup ratio vs CPU.</summary>
+        public double ExpectedSpeedupRatio { get; init; }
+    }
+
+    /// <summary>
+    /// AI hint for key rotation in TPM.
+    /// </summary>
+    public record KeyRotationHint
+    {
+        /// <summary>Whether rotation is recommended.</summary>
+        public bool RotationRecommended { get; init; }
+
+        /// <summary>Recommended rotation interval.</summary>
+        public TimeSpan RecommendedInterval { get; init; }
+
+        /// <summary>Risk level if not rotated (0.0-1.0).</summary>
+        public double RiskLevel { get; init; }
+
+        /// <summary>Reason for the recommendation.</summary>
+        public string? Reason { get; init; }
+    }
+
+    /// <summary>
+    /// AI hint for HSM key policy.
+    /// </summary>
+    public record HsmKeyPolicyHint
+    {
+        /// <summary>Recommended key algorithm.</summary>
+        public string RecommendedAlgorithm { get; init; } = "RSA-4096";
+
+        /// <summary>Recommended key usage constraints.</summary>
+        public string[] RecommendedUsage { get; init; } = Array.Empty<string>();
+
+        /// <summary>Whether hardware enforcement is recommended.</summary>
+        public bool RequireHardwareEnforcement { get; init; }
+
+        /// <summary>Reason for the recommendation.</summary>
+        public string? Reason { get; init; }
+    }
+
+    #endregion
 }

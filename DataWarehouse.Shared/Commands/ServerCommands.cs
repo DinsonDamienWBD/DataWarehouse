@@ -1,6 +1,8 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+using DataWarehouse.SDK.Hosting;
+
 namespace DataWarehouse.Shared.Commands;
 
 /// <summary>
@@ -64,7 +66,7 @@ public sealed record ServerInfo
 }
 
 /// <summary>
-/// Starts the DataWarehouse server.
+/// Starts the DataWarehouse server using the IServerHost interface for real kernel startup.
 /// </summary>
 public sealed class ServerStartCommand : ICommand
 {
@@ -89,8 +91,6 @@ public sealed class ServerStartCommand : ICommand
         var port = Convert.ToInt32(parameters.GetValueOrDefault("port") ?? 5000);
         var mode = parameters.GetValueOrDefault("mode")?.ToString() ?? "Workstation";
 
-        // Note: In a real implementation, this would start the kernel
-        // For now, we just validate and return success
         if (port < 1 || port > 65535)
         {
             return CommandResult.Fail("Port must be between 1 and 65535.");
@@ -102,23 +102,49 @@ public sealed class ServerStartCommand : ICommand
             return CommandResult.Fail($"Invalid mode. Valid modes: {string.Join(", ", validModes)}");
         }
 
-        await Task.Delay(100, cancellationToken); // Simulate startup
-
-        var status = new ServerStatus
+        var serverHost = ServerHostRegistry.Current;
+        if (serverHost == null)
         {
-            IsRunning = true,
-            Port = port,
-            Mode = mode,
-            ProcessId = Environment.ProcessId,
-            StartTime = DateTime.UtcNow
-        };
+            return CommandResult.Fail("No server host registered. The Launcher must be initialized first.");
+        }
 
-        return CommandResult.Ok(status, $"DataWarehouse server started on port {port} in {mode} mode.");
+        if (serverHost.IsRunning)
+        {
+            return CommandResult.Fail("Server is already running.");
+        }
+
+        try
+        {
+            var config = new EmbeddedConfiguration
+            {
+                PersistData = true,
+                ExposeHttp = true,
+                HttpPort = port,
+                DataPath = parameters.GetValueOrDefault("dataPath")?.ToString()
+            };
+
+            await serverHost.StartAsync(config, cancellationToken);
+
+            var status = new ServerStatus
+            {
+                IsRunning = true,
+                Port = serverHost.Status?.Port ?? port,
+                Mode = mode,
+                ProcessId = Environment.ProcessId,
+                StartTime = serverHost.Status?.StartTime ?? DateTime.UtcNow
+            };
+
+            return CommandResult.Ok(status, $"DataWarehouse server started on port {status.Port} in {mode} mode.");
+        }
+        catch (Exception ex)
+        {
+            return CommandResult.Fail($"Failed to start server: {ex.Message}", ex);
+        }
     }
 }
 
 /// <summary>
-/// Stops the DataWarehouse server.
+/// Stops the DataWarehouse server using the IServerHost interface for real kernel shutdown.
 /// </summary>
 public sealed class ServerStopCommand : ICommand
 {
@@ -142,21 +168,51 @@ public sealed class ServerStopCommand : ICommand
     {
         var graceful = parameters.GetValueOrDefault("graceful") as bool? ?? true;
 
-        if (graceful)
+        var serverHost = ServerHostRegistry.Current;
+        if (serverHost == null)
         {
-            await Task.Delay(500, cancellationToken); // Simulate graceful shutdown
+            return CommandResult.Fail("No server host registered. The Launcher must be initialized first.");
         }
 
-        return CommandResult.Ok(new
+        if (!serverHost.IsRunning)
         {
-            Graceful = graceful,
-            ShutdownTime = DateTime.UtcNow
-        }, graceful ? "DataWarehouse server stopped gracefully." : "DataWarehouse server stopped.");
+            return CommandResult.Fail("Server is not running.");
+        }
+
+        try
+        {
+            using var shutdownCts = graceful
+                ? new CancellationTokenSource(TimeSpan.FromSeconds(10))
+                : new CancellationTokenSource();
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, shutdownCts.Token);
+
+            await serverHost.StopAsync(linked.Token);
+
+            return CommandResult.Ok(new
+            {
+                Graceful = graceful,
+                ShutdownTime = DateTime.UtcNow
+            }, graceful ? "DataWarehouse server stopped gracefully." : "DataWarehouse server stopped.");
+        }
+        catch (OperationCanceledException)
+        {
+            return CommandResult.Ok(new
+            {
+                Graceful = false,
+                ShutdownTime = DateTime.UtcNow
+            }, "DataWarehouse server stop timed out, forced shutdown.");
+        }
+        catch (Exception ex)
+        {
+            return CommandResult.Fail($"Failed to stop server: {ex.Message}", ex);
+        }
     }
 }
 
 /// <summary>
-/// Shows server status.
+/// Shows server status by querying the IServerHost for real status information.
 /// </summary>
 public sealed class ServerStatusCommand : ICommand
 {
@@ -173,41 +229,41 @@ public sealed class ServerStatusCommand : ICommand
     public IReadOnlyList<string> RequiredFeatures => Array.Empty<string>();
 
     /// <inheritdoc />
-    public async Task<CommandResult> ExecuteAsync(
+    public Task<CommandResult> ExecuteAsync(
         CommandContext context,
         Dictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        if (context.InstanceManager.IsConnected)
-        {
-            var response = await context.InstanceManager.ExecuteAsync("server.status",
-                new Dictionary<string, object>(), cancellationToken);
+        var serverHost = ServerHostRegistry.Current;
 
+        if (serverHost != null && serverHost.IsRunning && serverHost.Status != null)
+        {
+            var hostStatus = serverHost.Status;
             var status = new ServerStatus
             {
                 IsRunning = true,
-                Port = 5000,
-                Mode = "Workstation",
-                ProcessId = Environment.ProcessId,
-                StartTime = DateTime.UtcNow.AddDays(-15).AddHours(-7).AddMinutes(-23)
+                Port = hostStatus.Port,
+                Mode = hostStatus.Mode,
+                ProcessId = hostStatus.ProcessId,
+                StartTime = hostStatus.StartTime
             };
 
-            return CommandResult.Ok(status, "Server is running.");
+            return Task.FromResult(CommandResult.Ok(status, "Server is running."));
         }
 
-        return CommandResult.Ok(new ServerStatus
+        return Task.FromResult(CommandResult.Ok(new ServerStatus
         {
             IsRunning = false,
             Port = 0,
             Mode = "Unknown",
             ProcessId = 0,
             StartTime = null
-        }, "Server is not running or not connected.");
+        }, "Server is not running or not connected."));
     }
 }
 
 /// <summary>
-/// Shows server information.
+/// Shows server information by querying the IServerHost for real instance data.
 /// </summary>
 public sealed class ServerInfoCommand : ICommand
 {
@@ -224,33 +280,54 @@ public sealed class ServerInfoCommand : ICommand
     public IReadOnlyList<string> RequiredFeatures => Array.Empty<string>();
 
     /// <inheritdoc />
-    public async Task<CommandResult> ExecuteAsync(
+    public Task<CommandResult> ExecuteAsync(
         CommandContext context,
         Dictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        if (!context.InstanceManager.IsConnected)
+        var serverHost = ServerHostRegistry.Current;
+
+        if (serverHost != null && serverHost.IsRunning && serverHost.Status != null)
         {
-            return CommandResult.Fail("Not connected to a DataWarehouse instance.");
+            var hostStatus = serverHost.Status;
+            var info = new ServerInfo
+            {
+                InstanceId = hostStatus.InstanceId ?? "unknown",
+                Version = "2.0.0",
+                Mode = hostStatus.Mode,
+                HttpPort = hostStatus.Port,
+                GrpcPort = 0,
+                TlsEnabled = false,
+                LoadedPlugins = hostStatus.LoadedPlugins,
+                ActiveConnections = 0,
+                DataPath = hostStatus.DataPath ?? "N/A",
+                LogPath = Path.Combine(hostStatus.DataPath ?? ".", "logs")
+            };
+
+            return Task.FromResult(CommandResult.Ok(info, "Server Information"));
         }
 
-        var response = await context.InstanceManager.ExecuteAsync("server.info",
-            new Dictionary<string, object>(), cancellationToken);
+        if (!context.InstanceManager.IsConnected)
+        {
+            return Task.FromResult(CommandResult.Fail(
+                "Not connected to a DataWarehouse instance. Use 'dw connect' or start a local server."));
+        }
 
-        var info = new ServerInfo
+        // Query connected instance for its info
+        var connectedInfo = new ServerInfo
         {
             InstanceId = context.InstanceManager.Capabilities?.InstanceId ?? "unknown",
-            Version = context.InstanceManager.Capabilities?.Version ?? "1.0.0",
-            Mode = "Workstation",
-            HttpPort = 8080,
-            GrpcPort = 9090,
-            TlsEnabled = true,
+            Version = context.InstanceManager.Capabilities?.Version ?? "2.0.0",
+            Mode = "Remote",
+            HttpPort = context.InstanceManager.CurrentConnection?.Port ?? 0,
+            GrpcPort = 0,
+            TlsEnabled = false,
             LoadedPlugins = context.InstanceManager.Capabilities?.LoadedPlugins.Count ?? 0,
-            ActiveConnections = 45,
-            DataPath = "/var/lib/datawarehouse/data",
-            LogPath = "/var/log/datawarehouse"
+            ActiveConnections = 0,
+            DataPath = "Remote instance",
+            LogPath = "Remote instance"
         };
 
-        return CommandResult.Ok(info, "Server Information");
+        return Task.FromResult(CommandResult.Ok(connectedInfo, "Server Information (Remote)"));
     }
 }

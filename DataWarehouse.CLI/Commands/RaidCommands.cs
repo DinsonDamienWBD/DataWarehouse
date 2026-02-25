@@ -1,4 +1,8 @@
 using Spectre.Console;
+using DataWarehouse.Kernel;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.CLI.Commands;
 
@@ -7,12 +11,41 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class RaidCommands
 {
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-raid")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
+
     public static async Task ListConfigurationsAsync()
     {
         await AnsiConsole.Status()
             .StartAsync("Loading RAID configurations...", async ctx =>
             {
-                var configs = GetRaidConfigurations();
+                var configs = await GetRaidConfigurationsAsync();
+
+                if (configs.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[yellow]No RAID configurations found.[/]");
+                    return;
+                }
 
                 var table = new Table()
                     .Border(TableBorder.Rounded)
@@ -39,7 +72,6 @@ public static class RaidCommands
                 }
 
                 AnsiConsole.Write(table);
-                await Task.CompletedTask;
             });
     }
 
@@ -171,14 +203,56 @@ public static class RaidCommands
         await Task.CompletedTask;
     }
 
-    private static List<RaidConfig> GetRaidConfigurations()
+    /// <summary>
+    /// Queries the kernel message bus for active RAID configurations.
+    /// Returns an empty list if the kernel or RAID plugin is unavailable.
+    /// </summary>
+    private static async Task<List<RaidConfig>> GetRaidConfigurationsAsync()
     {
-        return new List<RaidConfig>
+        try
         {
-            new() { Id = "raid-001", Name = "Primary Array", Level = "6", Status = "Optimal", TotalDisks = 8, ActiveDisks = 8, Capacity = 28L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 64 },
-            new() { Id = "raid-002", Name = "Archive Array", Level = "Z2", Status = "Optimal", TotalDisks = 12, ActiveDisks = 12, Capacity = 80L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 128 },
-            new() { Id = "raid-003", Name = "Cache Array", Level = "10", Status = "Optimal", TotalDisks = 4, ActiveDisks = 4, Capacity = 2L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 64 },
-        };
+            var kernel = await GetKernelAsync();
+            var request = new PluginMessage
+            {
+                Type = "raid.configuration.list",
+                SourcePluginId = "cli",
+                Source = "CLI"
+            };
+
+            var response = await kernel.MessageBus.SendAsync(
+                "raid.configuration.list", request, TimeSpan.FromSeconds(5));
+
+            if (response.Success && response.Payload is IEnumerable<object> configList)
+            {
+                var result = new List<RaidConfig>();
+                foreach (var item in configList)
+                {
+                    if (item is Dictionary<string, object> c)
+                    {
+                        result.Add(new RaidConfig
+                        {
+                            Id = c.GetValueOrDefault("Id", "")?.ToString() ?? "",
+                            Name = c.GetValueOrDefault("Name", "")?.ToString() ?? "",
+                            Level = c.GetValueOrDefault("Level", "")?.ToString() ?? "",
+                            Status = c.GetValueOrDefault("Status", "")?.ToString() ?? "",
+                            TotalDisks = c.GetValueOrDefault("TotalDisks") is int td ? td : 0,
+                            ActiveDisks = c.GetValueOrDefault("ActiveDisks") is int ad ? ad : 0,
+                            Capacity = c.GetValueOrDefault("Capacity") is long cap ? cap : 0,
+                            StripeSizeKB = c.GetValueOrDefault("StripeSizeKB") is int ss ? ss : 0
+                        });
+                    }
+                }
+                return result;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]No RAID configuration data available - RAID plugin not responding.[/]");
+            return new List<RaidConfig>();
+        }
+        catch (Exception)
+        {
+            AnsiConsole.MarkupLine("[yellow]No RAID configuration data available - kernel context not accessible.[/]");
+            return new List<RaidConfig>();
+        }
     }
 
     private static string FormatBytes(long bytes)

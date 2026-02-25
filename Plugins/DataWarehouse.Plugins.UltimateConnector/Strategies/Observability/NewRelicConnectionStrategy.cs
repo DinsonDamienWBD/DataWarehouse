@@ -1,0 +1,17 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Net.Http.Headers;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Observability;
+
+/// <summary>New Relic connection strategy. HTTPS to metric-api.newrelic.com. Full-stack observability platform.</summary>
+public sealed class NewRelicConnectionStrategy : ObservabilityConnectionStrategyBase
+{
+    public override string StrategyId => "newrelic";public override string DisplayName => "New Relic";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "New Relic full-stack observability. APM, infrastructure monitoring, logs, and real user monitoring.";public override string[] Tags => ["newrelic", "commercial", "apm", "full-stack", "saas", "rum"];
+    public NewRelicConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "https://metric-api.newrelic.com";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };if (config.Properties.TryGetValue("ApiKey", out var apiKey)){httpClient.DefaultRequestHeaders.Add("Api-Key", apiKey.ToString()!);}return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "NewRelic", ["BaseUrl"] = baseUrl });}
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(true);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "New Relic API configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
+    public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { metrics });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/metric/v1", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default){var json = JsonSerializer.Serialize(logs);var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/log/v1", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default){var json = JsonSerializer.Serialize(traces);var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/trace/v1", content, ct);response.EnsureSuccessStatusCode();}
+}

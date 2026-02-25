@@ -6,7 +6,7 @@
 @implements IDisposable
 
 <!-- Skip to main content link for keyboard/screen reader users -->
-<a href="#main-content" class="skip-link" @onfocus="() => _skipLinkVisible = true" @onblur="() => _skipLinkVisible = false">
+<a href="#main-content" class="skip-link">
     Skip to main content
 </a>
 
@@ -133,8 +133,7 @@
 @code {
     private bool _showCommandPalette;
     private bool _isConnected;
-    private bool _skipLinkVisible;
-    private bool _showSyncPanel;
+    private bool _showSyncPanel = false;
     private string _announcement = string.Empty;
 
     private string ConnectionStatusClass => _isConnected ? "connected" : "disconnected";

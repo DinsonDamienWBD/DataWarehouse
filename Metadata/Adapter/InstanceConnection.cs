@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net.Sockets;
@@ -286,10 +287,12 @@ public sealed class RemoteInstanceConnection : IInstanceConnection
     private bool _connected;
     private bool _disposed;
 
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+
     public RemoteInstanceConnection(ILoggerFactory? loggerFactory = null)
     {
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<RemoteInstanceConnection>();
-        _httpClient = new HttpClient();
+        _httpClient = SharedHttpClient;
     }
 
     public string InstanceId => _instanceId;

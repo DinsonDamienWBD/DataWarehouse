@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Services;
 
@@ -140,8 +140,8 @@ public class ConfigurationService : IConfigurationService
 {
     private SystemConfiguration _systemConfig = new();
     private SecurityPolicySettings _securityPolicies = new();
-    private readonly ConcurrentDictionary<string, TenantConfiguration> _tenants = new();
-    private readonly ConcurrentDictionary<string, Dictionary<string, object>> _pluginConfigs = new();
+    private readonly BoundedDictionary<string, TenantConfiguration> _tenants = new BoundedDictionary<string, TenantConfiguration>(1000);
+    private readonly BoundedDictionary<string, Dictionary<string, object>> _pluginConfigs = new BoundedDictionary<string, Dictionary<string, object>>(1000);
     private readonly SemaphoreSlim _saveLock = new(1, 1);
 
     public event EventHandler<ConfigurationChangedEventArgs>? ConfigurationChanged;

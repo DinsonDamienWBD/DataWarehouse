@@ -1,6 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel
 {
@@ -16,8 +16,8 @@ namespace DataWarehouse.Kernel
     /// </summary>
     public sealed class PluginRegistry : IPluginRegistry
     {
-        private readonly ConcurrentDictionary<string, IPlugin> _plugins = new();
-        private readonly ConcurrentDictionary<PluginCategory, List<IPlugin>> _byCategory = new();
+        private readonly BoundedDictionary<string, IPlugin> _plugins = new BoundedDictionary<string, IPlugin>(1000);
+        private readonly BoundedDictionary<PluginCategory, List<IPlugin>> _byCategory = new BoundedDictionary<PluginCategory, List<IPlugin>>(1000);
         private readonly object _categoryLock = new();
         private OperatingMode _operatingMode = OperatingMode.Workstation;
 
@@ -213,7 +213,7 @@ namespace DataWarehouse.Kernel
             // If any plugin explicitly declares operating mode preference, prefer it
             var modePreferred = candidates.FirstOrDefault(p =>
             {
-                var metadata = GetPluginMetadata(p);
+                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
                 if (metadata.TryGetValue("PreferredMode", out var mode))
                 {
                     return mode.ToString()?.Equals(_operatingMode.ToString(), StringComparison.OrdinalIgnoreCase) == true;
@@ -226,7 +226,7 @@ namespace DataWarehouse.Kernel
             // Otherwise select by quality level
             var ordered = candidates.OrderByDescending(p =>
             {
-                var metadata = GetPluginMetadata(p);
+                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
                 if (metadata.TryGetValue("QualityLevel", out var ql) && ql is int quality)
                 {
                     return quality;
@@ -237,16 +237,16 @@ namespace DataWarehouse.Kernel
             return ordered.First();
         }
 
-        private Dictionary<string, object> GetPluginMetadata(IPlugin plugin)
+        private async Task<Dictionary<string, object>> GetPluginMetadataAsync(IPlugin plugin)
         {
             try
             {
-                var response = plugin.OnHandshakeAsync(new HandshakeRequest
+                var response = await plugin.OnHandshakeAsync(new HandshakeRequest
                 {
                     KernelId = "registry",
                     ProtocolVersion = "1.0",
                     Timestamp = DateTime.UtcNow
-                }).GetAwaiter().GetResult();
+                });
 
                 return response.Metadata ?? new Dictionary<string, object>();
             }
@@ -255,5 +255,6 @@ namespace DataWarehouse.Kernel
                 return new Dictionary<string, object>();
             }
         }
+
     }
 }

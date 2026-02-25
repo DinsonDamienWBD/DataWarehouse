@@ -1,0 +1,441 @@
+@page "/system-overview"
+@using DataWarehouse.Dashboard.Services
+@inject DashboardApiClient ApiClient
+@inject ILogger<SystemOverview> Logger
+@implements IDisposable
+
+<PageTitle>System Overview - DataWarehouse</PageTitle>
+
+<div class="row g-4 mb-4">
+    @if (_error != null)
+    {
+        <div class="col-12">
+            <div class="alert alert-warning d-flex align-items-center" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <div>
+                    <strong>API Connection Issue:</strong> @_error
+                    <br /><small class="text-muted">Displaying last known data. Auto-retry in progress.</small>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_loading && _systemStatus == null)
+    {
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Connecting to Launcher API...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Top Stats Cards -->
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Uptime</h6>
+                    <h4 class="mb-0">@FormatUptime(_systemStatus?.Uptime ?? TimeSpan.Zero)</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Plugins Active</h6>
+                    <h4 class="mb-0">
+                        @(_systemStatus?.ActivePluginCount ?? 0)
+                        <small class="text-muted">/ @(_systemStatus?.PluginCount ?? 0)</small>
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Nodes Online</h6>
+                    <h4 class="mb-0">@(_systemStatus?.NodeCount ?? 0)</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Storage Used</h6>
+                    <h4 class="mb-0">@FormatBytes(_systemStatus?.StorageUsedBytes ?? 0)</h4>
+                    <small class="text-muted">of @FormatBytes(_systemStatus?.StorageTotalBytes ?? 0)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Requests/sec</h6>
+                    <h4 class="mb-0">@((_systemStatus?.RequestsPerSecond ?? 0).ToString("F1"))</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Health</h6>
+                    <h4 class="mb-0">
+                        <span class="badge @GetHealthBadgeClass(_systemStatus?.HealthStatus ?? "Unknown")">
+                            @(_systemStatus?.HealthStatus ?? "Unknown")
+                        </span>
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin Status Table -->
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-plug me-2"></i>Plugin Status</h5>
+                    <span class="badge bg-primary">@_plugins.Count plugins</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th role="button" @onclick='() => SortPlugins("Name")'>
+                                        Name @GetSortIcon("Name")
+                                    </th>
+                                    <th role="button" @onclick='() => SortPlugins("Version")'>
+                                        Version @GetSortIcon("Version")
+                                    </th>
+                                    <th role="button" @onclick='() => SortPlugins("Health")'>
+                                        Health @GetSortIcon("Health")
+                                    </th>
+                                    <th role="button" @onclick='() => SortPlugins("StrategyCount")'>
+                                        Strategies @GetSortIcon("StrategyCount")
+                                    </th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var plugin in GetSortedPlugins())
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@plugin.Name</strong>
+                                            <br /><small class="text-muted">@plugin.Id</small>
+                                        </td>
+                                        <td>@plugin.Version</td>
+                                        <td>
+                                            <span class="badge @GetHealthBadgeClass(plugin.Health)">
+                                                @plugin.Health
+                                            </span>
+                                        </td>
+                                        <td>@plugin.StrategyCount</td>
+                                        <td><span class="badge bg-secondary">@plugin.Category</span></td>
+                                    </tr>
+                                }
+                                @if (!_plugins.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-3">
+                                            No plugins loaded
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Recent Events</h5>
+                    <a href="security-dashboard" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="card-body overflow-auto" style="max-height: 400px;">
+                    @if (_recentEvents.Any())
+                    {
+                        @foreach (var evt in _recentEvents)
+                        {
+                            <div class="d-flex align-items-start mb-3">
+                                <span class="badge @GetSeverityBadgeClass(evt.Severity) me-2 mt-1">
+                                    @evt.Severity
+                                </span>
+                                <div>
+                                    <div class="fw-semibold small">@evt.Description</div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">
+                                        @evt.Source &middot; @evt.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2">No recent events</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- System Metrics -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>System Metrics</h5>
+                    <small class="text-muted">Auto-refreshes every 10 seconds</small>
+                </div>
+                <div class="card-body">
+                    @if (_metrics != null)
+                    {
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">CPU</label>
+                                <div class="progress" style="height: 24px;">
+                                    <div class="progress-bar @GetProgressBarClass(_metrics.CpuUsagePercent)"
+                                         role="progressbar"
+                                         style="width: @Math.Max(5, _metrics.CpuUsagePercent)%">
+                                        @_metrics.CpuUsagePercent.ToString("F1")%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">Memory</label>
+                                <div class="progress" style="height: 24px;">
+                                    <div class="progress-bar @GetProgressBarClass(_metrics.MemoryUsagePercent)"
+                                         role="progressbar"
+                                         style="width: @Math.Max(5, _metrics.MemoryUsagePercent)%">
+                                        @_metrics.MemoryUsagePercent.ToString("F1")%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">Disk</label>
+                                <div class="progress" style="height: 24px;">
+                                    <div class="progress-bar @GetProgressBarClass(_metrics.DiskUsagePercent)"
+                                         role="progressbar"
+                                         style="width: @Math.Max(5, _metrics.DiskUsagePercent)%">
+                                        @_metrics.DiskUsagePercent.ToString("F1")%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">Latency</label>
+                                <div class="progress" style="height: 24px;">
+                                    @{
+                                        var latencyPercent = Math.Min(100, _metrics.AverageLatencyMs / 10.0);
+                                    }
+                                    <div class="progress-bar @GetProgressBarClass(latencyPercent)"
+                                         role="progressbar"
+                                         style="width: @Math.Max(5, latencyPercent)%">
+                                        @_metrics.AverageLatencyMs.ToString("F1") ms
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr />
+                        <div class="row text-center">
+                            <div class="col">
+                                <h5 class="mb-0">@_metrics.ActiveConnections</h5>
+                                <small class="text-muted">Connections</small>
+                            </div>
+                            <div class="col">
+                                <h5 class="mb-0">@_metrics.RequestsPerSecond.ToString("F1")</h5>
+                                <small class="text-muted">Req/sec</small>
+                            </div>
+                            <div class="col">
+                                <h5 class="mb-0">@_metrics.ThreadCount</h5>
+                                <small class="text-muted">Threads</small>
+                            </div>
+                            <div class="col">
+                                <h5 class="mb-0">@FormatUptime(TimeSpan.FromSeconds(_metrics.UptimeSeconds))</h5>
+                                <small class="text-muted">Uptime</small>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-3">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            Loading metrics...
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private SystemStatusDto? _systemStatus;
+    private MetricsDto? _metrics;
+    private List<PluginInfoDto> _plugins = new();
+    private List<SecurityEventDto> _recentEvents = new();
+    private string? _error;
+    private bool _loading = true;
+    private PeriodicTimer? _refreshTimer;
+    private CancellationTokenSource? _cts;
+
+    private string _sortColumn = "Name";
+    private bool _sortAscending = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cts = new CancellationTokenSource();
+        await RefreshDataAsync();
+        _ = AutoRefreshLoopAsync(_cts.Token);
+    }
+
+    private async Task AutoRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        _refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        try
+        {
+            while (await _refreshTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await RefreshDataAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal disposal
+        }
+    }
+
+    private async Task RefreshDataAsync()
+    {
+        try
+        {
+            _loading = true;
+            var statusTask = ApiClient.GetSystemStatusAsync();
+            var pluginsTask = ApiClient.GetPluginsAsync();
+            var eventsTask = ApiClient.GetSecurityEventsAsync(10);
+            var metricsTask = ApiClient.GetMetricsAsync();
+
+            await Task.WhenAll(statusTask, pluginsTask, eventsTask, metricsTask);
+
+            _systemStatus = await statusTask;
+            _plugins = (await pluginsTask).ToList();
+            _recentEvents = (await eventsTask).ToList();
+            _metrics = await metricsTask;
+            _error = null;
+        }
+        catch (DashboardApiException ex)
+        {
+            _error = ex.Message;
+            Logger.LogWarning(ex, "Failed to refresh system overview data");
+        }
+        catch (Exception ex)
+        {
+            _error = "Unexpected error loading data.";
+            Logger.LogError(ex, "Unexpected error refreshing system overview");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SortPlugins(string column)
+    {
+        if (_sortColumn == column)
+            _sortAscending = !_sortAscending;
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+    }
+
+    private IEnumerable<PluginInfoDto> GetSortedPlugins()
+    {
+        var sorted = _sortColumn switch
+        {
+            "Name" => _sortAscending
+                ? _plugins.OrderBy(p => p.Name)
+                : _plugins.OrderByDescending(p => p.Name),
+            "Version" => _sortAscending
+                ? _plugins.OrderBy(p => p.Version)
+                : _plugins.OrderByDescending(p => p.Version),
+            "Health" => _sortAscending
+                ? _plugins.OrderBy(p => p.Health)
+                : _plugins.OrderByDescending(p => p.Health),
+            "StrategyCount" => _sortAscending
+                ? _plugins.OrderBy(p => p.StrategyCount)
+                : _plugins.OrderByDescending(p => p.StrategyCount),
+            _ => _plugins.OrderBy(p => p.Name)
+        };
+        return sorted;
+    }
+
+    private string GetSortIcon(string column)
+    {
+        if (_sortColumn != column) return "";
+        return _sortAscending ? "\u25B2" : "\u25BC";
+    }
+
+    private static string GetHealthBadgeClass(string status) => status.ToLowerInvariant() switch
+    {
+        "healthy" => "bg-success",
+        "degraded" => "bg-warning text-dark",
+        "unhealthy" or "critical" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string GetSeverityBadgeClass(string severity) => severity.ToLowerInvariant() switch
+    {
+        "critical" => "bg-danger",
+        "high" => "bg-warning text-dark",
+        "medium" => "bg-info",
+        "low" => "bg-secondary",
+        "info" => "bg-light text-dark",
+        _ => "bg-secondary"
+    };
+
+    private static string GetProgressBarClass(double percent)
+    {
+        if (percent < 60) return "bg-success";
+        if (percent < 80) return "bg-warning";
+        return "bg-danger";
+    }
+
+    private static string FormatUptime(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1) return $"{(int)ts.TotalDays}d {ts.Hours}h";
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m {ts.Seconds}s";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB", "PB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:F1} {sizes[order]}";
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _refreshTimer?.Dispose();
+    }
+}

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Dashboard.Services;
 
@@ -147,7 +148,7 @@ public class SystemHealthService : ISystemHealthService
     private readonly ILogger<SystemHealthService> _logger;
     private readonly IPluginDiscoveryService _pluginService;
     private readonly ConcurrentQueue<SystemMetrics> _metricsHistory = new();
-    private readonly ConcurrentDictionary<string, SystemAlert> _alerts = new();
+    private readonly BoundedDictionary<string, SystemAlert> _alerts = new BoundedDictionary<string, SystemAlert>(1000);
     private readonly DateTime _startTime = DateTime.UtcNow;
     private HealthStatus _lastStatus = HealthStatus.Unknown;
     private readonly Process _currentProcess = Process.GetCurrentProcess();

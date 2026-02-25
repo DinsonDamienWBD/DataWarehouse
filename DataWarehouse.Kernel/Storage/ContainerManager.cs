@@ -1,7 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
-using System.Collections.Concurrent;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Kernel.Storage
 {
@@ -11,10 +11,10 @@ namespace DataWarehouse.Kernel.Storage
     /// </summary>
     public class ContainerManager : ContainerManagerPluginBase
     {
-        private readonly ConcurrentDictionary<string, Container> _containers = new();
-        private readonly ConcurrentDictionary<string, InternalQuota> _quotas = new();
-        private readonly ConcurrentDictionary<string, List<AccessEntry>> _accessEntries = new();
-        private readonly ConcurrentDictionary<string, ContainerUsage> _usage = new();
+        private readonly BoundedDictionary<string, Container> _containers = new BoundedDictionary<string, Container>(1000);
+        private readonly BoundedDictionary<string, InternalQuota> _quotas = new BoundedDictionary<string, InternalQuota>(1000);
+        private readonly BoundedDictionary<string, List<AccessEntry>> _accessEntries = new BoundedDictionary<string, List<AccessEntry>>(1000);
+        private readonly BoundedDictionary<string, ContainerUsage> _usage = new BoundedDictionary<string, ContainerUsage>(1000);
         private readonly IKernelContext _context;
         private readonly ContainerManagerConfig _config;
 
@@ -336,9 +336,9 @@ namespace DataWarehouse.Kernel.Storage
         /// <summary>
         /// Checks if a subject has at least the specified access level.
         /// </summary>
-        public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
+        public async Task<bool> HasAccessAsync(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
         {
-            var level = GetAccessLevelAsync(context, containerId, context.UserId).GetAwaiter().GetResult();
+            var level = await GetAccessLevelAsync(context, containerId, context.UserId);
             return level >= requiredLevel;
         }
 
@@ -410,7 +410,7 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             _usage.TryGetValue(container.Id, out var usage);
-            return Task.FromResult(usage);
+            return Task.FromResult<ContainerUsage?>(usage);
         }
 
         /// <summary>

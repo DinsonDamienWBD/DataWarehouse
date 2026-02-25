@@ -119,8 +119,6 @@ public class PluginDiscoveryServiceTests
     {
         _loggerMock = new Mock<ILogger<TestPluginDiscoveryService>>();
         _configMock = new Mock<IConfiguration>();
-        _configMock.Setup(c => c.GetValue<string>("PluginsDirectory", It.IsAny<string>()))
-            .Returns((string)null!);
         _service = new TestPluginDiscoveryService(_loggerMock.Object, _configMock.Object);
     }
 
@@ -196,11 +194,13 @@ public class PluginDiscoveryServiceTests
     }
 
     [Fact]
-    public async Task RefreshPluginsAsync_Completes()
+    public async Task RefreshPluginsAsync_Completes_WithoutException()
     {
-        // Act & Assert
-        await _service.RefreshPluginsAsync();
-        // Should not throw
+        // Act
+        var exception = await Record.ExceptionAsync(() => _service.RefreshPluginsAsync());
+
+        // Assert
+        exception.Should().BeNull();
     }
 }
 

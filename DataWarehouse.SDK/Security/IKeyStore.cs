@@ -1,3 +1,7 @@
+using DataWarehouse.SDK.Contracts;
+using System.Security.Cryptography;
+using DataWarehouse.SDK.Utilities;
+
 namespace DataWarehouse.SDK.Security
 {
     /// <summary>
@@ -54,9 +58,81 @@ namespace DataWarehouse.SDK.Security
     }
 
     /// <summary>
+    /// Describes the capabilities of a key store implementation.
+    /// Used to advertise features to callers and enable capability-based routing.
+    /// </summary>
+    public record KeyStoreCapabilities
+    {
+        /// <summary>
+        /// Whether this key store supports key rotation operations.
+        /// If true, CreateKeyAsync can be used to rotate existing keys.
+        /// </summary>
+        public bool SupportsRotation { get; init; } = true;
+
+        /// <summary>
+        /// Whether this key store supports envelope encryption (wrap/unwrap operations).
+        /// If true, the implementation must also implement IEnvelopeKeyStore.
+        /// </summary>
+        public bool SupportsEnvelope { get; init; }
+
+        /// <summary>
+        /// Whether keys are stored/generated in a Hardware Security Module (HSM).
+        /// If true, keys never leave the HSM boundary in plaintext.
+        /// </summary>
+        public bool SupportsHsm { get; init; }
+
+        /// <summary>
+        /// Whether this key store supports automatic key expiration/TTL.
+        /// If true, keys may expire and need renewal based on policy.
+        /// </summary>
+        public bool SupportsExpiration { get; init; }
+
+        /// <summary>
+        /// Whether this key store supports multi-region replication.
+        /// If true, keys are automatically replicated across configured regions for HA.
+        /// </summary>
+        public bool SupportsReplication { get; init; }
+
+        /// <summary>
+        /// Whether this key store supports versioned keys (multiple versions per key ID).
+        /// If true, GetKeyAsync may return different key material based on version metadata.
+        /// </summary>
+        public bool SupportsVersioning { get; init; }
+
+        /// <summary>
+        /// Whether this key store supports per-key ACL policies.
+        /// If true, each key can have granular access control beyond the security context.
+        /// </summary>
+        public bool SupportsPerKeyAcl { get; init; }
+
+        /// <summary>
+        /// Whether this key store supports audit logging of key operations.
+        /// If true, all key access is logged for compliance/forensics.
+        /// </summary>
+        public bool SupportsAuditLogging { get; init; }
+
+        /// <summary>
+        /// Maximum key size supported in bytes (0 = unlimited).
+        /// </summary>
+        public int MaxKeySizeBytes { get; init; }
+
+        /// <summary>
+        /// Minimum key size supported in bytes.
+        /// </summary>
+        public int MinKeySizeBytes { get; init; } = 16;
+
+        /// <summary>
+        /// Additional metadata about this key store implementation.
+        /// Can include provider name, region, compliance certifications, etc.
+        /// </summary>
+        public Dictionary<string, object> Metadata { get; init; } = new();
+    }
+
+    /// <summary>
     /// Core interface for key management operations.
     /// All key store plugins must implement this interface.
     /// </summary>
+    /// <seealso cref="IKeyRotatable"/>
     public interface IKeyStore
     {
         /// <summary>
@@ -65,6 +141,35 @@ namespace DataWarehouse.SDK.Security
         /// </summary>
         /// <returns>The current key identifier.</returns>
         Task<string> GetCurrentKeyIdAsync();
+
+        /// <summary>
+        /// Asynchronously retrieves a key as a <see cref="NativeKeyHandle"/> for secure zero-copy access.
+        /// The returned handle holds key material in unmanaged memory with guaranteed secure wipe on Dispose.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>
+        /// A <see cref="NativeKeyHandle"/> containing the key material in unmanaged memory.
+        /// The caller MUST dispose the handle when done to trigger secure wipe.
+        /// </returns>
+        /// <remarks>
+        /// Default implementation wraps <see cref="GetKeyAsync"/> and converts the byte[] to a NativeKeyHandle,
+        /// zeroing the intermediate byte[] immediately. Override for native-first implementations that avoid
+        /// the managed byte[] intermediate entirely.
+        /// </remarks>
+        async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+        {
+            var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
+            try
+            {
+                return NativeKeyHandle.FromBytes(keyBytes);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(keyBytes);
+            }
+        }
 
         /// <summary>
         /// Synchronously retrieves a key by ID.
@@ -91,6 +196,115 @@ namespace DataWarehouse.SDK.Security
         /// <param name="context">Security context for ACL validation.</param>
         /// <returns>The newly created key bytes.</returns>
         Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context);
+    }
+
+    /// <summary>
+    /// Strategy pattern interface for key store implementations.
+    /// Enables pluggable storage backends (file system, database, Vault, KMS, etc.)
+    /// while sharing common infrastructure in KeyStoreStrategyBase.
+    /// </summary>
+    public interface IKeyStoreStrategy : IKeyStore
+    {
+        /// <summary>
+        /// Gets the capabilities of this key store implementation.
+        /// Used for feature discovery and capability-based routing.
+        /// </summary>
+        KeyStoreCapabilities Capabilities { get; }
+
+        /// <summary>
+        /// Initializes the key store strategy.
+        /// Called once during plugin initialization before any operations.
+        /// </summary>
+        /// <param name="configuration">Configuration dictionary from plugin settings.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Tests connectivity and health of the underlying storage backend.
+        /// Returns true if the key store is operational.
+        /// </summary>
+        Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Lists all key IDs accessible to the given security context.
+        /// Used for key discovery and management operations.
+        /// </summary>
+        /// <param name="context">Security context for ACL filtering.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of accessible key IDs.</returns>
+        Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Deletes a key by ID.
+        /// Requires elevated permissions. May be irreversible depending on backend.
+        /// </summary>
+        /// <param name="keyId">The key identifier to delete.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets metadata about a key without retrieving the key material itself.
+        /// Used for audit trails, key rotation policies, etc.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Key metadata, or null if key doesn't exist.</returns>
+        Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// Metadata about a key (without the key material itself).
+    /// Used for key management, audit trails, and rotation policies.
+    /// </summary>
+    public record KeyMetadata
+    {
+        /// <summary>
+        /// The key identifier.
+        /// </summary>
+        public string KeyId { get; init; } = "";
+
+        /// <summary>
+        /// When the key was created (UTC).
+        /// </summary>
+        public DateTime CreatedAt { get; init; }
+
+        /// <summary>
+        /// Who created the key (user ID or service principal).
+        /// </summary>
+        public string? CreatedBy { get; init; }
+
+        /// <summary>
+        /// When the key was last rotated (UTC), or null if never rotated.
+        /// </summary>
+        public DateTime? LastRotatedAt { get; init; }
+
+        /// <summary>
+        /// When the key expires (UTC), or null if no expiration.
+        /// </summary>
+        public DateTime? ExpiresAt { get; init; }
+
+        /// <summary>
+        /// Current version of the key (for versioned key stores).
+        /// </summary>
+        public int Version { get; init; } = 1;
+
+        /// <summary>
+        /// Key size in bytes.
+        /// </summary>
+        public int KeySizeBytes { get; init; }
+
+        /// <summary>
+        /// Whether this key is currently active for encryption operations.
+        /// Inactive keys can still decrypt but won't be used for new encryptions.
+        /// </summary>
+        public bool IsActive { get; init; } = true;
+
+        /// <summary>
+        /// Additional metadata (tags, compliance info, etc.).
+        /// </summary>
+        public Dictionary<string, object> Metadata { get; init; } = new();
     }
 
     /// <summary>
@@ -446,7 +660,7 @@ namespace DataWarehouse.SDK.Security
             var json = System.Text.Json.JsonSerializer.Serialize(this);
             var jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(5 + 4 + 4 + jsonBytes.Length);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(MagicBytes);
@@ -548,8 +762,8 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public class DefaultKeyStoreRegistry : IKeyStoreRegistry
     {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IKeyStore> _keyStores = new();
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
+        private readonly BoundedDictionary<string, IKeyStore> _keyStores = new BoundedDictionary<string, IKeyStore>(1000);
+        private readonly BoundedDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new BoundedDictionary<string, IEnvelopeKeyStore>(1000);
 
         /// <inheritdoc/>
         public void Register(string pluginId, IKeyStore keyStore)
@@ -630,14 +844,14 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public class InMemoryKeyManagementConfigProvider : IKeyManagementConfigProvider
     {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, KeyManagementConfig> _configs = new();
+        private readonly BoundedDictionary<string, KeyManagementConfig> _configs = new BoundedDictionary<string, KeyManagementConfig>(1000);
 
         /// <inheritdoc/>
         public Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
         {
             var key = GetConfigKey(context);
             _configs.TryGetValue(key, out var config);
-            return Task.FromResult(config);
+            return Task.FromResult<KeyManagementConfig?>(config);
         }
 
         /// <inheritdoc/>
@@ -732,6 +946,426 @@ namespace DataWarehouse.SDK.Security
             }
 
             return (true, null);
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for key store strategy implementations.
+    /// Provides common infrastructure including:
+    /// - Thread-safe key caching with configurable expiration
+    /// - Initialization with SemaphoreSlim pattern
+    /// - Security context validation
+    /// - Message bus integration for key operation events
+    /// - Template methods for storage operations
+    /// </summary>
+    public abstract class KeyStoreStrategyBase : StrategyBase, IKeyStoreStrategy
+    {
+        private readonly BoundedDictionary<string, CachedKey> _keyCache = new BoundedDictionary<string, CachedKey>(1000);
+        private readonly SemaphoreSlim _initializationLock = new(1, 1);
+        private bool _disposed;
+        private TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
+        private Contracts.IMessageBus? _messageBus;
+
+        /// <summary>
+        /// Gets the unique identifier for this key store strategy.
+        /// Default derives from the class name. Override to provide a custom identifier.
+        /// </summary>
+        public override string StrategyId => GetType().Name.Replace("Strategy", "").ToLowerInvariant();
+
+        /// <summary>
+        /// Gets the display name for this key store strategy.
+        /// Default derives from the class name. Override to provide a custom name.
+        /// </summary>
+        public override string Name => GetType().Name.Replace("Strategy", "");
+
+        /// <summary>
+        /// Gets the capabilities of this key store implementation.
+        /// Derived classes must override to specify their capabilities.
+        /// </summary>
+        public abstract KeyStoreCapabilities Capabilities { get; }
+
+        /// <summary>
+        /// Gets the configuration dictionary passed during initialization.
+        /// Available after InitializeAsync completes.
+        /// </summary>
+        protected Dictionary<string, object> Configuration { get; private set; } = new();
+
+        /// <summary>
+        /// Initializes the key store strategy with configuration.
+        /// Derived classes should override InitializeStorage for backend-specific initialization.
+        /// </summary>
+        public async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        {
+            if (IsInitialized)
+                return;
+
+            await _initializationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (IsInitialized)
+                    return;
+
+                Configuration = configuration ?? new Dictionary<string, object>();
+
+                // Configure cache expiration if specified
+                if (Configuration.TryGetValue("CacheExpirationMinutes", out var cacheMinutes) && cacheMinutes is int minutes)
+                {
+                    _cacheExpiration = TimeSpan.FromMinutes(minutes);
+                }
+
+                // Optional: Get message bus reference for event publishing
+                if (Configuration.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is Contracts.IMessageBus messageBus)
+                {
+                    _messageBus = messageBus;
+                }
+
+                // Call derived class initialization
+                await InitializeStorage(cancellationToken).ConfigureAwait(false);
+
+                _initialized = true;
+            }
+            finally
+            {
+                _initializationLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Initializes the underlying storage backend.
+        /// Called once during InitializeAsync. Override to connect to databases, HSMs, etc.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        protected abstract Task InitializeStorage(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Tests connectivity and health of the underlying storage backend.
+        /// Default implementation returns true. Override for actual health checks.
+        /// </summary>
+        public virtual Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(IsInitialized && !_disposed);
+        }
+
+        /// <summary>
+        /// Gets the current active key ID for encryption operations.
+        /// Default implementation returns "default". Override to implement key rotation logic.
+        /// </summary>
+        public virtual Task<string> GetCurrentKeyIdAsync()
+        {
+            EnsureInitialized();
+            return Task.FromResult("default");
+        }
+
+        /// <summary>
+        /// Synchronously retrieves a key by ID.
+        /// Prefer <see cref="GetKeyAsync"/> in async contexts to avoid threadpool starvation.
+        /// </summary>
+        public virtual byte[] GetKey(string keyId)
+        {
+            return Task.Run(() => GetKeyAsync(keyId, CreateSystemContext())).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Asynchronously retrieves or creates an encryption key for the specified ID.
+        /// Uses caching and delegates to LoadKeyFromStorage for actual retrieval.
+        /// </summary>
+        public virtual async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context)
+        {
+            EnsureInitialized();
+            ValidateSecurityContext(context);
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+
+            // Check cache first
+            if (_keyCache.TryGetValue(keyId, out var cachedKey))
+            {
+                if (cachedKey.ExpiresAt > DateTime.UtcNow)
+                {
+                    return cachedKey.KeyData;
+                }
+                else
+                {
+                    // Remove expired key from cache
+                    _keyCache.TryRemove(keyId, out _);
+                }
+            }
+
+            // Load from storage
+            var keyData = await LoadKeyFromStorage(keyId, context).ConfigureAwait(false);
+
+            // Cache the key
+            var cached = new CachedKey
+            {
+                KeyData = keyData,
+                ExpiresAt = DateTime.UtcNow.Add(_cacheExpiration)
+            };
+            _keyCache[keyId] = cached;
+
+            // Publish key accessed event
+            await PublishKeyEventAsync("keystore.key.accessed", keyId, context).ConfigureAwait(false);
+
+            return keyData;
+        }
+
+        /// <summary>
+        /// Creates or rotates a key with the specified ID.
+        /// Delegates to SaveKeyToStorage for actual persistence.
+        /// </summary>
+        public virtual async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context)
+        {
+            EnsureInitialized();
+            ValidateSecurityContext(context);
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+
+            // Check if rotation is supported
+            if (!Capabilities.SupportsRotation)
+            {
+                throw new NotSupportedException($"Key store '{GetType().Name}' does not support key rotation.");
+            }
+
+            // Generate new key
+            var keyData = GenerateKey();
+
+            // Validate key size
+            if (Capabilities.MaxKeySizeBytes > 0 && keyData.Length > Capabilities.MaxKeySizeBytes)
+            {
+                throw new InvalidOperationException($"Generated key size ({keyData.Length} bytes) exceeds maximum ({Capabilities.MaxKeySizeBytes} bytes).");
+            }
+
+            if (keyData.Length < Capabilities.MinKeySizeBytes)
+            {
+                throw new InvalidOperationException($"Generated key size ({keyData.Length} bytes) is below minimum ({Capabilities.MinKeySizeBytes} bytes).");
+            }
+
+            // Save to storage
+            await SaveKeyToStorage(keyId, keyData, context).ConfigureAwait(false);
+
+            // Update cache
+            var cached = new CachedKey
+            {
+                KeyData = keyData,
+                ExpiresAt = DateTime.UtcNow.Add(_cacheExpiration)
+            };
+            _keyCache[keyId] = cached;
+
+            // Publish key created/rotated event
+            await PublishKeyEventAsync("keystore.key.created", keyId, context).ConfigureAwait(false);
+
+            return keyData;
+        }
+
+        /// <summary>
+        /// Lists all key IDs accessible to the given security context.
+        /// Default implementation returns empty list. Override to implement key discovery.
+        /// </summary>
+        public virtual Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)
+        {
+            // Default implementation: return empty list (no keys enumerable by default)
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        }
+
+        /// <summary>
+        /// Deletes a key by ID.
+        /// Default implementation returns false (deletion not supported). Override to support deletion.
+        /// </summary>
+        public virtual Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
+        {
+            // Default implementation: key deletion not supported by default (immutable key store)
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Gets metadata about a key without retrieving the key material itself.
+        /// Default implementation returns null. Override to support metadata queries.
+        /// </summary>
+        public virtual Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<KeyMetadata?>(null);
+        }
+
+        /// <summary>
+        /// Retrieves a key as a <see cref="NativeKeyHandle"/> for secure zero-copy access.
+        /// Default delegates to the <see cref="IKeyStore"/> default interface method.
+        /// Override for native-first implementations that skip the managed byte[] intermediate.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A <see cref="NativeKeyHandle"/> containing the key. Caller must dispose.</returns>
+        /// <remarks>
+        /// Native-first implementations should allocate unmanaged memory directly from
+        /// the backing store, avoiding any managed byte[] allocation. This eliminates
+        /// the risk of key material being copied by GC compaction.
+        /// </remarks>
+        public virtual async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+        {
+            var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
+            try
+            {
+                return NativeKeyHandle.FromBytes(keyBytes);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(keyBytes);
+            }
+        }
+
+        /// <summary>
+        /// Loads a key from the underlying storage backend.
+        /// Derived classes MUST implement this method.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <returns>The key bytes.</returns>
+        protected abstract Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context);
+
+        /// <summary>
+        /// Saves a key to the underlying storage backend.
+        /// Derived classes MUST implement this method.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="keyData">The key bytes to save.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        protected abstract Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context);
+
+        /// <summary>
+        /// Generates a new cryptographically secure key.
+        /// Default implementation generates a 256-bit (32-byte) key using RandomNumberGenerator.
+        /// Override to customize key generation.
+        /// </summary>
+        protected virtual byte[] GenerateKey()
+        {
+            var keyData = new byte[32]; // 256 bits
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(keyData);
+            return keyData;
+        }
+
+        /// <summary>
+        /// Validates the security context.
+        /// Throws SecurityException if context is invalid.
+        /// Override to add custom validation logic.
+        /// </summary>
+        protected virtual void ValidateSecurityContext(ISecurityContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+
+            if (string.IsNullOrWhiteSpace(context.UserId))
+            {
+                throw new System.Security.SecurityException("Security context must have a valid UserId.");
+            }
+        }
+
+        /// <summary>
+        /// Creates a system-level security context for internal operations.
+        /// Used when no user context is available (e.g., legacy GetKey method).
+        /// </summary>
+        protected virtual ISecurityContext CreateSystemContext()
+        {
+            return new SystemSecurityContext();
+        }
+
+        /// <summary>
+        /// Publishes a key operation event to the message bus (if configured).
+        /// Events include: keystore.key.accessed, keystore.key.created, keystore.key.deleted.
+        /// </summary>
+        protected virtual async Task PublishKeyEventAsync(string eventTopic, string keyId, ISecurityContext context)
+        {
+            if (_messageBus == null)
+                return;
+
+            try
+            {
+                var message = new Utilities.PluginMessage
+                {
+                    Type = eventTopic,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["keyId"] = keyId,
+                        ["userId"] = context.UserId,
+                        ["tenantId"] = context.TenantId ?? "",
+                        ["timestamp"] = DateTime.UtcNow,
+                        ["keyStore"] = GetType().Name
+                    }
+                };
+
+                await _messageBus.PublishAsync(eventTopic, message).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KeyStoreStrategyBase.PublishKeyEventAsync] {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Clears the key cache.
+        /// Useful for testing or when keys are externally modified.
+        /// </summary>
+        protected void ClearCache()
+        {
+            _keyCache.Clear();
+        }
+
+        /// <summary>
+        /// Ensures the key store has been initialized.
+        /// Throws InvalidOperationException if not initialized.
+        /// </summary>
+        private void EnsureInitialized()
+        {
+            if (!IsInitialized)
+            {
+                throw new InvalidOperationException($"Key store '{GetType().Name}' has not been initialized. Call InitializeAsync first.");
+            }
+
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(GetType().Name);
+            }
+        }
+
+        /// <summary>
+        /// Disposes resources used by the key store.
+        /// </summary>
+        public new virtual void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            // Wipe key material from cache before clearing
+            foreach (var entry in _keyCache.Values)
+            {
+                if (entry.KeyData != null)
+                {
+                    CryptographicOperations.ZeroMemory(entry.KeyData);
+                }
+            }
+            _keyCache.Clear();
+            _initializationLock.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Internal cached key structure.
+        /// </summary>
+        private sealed class CachedKey
+        {
+            public byte[] KeyData { get; init; } = Array.Empty<byte>();
+            public DateTime ExpiresAt { get; init; }
+        }
+
+        /// <summary>
+        /// System-level security context for internal operations.
+        /// </summary>
+        private sealed class SystemSecurityContext : ISecurityContext
+        {
+            public string UserId => "SYSTEM";
+            public string? TenantId => null;
+            public IEnumerable<string> Roles => new[] { "SYSTEM" };
+            public bool IsSystemAdmin => true;
         }
     }
 }

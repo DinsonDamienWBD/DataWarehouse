@@ -1,0 +1,6049 @@
+# DataWarehouse Production-Readiness Audit Findings
+
+**Date:** 2026-02-25
+**Methodology:** File-by-file scan, 15 categories per the ULTIMATE-AUDIT-PROMPT.md
+**Agent:** Sonnet (scanning) orchestrated by Opus (coordination)
+
+---
+
+## DataWarehouse.SDK
+
+### Chunk 000 (15 files: AI/, Attributes/, Compliance/, Configuration/ConfigurationHierarchy-IUserOverridable)
+
+**Files Reviewed:** 15 | **Findings:** 9 (3 HIGH, 4 MEDIUM, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1 | 4 | P1 | `Configuration/IUserOverridable.cs:388` | Regex.IsMatch without timeout on externally-supplied RegexPattern — ReDoS vector. `catch (RegexParseException)` only handles syntax errors, not pathological backtracking. |
+| 2 | 2 | P1 | `Configuration/FaultToleranceConfig.cs:496-501` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — data race, stale/torn reference on ARM/32-bit. |
+| 3 | 2 | P1 | `AI/MlPipeline/VdeFeatureStore.cs:296-314` | TOCTOU race in `RegisterModelAsync`: version check and insert are not atomic. Two concurrent registrations can both pass the monotonicity guard. |
+| 4 | 6 | P2 | `Configuration/FeatureToggleRegistry.cs:395-398` | `ContinueWith` without `TaskScheduler.Default` — inherits ambient SynchronizationContext. Debug.WriteLine in fault handler disappears in Release builds. |
+| 5 | 5 | P2 | `Configuration/ConfigurationHierarchy.cs:165-169` | Silent `catch (JsonException) {}` skips corrupt config files with no logging. Also at line 188-191. |
+| 6 | 13 | P2 | `AI/MlPipeline/VdeFeatureStore.cs:276-282,296-298,325-329` | O(n) prefix scan on ConcurrentDictionary for every feature/model lookup. No secondary index. |
+| 7 | 13 | P2 | `AI/MlPipeline/VdeFeatureStore.cs:470-484` | `GetStats()` does double full-scan of `_features` and `_models` — O(n) allocation per call. |
+| 8 | 15 | P2 | `AI/MlPipeline/VdeFeatureStore.cs:354-385` | `PromoteModelAsync` is entirely synchronous (returns ValueTask.CompletedTask) — accepted pattern but method is also non-atomic (see finding 3). |
+| 9 | 14 | P2 | `Compliance/CompliancePassport.cs:102-103` | `CoversRegulation(string regulationId)` — no null guard; null input silently returns false. |
+
+**Clean files:** GraphStructures.cs, IAIProvider.cs, KnowledgeObject.cs, CapabilityResult.cs, VectorOperations.cs, PluginPriorityAttribute.cs, IComplianceAutomation.cs, ISovereigntyMesh.cs, PassportEnums.cs
+
+---
+
+### Chunk 001 (15 files: Configuration/LoadBalancing-UserConfig, Connectors/, Contracts/ActiveStorage-ChaosVaccination)
+
+**Files Reviewed:** 15 | **Findings:** 10 (4 HIGH, 5 MEDIUM, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 10 | 10 | P0 | `Configuration/LoadBalancingConfig.cs:613-615` | `string.GetHashCode()` used for consistent hashing in `SelectConsistentHashing` — non-deterministic across process restarts and runtimes. Breaks session affinity completely. |
+| 11 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:399-403` | TOCTOU race on `_lastMetricsReset` (plain DateTime field, non-atomic on 32-bit). Multiple threads can reset minute counter simultaneously. |
+| 12 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:371-378` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — stale reference on ARM. |
+| 13 | 5 | P1 | `Contracts/ActiveStoragePluginBases.cs:751-754,789-792` | Bare `catch { return null; }` in `RequestOptimalResourceLimitsAsync` and `RequestOptimalExecutionTimeAsync` — no logging at all. |
+| 14 | 15 | P2 | `Contracts/Carbon/IEnergyMeasurement.cs:50` | `GetCurrentPowerDrawWatts` returns `Task<double>` but missing `Async` suffix — inconsistent with all other methods in same interface. |
+| 15 | 13 | P2 | `Configuration/LoadBalancingConfig.cs:432` | O(n) LINQ Count with predicate on every `SelectIntelligentMode` call (hot path). |
+| 16 | 13 | P2 | `Configuration/LoadBalancingConfig.cs:473-487` | Four sequential O(n) LINQ passes in `SelectOptimalAlgorithm` on per-request hot path. |
+| 17 | 9 | P2 | `Contracts/AedsPluginBases.cs:526-528` | `ServerDispatcherPluginBase.StartAsync` is a no-op with no abstract hook to enforce initialization in derived classes. |
+| 18 | 14 | P2 | `Configuration/UserConfigurationSystem.cs:403-444` | `ImportConfigurationAsync` bypasses all parameter validation — deserialized values written directly to hierarchy without bounds/permission checks. |
+| 19 | 15 | P2 | `Contracts/ActiveStoragePluginBases.cs:745-755,764-793` | `RequestOptimal*Async` methods always return null — fire-and-forget publish disguised as request-response pattern. |
+
+**Clean files:** CategoryStrategyBases.cs, ConnectionStrategyBase.cs, ConnectionStrategyRegistry.cs, IConnectionStrategy.cs, IDataConnector.cs, CarbonTypes.cs, ICarbonBudget.cs, ICarbonReporting.cs, IGreenPlacement.cs, ChaosVaccinationTypes.cs
+
+---
+
+### Chunk 002 (15 files: Contracts/ChaosVaccination/IBlastRadius-IVaccination, Compliance/, Composition/, Compression/, Compute/Capabilities-IComputeRuntime)
+
+**Files Reviewed:** 15 | **Findings:** 14 (4 HIGH, 7 MEDIUM, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 20 | 11 | P1 | `Contracts/ChaosVaccination/IImmuneResponseSystem.cs:64` + `Contracts/Composition/AutonomousOperationsTypes.cs:29` | Duplicate `RemediationActionType` enum and `RemediationAction` record in two namespaces with different members — ambiguous type resolution. |
+| 21 | 2 | P1 | `Contracts/Compliance/ComplianceStrategy.cs:946-978` | Mixed lock + Interlocked pattern: `IncrementErrorCount()` uses Interlocked outside `_statsLock` while `UpdateStatistics` uses Interlocked inside lock. Inconsistent synchronization. |
+| 22 | 15 | P1 | `Contracts/Compute/ComputeTypes.cs:79,90,188` | `GetXxxAsString()` XML doc claims `InvalidOperationException` on invalid UTF-8, but UTF-8 default encoding silently replaces with U+FFFD — never throws. |
+| 23 | 4 | P1 | `Contracts/Composition/SupplyChainAttestationTypes.cs:281-322` | Path traversal: `VerifyAsync(string binaryPath)` reads arbitrary caller-supplied file paths without sanitization or base-directory constraint. |
+| 24 | 12 | P2 | `Contracts/Compression/CompressionStrategy.cs:439-441` | `AverageDecompressionThroughput` uses `TotalBytesOut` (compressed) instead of `TotalBytesIn` — systematically wrong metric. |
+| 25 | 12 | P2 | `Contracts/Composition/ProvenanceCertificateTypes.cs:156-167` | Hash-chain verification skips link when `AfterHash` is null — attacker can bypass continuity check by removing AfterHash. |
+| 26 | 12/10 | P2 | `Contracts/Composition/ProvenanceCertificateTypes.cs:187-196` | `ComputeCertificateHash` claims "sorted keys" but System.Text.Json does not sort dictionary keys — non-canonical serialization breaks verification. |
+| 27 | 14 | P2 | `Contracts/ChaosVaccination/IVaccinationScheduler.cs:80-85` | `VaccinationSchedule` allows both `CronExpression` and `IntervalMs` null or both set — no mutual exclusion validation. |
+| 28 | 14 | P2 | `Contracts/ChaosVaccination/IVaccinationScheduler.cs:147-158` | `TimeWindow.StartHour`/`EndHour` have no 0-23 range guard; overnight windows unsupported. |
+| 29 | 13 | P2 | `Contracts/Compliance/ComplianceStrategy.cs:410-418` | `GetViolationsByCategory` allocates two dictionaries per call on an immutable record. |
+| 30 | 5 | P2 | `Contracts/Composition/SupplyChainAttestationTypes.cs:318-321` | `VerifyAsync` swallows all exceptions including OOM — converts to opaque failure result. |
+| 31 | 15 | P2 | `Contracts/Compliance/ComplianceStrategy.cs:265,368` | `DetectedAt`/`AssessmentTime` use `DateTime` while sibling contracts use `DateTimeOffset`. |
+| 32 | 14 | P2 | `Contracts/Compression/CompressionStrategy.cs:791-792` | `ValidateInput` rejects empty arrays — overly restrictive for legitimate use cases. |
+| 33 | 11 | P2 | `Contracts/Compute/IComputeRuntimeStrategy.cs:161` | `DisposeAsync` method does not implement `IAsyncDisposable` — `await using` cannot be used. |
+
+**Clean files:** IBlastRadiusEnforcer.cs, IChaosInjectionEngine.cs, IChaosResultsDatabase.cs, DataRoomTypes.cs, SchemaEvolutionTypes.cs, ComputeCapabilities.cs
+
+---
+
+### Chunk 003 (15 files: Contracts/Compute/PipelineCompute, Consciousness/, Dashboards/, DataFormat/, DataLake/, DataMesh/, Distributed/Federated-ICluster)
+
+**Files Reviewed:** 15 | **Findings:** 11 (4 HIGH, 4 MEDIUM, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 34 | 5/4 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:347` | `WarnInsecureMode()` is complete no-op — security alert never emitted. Method is `private` so cannot be overridden despite comment claiming otherwise. |
+| 35 | 2 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:50,349` | `_insecureModeWarned` bool flag read/written without synchronization across concurrent publish paths. |
+| 36 | 13/9 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:190` | `PublishToAllNodesAsync` broadcasts sequentially (N x RTT). No cancellation check between iterations. |
+| 37 | 15 | P1 | `Contracts/Compute/PipelineComputeStrategy.cs:689,715` | `EstimateCapacityCoreAsync` returns `double` not `Task<double>` — Async suffix is a lie. `EstimateThroughputAsync` is async with no awaits. |
+| 38 | 13/14 | P2 | `Contracts/Consciousness/IConsciousnessScorer.cs:64,21` | `byte[] data` parameter forces full object materialization — no streaming alternative for TB-scale data. |
+| 39 | 15/14 | P2 | `Contracts/Consciousness/IConsciousnessScorer.cs:24,43,67` | `Dictionary<string, object>` as public interface parameter instead of `IReadOnlyDictionary`. |
+| 40 | 10/12 | P2 | `Contracts/DataLake/DataLakeStrategy.cs:214,225` | `TotalSizeBytes` accumulates both read and write throughput — inflated/wrong storage footprint values. |
+| 41 | 12/14 | P2 | `Contracts/Compute/PipelineComputeStrategy.cs:719` | `MemoryPerGb == 0` causes division-by-zero producing +Infinity. `ComputeIntensity > 1.0` produces negative capacity. |
+| 42 | 13 | P2 | `Contracts/Consciousness/ConsciousnessScore.cs:199,205` | `EffectiveValueWeights`/`EffectiveLiabilityWeights` allocate new dictionary on every property access. |
+| 43 | 7 | P2 | `Contracts/Dashboards/IDashboardStrategy.cs:20` | Interface extends `IDisposable` only — async-heavy implementations should use `IAsyncDisposable`. |
+| 44 | 3 | P2 | `Contracts/DataLake/DataLakeStrategy.cs:196` | Unnecessary async state machine on straight-line double-await disposal — minor overhead. |
+
+**Clean files:** ConsciousnessStrategyBase.cs, DashboardCapabilities.cs, DashboardTypes.cs, DataFormatStrategy.cs, DataMeshStrategy.cs, IAutoGovernance.cs, IAutoScaler.cs, IAutoTier.cs, IClusterMembership.cs
+
+---
+
+### Chunk 004 (15 files: Contracts/Distributed/IFederated-IReplicationSync, Distribution/, Ecosystem/ConnectionPool-JepsenTestScenarios)
+
+**Files Reviewed:** 15 | **Findings:** 18 (5 HIGH, 8 MEDIUM, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 45 | 6 | P1 | `Contracts/Ecosystem/ConnectionPoolImplementations.cs:113-114` | Fire-and-forget health/eviction timers: `_ = RunHealthChecksAsync()` — post-await exceptions silently lost. |
+| 46 | 4 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:127,201-217` | Shell injection: unvalidated `IpAddress` and `ContainerName` passed to `/bin/sh -c` via `docker exec`. |
+| 47 | 4 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:923-930` | Shell injection: caller-supplied env var keys/values concatenated into Docker command without escaping. |
+| 48 | 12 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:820-860` | `CheckCausalConsistency` is a no-op — builds dependency graph but if-block body is empty. Always returns zero violations. |
+| 49 | 9 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:201-218` | Process exit code not checked in `DockerExecAsync` — fault injection silently fails, producing false-positive test passes. |
+| 50 | 7 | P2 | `Contracts/Ecosystem/ConnectionPoolImplementations.cs:544-561` | `NetworkStream` may be abandoned if `Dispose()` throws in `DestroyAsync`. |
+| 51 | 13 | P2 | `Contracts/Ecosystem/JepsenReportGenerator.cs:379-421` | O(n²) timeline bucketing — full history scan per second bucket. |
+| 52 | 13 | P2 | `Contracts/Ecosystem/JepsenTestHarness.cs:1009` | `List.Contains` in hot loop (100ms tick) — use HashSet for O(1) lookup. |
+| 53 | 12 | P2 | `Contracts/Ecosystem/JepsenTestHarness.cs:951-954` | Health check uses `echo ok` instead of actual service readiness check. |
+| 54 | 4 | P2 | `Contracts/Distribution/AedsInterfaces.cs:599-604` | `VerificationPin` as plain string — no hashing guidance, risks cleartext storage. |
+| 55 | 4 | P2 | `Contracts/Distribution/AedsInterfaces.cs:407-412,482-488` | `AuthToken` as plain string across control/data plane config records. |
+| 56 | 12 | P2 | `Contracts/Ecosystem/HelmChartSpecification.cs:501` | Default admin password `"changeme"` in generated Helm secret template. |
+| 57 | 15 | P2 | `Contracts/Ecosystem/JepsenTestHarness.cs:815-820` | Doc says "verifies" causal consistency but implementation is empty (see #48). |
+| 58 | 14 | P2 | `Contracts/Distributed/IFederatedMessageBus.cs:84` | `GetNodes(count)` missing documented constraints for edge values. |
+| 59 | 14 | P2 | `Contracts/Distributed/ILoadBalancerStrategy.cs:75-80` | `CpuUsage`/`MemoryUsage` not validated to [0,100] range. |
+| 60 | 15 | P2 | `Contracts/Distribution/DistributionTypes.cs:196-208` | `Whitelist`/`Blacklist` terminology — should be `Allowlist`/`Denylist`. |
+| 61 | 13 | P2 | `Contracts/Distribution/DistributionCapabilities.cs:148-166` | `CapabilityScore` recomputed on every access in immutable record. |
+| 62 | 15 | P2 | `Contracts/Distribution/AedsInterfaces.cs:645-651` | `SentinelConfig.PrivateKey` as plain string risks logging via record ToString(). |
+
+**Clean files:** IP2PNetwork.cs, IReplicationSync.cs, IConnectionPool.cs, JepsenTestScenarios.cs, IContentDistributionStrategy.cs
+
+---
+
+### Chunk 005 (15 files: Ecosystem/JepsenWorkload-SdkLanguageTemplates, TerraformProvider, EdgeComputing, Encryption/, Gaming/)
+
+**Files Reviewed:** 15 | **Findings:** 19 (5 HIGH, 8 MEDIUM, 6 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 63 | 1 | P0 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:193-667` | All 9 database execution methods are non-functional stubs — `_ = node; _ = key; return null/true/CompletedTask`. Entire Jepsen harness produces fabricated history. |
+| 64 | 10 | P1 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:154-167` | Timeout catch always records `Type = OperationType.Read` regardless of actual operation — corrupts linearizability checker input. |
+| 65 | 13 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:70-627` | `List<byte>` + `AddRange` for binary serialization in every `ToBytes()` method — 3 copies per message. |
+| 66 | 14 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:93,245,373` | Unbounded count allocation from untrusted input in `FromBytes()` — deserialization DoS. |
+| 67 | 12 | P1 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:453-455` | Generated Go missing `plugin` import — provider will not compile. |
+| 68 | 1 | P2 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:558-574` | Generated CRUD Go functions are `// TODO` stubs with hardcoded IDs. |
+| 69 | 15 | P2 | `Contracts/Ecosystem/SdkLanguageTemplates.cs:158` | Generated Python SDK methods use `...` (Ellipsis) as body — silently do nothing. |
+| 70 | 2 | P2 | `Contracts/Encryption/EncryptionStrategy.cs:534` | `_lastUpdateTime` (DateTime) written without synchronization — torn read on 32-bit. |
+| 71 | 10 | P2 | `Contracts/Encryption/EncryptionStrategy.cs:885` | `EncryptedAt` default initializer overwrites on deserialization — corrupts audit timestamps. |
+| 72 | 12 | P2 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:708-722` | `WorkloadMixer` selects workload once per client, not per operation — ratio only applies at startup. |
+| 73 | 14 | P2 | `Contracts/Ecosystem/ProtoVersioningStrategy.cs:102-134` | `service`/`method` not validated for whitespace in `MigrateRequest`. |
+| 74 | 4 | P2 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:199-220` | `tls_skip_verify` schema attribute has no security warning in description. |
+| 75 | 12 | P2 | `Contracts/Gaming/GamingCapabilities.cs:130-134` | `SupportsSaveSize` conflates "not supported" with "too large" — callers can't distinguish. |
+| 76 | 15 | P2 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:75` | `knownValues` naming misleads about scope/persistence. |
+| 77 | 15 | P2 | `Contracts/Ecosystem/ProtoVersioningStrategy.cs:141-145` | `GetMinimumClientVersion(service)` ignores service parameter — always returns "1.0.0". |
+| 78 | 15 | P2 | `Contracts/Ecosystem/SdkContractGenerator.cs:89-121` | `switch` over `SdkLanguage` has no `default` case — silently returns empty output. |
+| 79 | 12 | P2 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:650-656` | `ExecuteReadTotalAsync` returns `0L` — causes false bank invariant violations. |
+| 80 | 15 | P2 | `Contracts/EdgeComputing/IEdgeComputingStrategy.cs` | Multiple interfaces in one file hidden behind `#region` blocks. |
+| 81 | 9 | P2 | `Contracts/Encryption/ICryptoAgilityEngine.cs:311-329` | `PauseMigrationAsync` base impl records no state change — derived classes can silently fail to pause. |
+
+**Clean files:** PulumiProviderSpecification.cs, SdkClientSpecification.cs, CryptoAgilityTypes.cs, PqcAlgorithmRegistry.cs, GamingTypes.cs
+
+---
+
+### Chunk 006 (15 files: Contracts/Gaming/IGamingServiceStrategy.cs → Contracts/Hierarchy/Feature/InterfacePluginBase.cs)
+
+**Files Reviewed:** 15 | **Findings:** 18 (6 HIGH, 8 MEDIUM, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 82 | 6 | P1 | `Contracts/Hierarchy/DataPipeline/StoragePluginBase.cs:132-137` | Timer callback `async _ => await CleanupExpiredCacheAsync()` is fire-and-forget — `TimerCallback` is void-returning, exceptions silently lost. |
+| 83 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:177` | `_totalProcessingTime += duration` is non-atomic read-modify-write on a shared TimeSpan field — data race under concurrent `ProcessAsync` calls. |
+| 84 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:146-154` | `_initialized` (bool) and `_startTime` (DateTime) read/written without volatile/lock — double-checked locking on non-volatile field, double init risk. |
+| 85 | 7 | P1 | `Contracts/Hierarchy/DataPipeline/EncryptionPluginBase.cs:479` | `(int)encryptedData.Length` silently overflows for streams >2GB — corrupt MemoryStream capacity or ArgumentOutOfRangeException. |
+| 86 | 12 | P1 | `Contracts/Hierarchy/DataPipeline/ReplicationPluginBase.cs:152-163` | `ContinueWith(OnlyOnRanToCompletion)` discards faulted/cancelled task context — replication failures produce misleading exceptions. Same at line 192-199. |
+| 87 | 15 | P1 | `Contracts/Hierarchy/DataPipeline/IntegrityPluginBase.cs:26-27` | `ValidateChainAsync` always returns `true` — subclasses that forget to override silently approve all chain validations. |
+| 88 | 13 | P2 | `Contracts/Hierarchy/DataPipeline/EncryptionPluginBase.cs:334-344` | `KeyAccessLog.OrderBy()` runs O(n) sort on every eviction at MaxKeyAccessLogSize=10,000. |
+| 89 | 13 | P2 | `Contracts/Hierarchy/DataPipeline/StoragePluginBase.cs:267` | `_cacheEntries.OrderBy(kv => kv.Value.CreatedAt)` — O(n) sort on every cache insert past MaxEntries. |
+| 90 | 9 | P2 | `Contracts/Hierarchy/DataPipeline/EncryptionPluginBase.cs:484-488` | `UpdateEncryptionStats(data.Length)` called before result stream consumed; `.Length` may throw on non-seekable streams. Audit log records optimistic success. |
+| 91 | 14 | P2 | `Contracts/HardwareAccelerationPluginBases.cs:898-902` | `ConnectAsync(slotId, pin)` has no null/empty validation — null PIN propagates to HSM driver. |
+| 92 | 14 | P2 | `Contracts/HardwareAccelerationPluginBases.cs:335-343` | `EncryptQatAsync`/`DecryptQatAsync` accept null keys — undefined behavior at hardware driver level. |
+| 93 | 2 | P2 | `Contracts/HardwareAccelerationPluginBases.cs:808-813` | `ConnectedSlot` string property written from Connect/Disconnect without synchronization — race with `IsConnected` reads. |
+| 94 | 4 | P2 | `Contracts/Hierarchy/DataPipeline/EncryptionPluginBase.cs:793-794` | `DefaultSecurityContext.IsSystemAdmin => true` — missing context grants admin privileges (fail-open). |
+| 95 | 12 | P2 | `Contracts/Hierarchy/DataPipeline/CompressionPluginBase.cs:183-185` | Decompress context passes plugin's default `CompressionAlgorithm` — may hint AI selector to wrong algorithm for decompression. |
+| 96 | 15 | P2 | `Contracts/HardwareAccelerationPluginBases.cs:28-29` | `ExecuteWorkloadAsync` returns static `"delegated-to-hardware-accelerator"` dict — silent no-op if not overridden. |
+| 97 | 15 | P2 | `Contracts/Hierarchy/Feature/DataManagementPluginBase.cs:181-185` | `ManageDataWithStrategyAsync` discards resolved strategy (`_`) and returns input dict copy — ACL overhead for zero benefit. |
+| 98 | 11 | P2 | `Contracts/Hierarchy/DataPipeline/ReplicationPluginBase.cs:21` | Category misclassified as `PluginCategory.StorageProvider` — should be replication-specific. |
+| 99 | 11 | P2 | `Contracts/HardwareAccelerationPluginBases.cs:120` | Category misclassified as `PluginCategory.OrchestrationProvider` — hardware accelerators are not orchestrators. |
+
+**Clean files:** IGamingServiceStrategy.cs, DataTransformationPluginBase.cs, DataTransitPluginBase.cs, DataPipelinePluginBase.cs, ComputePluginBase.cs, FormatPluginBase.cs, InfrastructurePluginBase.cs, InterfacePluginBase.cs
+
+---
+
+### Chunk 007 (15 files: Contracts/Hierarchy/Feature/MediaPluginBase.cs → Contracts/IDataTransformation.cs)
+
+**Files Reviewed:** 15 | **Findings:** 14 (4 HIGH, 7 MEDIUM, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 100 | 1 | P0 | `Contracts/IConsensusEngine.cs:96-134` | LogReplicator, HierarchicalConsensusManager, SnapshotManager are pure stubs — hardcoded returns (0, true, CompletedTask), untyped `object plugin` constructors. |
+| 101 | 15 | P1 | `Contracts/Hierarchy/Feature/OrchestrationPluginBase.cs:68-81` | `OrchestrateWithStrategyAsync` discards resolved strategy — lambda `_ => Task.FromResult(new Dict(workflow))` just copies input dict. |
+| 102 | 15 | P1 | `Contracts/Hierarchy/Feature/PlatformPluginBase.cs:68-81` | `ExecutePlatformOpWithStrategyAsync` identical defect — strategy resolved but never called, operation dict returned as-is. |
+| 103 | 4 | P1 | `Contracts/Hierarchy/Feature/SecurityPluginBase.cs:55-60` | `EvaluateAccessWithIntelligenceAsync` defaults to `allowed=true`, `DetectAnomalousAccessAsync` defaults to `false` — fail-open security on base class. |
+| 104 | 14 | P2 | `Contracts/IConsensusEngine.cs:38` | `ProposeAsync(Proposal)` missing CancellationToken — consensus round-trips uninterruptible. |
+| 105 | 7 | P2 | `Contracts/IConsensusEngine.cs:43` | `OnCommit(Action<Proposal>)` has no deregistration — stale handlers leak memory and keep plugin graph alive. |
+| 106 | 12 | P2 | `Contracts/Hierarchy/Feature/MediaPluginBase.cs:133-135` | Missing `inputStream` key silently substitutes `Stream.Null` — empty-byte processing with no error. |
+| 107 | 12 | P2 | `Contracts/Hierarchy/Feature/ObservabilityPluginBase.cs:124-136` | Boolean sentinel pattern on `DispatchObservabilityStrategyAsync<bool>` — exceptions from MetricsAsync/TracingAsync bubble unexpectedly. |
+| 108 | 14 | P2 | `Contracts/ICloudEnvironment.cs:16` | `IsCurrentEnvironment()` is synchronous — cloud metadata endpoint queries will block/deadlock in async contexts. |
+| 109 | 3 | P2 | `Contracts/ICloudEnvironment.cs:22` | `CreateStorageProvider()` synchronous factory — async init deferred to first call, hiding latency spikes. |
+| 110 | 9 | P2 | `Contracts/IDataTransformation.cs:27-33` | `OnWrite`/`OnRead` return Stream with no disposal/error/seekability contract — lazy evaluation masks transform errors. |
+| 111 | 15 | P2 | `Contracts/IConsensusEngine.cs:93` | `GeoRaftNode.VotingStatus` typed as `object?` — untyped escape hatch in strongly-typed contract. |
+| 112 | 15 | P2 | `Contracts/IConsensusEngine.cs:120-126` | `JointConsensusState` has both OldMembers/NewMembers and OldConfiguration/NewConfiguration — undocumented distinction, likely redundant. |
+| 113 | 15 | P2 | `Contracts/ICacheableStorage.cs:289` | `CacheEntryMetadata.Key` setter calls `new Uri(value)` — throws `UriFormatException` on non-URI keys silently. |
+
+**Clean files:** ResiliencePluginBase.cs, StreamingPluginBase.cs, NewFeaturePluginBase.cs, ICompressionProvider.cs, IContainerManager.cs, IDataTerminal.cs
+
+---
+
+### Chunk 008 (15 files: Contracts/IDataWarehouse.cs → Contracts/IReplicationService.cs)
+
+**Files Reviewed:** 15 | **Findings:** 6 (2 HIGH, 3 MEDIUM, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 114 | 14 | P1 | `Contracts/IMetadataIndex.cs:15,24,39` | Three async methods (`IndexManifestAsync`, `SearchAsync`, `UpdateLastAccessAsync`) lack CancellationToken — inconsistent with other methods on same interface. |
+| 115 | 14 | P1 | `Contracts/IReplicationService.cs:17` + `Contracts/IFederationNode.cs:31,39,49,58` | `RestoreAsync` and all 4 `IFederationNode` methods lack CancellationToken — network I/O operations uninterruptible. |
+| 116 | 5 | P2 | `Contracts/IPipelineOrchestrator.cs:271` | `PipelineContext.Dispose` bare `catch { /* Ignore disposal errors */ }` — zero diagnostic signal on stream disposal failures. |
+| 117 | 15 | P2 | `Contracts/IMessageBus.cs:263-266` | `PublishAndWaitAsync` default delegates to fire-and-forget `PublishAsync` — contract lie, callers think handlers complete before return. |
+| 118 | 14 | P2 | `Contracts/IFederationNode.cs:31,39,49,58` | All four gRPC federation methods lack CancellationToken — cannot propagate deadlines/cancellations. |
+| 119 | 2 | P2 | `Contracts/IKnowledgeLake.cs:17-20` | `KnowledgeEntry.LastAccessedAt`/`AccessCount` mutable on shared record without atomic operations — torn writes on ARM. |
+
+**Clean files:** IDataWarehouse.cs, IIndexableStorage.cs, IKernelInfrastructure.cs, IListableStorage.cs, IMultiRegionReplication.cs, IPlugin.cs, IPluginCapability.cs, IPluginCapabilityRegistry.cs, IRealTimeProvider.cs
+
+---
+
+### Chunk 009 (15 files: Contracts/ISerializer.cs → Contracts/Interface/GraphQlSchemaGenerator.cs)
+
+**Files Reviewed:** 15 | **Findings:** 11 (4 HIGH, 4 MEDIUM, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 120 | 5 | P1 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:426-429` | `SubscribeToIntelligenceTopics` bare `catch {}` swallows all subscription errors — Intelligence discovery silently never works. |
+| 121 | 5 | P1 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:1487-1490` | `RegisterHandler` fire-and-forget handler catches all exceptions with no logging — bugs in derived plugins invisible. |
+| 122 | 5 | P1 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:559-562` | `SendIntelligenceRequestAsync` bare catch returns null — production bugs indistinguishable from normal fallback. |
+| 123 | 2 | P1 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:198-201` | TOCTOU race: `_capabilityCacheTime` read outside `_stateLock` while written under lock — stale reads on ARM. |
+| 124 | 4 | P2 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs` (multiple) | `Guid.NewGuid()` for correlation IDs in `_pendingRequests` — predictable in multi-tenant bus environments. |
+| 125 | 6 | P2 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:370-383` | Async lambda in `MessageBus.Subscribe` — faults from `OnIntelligenceAvailableAsync` unobserved. |
+| 126 | 3 | P2 | `Contracts/IntelligenceAware/IntelligenceAwarePluginBase.cs:1423,1485` | `CancellationToken.None` hardcoded in typed handler wrappers — shutdown cannot interrupt long-running handlers. |
+| 127 | 10 | P2 | `Contracts/InfrastructureContracts.cs:151` | `ComplianceViolation.ViolationSeverity` typed as `object?` instead of existing enum — type confusion on serialization. |
+| 128 | 9 | P2 | `Contracts/InfrastructureContracts.cs:285` | `AuthenticationRequest.Password` stored as plain `string?` — cannot be zeroed, may leak via serialization. |
+| 129 | 15 | P2 | `Contracts/IntelligenceAware/IntelligenceCapabilities.cs:464-492` | `1L << 64` through `1L << 68` silently wrap modulo 64 — Agent capabilities alias with Core AI capabilities. |
+| 130 | 12 | P2 | `Contracts/Interface/DynamicApiGenerator.cs:249` | `ModelRegenerated` event raised inside `_regenerateLock` — deadlock risk if subscriber calls back into generator. |
+
+**Clean files:** ISerializer.cs, IStrategy.cs, IStrategyAclProvider.cs, ITieredStorage.cs, IIntelligenceAware.cs, IntelligenceCapabilityResponse.cs, IntelligenceContext.cs, IntelligenceTopics.cs, NlpTypes.cs, GraphQlSchemaGenerator.cs
+
+---
+
+### Chunk 010 (15 files: Contracts/Interface/GrpcServiceGenerator.cs → Contracts/Media/MediaStrategyBase.cs)
+
+**Files Reviewed:** 15 | **Findings:** 16 (7 HIGH, 9 MEDIUM)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 131 | 5 | P1 | `Contracts/LegacyStoragePluginBases.cs:87` | Bare `catch { return false; }` swallows OperationCanceledException — cancellation contract broken. |
+| 132 | 5 | P1 | `Contracts/LegacyStoragePluginBases.cs:253,296,352` | Three bare catches in cache invalidation loops swallow OperationCanceledException. |
+| 133 | 12 | P1 | `Contracts/LegacyStoragePluginBases.cs:82-84` | `UnauthorizedAccessException` mapped to `return true` — access denied ≠ exists. |
+| 134 | 12 | P1 | `Contracts/LegacyStoragePluginBases.cs:59-73` | `bytesRead` from `ReadAsync` unused; redundant branches both return true. |
+| 135 | 6 | P1 | `Contracts/LegacyStoragePluginBases.cs:181` | Timer callback `async _ => await CleanupExpiredAsync()` is async void — unobserved exceptions crash process. |
+| 136 | 7 | P1 | `Contracts/LegacyStoragePluginBases.cs:197-203` | `data.Length` after save throws `NotSupportedException` on non-seekable streams. |
+| 137 | 2 | P1 | `Contracts/LegacyStoragePluginBases.cs:411-418` | TOCTOU on `_indexStore` capacity check — concurrent inserts exceed MaxIndexStoreSize. |
+| 138 | 12 | P2 | `Contracts/LegacyConsensusPluginBase.cs:119-120` | `CommitIndex` and `LastApplied` both set to `cluster.Term` — semantically wrong Raft fields. |
+| 139 | 1 | P2 | `Contracts/LegacyConsensusPluginBase.cs:130-133` | `GetClusterHealthAsync` returns hardcoded zeros — misleading health report. |
+| 140 | 4 | P2 | `Contracts/Interface/InterfaceStrategyBase.cs:109` | `ex.Message` leaked into HTTP 500 response body — information disclosure. |
+| 141 | 4 | P2 | `Contracts/Interface/WebSocketApiGenerator.cs:425-428` | `pluginId`/`capabilityName` not sanitized before JS embedding — XSS injection risk. |
+| 142 | 12 | P2 | `Contracts/Interface/GrpcServiceGenerator.cs:135,208` | Proto file uses `XxxResponse` but runtime descriptor uses `XxxResponseBatch` — type mismatch. |
+| 143 | 15 | P2 | `Contracts/Interface/OpenApiSpecGenerator.cs:419-421` | `nullable:true` is OpenAPI 3.0 syntax emitted in declared 3.1 spec. |
+| 144 | 13 | P2 | `Contracts/LegacyStoragePluginBases.cs:440-447` | `SearchIndexAsync` is O(N×M) full-scan with no warning — severe degradation at scale. |
+| 145 | 14 | P2 | `Contracts/LegacyStoragePluginBases.cs:545` | `IndexManifestAsync` calls `IndexDocumentAsync` without CancellationToken. |
+| 146 | 3 | P2 | `Contracts/LegacyStoragePluginBases.cs:577-579` | `Task.Yield()` per item in in-memory `EnumerateAllAsync` — needless thread-pool scheduling. |
+
+**Clean files:** IInterfaceStrategy.cs, InterfaceCapabilities.cs, InterfaceTypes.cs, LegacyInterfacePluginBase.cs, IMediaStrategy.cs, MediaCapabilities.cs, MediaStrategyBase.cs, LowLatencyPluginBases.cs, LegacyContainerManagerPluginBase.cs
+
+---
+
+### Chunk 011 (15 files: Contracts/Media/MediaTypes.cs → Contracts/Persistence/DefaultPluginStateStore.cs)
+
+**Files Reviewed:** 15 | **Findings:** 12 (1 P0, 4 HIGH, 4 MEDIUM, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 147 | 2 | P0 | `Contracts/MilitarySecurityPluginBases.cs:435` | `TwoPersonIntegrityPluginBase._pendingOperations` is plain `Dictionary` accessed concurrently — race allows dual-auth bypass on nuclear/crypto ops. |
+| 148 | 6 | P1 | `Contracts/OrchestrationContracts.cs:610` | `_ = Task.WhenAll(optionalTasks)` fire-and-forget — exceptions lost, `timeoutCts` disposed while tasks run. |
+| 149 | 7 | P1 | `Contracts/OrchestrationContracts.cs:602-610` | `using var timeoutCts` disposed before fire-and-forget tasks complete — `ObjectDisposedException` in running tasks. |
+| 150 | 4 | P1 | `Contracts/MilitarySecurityPluginBases.cs:330-341` | `DowngradeAsync` accepts null/empty `authorizationCode` — unauthorized declassification risk. |
+| 151 | 9 | P1 | `Contracts/Persistence/DefaultPluginStateStore.cs:118-125` | `catch (Exception) when` swallows `OperationCanceledException` — cancellation silently ignored on fallback. |
+| 152 | 12 | P2 | `Contracts/MilitarySecurityPluginBases.cs:568` | Expired TPI operations never evicted — unbounded memory growth in `_pendingOperations`. |
+| 153 | 13 | P2 | `Contracts/Observability/MetricTypes.cs:136,143` | Factory returns mutable `List<T>` as `IReadOnlyList` — callers can cast and mutate. |
+| 154 | 12 | P2 | `Contracts/Observability/TraceTypes.cs:186-193` | `ParseTraceparent` doesn't validate field lengths; `Convert.ToByte` throws wrong exception type. |
+| 155 | 14 | P2 | `Contracts/Observability/ObservabilityStrategyBase.cs:47-49` | `SupportsDistributedTracing=true` with `SupportsTracing=false` never rejected — inconsistent capability state. |
+| 156 | 15 | P2 | `Contracts/MilitarySecurityPluginBases.cs:432-435` | Comment implies memory dictionary acceptable for production TPI — misleading. |
+| 157 | 15 | P2 | `Contracts/Observability/IObservabilityStrategy.cs:17` | Documents `InvalidOperationException` "not initialized" but interface has no `InitializeAsync`. |
+| 158 | 14 | P2 | `Contracts/Media/MediaTypes.cs:166-176` | `Resolution(int,int)` allows negative/zero values — no factory validation. |
+
+**Clean files:** Messages.cs, NullObjects.cs, IAuditTrail.cs, ICorrelatedLogger.cs, IResourceMeter.cs, ISdkActivitySource.cs, ObservabilityCapabilities.cs
+
+---
+
+### Chunk 012 (15 files: Contracts/Persistence/IPersistentBackingStore–Policy/IPolicyStore)
+
+**Files Reviewed:** 15 | **Findings:** 8 (3 P1, 5 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 159 | 1 | P1 | `Contracts/Policy/IAiHook.cs:119` | `RecommendationReceiver.Subscribe` silently discards the handler and returns a no-op disposable — comment says "Phase 77 will implement". Entire AI recommendation delivery path is broken at SDK layer. |
+| 160 | 6 | P1 | `Contracts/PluginBase.cs:821-868` | Message bus subscription callbacks are async lambdas with no try/catch — exceptions escape unobserved, silently killing the subscription for the plugin's lifetime. |
+| 161 | 2 | P1 | `Contracts/PluginBase.cs:708-713` | `_knowledgeRegistered` is plain bool (not volatile) used in lock pattern — derived classes doing unsynchronized reads may see stale `false`, causing duplicate registrations. |
+| 162 | 13 | P2 | `Contracts/PluginBase.cs:1274` | `CreateBoundedDictionary` ignores `maxCapacity` parameter — hardcodes 1000 instead, silently breaking caller-specified cache sizing. |
+| 163 | 15 | P2 | `Contracts/Policy/IPolicyEngine.cs:58-68` | `SimulateAsync` XML doc says "(PERF-07 placeholder)" — explicit stub marker in production interface contract. |
+| 164 | 9 | P2 | `Contracts/PluginBase.cs:818-873` | `SubscribeToKnowledgeRequests` catch swallows Subscribe failure after Debug.WriteLine — plugin reports Healthy with zero subscriptions. |
+| 165 | 14 | P2 | `Contracts/Persistence/IPluginStateStore.cs:74-75` | `BuildPath` does no validation on pluginId/key — path traversal (`../../`) could cross plugin state boundaries. |
+| 166 | 14 | P2 | `Contracts/Persistence/IPersistentBackingStore.cs:31-65` | All five interface methods accept `path` with no documented preconditions for null/empty — inconsistent behavior across implementations. |
+
+**Clean files:** PluginStateEntry.cs, IPipelineTransaction.cs, PipelinePolicyContracts.cs, AuthorityTypes.cs, EscalationTypes.cs, HardwareTokenTypes.cs, IEffectivePolicy.cs, IMetadataResidencyResolver.cs, IPolicyPersistence.cs, IPolicyStore.cs
+
+---
+
+### Chunk 013 (15 files: Contracts/Policy/MetadataResidencyTypes–Query/ParquetCompatibleWriter)
+
+**Files Reviewed:** 15 | **Findings:** 11 (3 P1, 8 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 167 | 5 | P1 | `Contracts/Query/FederatedQueryEngine.cs:534` | `PublishExecutionEventAsync` catch-all with no logging — message bus failures completely invisible to operators. |
+| 168 | 2 | P1 | `Contracts/Query/CostBasedQueryPlanner.cs:21-25` | `_stats` is a shared mutable instance field written per `Plan()` call with no synchronization — concurrent queries silently use wrong statistics producing incorrect query plans. |
+| 169 | 2 | P1 | `Contracts/Query/ColumnarBatch.cs:229-230` | `ColumnarBatchBuilder._maxRowIndex` and `_columns` mutated without synchronization — classic check-then-act race in parallel batch-building. |
+| 170 | 15 | P2 | `Contracts/Query/ParquetCompatibleWriter.cs:458-460` | `ReadFromStream` wraps sync `ReadRowGroup` in `Task.FromResult` inside async IAsyncEnumerable — false async contract, blocks thread pool on network streams. |
+| 171 | 3 | P2 | `Contracts/Query/ParquetCompatibleWriter.cs:149-182` | `WriteToStreamAsync` does synchronous BinaryWriter.Write inside async method — thread pool starvation on slow streams. |
+| 172 | 4 | P2 | `Contracts/Query/FederatedQueryEngine.cs:189,237` | Raw SQL published verbatim to message bus — sensitive data in literal values leaks to all subscribers and downstream sinks. |
+| 173 | 9 | P2 | `Contracts/Query/CostBasedQueryPlanner.cs:271` | `EnumerateJoinOrders` returns `bestPlan!` (null-forgiving) without guard — latent NullReferenceException if invariants violated. |
+| 174 | 14 | P2 | `Contracts/Query/ParquetCompatibleWriter.cs:483,503` | `ReadMetadata` reads untrusted `numColumns`/`numRowGroups` with no bounds check — malformed files trigger multi-GB allocations (DoS). |
+| 175 | 15 | P2 | `Contracts/Query/FederatedQueryEngine.cs:527-529` | `SourcePluginId = "FederatedQueryEngine"` hardcoded magic string — not a real plugin, breaks message routing. |
+| 176 | 14 | P2 | `Contracts/Query/ColumnarBatch.cs:197-204` | `ColumnarBatch` constructor doesn't validate column vector lengths match `rowCount` — silent data corruption on mismatch. |
+| 177 | 13 | P2 | `Contracts/Query/IFederatedDataSource.cs:280` | `ResolveTable` enumerates live `_sources.Values` directly — values may change mid-enumeration (minor). |
+
+**Clean files:** MetadataResidencyTypes.cs, PolicyContext.cs, PolicyEnums.cs, PolicyTypes.cs, QuorumTypes.cs, ProviderInterfaces.cs, IQueryPlanner.cs, ISqlParser.cs, FederatedQueryPlanner.cs
+
+---
+
+### Chunk 014 (15 files: Contracts/Query/QueryExecutionEngine–Scaling/BoundedCache)
+
+**Files Reviewed:** 15 | **Findings:** 13 (4 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 178 | 4 | P1 | `Contracts/Query/QueryExecutionEngine.cs:844-845` | `Regex.IsMatch` without timeout on LIKE pattern — ReDoS vulnerability + per-row regex recompilation. |
+| 179 | 9 | P1 | `Contracts/Query/QueryExecutionEngine.cs:935-951` | Single-arg `tag('name')` and `has_tag('name')` always return null/false — one-arg code path falls through without calling provider. |
+| 180 | 12 | P1 | `Contracts/Query/QueryExecutionEngine.cs:1006-1021` | `CastValue` throws unhandled `FormatException`/`OverflowException` on bad data — tears down query enumerator instead of SQL-standard null/error. |
+| 181 | 6 | P1 | `Contracts/Scaling/BoundedCache.cs:483-485` | Fire-and-forget write-through in `EvictLruNode` swallows all errors — silent data loss when backing store is degraded. |
+| 182 | 13 | P2 | `Contracts/Query/QueryExecutionEngine.cs:872-873` | `EvaluateBinaryOp` uses `ToString()` for equality — loses numeric type semantics (`1` != `1.0`). |
+| 183 | 4 | P2 | `Contracts/Replication/ReplicationStrategy.cs:440,444` | `DateTimeOffset.Parse` on untrusted metadata without `CultureInfo.InvariantCulture` — culture-sensitive, throws on malformed timestamps. |
+| 184 | 14 | P2 | `Contracts/Query/QueryExecutionEngine.cs:1154-1161` | `DataSourceStatisticsProvider` adapter forwards null `tableName` to backing implementation without validation. |
+| 185 | 13 | P2 | `Contracts/Scaling/BoundedCache.cs:241-251` | `GetOrDefault` acquires exclusive write lock for every read (LRU promotion) — serializes all concurrent cache reads. |
+| 186 | 1 | P2 | `Contracts/Query/SqlAst.cs:27-48` | INSERT/UPDATE/DELETE AST nodes have "Placeholder … not fully implemented yet" comments — parser only handles SELECT but error message promises all four. |
+| 187 | 1 | P2 | `Contracts/Query/QueryExecutionEngine.cs:596` | Inline "external sort for > 512MB not implemented yet" comment + unused `SortSpillThresholdBytes` constant. |
+| 188 | 10 | P2 | `Contracts/Query/QueryExecutionEngine.cs:403,410` | Hash join stringifies all keys via `ToString()` — numeric type formatting differences produce wrong join results. |
+| 189 | 13 | P2 | `Contracts/Replication/ReplicationStrategy.cs:468` | `Count()` on `IEnumerable<string>` enumerates full sequence unnecessarily. |
+| 190 | 15 | P2 | `Contracts/Query/QueryExecutionEngine.cs:88-89` | `HashJoinSpillThresholdBytes` and `SortSpillThresholdBytes` constants declared but never used — dead code implying absent functionality. |
+
+**Clean files:** QueryOptimizer.cs, QueryPlan.cs, SqlTokenizer.cs, TagAwareQueryExtensions.cs, RaidStrategy.cs, IBulkheadIsolation.cs, ICircuitBreaker.cs, IDeadLetterQueue.cs, IGracefulShutdown.cs, ITimeoutPolicy.cs
+
+---
+
+### Chunk 015 (15 files: Contracts/Scaling/IBackpressureAware–Spatial/ProximityVerificationResult)
+
+**Files Reviewed:** 15 | **Findings:** 9 (2 P1, 3 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 191 | 2 | P1 | `Contracts/Security/SecurityStrategy.cs:477,611-730` | Mixed `Interlocked.*` + `lock(_statsLock)` on same fields — `IncrementErrorCount` races with `ResetStatistics`, `_totalEvaluationTimeMs` read non-atomically relative to `_totalEvaluations`. |
+| 192 | 9 | P1 | `Contracts/Security/SecurityStrategy.cs:672-689` | `EvaluateDomainCoreAsync` silently returns Deny on domain mismatch instead of forcing override — spurious denials for all domains except the one `EvaluateCoreAsync` returns. |
+| 193 | 14 | P2 | `Contracts/Scaling/PluginScalingMigrationHelper.cs:312` | `DefaultDeserialize` uses null-forgiving `!` on `JsonSerializer.Deserialize` — silent null on type mismatch. |
+| 194 | 10 | P2 | `Contracts/Spatial/GpsCoordinate.cs:74-77` | `Equals` uses direct `==` on `double` latitude/longitude/altitude — IEEE 754 false-negative equality for computed coordinates. |
+| 195 | 9 | P2 | `Contracts/Security/SecurityStrategy.cs:541-545` | `EvaluateAsync` wraps `OperationCanceledException` in `SecurityException` — breaks standard cancellation semantics. |
+| 196 | 15 | P2 | `Contracts/Spatial/ISpatialAnchorStrategy.cs:5` | Missing `[SdkCompatibility]` attribute on public interface — tooling cannot determine minimum SDK version. |
+| 197 | 2 | P2 | `Contracts/Scaling/PluginScalingMigrationHelper.cs:252-256` | `MigrateConcurrentDictionary` snapshot semantics undocumented — entries added after snapshot silently excluded. |
+| 198 | 2 | P2 | `Contracts/SemanticSync/ISyncFidelityController.cs:64` | `FidelityPolicy` record contains mutable `Dictionary` — breaks immutability contract, concurrent mutation risk. |
+| 199 | 13 | P2 | `Contracts/SemanticSync/SemanticSyncStrategyBase.cs:76-80` | Cosine similarity loop has no SIMD hint — scalar for 512-4096 dimension vectors (perf note). |
+
+**Clean files:** IBackpressureAware.cs, IScalableSubsystem.cs, ScalingModels.cs, SdkCompatibilityAttribute.cs, ISemanticClassifier.cs, ISemanticConflictResolver.cs, ISummaryRouter.cs, SemanticSyncModels.cs
+
+---
+
+### Chunk 016 (15 files: Contracts/Spatial/SpatialAnchor–TamperProof/ITimeLockProvider)
+
+**Files Reviewed:** 15 | **Findings:** 18 (3 P0, 8 P1, 7 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 200 | 1 | P0 | `Contracts/TamperProof/AccessLogEntry.cs:232-237` | `ComputeBlake3Hash` silently returns SHA512 — callers requesting Blake3 get wrong algorithm with no indication. Security contract lie. |
+| 201 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:402,419` | `Principal = "system"` hardcoded in tamper-proof audit log — defeats forensic attribution for all read/audit ops. |
+| 202 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:329-339` | Pre-write log entry has `Succeeded=false` with no `ErrorMessage` — fails own `Validate()`, throws on every write. |
+| 203 | 5 | P1 | `Contracts/TamperProof/IBlockchainProvider.cs:562-564` | Bare `catch { return false; }` in `ValidateChainIntegrityAsync` — network errors indistinguishable from corruption. |
+| 204 | 3 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:131` + 4 others | All 5 TamperProof bases: `ComputeHashAsync` wraps sync `sha.ComputeHash(Stream)` in `Task.FromResult` — blocks thread. |
+| 205 | 2 | P1 | `Contracts/StrategyBase.cs:88-98` | `InitializeAsync` broken DCL — `_initialized` not volatile, set outside lock after await. Race allows duplicate init. |
+| 206 | 2 | P1 | `Contracts/StorageOrchestratorBase.cs:15` | `_strategy` field not volatile — concurrent reads can see stale reference after `SetStrategy`. |
+| 207 | 1 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:500-514` | `PurgeAsync` base queries entries but deletes nothing — silent no-op purge. |
+| 208 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:329-330` | `ExistsBatchAsync` only checks first provider — ignores strategy, false negatives for mirrored/WAL. |
+| 209 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:71` | `data.Length` read without `CanSeek` guard — throws `NotSupportedException` on non-seekable streams. |
+| 210 | 9 | P1 | `Contracts/StorageOrchestratorBase.cs:154-155` | `DeleteAsync` passes no `ct` to providers, swallows partial failures silently. |
+| 211 | 14 | P2 | `Contracts/Spatial/SpatialAnchor.cs:38-43` | `CreatedAt`/`ExpiresAt` are `DateTime` not `DateTimeOffset` — timezone ambiguity in expiry check. |
+| 212 | 14 | P2 | `Contracts/Spatial/VisualFeatureSignature.cs:62` | `CapturedAt <= DateTime.UtcNow` comparison on plain `DateTime` — timezone-ambiguous. |
+| 213 | 14 | P2 | `Contracts/StrategyRegistry.cs:224-228` | `DiscoverFromAssembly` silently skips instantiation failures — caller cannot detect them. |
+| 214 | 13 | P2 | `Contracts/TamperProof/AccessLogEntry.cs:492-560` | `FromEntries` runs 4 extra LINQ passes over large collections instead of single foreach. |
+| 215 | 12 | P2 | `Contracts/TamperProof/IBlockchainProvider.cs:600-602` | Merkle tree uses string concat — second preimage collision vulnerability. |
+| 216 | 14 | P2 | `Contracts/TamperProof/ITimeLockProvider.cs:228-280` | `LockAsync` doesn't verify object existence before delegating to abstract. |
+| 217 | 15 | P2 | `Contracts/StorageOrchestratorBase.cs:163-165` | `GetHealthAsync` returns `IsHealthy = true` unconditionally — hardcoded lie. |
+
+**Clean files:** SpatialAnchorCapabilities.cs, StreamingStrategy.cs, StorageProcessingStrategy.cs
+
+---
+
+### Chunk 017 (15 files: Contracts/TamperProof/IWormStorageProvider–Transit/TransitAuditTypes)
+
+**Files Reviewed:** 15 | **Findings:** 15 (1 P0, 10 P1, 4 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 218 | 4 | P0 | `Contracts/TamperProof/WriteContext.cs:43-46` | `ClientIp`, `UserAgent`, `SessionId` stored in audit records without any length/format validation — injection into tamper-proof manifests. |
+| 219 | 1 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:348,537-546` | `RequestRetentionPolicyAsync` always returns null + region explicitly named "Stub Types". |
+| 220 | 3 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:287-291` | `ComputeHashAsync` blocks on `sha.ComputeHash(data)` stream read — sync-over-async. |
+| 221 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:97-102` | Endpoint URIs logged without credential redaction — `sftp://user:password@host` leaks to bus. |
+| 222 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:72` | Auto-generated `AuditId = Guid.NewGuid()` in record breaks equality/dedup semantics. |
+| 223 | 10 | P1 | `Contracts/TamperProof/TamperProofManifest.cs:241-274` | `ComputeManifestHash` hardcodes SHA-256 regardless of configured `HashAlgorithm` — self-consistency broken. |
+| 224 | 10 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:283-284` | `VerifyAsync` unconditionally returns `verified=true` — silent integrity bypass for any non-overriding subclass. |
+| 225 | 11 | P1 | `Contracts/TamperProof/TamperIncidentReport.cs:77-78` | `RelatedAccessLogs` typed as `List<object>?` with "when type is available" comment — deferred type binding. |
+| 226 | 12 | P1 | `Contracts/TamperProof/TamperProofConfiguration.cs:297-303` | `required` properties have unreachable null guards — dead code creates confusing validation output. |
+| 227 | 12 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:415` | `ExtendRetentionAsync` skips validation when retention is indefinite (null) — past dates accepted. |
+| 228 | 14 | P1 | `Contracts/Transit/TransitAuditTypes.cs:87-102` | `TransitAuditEntry` has no validation — `StrategyId` defaults to empty, `Timestamp` can be MinValue. |
+| 229 | 10 | P2 | `Contracts/TamperProof/TamperProofResults.cs:886-906` | `IntegrityHash.Parse` sets `ComputedAt = UtcNow` — falsified audit timestamp on parsed hashes. |
+| 230 | 2 | P2 | `Contracts/Transit/DataTransitStrategyBase.cs:73,161` | `_lastUpdateTime` not thread-safe despite "Thread-safe" class claim — torn reads on DateTime. |
+| 231 | 13 | P2 | `Contracts/TamperProof/TamperProofResults.cs:1123-1126` | `AuditChain.GetVersion` uses O(n) linear scan on ordered list — should be binary search or index. |
+| 232 | 14 | P2 | `Contracts/TamperProof/TimeLockTypes.cs:14-62` | `TimeLockPolicy` record has no `Validate()` — `Min > Max` and empty unlock conditions unenforced. |
+
+**Clean files:** TamperProofEnums.cs, TimeLockEnums.cs, IDataTransitStrategy.cs, ITransitOrchestrator.cs, TerminalResult.cs
+
+---
+
+### Chunk 018 (15 files: Contracts/TransitEncryptionPluginBases–Deployment/CloudProviders/GcpProvider)
+
+**Files Reviewed:** 15 | **Findings:** 17 (9 P1, 8 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 233 | 1 | P1 | `Deployment/CloudProviders/AwsProvider.cs:40` | All methods are complete stubs — `ProvisionVmAsync` returns Guid-based fake ID with "Simulated instance ID" comment, `GetMetricsAsync` returns hardcoded 45% CPU / 65% storage, `DeprovisionAsync` always returns true. Class summary reads "placeholder for AWS SDK integration". |
+| 234 | 1 | P1 | `Deployment/CloudProviders/AzureProvider.cs:28-68` | Identical stub pattern — all five interface methods return hardcoded values or empty lists. `GetMetricsAsync` returns fabricated 50% CPU / 70% storage. Class summary admits "placeholder". |
+| 235 | 1 | P1 | `Deployment/CloudProviders/GcpProvider.cs:28-68` | Same stub pattern for GCP — `GetMetricsAsync` returns hardcoded 55% CPU / 75% storage. All operations return faked or empty data. |
+| 236 | 1 | P1 | `Deployment/BareMetalOptimizer.cs:145-173` | SPDK binding block (Steps 4-5) is commented-out dead code. Logs "SPDK user-space NVMe ACTIVE (simulated)". `ConfigureSpdkOptimizations` at line 179 contains only log statements with "In production" commentary. |
+| 237 | 1 | P1 | `Deployment/BalloonCoordinator.cs:185-200` | `HandleBalloonInflation` only triggers GC.Collect; comments say "In a real implementation, this would: Reduce VDE block cache, metadata cache, flush write buffers". `HandleBalloonDeflation` is comment-only with no code. |
+| 238 | 1 | P1 | `Deployment/BareMetalDetector.cs:91-93` | Comment reads "In production, this would check if Phase 35 NvmePassthroughStrategy is available — For now, assume SPDK available if NVMe present". Any NVMe system is misclassified as SPDK-capable. |
+| 239 | 6 | P1 | `Deployment/BalloonCoordinator.cs:101` | `_ = Task.Run(async () => {...}, ct)` — discarded task. Inner try/catch only covers `GetStatisticsAsync`; outer `Task.Delay` and `HandleBalloonInflation/Deflation` are uncaught. Monitoring loop dies silently on cancellation or exception. |
+| 240 | 2 | P1 | `Deployment/BalloonCoordinator.cs:62,96,137` | `_isActive` is plain `bool` written from `StartCooperationAsync`/`StopCooperationAsync`/`Dispose` but read from `Task.Run` background thread — no volatile, no Interlocked, no memory barrier. Loop may not stop on ARM. |
+| 241 | 2 | P1 | `Contracts/TransitEncryptionPluginBases.cs:105,266-281` | `_presetsInitialized` is plain `bool` in double-checked lock pattern — outer check at line 266 is non-volatile read, no memory barrier on fast path. Double-initialization race on weak-ordering architectures. |
+| 242 | 7 | P1 | `Deployment/BareMetalDetector.cs:127` | `new HttpClient` per-call inside `IsCloudEnvironmentAsync` — classic socket exhaustion anti-pattern. Each disposal puts socket in TIME_WAIT for 4 minutes. |
+| 243 | 7 | P1 | `Deployment/CloudDetector.cs:46` | Same per-request `new HttpClient` anti-pattern — creates fresh client on every `DetectAsync` call with up to 5 HTTP requests. |
+| 244 | 1 | P2 | `Deployment/CloudProviders/CloudProviderFactory.cs:41-53` | Comment describes intended production behavior (dynamic SDK loading via assembly contexts) but implementation just calls `new AwsProvider()`/`new AzureProvider()`/`new GcpProvider()` — all stubs. |
+| 245 | 5 | P2 | `Deployment/BareMetalDetector.cs:113-118` | Outer catch swallows all exceptions from entire `DetectAsync` body, returns `null` with only a comment — no logging, not even Debug.WriteLine. |
+| 246 | 5 | P2 | `Deployment/BalloonCoordinator.cs:168-171` | `GetBalloonStatusAsync` has bare `catch { return null; }` with no logging — driver errors indistinguishable from "balloon not available". |
+| 247 | 5 | P2 | `Contracts/TransitEncryptionPluginBases.cs:957-984` | `TranscryptBatchAsync` catches per-item exceptions and adds failed placeholder result with empty byte[] ciphertext — no logging, no error indicator, `_failedOperations` counter not incremented. |
+| 248 | 13 | P2 | `Database/StreamingSql/WindowOperators.cs:518-532` | `SlidingWindow.ProcessEvent` recomputes full window aggregation on every event — O(N) per event = O(N²) total for window of N events. CPU bottleneck at high ingestion rates. |
+| 249 | 9 | P2 | `Contracts/TransitEncryptionPluginBases.cs:597-617` | `DecryptStreamFromTransitAsync` passes empty metadata dict to `DecryptFromTransitAsync` which requires `metadata["PresetId"]` — every call throws `InvalidOperationException`. Stream header extraction never implemented. |
+
+**Clean files:** QueryResult.cs, IStreamingSqlEngine.cs, StreamingSqlEngine.cs, HybridDatabasePluginBase.cs, CloudResourceMetrics.cs
+
+---
+
+### Chunk 019 (15 files: Deployment/CloudProviders/ICloudProvider–Deployment/HostedOptimizer)
+
+**Files Reviewed:** 15 | **Findings:** 13 (8 P1, 5 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 250 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:150-164` | `FilterPlugins` is a log-only stub — comment says "In production, this would call KernelInfrastructure.DisablePluginsExcept". Plugin-filtering call is commented out. Edge devices load all plugins regardless of `AllowedPlugins` config. |
+| 251 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:167-182` | `ConfigureFlashOptimization()` is log-only stub — "In production, this would configure…" comment block. VDE block cache, WAL sync mode, O_DIRECT never configured. SD card wear not reduced. |
+| 252 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:184-199` | `ConfigureOfflineResilience()` is log-only stub — local write buffer, retry policy, offline-mode detection never wired up. Edge devices that lose connectivity drop writes silently. |
+| 253 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:201-214` | `ConfigureConnectionLimit(int maxConnections)` is log-only stub — "In production, this would use SemaphoreSlim to cap network listeners." Connection limits never enforced on constrained hardware. |
+| 254 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:217-233` | `ConfigureBandwidthThrottle(long bytesPerSec)` is log-only stub — "In production, this would implement token bucket algorithm." No rate limiter wired. Cellular links can be saturated. |
+| 255 | 1 | P1 | `Deployment/HostedOptimizer.cs:219-243` | `ConfigureIoAlignmentAsync` detects block size then does nothing — "For now, just log the recommendation" comment. I/O alignment optimization never applied to any hosted VM deployment. |
+| 256 | 4 | P1 | `Deployment/FilesystemDetector.cs:186-210` | `DetectMacOsFilesystemAsync` passes `path` directly into shell argument via string interpolation `$"-T \"{path}\""` — command injection if path contains quotes/semicolons/backticks. Should use `ArgumentList`. |
+| 257 | 5 | P1 | `Deployment/EdgeDetector.cs:132-136` | Outer catch swallows ALL exceptions including `OperationCanceledException` — returns null with only a comment, no logging. Cancellation tokens silently ignored, bugs invisible. |
+| 258 | 1 | P2 | `Deployment/FilesystemDetector.cs:218-226` | `GetLinuxBlockSizeAsync` hardcodes return 4096 regardless of actual block size — comment acknowledges limitation. Same at `GetWindowsBlockSizeAsync`. Wrong for 512-byte or 8KB+ block devices. |
+| 259 | 5 | P2 | `Deployment/EdgeDetector.cs:165-168` | Catch in `DetectLinuxEdgePlatformAsync` swallows all exceptions with only comment — hides permission errors, OperationCanceledException, genuine bugs from operators. |
+| 260 | 5 | P2 | `Deployment/EdgeDetector.cs:197-200` | Catch in `GetLinuxTotalMemoryMbAsync` swallows all exceptions — returns 0, causing edge classification to fail silently. |
+| 261 | 14 | P2 | `Deployment/DeploymentProfileFactory.cs:39-111` | `CreateProfile(DeploymentContext context)` has no null check — null context produces opaque NullReferenceException at `context.Environment`. |
+| 262 | 14 | P2 | `Deployment/HostedOptimizer.cs:70-111` | `OptimizeAsync` accepts `vdeContainerPath` but doesn't validate null/empty before passing to shell arguments and file-path operations. |
+
+**Clean files:** ICloudProvider.cs, StorageSpec.cs, VmSpec.cs, DeploymentContext.cs, DeploymentEnvironment.cs, DeploymentProfile.cs, CustomEdgeProfileBuilder.cs, EdgeProfile.cs, IndustrialGatewayProfile.cs, RaspberryPiProfile.cs
+
+---
+
+### Chunk 020 (15 files: Deployment/HostedVmDetector–Edge/Bus/NullBusController)
+
+**Files Reviewed:** 15 | **Findings:** 10 (4 P1, 3 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 263 | 1 | P1 | `Deployment/HypervisorOptimizer.cs:138-152` | `RegisterLiveMigrationHooksAsync` accepts `preMigrationFlush` callback then discards it — "In production, this would install pre-migration callbacks per hypervisor type" comment. Data loss during live migration. |
+| 264 | 1 | P1 | `Deployment/HypervisorOptimizer.cs:154-231` | All `ConfigureParavirtIo` switch-case branches and `ApplyHypervisorSpecificOptimizations` if/else blocks are log-only stubs with "In production:" comments throughout. Zero actual configuration. |
+| 265 | 1 | P1 | `Deployment/HyperscaleProvisioner.cs:212-230` | `ProvisionNewNodeAsync` returns immediately without waiting for cluster join — "In production: Wait for new node to join cluster" comment. Can cause runaway node provisioning. |
+| 266 | 1 | P1 | `Deployment/HyperscaleProvisioner.cs:259` | `DeprovisionLeastLoadedNodeAsync` logs "Node drained" but no drain occurred — data on node destroyed without rebalancing. Data loss defect. |
+| 267 | 2 | P2 | `Deployment/HyperscaleProvisioner.cs:63,84,96,119` | `_isActive` is non-volatile plain `bool` written from caller thread, read from background `Task.Run` loop. May never observe `false` write on multi-core. |
+| 268 | 6 | P2 | `Deployment/HyperscaleProvisioner.cs:94-109` | Background scaling loop `Task.Delay` is outside try/catch — `OperationCanceledException` on cancellation silently swallowed by discarded task. |
+| 269 | 1 | P2 | `Deployment/SpdkBindingValidator.cs:261-268` | `CheckWindowsMountStatusAsync` always returns `(true, "unknown", true)` — SPDK validation always fails on Windows. "For simplicity" comment confirms deferred work. |
+| 270 | 12 | LOW | `Deployment/ParavirtIoDetector.cs:165-177` | VirtIO SCSI check uses bare vendor ID `1AF4` without requiring SCSI device ID — misclassifies VirtIO Net/Balloon as VirtIO SCSI. |
+| 271 | 15 | LOW | `Deployment/HyperscaleProvisioner.cs:82,111` | `StartAutoScalingAsync` is `async` with `await Task.CompletedTask` — meaningless state machine, returns before background loop starts. |
+| 272 | 14 | LOW | `Deployment/HyperscaleProvisioner.cs:214-223` | Hardcoded `"general-purpose"` instance type and `100` GB storage in `ProvisionNewNodeAsync` — not user-configurable. |
+
+**Clean files:** HostedVmDetector.cs, HypervisorDetector.cs, IDeploymentDetector.cs, IAedsCore.cs, BusControllerFactory.cs, GpioBusController.cs, I2cBusController.cs, IGpioBusController.cs, II2cBusController.cs, ISpiBusController.cs, NullBusController.cs
+
+---
+
+### Chunk 021 (15 files: Edge/Bus/PinMapping–Edge/Inference/InferenceSettings)
+
+**Files Reviewed:** 15 | **Findings:** 12 (4 P1, 5 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 273 | 1 | P1 | `Edge/Flash/FlashDevice.cs:76-138` | `LinuxMtdFlashDevice` — every method is a silent no-op stub. `EraseBlockAsync`, `WritePageAsync`, `ReadPageAsync` do nothing. `IsBlockBadAsync` returns hardcoded `false`. No PlatformNotSupportedException. FTL stack silently passes while writing nothing. |
+| 274 | 15 | P1 | `Edge/Camera/CameraFrameGrabber.cs:55,81,98,130` | `*Async` methods (`OpenAsync`, `CloseAsync`, `CaptureFrameAsync`, `UpdateSettingsAsync`) perform blocking native OpenCV calls but return `Task.CompletedTask` — violates async contract, causes thread starvation on constrained devices. |
+| 275 | 2 | P1 | `Edge/Flash/BadBlockManager.cs:29,44-62,69,75` | `_badBlocks` is `HashSet<long>` used across concurrent async paths (`ScanBadBlocksAsync` + `MarkBadAsync` + `IsBad`) without synchronization — corrupts set state, data written to defective blocks. |
+| 276 | 2 | P1 | `Edge/Flash/FlashTranslationLayer.cs:34-38` | `_logicalToPhysical` (Dictionary), `_freeBlocks` (HashSet), `_dirtyBlocks` (HashSet), `_writeCount`, `_eraseCount` all mutated concurrently with no locks — corrupts L2P map, silent data corruption. |
+| 277 | 15 | P2 | `Edge/Inference/OnnxWasiNnHost.cs:107,129` | `LoadModelAsync` and `InferAsync` do blocking CPU/IO work then `return await Task.FromResult(...)` — sync disguised as async. |
+| 278 | 1 | P2 | `Edge/Bus/PinMapping.cs:126-171` | `BeagleBoneBlack` maps 4/92 pins, `JetsonNano` maps 10/40 pins — "partial mapping only" with "placeholder for future expansion" comment. Runtime `ArgumentException` on unmapped pins. |
+| 279 | 9 | P2 | `Edge/Flash/FlashTranslationLayer.cs:209-214` | `GarbageCollectAsync` catch block marks block bad but emits no log/metric — silently reduces usable capacity with no operator visibility. |
+| 280 | 14 | P2 | `Edge/Inference/OnnxWasiNnHost.cs:119` | `session.InputNames[0]` with no empty-check — `IndexOutOfRangeException` on malformed ONNX model with no diagnostic message. |
+| 281 | 13 | P2 | `Edge/Flash/WearLevelingStrategy.cs:37-51` | `SelectBlockForWrite` allocates `new List<long>` on every write call — hot-path heap allocation on memory-constrained edge devices. |
+| 282 | 14 | LOW | `Edge/Camera/CameraFrameGrabber.cs:58` | `int.TryParse(settings.DevicePath)` silently falls back to device index 0 for Linux paths like `/dev/video3` — wrong device opened. |
+| 283 | 1 | LOW | `Edge/Inference/OnnxWasiNnHost.cs:141` | "Simplified batch implementation" comment — sequential loop defeats batch inference purpose on GPU/NPU. |
+| 284 | 2 | LOW | `Edge/Bus/SpiBusController.cs:31,96` | `_disposed` fields are non-volatile `bool` — concurrent Dispose+use race can pass disposed check due to missing memory barrier. |
+
+**Clean files:** CameraSettings.cs, FrameBuffer.cs, ICameraDevice.cs, EdgeConstants.cs, IFlashTranslationLayer.cs, IWasiNnHost.cs, InferenceSession.cs, InferenceSettings.cs
+
+---
+
+### Chunk 022 (15 files: Edge/Inference/OnnxWasiNnHost–Edge/Protocols/ICoApClient)
+
+**Files Reviewed:** 15 | **Findings:** 22 (2 P0, 15 P1, 5 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 285 | 1 | P0 | `Edge/Mesh/BleMesh.cs:7-52`, `ZigbeeMesh.cs:7-52`, `LoRaMesh.cs:7-98` | All three mesh implementations self-identify as "Stub implementation demonstrating API contract." Loopback simulation inverts source/destination. `DiscoverTopologyAsync` returns empty lists. Rule 13 violation. |
+| 286 | 1 | P0 | `Edge/Protocols/CoApClient.cs:131-139` | `ObserveAsync` returns no-op `IDisposable`, never registers callback, never sends Observe option. Callers believe they have live subscription but receive nothing. Silent stub. |
+| 287 | 1 | P1 | `Edge/Protocols/CoApClient.cs:63-66` | DTLS flag silently ignored — `UseDtls=true` and `coaps://` URIs use plain `UdpClient`. Security-sensitive IoT payloads travel in cleartext. |
+| 288 | 2 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:61-106` | Session cache check-then-act (`TryGetValue→build→evict→assign`) not atomic. Concurrent loads orphan native ONNX Runtime handles. |
+| 289 | 2 | P1 | `Edge/Protocols/CoApClient.cs:76-77` | `_nextMessageId++` on plain `ushort` is not atomic — concurrent sends produce duplicate message IDs, causing response mismatch or permanent hangs. |
+| 290 | 3 | P1 | `Edge/Protocols/CoApClient.cs:260` | `UdpClient.ReceiveAsync()` without CancellationToken — `DisposeAsync` hangs forever on quiet network waiting for UDP packet. |
+| 291 | 5 | P1 | `Edge/Protocols/CoApClient.cs:263-265` | Bare `catch (Exception)` in receive loop silences all errors including `ObjectDisposedException`, `SocketException` — causes busy-spin on unrecoverable errors. |
+| 292 | 6 | P1 | `Edge/Protocols/CoApClient.cs:253-268` | Receive loop stored as `_receiveTask` but exceptions consumed by silent catch — task fault leaves all in-flight callers waiting until 5s timeout. |
+| 293 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:95-106` | Session leaked on cache-full race — concurrent insert replaces entry without disposing overwritten session's native handle. |
+| 294 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:65-95` | `SessionOptions` created with `new`, disposed only in catch block — leaked on success path. Per-model-load native memory leak. |
+| 295 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:153-158` | `Dispose` iterates `_sessionCache.Values` while concurrent `LoadModelAsync` may mutate it. If not snapshot-safe, `InvalidOperationException` or missed disposal. |
+| 296 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:118` | Hard cast `(OnnxInferenceSession)session` with no type guard — `InvalidCastException` with no diagnostic for non-ONNX session types. |
+| 297 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:119` | `session.InputNames[0]` with no empty-check — `IndexOutOfRangeException` on models with zero inputs. |
+| 298 | 10 | P1 | `Edge/Memory/MemoryBudgetTracker.cs:76-88` | `_allocatedBytes` incremented by requested `size` on Rent but decremented by `array.Length` on Return — counter drifts negative due to ArrayPool rounding. |
+| 299 | 12 | P1 | `Edge/Protocols/CoApClient.cs:241-245` | CoAP option encoding violates RFC 7252 — writes absolute option number instead of delta. All requests with options are malformed; client non-functional against real servers. |
+| 300 | 15 | P1 | `Edge/Protocols/CoApClient.cs:88` | Hardcoded 5-second timeout with no override — LoRa networks (2-20s RTT) always time out. Violates user-configurability. |
+| 301 | 2 | P2 | `Edge/Protocols/CoApClient.cs:69-73` | `_udpClient` lazy init not thread-safe — concurrent `SendAsync` creates two UdpClients, starts two receive loops, leaks first. |
+| 302 | 2 | P2 | `Edge/Mesh/LoRaMesh.cs:15,34,56-60` | `_initialized` plain `bool` (not volatile), `_knownNodes` plain `Dictionary` — both used from multiple threads. Same issue in BleMesh/ZigbeeMesh. |
+| 303 | 7 | P2 | `Edge/Memory/BoundedMemoryRuntime.cs:134-137` | `Dispose` doesn't null `_monitorTimer` or dispose `_tracker` — timer callback can fire post-dispose. |
+| 304 | 9 | P2 | `Edge/Memory/BoundedMemoryRuntime.cs:111-112` | `_tracker!` null-forgiving — TOCTOU between `_settings.Enabled` check and `_tracker` assignment can NRE. |
+| 305 | 12 | P2 | `Edge/Protocols/CoApResponse.cs:26` | `IsSuccess` uses HTTP-style range check (200-299) but real CoAP servers send wire-encoded codes (e.g., 0x45=2.05) — `IsSuccess` always false for real servers. |
+| 306 | 12 | P2 | `Edge/Inference/OnnxWasiNnHost.cs:98-103` | Cache eviction uses `First()` (arbitrary) but variable named `oldest` — not LRU/FIFO. Frequently-used models can be evicted. |
+
+**Clean files:** MemorySettings.cs, IMeshNetwork.cs, MeshSettings.cs, MeshTopology.cs, CoApRequest.cs, ICoApClient.cs
+
+---
+
+### Chunk 023 (15 files: Edge/Protocols/IMqttClient–Federation/Catalog/IManifestService)
+
+**Files Reviewed:** 15 | **Findings:** 11 (2 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 307 | 5 | P1 | `Edge/Protocols/MqttClient.cs:359` | Reconnect loop bare `catch (Exception)` swallows `OperationCanceledException` and permanent auth failures — spins for MaxReconnectAttempts against unrecoverable errors. |
+| 308 | 12 | P1 | `Federation/Authorization/InMemoryPermissionCache.cs:56` | `BoundedDictionary` constructed with hardcoded `1000` instead of `_config.MaxEntries` — ignores user configuration, 10x higher cache miss rate than configured. |
+| 309 | 2 | P2 | `Edge/Protocols/MqttClient.cs:148-149` | `_reconnectCts` cancelled/nulled in `DisconnectAsync` without synchronization — races with `OnMqttDisconnectedAsync`, NRE or orphaned CTS. |
+| 310 | 5 | P2 | `Federation/Authorization/PermissionAwareRouter.cs:207-210` | Security denial audit logs silently discarded with no diagnostic trace — compliance/forensics gap. |
+| 311 | 5 | P2 | `Federation/Authorization/PermissionAwareRouter.cs:252,288` | `TryExtractBool`/`TryExtractString` swallow all reflection exceptions — property getter throws → permanent silent denial with no trace. |
+| 312 | 12 | P2 | `Edge/Protocols/MqttClient.cs:379-381` | Subscription restoration after reconnect always uses QoS 1, discarding original QoS — QoS 0 gets duplicates, QoS 2 loses exactly-once. |
+| 313 | 13 | P2 | `Edge/Protocols/MqttClient.cs:235-239` | `_subscribedTopics` is `List<string>` with O(n) `Contains` for duplicate detection — quadratic on frequent reconnects. |
+| 314 | 15 | LOW | `Federation/Addressing/UuidGenerator.cs:100-105` | Comments describe standard LE layout but code uses custom encoding — misleading for interop, round-trip internally consistent. |
+| 315 | 14 | LOW | `Edge/Protocols/MqttClient.cs:164` | No MQTT publish topic format validation — wildcards/null chars accepted, rejected at broker with cryptic error. |
+| 316 | 4 | LOW | `Edge/Protocols/MqttConnectionSettings.cs:66` | `Password` as plain `string` on managed heap — visible in heap dumps, no zeroing or secret-store guidance. |
+| 317 | 15 | LOW | `Federation/Authorization/PermissionAwareRouter.cs:199` | `DateTime.UtcNow` in audit log payload instead of `DateTimeOffset.UtcNow` — inconsistent with rest of codebase. |
+
+**Clean files:** IMqttClient.cs, MqttConnectionSettings.cs, MqttMessage.cs, KernelLoggingExtensions.cs, IObjectIdentityProvider.cs, ObjectIdentity.cs, UuidObjectAddress.cs, IPermissionCache.cs, PermissionCacheEntry.cs, PermissionCheckResult.cs, IManifestService.cs
+
+---
+
+### Chunk 024 (15 files: Federation/Catalog/ManifestCache–Federation/Routing/DualHeadRouter)
+
+**Files Reviewed:** 15 | **Findings:** 18 (6 P1, 8 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 318 | 12 | P1 | `Federation/Catalog/ManifestCache.cs:37` | BoundedDictionary hardcoded capacity 1,000 — `_maxSize` parameter (default 100,000) completely ignored. Cache collapses at 1K entries regardless of config. |
+| 319 | 12 | P1 | `Federation/Catalog/ManifestStateMachine.cs:35` | `_disposed` not volatile; no disposed-check guard in Apply/GetSnapshot/RestoreSnapshot — post-Dispose calls throw opaque ObjectDisposedException from ReaderWriterLockSlim internals. Same defect in ClusterTopology:31. |
+| 320 | 6 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:77` | `_ = RunHealthCheckLoopAsync(_cts.Token)` — fire-and-forget discards health loop task. Exceptions silently kill health monitoring; cluster degrades without signal. |
+| 321 | 7 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:315-320` | `_topology` (ClusterTopology : IDisposable, owns ReaderWriterLockSlim) never disposed in Dispose() — handle leak per instance. |
+| 322 | 15 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:220` | `RegisterNodeAsync(registration, bool skipTopologyRateLimit, ct)` is public but absent from `IFederationOrchestrator` interface — callers via interface silently lack rate-limit bypass. |
+| 323 | 1 | P1 | `Federation/Replication/LocationAwareReplicaSelector.cs:184-198` | `GetLeaderNodeIdAsync` returns null for all non-leader nodes — `ConsistencyLevel.Strong` always throws InvalidOperationException in multi-node clusters. Doc comment says "Placeholder Implementation". |
+| 324 | 12 | P2 | `Federation/Catalog/ManifestCache.cs:58-65` | TOCTOU race in Set() eviction: check-evict-insert not atomic — concurrent calls can double-evict or overflow by 1. |
+| 325 | 12 | P2 | `Federation/Orchestration/FederationOrchestrator.cs:104` | `FreeBytes = registration.TotalBytes` — always assumes 100% free at registration; rejoining nodes with data get writes directed to full disks. |
+| 326 | 9 | P2 | `Federation/Catalog/ManifestStateMachine.cs:100-130` | `Apply()` switch on `command.Action` has no default case — unknown Raft log actions silently dropped; log corruption invisible. |
+| 327 | 9 | P2 | `Federation/Orchestration/FederationOrchestrator.cs:110-123` | Raft path never updates local `_topology` after proposal — leader's own routing returns stale topology until external commit callback. |
+| 328 | 9 | P2 | `Federation/Replication/ReplicationAwareRouter.cs:109-147` | Fallback loop always re-fetches `fallbackChain[0]` without tracking tried nodes — can retry same failing replica for all MaxFallbackAttempts. |
+| 329 | 13 | P2 | `Federation/Catalog/ManifestStateMachine.cs:207-224` | `GetStatistics()` makes 4-5 LINQ passes over `_index.Values` under read lock — blocks all writers on large manifests. |
+| 330 | 3 | P2 | `Federation/Replication/ReplicaFallbackChain.cs:49` | `GetNodeTopologyAsync(replicaId)` called without CancellationToken — topology fetch uncancellable. |
+| 331 | 14 | P2 | `Federation/Orchestration/FederationOrchestrator.cs:91-138` | No validation on `registration.NodeId`, `Address`, or `Port` — empty NodeId inserts phantom node, null Address propagates, invalid Port unchecked. |
+| 332 | 15 | LOW | `FederationOrchestrator.cs:71,83,216; RaftBackedManifest.cs:64` | Async methods with no actual async work use `await Task.CompletedTask` — unnecessary state machine overhead. |
+| 333 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:70` | `RestoreSnapshot` no null/empty guard on `snapshot` — null throws opaque ArgumentNullException from JsonSerializer. |
+| 334 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:92-95` | `Apply` no null guard on `logEntry` — null from Raft log compaction throws unhandled in OnCommit callback. |
+| 335 | 13 | LOW | `Federation/Routing/DualHeadRouter.cs:39,79` | `BoundedDictionary(1000)` for 2-member `RequestLanguage` enum — 500x over-allocated routing counter. |
+
+**Clean files:** ObjectLocationEntry.cs, IFederationOrchestrator.cs, NodeHeartbeat.cs, NodeRegistration.cs, ConsistencyLevel.cs, IReplicaSelector.cs
+
+---
+
+### Chunk 025 (15 files: Federation/Routing/IRequestClassifier–Hardware/Accelerators/HsmProvider)
+
+**Files Reviewed:** 15 | **Findings:** 17 (6 P1, 7 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 336 | 1 | P1 | `Federation/Routing/RoutingPipeline.cs:ObjectPipeline,FilePathPipeline` | Both `ObjectPipeline` and `FilePathPipeline` throw `NotSupportedException` unconditionally — stub implementations behind production interfaces. |
+| 337 | 1 | P1 | `Hardware/Accelerators/HsmProvider.cs:EncryptAsync,DecryptAsync,SignAsync,VerifyAsync` | All 4 crypto operations throw "HSM operations not yet implemented" — entire HSM provider is a hard stub. |
+| 338 | 15 | P1 | `Hardware/Accelerators/GpuAccelerator.cs:GpuAccelerator,CannInterop` | `GpuAccelerator` silently falls back to CPU loops when GPU unavailable; `CannInterop` silently uses CPU when NPU present. `IsCpuFallback` reports false when hardware is "available" but never actually uses hardware. |
+| 339 | 15 | P1 | `Hardware/Accelerators/CannInterop.cs:IsCpuFallback` | `IsCpuFallback => _isAvailable` — semantically inverted: returns true when NPU IS available, false when it isn't. |
+| 340 | 6 | P1 | `Hardware/Accelerators/HsmProvider.cs:Dispose` | `Dispose()` does `_ = DisconnectAsync()` — fire-and-forget async disconnect; connection may not be cleaned up. |
+| 341 | 2 | P1 | `Hardware/Accelerators/CannInterop.cs:Dispose` | `_disposed` check-and-set outside lock — concurrent Dispose() calls race: double-free of native resources. |
+| 342 | 12 | P2 | `Federation/Topology/ProximityCalculator.cs:CalculateLatencyScore` | Latency score formula divides by `node.EstimatedLatencyMs` — returns infinity for 0ms latency; NaN propagates through routing weights. |
+| 343 | 12 | P2 | `Federation/Topology/ProximityCalculator.cs:CalculateCapacityScore` | Capacity score: `node.FreeBytes / (double)node.TotalBytes` — division by zero when TotalBytes=0 (uninitialized node). |
+| 344 | 9 | P2 | `Federation/Topology/LocationAwareRouter.cs:RouteAsync` | Catch-all `catch (Exception)` returns empty `RoutingDecision` — caller cannot distinguish "no route" from "routing failed"; errors silently swallowed. |
+| 345 | 2 | P2 | `Hardware/Accelerators/GpuAccelerator.cs:_isAvailable` | `_isAvailable` plain bool set in constructor, read from multiple threads — no volatile/Interlocked for visibility guarantee. |
+| 346 | 2 | P2 | `Hardware/Accelerators/CudaInterop.cs:_isAvailable` | Same as above — `_isAvailable` non-volatile bool read cross-thread. |
+| 347 | 7 | P2 | `Hardware/Accelerators/HsmProvider.cs:constructor` | Creates `SemaphoreSlim(maxConcurrentOperations)` as field but class Dispose() doesn't dispose it — semaphore leak. |
+| 348 | 14 | P2 | `Federation/Routing/PatternBasedClassifier.cs:ClassifyRequest` | No null check on `request.Key` — NullReferenceException on any request with null key hitting regex patterns. |
+| 349 | 13 | LOW | `Federation/Topology/ProximityCalculator.cs:CalculateProximity` | Allocates `new List<(string, double)>` per call in hot routing path — consider pooling or array. |
+| 350 | 15 | LOW | `Hardware/Accelerators/CudaInterop.cs:MatrixMultiplyAsync` | Named `*Async` but does purely synchronous CPU loop wrapped in Task.FromResult — no actual GPU dispatch. |
+| 351 | 14 | LOW | `Federation/Topology/LocationAwareRouter.cs:RouteAsync` | No validation that `RoutingPolicy.PreferredRegion` or `RoutingPolicy.PreferredZone` are non-null before string comparison. |
+| 352 | 15 | LOW | `Federation/Routing/StorageRequest.cs:EstimatedSizeBytes` | `EstimatedSizeBytes` defaults to 0 — capacity-based routing always sees 0-byte requests when callers don't set it. |
+
+**Clean files:** IRequestClassifier.cs, IStorageRouter.cs, RequestLanguage.cs, ITopologyProvider.cs, NodeTopology.cs, RoutingPolicy.cs
+
+---
+
+### Chunk 026 (15 files: Hardware/Accelerators/MetalInterop–Hardware/HardwareDevice)
+
+**Files Reviewed:** 15 | **Findings:** 22 (1 P0, 16 P1, 5 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 353 | 1 | P1 | `Hardware/Accelerators/MetalInterop.cs:302-376` + 5 others | CPU fallback disguised as GPU execution — Metal, OpenCL, SYCL, Triton, Vulkan, WebGPU all report hardware available then silently compute on CPU via Task.Run. Comments say "CPU fallback to establish API contract." Systemic across 6 accelerator classes. |
+| 354 | 1 | P1 | `Hardware/Accelerators/QatAccelerator.cs:396-420` | `EncryptQatAsync`/`DecryptQatAsync` unconditionally throw "deferred to future phases" — QAT crypto entirely unimplemented. |
+| 355 | 1 | P1 | `Hardware/Accelerators/Tpm2Provider.cs:114-244` | All 5 ITpm2Provider methods (`CreateKeyAsync`, `SignAsync`, `EncryptAsync`, `DecryptAsync`, `GetRandomAsync`) unconditionally throw "deferred to future phases" — complete stub class. |
+| 356 | 2 | P1 | `Hardware/Accelerators/Tpm2Provider.cs:279-315` | Double-checked locking on non-volatile `_isAvailable` — ARM64 unsafe, spurious re-initialization. |
+| 357 | 2 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:394-426` | Double-checked locking on non-volatile `_initialized` in `GetAvailableBackends`/`GetBestBackend` — concurrent `DetectAvailableBackends` on ARM. |
+| 358 | 3 | P1 | `Hardware/DriverLoader.cs:355-356` | Sync-over-async `.Wait()` on `UnloadAsync` inside `Dispose()` — deadlock risk when SemaphoreSlim.WaitAsync blocks under single-threaded SyncContext. |
+| 359 | 2 | P1 | `Hardware/Accelerators/QatAccelerator.cs:87-163` | Non-volatile `_isAvailable`/`_initialized` written inside lock, read outside via `IsAvailable` property — stale reads on ARM. |
+| 360 | 6 | P1 | `Hardware/DriverLoader.cs:461-502` | `_ = Task.Run(async () => ...)` fire-and-forget in `OnHardwareChangedHandler` — exceptions before inner try/catch silently lost; post-dispose execution possible. |
+| 361 | 6 | P1 | `Hardware/DriverLoader.cs:393-394` | `async void` FileSystemWatcher event handlers — unhandled exceptions crash the process. |
+| 362 | 7 | P1 | `Hardware/DriverLoader.cs:72,355-373` | Use-after-dispose race: `_loadLock` disposed while `UnloadAsync` still holds/releases it — `ObjectDisposedException` in finally block. |
+| 363 | 1 | P1 | `Hardware/Accelerators/Pkcs11Wrapper.cs:188-203` | `CK_FUNCTION_LIST` struct has only 6 of 70+ PKCS#11 function pointers — `[StructLayout(Sequential)]` maps wrong offsets for `C_OpenSession`/`C_Login`. |
+| 364 | 4 | P0 | `Hardware/Accelerators/Pkcs11Wrapper.cs:189-203` | P/Invoke struct layout mismatch — HSM `C_Login` with PIN may invoke arbitrary function pointer. Memory safety and security defect. |
+| 365 | 15 | P1 | `MetalInterop.cs:207` + 5 others | `IsCpuFallback => _isAvailable` — semantically inverted in all 6 accelerators (returns true when hardware IS available). |
+| 366 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:344-348` | Silent CPU fallback on unavailable backend — no log, no event, no signal to caller of >10x performance degradation. |
+| 367 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:446-458` | `MapBackendToProvider` silently maps ROCm/CoreML/NNAPI/OpenCL/CANN to CPU — hardware detected but never used. |
+| 368 | 14 | P1 | `Hardware/Accelerators/TritonInterop.cs:215-223` | `entryPoint` parameter inserted into shell-out arguments without quoting/sanitization — command injection via model config. |
+| 369 | 5 | P1 | `Hardware/Accelerators/MetalInterop.cs:266-271` + 3 others | Silent bare `catch` in GPU initialization (Metal, Vulkan, WebGPU, Triton) — all failure modes invisible. |
+| 370 | 1 | P2 | `MetalInterop.cs:201, VulkanInterop.cs:493, WebGpuInterop.cs:404` | `AcceleratorType` returns `NvidiaGpu\|AmdGpu` for Metal/Vulkan/WebGPU — wrong vendor identification. |
+| 371 | 1 | P2 | 7 accelerator files | `GetStatisticsAsync` returns hardcoded zeros for all metrics — monitoring blind to actual hardware utilization. |
+| 372 | 13 | P2 | 6 accelerator files | O(n³) CPU matrix multiply fallback on unbounded input — no dimension guard, 16K×16K = 1GB allocation. |
+| 373 | 2 | P2 | `Hardware/Accelerators/QatAccelerator.cs:88-90` | `_initialized` non-volatile, visible outside lock in `IsAvailable` — stale reads possible. |
+| 374 | 9 | P2 | `Hardware/DriverLoader.cs:104,149` | `ScanAsync`/`ScanDirectoryAsync` declared async but do synchronous assembly loading — blocks threadpool, CS1998 warning. |
+
+**Clean files:** HardwareDevice.cs, QatNativeInterop.cs, RocmInterop.cs, Tpm2Interop.cs
+
+---
+
+### Chunk 027 (15 files: Hardware/HardwareDeviceType–Hardware/Interop/MessagePackSerialization)
+
+**Files Reviewed:** 15 | **Findings:** 11 (4 P1, 4 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 375 | 1 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:152-266` | Full C ABI interop (Read/Write/Delete/List/Query) is a stub — all operations return empty success. Comment: "In production, this would route through the kernel's storage pipeline." Data loss at interop boundary. |
+| 376 | 1 | P1 | `Hardware/Hypervisor/HypervisorDetector.cs:190-198` | `GetCpuidHypervisorSignature` always returns `string.Empty` — comment says "SIMPLIFIED — use placeholder." CPUID detection branch is dead code; VMs get wrong HypervisorType. |
+| 377 | 2 | P1 | `Hardware/Hypervisor/HypervisorDetector.cs:60-78` | Double-checked locking on non-volatile `_cachedResult` reference — ARM64 may observe partially-constructed `HypervisorInfo`. |
+| 378 | 2 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:628-641` | `CheckRateLimit` TOCTOU race: GetOrAdd + separate write is non-atomic — rate limiter fails open under concurrency, enabling DoS. |
+| 379 | 1 | P2 | `Hardware/Hypervisor/BalloonDriver.cs:82-101` | `RegisterPressureHandler` stores callback but never subscribes to OS/hypervisor memory pressure — handler never invoked during real balloon events. |
+| 380 | 1 | P2 | `Hardware/Interop/GrpcServiceContracts.cs:502-517` | `QueryAsync` ignores filter/projection/orderBy — returns all objects with hardcoded score 1.0. Comment: "Query delegates to list with filter application" but no filter is applied. |
+| 381 | 4 | P2 | `Hardware/Interop/CrossLanguageSdkPorts.cs:528-531,566` | OAuth tokens generated with `Guid.NewGuid()` — only 122 bits entropy vs RFC 6749 requirement of 256-bit CSPRNG. |
+| 382 | 9 | P2 | `Hardware/Interop/CrossLanguageSdkPorts.cs:577-595` | `ValidateToken` returns first enabled app regardless of token ownership — token-to-app binding broken, wrong access policies enforced. |
+| 383 | 13 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:619-625` | O(n) linear `FindByClientId` scan on every token issuance — 1000 comparisons at capacity. |
+| 384 | 13 | LOW | `Hardware/Interop/MessagePackSerialization.cs:215-216` | Dead `MemoryStream`/`BinaryWriter` allocations in `WriteStorageAddress` — leftover from refactor. |
+| 385 | 15 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:272-278` | `GetLastError` always returns "No error"; `GetVersion` hardcodes "4.5.0" — cross-language error handling silently broken. |
+
+**Clean files:** HardwareDeviceType.cs, HypervisorInfo.cs, HypervisorType.cs, IBalloonDriver.cs, IHypervisorDetector.cs, IDriverLoader.cs, IHardwareAcceleration.cs, IHardwareProbe.cs, IPlatformCapabilityRegistry.cs, HardwareProbeFactory.cs
+
+---
+
+### Chunk 028 (15 files: Hardware/LinuxHardwareProbe–Hosting/ConnectionType)
+
+**Files Reviewed:** 15 | **Findings:** 17 (6 P1, 6 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 386 | 1 | P1 | `Hardware/Memory/NumaAllocator.cs:143-157,198-205` | Both Windows and Linux NUMA topology detectors always return null — `IsNumaAware` permanently false. Comments say "Graceful degradation until multi-socket hardware testing." All multi-socket deployments silently lose NUMA-aware allocation. |
+| 387 | 1 | P1 | `Hardware/Memory/NumaAllocator.cs:265` | `GetDeviceNumaNode` always returns 0 — device-to-NUMA-node affinity never queried. Comment describes Linux implementation path but not implemented. |
+| 388 | 1 | P1 | `Hardware/NVMe/NvmePassthrough.cs:335-344` | `SubmitWindowsAdminCommand` returns hardcoded zero NvmeCompletion after DeviceIoControl — never reads actual completion queue entry from output buffer. Identify/GetLogPage return zeros. |
+| 389 | 2 | P1 | `Hardware/NVMe/NvmePassthrough.cs:57-62,595-616` | `_disposed` not volatile; read outside lock, written inside — double-dispose or use-after-dispose on multi-core. |
+| 390 | 2 | P1 | `Hardware/LinuxHardwareProbe.cs:25,118-124` | `_disposed` not volatile; FileSystemWatcher callback races with Dispose creating new timer after old one disposed. |
+| 391 | 6 | P1 | `Hardware/PlatformCapabilityRegistry.cs:149-153` + 10 more sites | Background refresh failures use `Debug.WriteLine` only (no-op in production) — cache becomes permanently stale with zero alerting. |
+| 392 | 5 | P2 | `Hardware/MacOsHardwareProbe.cs:115-119` | `RunSystemProfilerAsync` broad catch swallows `OperationCanceledException` — cancellation requests not honoured. |
+| 393 | 5 | P2 | `Hardware/MacOsHardwareProbe.cs:149-152,185-188,223-226,247-249,303-305` | 5 completely empty catch blocks in parser methods — zero diagnostic signal for any deserialization or programming error. |
+| 394 | 5 | P2 | `Hardware/WindowsHardwareProbe.cs:158-161` | WMI event handler `OnWmiEventArrived` swallows all exceptions with no logging. |
+| 395 | 5 | P2 | `Hardware/WindowsHardwareProbe.cs:234-237` | `ParsePnPDevice` swallows all exceptions with no logging — WMI parse failures undiagnosable. |
+| 396 | 4 | P2 | `Hardware/MacOsHardwareProbe.cs:181` | `bsd_name` from system_profiler JSON used unsanitized in `/dev/` path construction — potential path traversal. |
+| 397 | 4 | P2 | `Hardware/NVMe/NvmePassthrough.cs:188` | `Regex.Match` without timeout on `devicePath` — should include timeout per project security policy. |
+| 398 | 15 | LOW | `Hardware/NVMe/NvmePassthrough.cs:208-226,462-498` | Async methods wrap sync P/Invoke in `Task.Run` with single lock — serializes all I/O despite multi-threaded interface doc. |
+| 399 | 13 | LOW | `Hardware/PlatformCapabilityRegistry.cs:190,286` | LINQ `.Where().ToList()` materialized inside read lock — holds ReaderWriterLockSlim for allocation duration. |
+| 400 | 9 | LOW | `MacOsHardwareProbe.cs:73-81; LinuxHardwareProbe.cs:105-113` | TOCTOU race on `_lastDiscovery` read outside lock — duplicate discovery calls on first concurrent access. |
+| 401 | 14 | LOW | `Hosting/ConnectionTarget.cs:72-79` | `Remote()` factory accepts null host and out-of-range port without validation. |
+| 402 | 1 | LOW | `Hardware/Memory/INumaAllocator.cs:119-123,160-163` | Public interface documentation explicitly describes Phase 35 stubs as "future work." |
+
+**Clean files:** NumaTopology.cs, INvmePassthrough.cs, NvmeCommand.cs, NvmeInterop.cs, NullHardwareProbe.cs, StorageDriverAttribute.cs, ConnectionType.cs
+
+---
+
+### Chunk 029 (15 files: Hosting/DeploymentTopology–Infrastructure/Authority/DeadManSwitch)
+
+**Files Reviewed:** 15 | **Findings:** 13 (7 P1, 4 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 403 | 4 | P1 | `Hosting/InstallShellRegistration.cs:298` | Unsanitized `installPath` injected into `lsregister` argument string — argument injection on macOS. |
+| 404 | 9 | P1 | `Hosting/InstallShellRegistration.cs:185-202` | `ExecutePowerShell` redirects stdout/stderr but never reads them — pipe buffer deadlock + silent failure (exit code ignored). |
+| 405 | 9 | P1 | `Hosting/InstallShellRegistration.cs:323-345` | `TryRunProcess` same pipe-buffer deadlock risk — redirected streams never consumed. |
+| 406 | 3 | P1 | `IO/DeterministicIo/DeadlineScheduler.cs:297` | `.AsTask().GetAwaiter().GetResult()` on EDF hot path — unnecessary Task allocation on every scheduled op, contradicts zero-allocation design. |
+| 407 | 6 | P1 | `IO/PushToPullStreamAdapter.cs:25-39` | Pump task `finally` block exceptions (DisposeAsync on transform stream) silently swallowed — consumer blocked on pipe reader with no error signal. |
+| 408 | 11 | P1 | `Infrastructure/Authority/AuthorityChainFacade.cs:86` | Down-cast to concrete `AuthorityResolutionEngine` — any other `IAuthorityResolver` silently falls back to SystemDefaults (wrong authority level). |
+| 409 | 2 | P1 | `Infrastructure/Authority/DeadManSwitch.cs:163-188` | Non-atomic check-then-set on `_isLocked` — concurrent calls both pass check, both record duplicate auto-lock authority decisions. Security-critical component. |
+| 410 | 2 | P2 | `Infrastructure/Authority/AuthorityResolutionEngine.cs:151-163` | `TryGetValue` outside `_historyLock`, list mutated concurrently — TOCTOU race in security-critical authority chain. `List<T>.OrderByDescending` can throw under concurrent modification. |
+| 411 | 2 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:372-374` | `_latencyWriteIndex` written without volatile; non-barrier read in `ComputeP99` — stale P99 on ARM. |
+| 412 | 7 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:194-223` | Double-dispose guard uses CTS state not `_disposed` flag — re-entry throws ObjectDisposedException; `_shutdownCts` not disposed on second call. |
+| 413 | 14 | P2 | `Hosting/InstallConfiguration.cs:52` | `AdminPassword` nullable with no validation when `CreateDefaultAdmin = true` — risk of blank admin account. |
+| 414 | 9 | LOW | `Infrastructure/Authority/DeadManSwitch.cs:198-217` | `UnlockAsync` doesn't verify system is locked — silently resets warning state and records misleading audit entry. |
+| 415 | 1 | LOW | `Infrastructure/Authority/AuthorityChainFacade.cs:262` | Hardcoded placeholder admin IDs `"admin-1"` through `"admin-5"` in `CreateDefault` quorum config. |
+
+**Clean files:** DeploymentTopology.cs, EmbeddedConfiguration.cs, OperatingMode.cs, PluginProfileAttribute.cs, ServiceProfileType.cs, IDeterministicIoPath.cs, PreAllocatedBufferPool.cs, AuthorityContextPropagator.cs
+
+---
+
+### Chunk 030 (15 files: Infrastructure/Authority/EscalationRecordStore–Infrastructure/Distributed/Discovery/MdnsServiceDiscovery)
+
+**Files Reviewed:** 15 | **Findings:** 21 (6 P1, 10 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 416 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:451-516` | Plugin scaffolding generates in-memory `Dictionary<string,byte[]>` store and `GetHashCode()`-seeded embedding — developers following scaffold ship mocks. |
+| 417 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:300-348` | `_isScaling` plain bool with non-atomic check-then-act — concurrent scale calls both pass guard. |
+| 418 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:317-360` | `_lastAction` (ScalingAction?) and `_lastScaledAt` (DateTimeOffset?) written without sync — torn reads on 64-bit. |
+| 419 | 3 | P1 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:513-515` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` — deadlock risk under SynchronizationContext. |
+| 420 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:593-920` | 6 CLI commands (`PluginBuild`, `PluginTest`, `KernelRun`, `PluginList`, `KernelHealth`, `Config`) are complete stubs — print hardcoded strings, no real I/O. |
+| 421 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:1191-1306` | `GraphQLGateway.ParseQuery()` splits on braces (comment: "Simplified parser"); `FindResolver()` returns "not implemented" for all unregistered fields. |
+| 422 | 8 | P2 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:105,140,147,436,451,462,469,492` | 8 `Console.WriteLine` calls in SDK library code — should use ILogger. |
+| 423 | 8 | P2 | `Infrastructure/DeveloperExperience.cs:25` | Default `ConsoleCliOutput` injected into SDK class — consumer libraries get unexpected stdout. |
+| 424 | 6 | P2 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:83,125` | Background tasks not cleanly awaited on stop — `TaskCanceledException` propagates unhandled. |
+| 425 | 6 | P2 | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:214,405` | `_electionTask`/`_heartbeatTask` never awaited in `Dispose()` — unobserved exceptions. |
+| 426 | 2 | P2 | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:32,198,621` | `_commitHandlers` List mutated via `Add()` from caller thread, iterated on heartbeat thread — concurrent modification. |
+| 427 | 2 | P2 | `Infrastructure/Authority/QuorumEngine.cs:83-84` | Request + semaphore added as two separate dictionary ops — TOCTOU race between writes. |
+| 428 | 7 | P2 | `Infrastructure/Authority/QuorumEngine.cs:84` | `SemaphoreSlim` instances in `_requestLocks` never disposed; class not IDisposable — handle leak. |
+| 429 | 9 | P2 | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:149-158` | `ProposeAsync` appends to `_persistent.Log` list directly, bypassing injected `_logStore` — FileRaftLogStore durability defeated. |
+| 430 | 12 | P2 | `Infrastructure/Distributed/Consensus/FileRaftLogStore.cs:268-271` | `CompactAsync` re-indexes from 1 — breaks follower offset tracking. Same in InMemoryRaftLogStore:166. |
+| 431 | 14 | P2 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:285-301` | No length check on DNS packet buffer; unbounded `qdCount` loop — crafted packet availability concern. |
+| 432 | 15 | LOW | `Infrastructure/Authority/HardwareTokenValidator.cs:121-175` | `ValidateYubiKeyOtp`/`ValidateYubiKeyFido2`/`ValidateTpmAttestation` return Success but only check format — no crypto validation. |
+| 433 | 4 | LOW | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:1039` | HMAC comparison uses `string.Equals` — timing side-channel (should use FixedTimeEquals). |
+| 434 | 13 | LOW | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:444,449` | O(n) scan + O(n log n) sort inside hot lock on every mDNS packet. |
+| 435 | 1 | LOW | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:96-153` | `InMemoryScalingExecutor` is public simulation class not marked test-only — accidental production injection. |
+| 436 | 13 | LOW | `Infrastructure/Distributed/Consensus/MultiRaftManager.cs:166` | `RouteKey` sorts all group IDs on every call — no caching of sorted array. |
+
+**Clean files:** EscalationRecordStore.cs, EscalationStateMachine.cs, QuorumVetoHandler.cs, IRaftLogStore.cs, InMemoryRaftLogStore.cs, RaftLogEntry.cs, RaftState.cs
+
+---
+
+### Chunk 031 (15 files: Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap–Infrastructure/Distributed/TcpP2PNetwork)
+
+**Files Reviewed:** 15 | **Findings:** 21 (5 P1, 8 P2, 8 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 437 | 3 | P1 | `Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap.cs:239` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` (deadlock) + double-disposes `_joinLock` (ObjectDisposedException). |
+| 438 | 6 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:280` | `_ = Task.Run(() => HandleIncomingConnectionAsync(client))` — faults silently lost; connection-level errors invisible. |
+| 439 | 1 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:481-488` | Request handler always returns `byte[0]` — SWIM ping/ack protocol broken; all nodes appear unreachable. |
+| 440 | 4 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:412` | `SendMessageAsync` uses `client.GetStream()` (raw NetworkStream), bypassing authenticated SslStream — all mTLS traffic sent plaintext. |
+| 441 | 2 | P1 | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:104-128` | `_cachedMembers` non-atomic rebuild; member mutations from `HandleJoinMessage` etc. bypass `_stateLock` — stale cache races. |
+| 442 | 8 | P2 | `Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap.cs:161,167,194,197,201,213` | 6 `Console.WriteLine` calls in SDK library code. |
+| 443 | 5 | P2 | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:363` | Bare `catch {}` in `HandleGossipReceived` — no logging for malformed/malicious payloads. |
+| 444 | 5 | P2 | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:463` | Bare `catch {}` in `ProcessRemoteItem` — CRDT merge errors silently lost. |
+| 445 | 5 | P2 | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:501` | Bare `catch {}` in `RunPropagationLoopAsync` — persistent propagation failures invisible. |
+| 446 | 5 | P2 | `Infrastructure/Distributed/Replication/GossipReplicator.cs:141` | Bare `catch {}` in `SpreadAsync` peer loop — catches everything including programming errors. |
+| 447 | 5 | P2 | `Infrastructure/Distributed/Replication/GossipReplicator.cs:253` | Bare `catch {}` in `SpreadToRandomPeersAsync` outer — swallows serializer/GetMembers failures. |
+| 448 | 5 | P2 | `Infrastructure/Distributed/TcpP2PNetwork.cs:287` | Bare `catch {}` in `AcceptConnectionsAsync` — comment says "log" but no logging; socket exhaustion invisible. |
+| 449 | 5 | P2 | `Infrastructure/Distributed/TcpP2PNetwork.cs:341` | Bare `catch {}` in `HandleIncomingConnectionAsync` — TLS/auth/protocol failures silently dropped. |
+| 450 | 12 | LOW | `Infrastructure/Distributed/Replication/CrdtRegistry.cs:51-77` | Prefix match checked before exact match — inverted specificity order. |
+| 451 | 4 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:640` | `CancellationToken.None` in refutation fire-and-forget — broadcast uncancellable during shutdown. |
+| 452 | 7 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:237-259` | `SslStream` created, authenticated, then dropped (not stored) — leaks or closes inner NetworkStream on GC. |
+| 453 | 15 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:473` | `ProcessIncomingMessageAsync` discards all "Data" messages — only logs to Debug, never raises OnPeerEvent. |
+| 454 | 13 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:843` | O(n²) bound enforcement on ConcurrentQueue via O(n) `Count` in loop. |
+| 455 | 15 | LOW | `Infrastructure/Distributed/Locking/DistributedLockService.cs:10` | Named "Distributed" but docs say "single process" — misleading for cross-node use. |
+| 456 | 15 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:499` | `await Task.CompletedTask` dead code at end of method. |
+| 457 | 5 | LOW | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:252` | Bare `catch {}` in `ResolveConflictAsync` CRDT deserialization fallback. |
+
+**Clean files:** ConsistentHashRing.cs, ConsistentHashLoadBalancer.cs, ResourceAwareLoadBalancer.cs, DistributedLock.cs, IDistributedLockService.cs, SwimProtocolState.cs, OrSetPruning.cs, SdkCrdtTypes.cs
+
+---
+
+### Chunk 032 (15 files: Infrastructure/ErrorHandling, InMemory/*, Intelligence/AiAutonomyConfiguration)
+
+**Files Reviewed:** 15 | **Findings:** 13 (4 P1, 6 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 458 | 1 | P1 | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:104-107` | Dead `for` loop iterating `PolicyLevelValues` with empty body — vestigial stub or logic gap. |
+| 459 | 2 | P1 | `Infrastructure/InMemory/InMemoryCircuitBreaker.cs:119-122` | `GetStatistics()` reads `_lastFailureTime` and `_lastSuccessAt` without lock; fields are written inside `_lock` elsewhere — memory model violation. |
+| 460 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:41-48` | `EnqueueAsync` eviction calls `OrderBy` (O(n log n)) inside a while loop on every over-capacity enqueue — severe hot-path perf regression at 10K capacity. |
+| 461 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:67-78` | `PeekAsync` and `DequeueAsync` also perform full O(n log n) sort of entire dictionary on every call. |
+| 462 | 1 | P2 | `Infrastructure/InMemory/InMemoryResourceMeter.cs:50-55` | `GetHistoryAsync` returns single-point snapshot regardless of requested time window — silently violates interface contract. |
+| 463 | 1 | P2 | `Infrastructure/InMemory/InMemoryResourceMeter.cs:90` | `CpuPercent` always hardcoded to 0 — stub value never computed. |
+| 464 | 2 | P2 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:41-50` | TOCTOU race: capacity check + OrderBy + TryRemove + insert not atomic — concurrent enqueues exceed capacity. |
+| 465 | 1 | P2 | `Infrastructure/InMemory/InMemoryClusterMembership.cs:22-23` | Untracked `TODO (v6.0)` in XML doc deferring etcd/Consul production impl. |
+| 466 | 1 | P2 | `Infrastructure/InMemory/InMemoryP2PNetwork.cs:22-23` | Untracked `TODO (v6.0)` in XML doc deferring gRPC production impl. |
+| 467 | 14 | P2 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:27-30` | Constructor accepts `maxCapacity <= 0` — value of 0 causes infinite eviction loop in `EnqueueAsync`. |
+| 468 | 15 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:103` | `SetAutonomyForLevel` name misleading given dead loop body — see #458. |
+| 469 | 13 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:156` | `IsFeatureKnown` allocates `Enum.GetValues<CheckTiming>()` on every call — should cache. |
+| 470 | 13 | LOW | `Infrastructure/InMemory/InMemoryAutoGovernance.cs:30-31` | `EvaluateAsync` unconditionally allocates two `List<>` even when no policies registered. |
+
+**Clean files:** ErrorHandling.cs, InMemoryAuditTrail.cs, InMemoryAutoScaler.cs, InMemoryAutoTier.cs, InMemoryBulkheadIsolation.cs, InMemoryFederatedMessageBus.cs, InMemoryLoadBalancerStrategy.cs, InMemoryReplicationSync.cs
+
+---
+
+### Chunk 033 (15 files: Intelligence/*, KernelInfrastructure, Policy/CascadeOverrideStore)
+
+**Files Reviewed:** 15 | **Findings:** 19 (7 P1, 8 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 471 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:477-483` | `CheckVersionCompatibilityAsync` is a complete stub — always returns `IsCompatible = true` with "In production, this would:" comment. |
+| 472 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:503-517` | `TryPreserveStateAsync` stores `Array.Empty<byte>()` — never calls `IReloadablePlugin.ExportStateAsync`. Plugin state silently lost on reload. |
+| 473 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:519-526` | `TryRestoreStateAsync` never calls `IReloadablePlugin.ImportStateAsync` — captured `state` variable completely ignored. |
+| 474 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:486-501` | `DrainPluginConnectionsAsync` is a hardcoded `Task.Delay(100)` — never calls `IReloadablePlugin.PrepareForUnloadAsync`. |
+| 475 | 5 | P1 | `Infrastructure/KernelInfrastructure.cs:503-516` | Bare `catch { return false; }` in `TryPreserveStateAsync` — state preservation errors silently swallowed. |
+| 476 | 5 | P1 | `Infrastructure/KernelInfrastructure.cs:528-543` | `TryRollbackAsync` bare catch says "log but don't throw" — no logging actually implemented. |
+| 477 | 6 | P1 | `Infrastructure/KernelInfrastructure.cs:1862-1886` | `_ = Task.Run(...)` in `CheckAvailability` timer — outer task faults silently lost. |
+| 478 | 5 | P2 | `Infrastructure/Intelligence/AiObservationPipeline.cs:195-199` | Catch swallows advisor exceptions with "production telemetry would log this" comment — no actual logging. |
+| 479 | 2 | P2 | `Infrastructure/Intelligence/CostAnalyzer.cs:241` | `_durationSum` (double) written with non-atomic `+=` from pipeline thread, read from public API — torn read/write. |
+| 480 | 6 | P2 | `Infrastructure/KernelInfrastructure.cs:1368` | `_ = LoadConfigurationAsync()` in constructor — initial config load failures silently swallowed. |
+| 481 | 6 | P2 | `Infrastructure/KernelInfrastructure.cs:1461` | `Task.Delay(100).ContinueWith(_ => ReloadAsync())` — inner `ReloadAsync` task not unwrapped, exceptions lost. |
+| 482 | 2 | P2 | `Infrastructure/Intelligence/WorkloadAnalyzer.cs:206-209` | `_burstCount` and `_lastBurstAt` mutated without synchronization — `_lastBurstAt` (struct) not atomic. |
+| 483 | 2 | P2 | `Infrastructure/Intelligence/HardwareProbe.cs:189-198` | `RecordLatency` mutates `_latencySampleIndex`/`_latencySampleCount` without sync — public `RefreshSnapshot()` breaks single-consumer assumption. |
+| 484 | 7 | P2 | `Infrastructure/KernelInfrastructure.cs:744` | `Process.GetCurrentProcess()` never disposed in `GetStats()` — called every 5s timer tick. |
+| 485 | 13 | P2 | `Infrastructure/Intelligence/WorkloadAnalyzer.cs:280-301` | `CalculateRollingAverage` iterates full 1440-entry buffer on each drain cycle — 14,400 iterations/sec avoidable. |
+| 486 | 15 | LOW | `Infrastructure/KernelInfrastructure.cs:474-484` | `CheckVersionCompatibilityAsync` named `Async` but only does `await Task.CompletedTask` — stub artifact. |
+| 487 | 1 | LOW | `Infrastructure/Intelligence/AiSelfModificationGuard.cs:160-164` | "In a real system, approvals would be gathered asynchronously" comment — known incomplete path, safe fail-closed. |
+| 488 | 14 | LOW | `Infrastructure/Policy/CascadeOverrideStore.cs:70-84` | `SetOverride` TOCTOU race: `ContainsKey` + `Count` + index-write not atomic on `ConcurrentDictionary`. |
+| 489 | 13 | LOW | `Infrastructure/Intelligence/CostAnalyzer.cs:266-273` | `GetOperationsPerHour` calls `_samples.ToArray()` (up to 10K entries) per tracker per rebuild — O(n×m) allocation pressure. |
+
+**Clean files:** AiAutonomyDefaults.cs, AiObservationRingBuffer.cs, AiPolicyIntelligenceFactory.cs, DataSensitivityAnalyzer.cs, HybridAutonomyProfile.cs, OverheadThrottle.cs, PolicyAdvisor.cs, ThreatDetector.cs
+
+---
+
+### Chunk 034 (15 files: Policy/CascadeStrategies through Policy/Performance/FastPathPolicyEngine)
+
+**Files Reviewed:** 15 | **Findings:** 12 (4 P1, 5 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 490 | 2 | P1 | `Infrastructure/Policy/DatabasePolicyPersistence.cs:82-90` | TOCTOU race in LWW replication: `GetAllAsync` + conditional `UpsertAsync` not atomic — concurrent writers silently violate last-writer-wins. |
+| 491 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyStore.cs:70-79` | Non-atomic `ContainsKey` → `Count` → `AddOrUpdate` — concurrent inserts silently exceed capacity and corrupt `_locationCounts`. |
+| 492 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyPersistence.cs:76-82` | Same non-atomic capacity check + insert pattern — advertises thread-safety but capacity bound silently exceeded. |
+| 493 | 5 | P1 | `Infrastructure/Policy/FilePolicyPersistence.cs:77-84` | Silent catch on `JsonException` and `IOException` — corrupted/inaccessible policy files dropped with zero logging, wrong policies applied. |
+| 494 | 9 | P2 | `Infrastructure/Policy/CircularReferenceDetector.cs:160` | `visited` is `List<string>` with O(n) `Contains` inside loop — O(maxDepth²). Also `visited.Count > maxDepth` check never fires (off-by-one). |
+| 495 | 1 | P2 | `Infrastructure/Policy/DatabasePolicyPersistence.cs:49` | `DatabasePolicyPersistence` ignores `ConnectionString`, uses `ConcurrentDictionaryDbStore` — functionally identical to InMemory. Rule 13 name lie. |
+| 496 | 3 | P2 | `Infrastructure/Policy/FilePolicyPersistence.cs:126-142` | `DeleteCoreAsync` uses sync `File.Exists`/`File.Delete` — blocks thread pool thread. |
+| 497 | 9 | P2 | `Infrastructure/Policy/Performance/FastPathPolicyEngine.cs:298-308` | `GetBloomFilterFromOptimizer` always returns null — `FullCascade` tier classification unreachable dead code. |
+| 498 | 13 | P2 | `Infrastructure/Policy/Performance/BloomFilterSkipIndex.cs:76-118` | `MayContain`/`Add` allocate string + byte[] on every call via `$"{(int)level}:{path}"` — hot path GC pressure. |
+| 499 | 15 | LOW | `Infrastructure/Policy/Compatibility/PolicyCompatibilityGate.cs:30` | `IsMultiLevelEnabled` is non-volatile property read/written from different threads. |
+| 500 | 14 | LOW | `Infrastructure/Policy/InMemoryPolicyStore.cs:151-162` | `ParseKey` has no guard against malformed composite keys — throws unhelpful `ArgumentOutOfRangeException`. |
+| 501 | 15 | LOW | `Infrastructure/Policy/Performance/CheckClassification.cs:88` | `BuildEntries()` called twice at static init — minor inefficiency and maintenance trap. |
+
+**Clean files:** CascadeStrategies.cs, V5ConfigMigrator.cs, EffectivePolicy.cs, HybridPolicyPersistence.cs, MergeConflictResolver.cs, CompiledPolicyDelegate.cs
+
+---
+
+### Chunk 035 (15 files: Policy/Performance/MaterializedPolicyCache through Policy/PolicySerializationHelper)
+
+**Files Reviewed:** 15 | **Findings:** 9 (3 P1, 4 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 502 | 2 | P1 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:63-65` | TOCTOU in version invalidation: `InvalidateAll` does `Clear()` then `Exchange` — concurrent `GetOrCompile` can trap stale delegate as if version N. |
+| 503 | 7 | P1 | `Infrastructure/Policy/Performance/PolicyMaterializationEngine.cs:31` | `SemaphoreSlim(1,1)` field never disposed — class doesn't implement `IDisposable`. Kernel event leaks. |
+| 504 | 7 | P1 | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:353-358` | `Dispose` nulls `_sandboxStore` without disposing it — `_sandboxStore` resources leak. |
+| 505 | 2 | P2 | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:266-267` | Double-checked lock on non-volatile `_sandboxStore`/`_sandboxEngine` — outer check unsafe on ARM. |
+| 506 | 13 | P2 | `Infrastructure/Policy/PolicyResolutionEngine.cs:536` | `string.Join` + `Take(i+1)` in hot resolution loop — per-level string + enumerator allocation on every resolve. |
+| 507 | 15 | P2 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:55` | `GetOrCompile` is synchronous but delegates to potentially-async compilation path — contract ambiguity. |
+| 508 | 14 | P2 | `Infrastructure/Policy/PolicyMarketplace.cs:153` | Deserialized `template.Policies` items used without null-item guard — `null` array elements cause NRE in `PoliciesToTuples`. |
+| 509 | 1 | LOW | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:127` | Misleading "Placeholder" comment on correctly-initialized field. |
+| 510 | 15 | LOW | `Infrastructure/Policy/PolicyPersistenceBase.cs:143-165` | Abstract `*CoreAsync` methods lack XML doc requiring `CancellationToken` propagation. |
+
+**Clean files:** MaterializedPolicyCache.cs, PolicySkipOptimizer.cs, SimulationImpactReport.cs, PolicyCategoryDefaults.cs, PolicyComplianceScorer.cs, PolicyPersistenceComplianceValidator.cs, PolicyPersistenceConfiguration.cs, PolicySerializationHelper.cs, PolicySimulator.cs
+
+---
+
+### Chunk 036 (15 files: Policy/PolicyTemplate through Moonshots/MoonshotConfiguration)
+
+**Files Reviewed:** 15 | **Findings:** 15 (5 P1, 6 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 511 | 6 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:113,121` | Timer callbacks discard `CompactAsync` and `FlushAllAsync` tasks via `_ =` — WAL flush failures silently lost, data loss invisible. |
+| 512 | 6 | P1 | `Infrastructure/StorageConnectionRegistry.cs:622` | `DisposeAsync().AsTask().ContinueWith(_ => {})` silently discards disposal exceptions — resource leaks invisible. |
+| 513 | 2 | P1 | `Infrastructure/Policy/TamperProofPolicyPersistence.cs:36` | `_lastHash` (string) not `volatile` — written under `_chainLock` but JIT may cache reads; integrity chain hash visibility not guaranteed. |
+| 514 | 2 | P1 | `Infrastructure/Scaling/ScalableMessageBus.cs:240` | `TopicPartition.RingBuffer ??=` assigns non-volatile field — concurrent `PublishAsync` reader may see partially-constructed object. |
+| 515 | 13 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:398` | `CompactWalData` copies WAL byte-by-byte into `List<byte>` — 2× allocation for 1GB partitions, severe GC pressure. |
+| 516 | 5 | P2 | `Infrastructure/StorageConnectionRegistry.cs:577` | `CheckHealthAsync` catch stores only `ex.Message` — full exception silently discarded. |
+| 517 | 5 | P2 | `Mathematics/ParityCalculation.cs:318` | Bare `catch { return false; }` in `ValidateXorParity` — programming errors masked as parity mismatches. |
+| 518 | 5 | P2 | `Infrastructure/StorageConnectionRegistry.cs:268` | Registry-level `CheckHealthAsync` bare catch — health check failure reason entirely lost. |
+| 519 | 2 | P2 | `Infrastructure/StorageConnectionRegistry.cs:462-519` | `StorageConnectionStats` fields (`PoolHits++`, `ConnectionsCreated++`, etc.) mutated without `Interlocked` from concurrent threads. |
+| 520 | 12 | P2 | `Infrastructure/Scaling/ScalableMessageBus.cs:137` | Backpressure shedding check happens AFTER enqueue — message already in queue when dropped, queue grows under load shedding. |
+| 521 | 14 | P2 | `Mathematics/ParityCalculation.cs:310` | `stackalloc byte[blockSize]` with unbounded `blockSize` from caller data — stack overflow for RAID-sized blocks. |
+| 522 | 15 | LOW | `Mathematics/ReedSolomon.cs:18` | `_lock` field declared but never used — dead code, misleading "thread-safe" claim. |
+| 523 | 2 | LOW | `Infrastructure/Scaling/ScalableMessageBus.cs:78` | `_disposed` not `volatile` — stale reads possible from concurrent threads. |
+| 524 | 2 | LOW | `Infrastructure/Scaling/WalMessageQueue.cs:95` | `_disposed` not `volatile` — timer callbacks may miss disposal signal. |
+| 525 | 4 | LOW | `Infrastructure/StandardizedExceptions.cs:87,97` | `Guid.NewGuid()` called twice — IncidentId in message string won't match IncidentId property. |
+
+**Clean files:** PolicyTemplate.cs, RegulatoryTemplate.cs, VersionedPolicyCache.cs, GaloisField.cs, IMoonshotHealthProbe.cs, IMoonshotOrchestrator.cs
+
+---
+
+### Chunk 037 (15 files: Moonshots/Defaults through Configuration/DataWarehouseConfiguration)
+
+**Files Reviewed:** 15 | **Findings:** 12 (4 P1, 4 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 526 | 3 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:75-107` | `LogChangeAsync` is entirely synchronous — `File.AppendAllText` inside `lock`, returns `Task.CompletedTask`. Blocks thread pool. |
+| 527 | 5 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:210-212` | Bare `catch {}` in `QueryChangesAsync` — corrupt audit entries silently skipped, partial results returned. |
+| 528 | 5 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:250-253` | Bare `catch {}` in `LoadChainHead` — chain head silently resets to genesis, integrity chain permanently broken. |
+| 529 | 2 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:31,119` | `_chainHeadHash` non-volatile, read in `VerifyIntegrityAsync` without lock while mutated under lock in `LogChangeAsync`. |
+| 530 | 14 | P2 | `Primitives/Configuration/ConfigurationChangeApi.cs:85` | Unguarded `Convert.ChangeType` — `InvalidCastException`/`FormatException` propagates to caller with no context. |
+| 531 | 14 | P2 | `Primitives/Configuration/ConfigurationChangeApi.cs:113` | Direct `propertyInfo.SetValue` without type validation — `ArgumentException` on type mismatch. |
+| 532 | 15 | P2 | `Primitives/Configuration/ConfigurationAuditLog.cs:75` | `LogChangeAsync` named Async but entirely synchronous — contract lie to callers. |
+| 533 | 13 | P2 | `Moonshots/MoonshotPipelineTypes.cs:152-155` | `StageResults` getter allocates new `List` + `.ToList().AsReadOnly()` on every access. |
+| 534 | 15 | LOW | `Primitives/Configuration/ConfigurationAuditLog.cs:75` | `LogChangeAsync` accepts `object?` values but uses `.ToString()` — complex objects record type name, not content. |
+| 535 | 14 | LOW | `Primitives/Configuration/ConfigurationChangeApi.cs:155-158` | `ParsePath` silently returns `(null,null)` for paths without exactly one dot — fails silently. |
+| 536 | 1 | LOW | `Primitives/Configuration/ConfigurationSerializer.cs:86` | `SaveToFile` non-atomic: `File.WriteAllText` truncates first — crash leaves empty config file. |
+| 537 | 1 | LOW | `Performance/ILowLatencyStorage.cs:1-3` | `// FUTURE:` header comment on complete interface definitions — misleading Rule 13 borderline. |
+
+**Clean files:** MoonshotConfigurationDefaults.cs, MoonshotConfigurationValidator.cs, MoonshotDashboardTypes.cs, MoonshotRegistry.cs, CompositeQuery.cs, Configuration.cs, ConfigurationItem.cs, ConfigurationPresets.cs, ConfigurationTypes.cs, DataWarehouseConfiguration.cs
+
+---
+
+### Chunk 038 (15 files: Configuration/IAutoConfiguration through Primitives/PipelineConfig)
+
+**Files Reviewed:** 15 | **Findings:** 13 (4 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 538 | 2 | P1 | `Primitives/Performance/PerformanceUtilities.cs:62-73` | ObjectPool `_count` TOCTOU: `Return()` checks `_count < _maxSize` then adds — two concurrent returns both pass guard, exceeding `_maxSize`. |
+| 539 | 7 | P1 | `Primitives/Performance/PerformanceUtilities.cs:293-313` | `BatchProcessor.DisposeAsync` leaks `_cts`/`_semaphore` if final `FlushAsync()` throws — `_disposed` never set true. |
+| 540 | 12 | P1 | `Primitives/Performance/PerformanceUtilities.cs:217` | `CurrentBatchCount` reads non-thread-safe `List<T>.Count` without semaphore — data race with `AddAsync`/`FlushAsync`. |
+| 541 | 12 | P1 | `Primitives/Configuration/PresetSelector.cs:31-35` | HSM/TPM check overrides ALL resource tiers — every enterprise machine with TPM locked into `paranoid` preset regardless of 512-core GPU workstation capability. |
+| 542 | 15 | P2 | `Primitives/Enums.cs:74-80` | `PluginCategory.InterfaceProvider` and `PluginCategory.Interface` are duplicates with overlapping docs. |
+| 543 | 15 | P2 | `Primitives/Enums.cs:93-163` | Several `CapabilityCategory` XML docs are wrong copy-paste from unrelated domains (3D graphics, psychology). |
+| 544 | 14 | P2 | `Primitives/Manifest.cs:43` | `StorageUri` getter throws `UriFormatException` on invalid `BlobUri` — no validation at assignment time. |
+| 545 | 13 | P2 | `Primitives/Performance/PerformanceUtilities.cs:268` | `FlushInternalAsync` does `.ToList()` copy on every flush — hot-path allocation avoidable by list swap. |
+| 546 | 10 | P2 | `Primitives/Manifest.cs:90,132` | `CreatedAt`/`LastAccessedAt` default to `UtcNow` — deserialized manifests silently appear freshly created. |
+| 547 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:30` | `FileAttributes` shadows `System.IO.FileAttributes` — compiler ambiguity risk. |
+| 548 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:79` | `Permission` shadows `DataWarehouse.SDK.Primitives.Permission` — ambiguous reference. |
+| 549 | 15 | LOW | `Primitives/Enums.cs:254` | Typo in XML doc: "b∈ used" (Unicode element-of symbol instead of letter "e"). |
+| 550 | 15 | LOW | `Primitives/NodeHandshake.cs:53` | `SuccessResult` / `Failure` naming inconsistency — asymmetric suffix. |
+
+**Clean files:** IAutoConfiguration.cs, IFileSystem.cs, HardwareTypes.cs, IHardwareAccelerator.cs, IMetadataProvider.cs, MetadataTypes.cs, PipelineConfig.cs, Handshake.cs
+
+---
+
+### Chunk 039 (15 files: Probabilistic/*, Replication/*, Scale/IExabyteScale, Security/AccessControl+AccessEnforcementInterceptor)
+
+**Files Reviewed:** 15 | **Findings:** 18 (5 P1, 8 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 551 | 12 | P1 | `Primitives/Probabilistic/CountMinSketch.cs:36,155,185` | `GetConfidenceInterval` uses mutable `_lastQueryResult` from previous `Estimate()` — stale data if any intervening call. Same in HyperLogLog and TDigest. |
+| 552 | 14 | P1 | `Primitives/Probabilistic/BloomFilter.cs:229-246` | `Deserialize()` no input length validation — attacker-controlled `bitCount` causes buffer over-read or OOM. Same in CountMinSketch:266. |
+| 553 | 14 | P1 | `Primitives/Probabilistic/HyperLogLog.cs:235-250` | `Deserialize()` no bounds check on `precision` — value of 31+ causes 2GB allocation. TopKHeavyHitters:281 same pattern. |
+| 554 | 7 | P1 | `Primitives/Probabilistic/SketchMerger.cs:56` | `SemaphoreSlim` created inside `while` loop per iteration, never disposed — handle leak per merge round. |
+| 555 | 12 | P1 | `Replication/IMultiMasterReplication.cs:141-146` | `VectorClock.HappensBefore` returns false for empty clock — violates Lamport causality, causes spurious conflict detection. |
+| 556 | 13 | P2 | `Primitives/Probabilistic/BloomFilter.cs:262-289` | `FillRatio` and `EstimateItemCount` each do O(n) bit scan independently — redundant, should share popcount helper. |
+| 557 | 12 | P2 | `Primitives/Probabilistic/TDigest.cs:401-402` | `Compress()` calls private `Quantile(centroid)` O(n) per centroid — O(n²) compression pass. |
+| 558 | 10 | P2 | `Primitives/Probabilistic/TDigest.cs:437` | Centroid lookup by float equality — falls through returning 0.5 after compression changes means, silently corrupting maxSize. |
+| 559 | 2 | P2 | `Primitives/Probabilistic/BloomFilter.cs:31,124` | `_itemCount` (long) non-atomic on 32-bit platforms — torn reads possible. Same in CountMinSketch, HyperLogLog, TopKHeavyHitters. |
+| 560 | 14 | P2 | `Security/AccessEnforcementInterceptor.cs:171-175` | Null-identity messages silently allowed on subscription delivery — publish path fail-closed but subscribe path fail-open. |
+| 561 | 12 | P2 | `Replication/DottedVersionVector.cs:96-124` | `HappensBefore` dual-use of `atLeastOneLess` variable misleading — technically correct but maintenance trap. |
+| 562 | 10 | P2 | `Primitives/Probabilistic/CountMinSketch.cs:196-218` | `TopK()` tiebreaker uses `GetHashCode()` — non-deterministic ordering across process restarts. |
+| 563 | 14 | P2 | `Primitives/Probabilistic/TDigest.cs:356` | `Deserialize()` no null check, unbounded `centroidCount` — OOM bomb. TopKHeavyHitters:281 same. |
+| 564 | 15 | LOW | `Security/AccessControl.cs` | File named `AccessControl.cs` but contains only `ContainerConfig` class — name mismatch. |
+| 565 | 15 | LOW | `Primitives/Probabilistic/CountMinSketch.cs:36` | `_lastQueryResult` field naming ambiguous — should be `_lastEstimate`. |
+| 566 | 15 | LOW | `Primitives/Probabilistic/TDigest.cs:431-444` | Private `Quantile(Centroid)` shadows public `Quantile(double)` with different semantics. |
+| 567 | 9 | LOW | `Primitives/Probabilistic/SketchMerger.cs:141` | Lazy `Select(deserializer)` defers exceptions to merge time — misleading stack traces. |
+| 568 | 1 | LOW | `Scale/IExabyteScale.cs:5` | `// FUTURE:` comment with no ticket reference — borderline Rule 13. |
+
+**Clean files:** RaidConstants.cs, StorageIntent.cs, IProbabilisticStructure.cs, IClusterMembership.cs
+
+---
+
+### Chunk 040 (15 files: Security/AccessVerdict, AccessVerificationMatrix, ActiveDirectory/*, CommandIdentity, CryptographicAlgorithmRegistry, IKeyRotationPolicy, IKeyStore, IMilitarySecurity, ISecurityContext, IncidentResponse/*, KeyManagement/*)
+
+**Files Reviewed:** 15 | **Findings:** 19 (1 P0, 7 P1, 6 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 569 | 6 | P0 | `Security/IncidentResponse/IncidentResponseEngine.cs:109` | Fire-and-forget `_ = _auditTrail.RecordAsync(...)` in CreateIncident — audit write failure silently swallowed, compliance-critical data loss for security incident engine. |
+| 570 | 6 | P1 | `Security/IncidentResponse/IncidentResponseEngine.cs:306-323` | Three `_ = EvaluateAutoResponseRulesAsync(msg)` fire-and-forget in bus subscriptions — no fault observation, no back-pressure, unlimited concurrent evaluations. |
+| 571 | 2 | P1 | `Security/KeyManagement/CloudKmsProvider.cs:343-375` | Token cache race: `_cachedAccessToken` and `_tokenExpiry` read without lock in fast-path; non-atomic pair allows stale token+expiry mismatch. Same in SecretsManagerKeyStore:925. |
+| 572 | 2 | P1 | `Security/IncidentResponse/IncidentResponseEngine.cs:31,301-323` | `_subscriptions` is plain `List<IDisposable>` mutated from StartMonitoring while Dispose iterates — unsynchronized concurrent List mutation. |
+| 573 | 4 | P1 | `Security/KeyManagement/CloudKmsProvider.cs:163-179` | GcpKmsProvider LoadKeyFromStorage generates DEK, wraps with KMS, but discards `wrappedDek` — plaintext DEK cached with no recovery path, data loss on restart. |
+| 574 | 3 | P1 | `Security/IKeyStore.cs:180` | `GetKey(string)` sync method on interface forces sync-over-async in all cloud KMS implementations — needs `[Obsolete(error:true)]`. |
+| 575 | 14 | P1 | `Security/IncidentResponse/IncidentResponseEngine.cs:265-275` | `RegisterAutoResponseRule` accepts arbitrary regex without compile-time validation — ReDoS pattern consumes 100ms per security event during attack. |
+| 576 | 5 | P1 | `Security/KeyManagement/SecretsManagerKeyStore.cs:434,478` | Bare `catch { return false; }` in TryLoadCredentialsFile + `catch { /* IMDS not available */ }` — swallows all exceptions including security-relevant I/O failures. Same in CloudKmsProvider:824. |
+| 577 | 13 | P2 | `Security/AccessVerificationMatrix.cs:162-176` | RemoveRules rebuilds ConcurrentBag without lock — concurrent AddRule entries lost between read and reassignment. Dead `_evaluationLock` field (line 23) never used. |
+| 578 | 2 | P2 | `Security/IncidentResponse/IncidentResponseEngine.cs:221,247-249` | `Incident.Status`/`ResolvedAt`/`Resolution` mutated without synchronization across concurrent playbook + resolution calls. |
+| 579 | 3 | P2 | `Security/KeyManagement/CloudKmsProvider.cs:258-268,744-754` | WrapKeyAsync/UnwrapKeyAsync discard caller's CancellationToken, pass CancellationToken.None to inner KMS ops. |
+| 580 | 13 | P2 | `Security/IncidentResponse/IncidentResponseEngine.cs:55` | `ActiveIncidentCount` property does O(n) LINQ Count on every access — hot property for metrics/health checks. |
+| 581 | 12 | P2 | `Security/KeyManagement/CloudKmsProvider.cs:175` | LoadKeyFromStorage hardcodes CancellationToken.None — outer cancellation cannot interrupt in-progress KMS wrap. Same in SecretsManagerKeyStore:739,777. |
+| 582 | 7 | P2 | `Security/KeyManagement/CloudKmsProvider.cs:410-417` + `SecretsManagerKeyStore.cs:973-980` | `new HttpClient()` per token exchange call — socket exhaustion under load. Existing `_httpClient` field should be reused. |
+| 583 | 15 | LOW | `Security/ActiveDirectory/SpnegoNegotiator.cs:99` | `RejectLegacyEncryption` is mutable `{ get; set; }` — security policy flag settable after construction, race between config and request processing. |
+| 584 | 14 | LOW | `Security/AccessVerdict.cs:110` | HierarchyAccessRule.MatchesPrincipal uses StartsWith on TrimEnd('*') but no validation pattern ends with '*' — "admin" matches "adminevil" prefix. |
+| 585 | 14 | LOW | `Security/IKeyRotationPolicy.cs:174-178` | KeyRotationMetadata uses `DateTime` (not DateTimeOffset) for CreatedAt/LastUsedAt/LastRotatedAt — ambiguous UTC vs local in distributed system. |
+| 586 | 15 | LOW | `Security/IKeyStore.cs:161-172` | GetKeyNativeAsync default implementation doesn't forward CancellationToken to inner GetKeyAsync call. |
+| 587 | 11 | LOW | `Security/ISecurityContext.cs:33` | CommandIdentity default returns null — callers silently skip hierarchy evaluation when implementations forget to override. |
+
+**Clean files:** IKerberosAuthenticator.cs, IMilitarySecurity.cs, CryptographicAlgorithmRegistry.cs, CommandIdentity.cs, ContainmentActions.cs
+
+---
+
+### Chunk 041 (15 files: Security/NativeKeyHandle, OsHardening/*, PluginIdentity, SecretManager, SecurityConfigLock, SecurityContracts, Siem/*, SupplyChain/*)
+
+**Files Reviewed:** 15 | **Findings:** 21 (1 P0, 7 P1, 8 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 588 | 4 | P0 | `Security/SupplyChain/SlsaVerifier.cs:371-375` | Signature verification silently bypassed when key store absent — returns `VerificationResult.Success` instead of failing closed, allowing unverified artifacts through. |
+| 589 | 2 | P1 | `Security/NativeKeyHandle.cs:116-119` | Non-atomic dispose: `_isDisposed` set true before `NativeMemory.Clear`+`Free` — concurrent thread sees disposed but key material still in memory, or accesses freed memory. |
+| 590 | 4 | P1 | `Security/SupplyChain/SlsaProvenanceGenerator.cs:490-495` | Crypto fallback silently degrades RSA-PSS to HMAC-SHA256 when signing key unavailable — no log, no warning, weaker algorithm used. |
+| 591 | 4 | P1 | `Security/SupplyChain/SlsaVerifier.cs:432-463` | Verifier imports private key for HMAC verification path — private key should never be needed for verification. HMAC fallback makes signatures forgeable by anyone with the "verification" key. |
+| 592 | 4 | P1 | `Security/OsHardening/PluginSandbox.cs:238-242` | Sandbox failure silently falls back to unsandboxed execution — fail-open security: if sandbox can't be created, plugin runs with full privileges. |
+| 593 | 6 | P1 | `Security/Siem/SiemTransportBridge.cs:306` | `_processingTask.Wait(5000)` result discarded, then CancellationTokenSource disposed while processing task may still be running — ObjectDisposedException race. |
+| 594 | 2 | P1 | `Security/Siem/SiemTransportBridge.cs:418-425` | UDP client lazy initialization not thread-safe — `_udpClient` field read/write without lock, concurrent calls can create duplicate clients. |
+| 595 | 14 | P1 | `Security/SecretManager.cs:102-108` | `Enum.Parse` on untrusted input without TryParse — throws FormatException leaking valid enum member names in error message. |
+| 596 | 5 | P2 | `Security/SupplyChain/DependencyScanner.cs:189-195` | Silent catch in vulnerability database fetch — `catch { return new() }` returns empty results, caller assumes no vulnerabilities found. |
+| 597 | 7 | P2 | `Security/Siem/SiemTransportBridge.cs:280-290` | CancellationTokenSource created in StartAsync but Dispose path only calls Cancel, never disposes CTS — handle leak on repeated start/stop cycles. |
+| 598 | 2 | P2 | `Security/SecurityConfigLock.cs:78-85` | `_lockAcquired` bool written inside lock but read outside lock in IsLocked property — torn read on 32-bit, stale cache on 64-bit without volatile. |
+| 599 | 13 | P2 | `Security/SupplyChain/SbomGenerator.cs:145-180` | SBOM generation loads all assemblies via reflection in single-threaded loop — O(n) blocking I/O with no parallelism or caching. |
+| 600 | 5 | P2 | `Security/OsHardening/SeccompProfile.cs:156-160` | Silent catch in profile application — `catch { /* seccomp not supported */ }` doesn't distinguish "not supported" from "failed to apply". |
+| 601 | 14 | P2 | `Security/SupplyChain/DependencyScanner.cs:95-110` | Assembly scanning catches all exceptions per-assembly but returns partial results without indicating incompleteness — caller assumes full scan. |
+| 602 | 8 | P2 | `Security/OsHardening/SecurityVerification.cs:67,89,112` | Three `Console.WriteLine` calls in verification output — should use ILogger or Debug.WriteLine. |
+| 603 | 15 | P2 | `Security/SecurityContracts.cs:45-50` | `ISecurityAuditable.GetAuditTrail` returns `IEnumerable<string>` — stringly-typed audit trail, no structured data. |
+| 604 | 15 | LOW | `Security/Siem/ISiemTransport.cs:28` | `SendEventAsync` returns `Task<bool>` — should return result object with failure reason, not just bool. |
+| 605 | 14 | LOW | `Security/PluginIdentity.cs:35-40` | Certificate thumbprint stored as string with no format validation — accepts any string, not validated as hex SHA-1/SHA-256. |
+| 606 | 15 | LOW | `Security/NativeKeyHandle.cs:85` | `Span` property returns `new Span<byte>(_pointer, _length)` from freed memory if called after Dispose — no ObjectDisposedException guard. |
+| 607 | 13 | LOW | `Security/SupplyChain/SlsaProvenanceGenerator.cs:350-380` | Environment variable collection (45+ vars) on every provenance generation — should cache or lazy-load. |
+| 608 | 15 | LOW | `Security/SecretManager.cs:145` | `ListSecrets()` returns `IReadOnlyDictionary` exposing internal key set — caller can enumerate all secret names. |
+
+**Clean files:** SecurityContracts.cs (mostly interfaces), ISiemTransport.cs (interface only)
+
+---
+
+### Chunk 042 (15 files: Security/Transit/*, Services/PluginRegistry+ServiceManager, Storage/Billing/Aws+Azure+BillingProviderFactory+BillingTypes+CostOptimizationTypes+Gcp)
+
+**Files Reviewed:** 15 | **Findings:** 19 (5 P1, 7 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 609 | 5 | P1 | `Services/ServiceManager.cs:411-413` | Silent catch in `CheckServiceHealthAsync` — bare `catch { return Unhealthy }` with no logging, impossible to distinguish crash from genuine unhealthy. |
+| 610 | 2 | P1 | `Services/ServiceManager.cs:16` | `_disposed` not volatile — callers on other threads read stale `false` after disposal, allowing post-dispose usage. |
+| 611 | 7 | P1 | `Services/ServiceManager.cs:482-488` | `DisposeAsync` calls `StopAllAsync()` which holds `_lifecycleLock.WaitAsync()` with no CancellationToken — hangs forever if lock held by hung StartAsync. |
+| 612 | 3 | P1 | `Services/ServiceManager.cs:175,236` | `StopAllAsync` and `StopServiceAsync` call `_lifecycleLock.WaitAsync()` without CancellationToken — infinite block if semaphore never released. |
+| 613 | 7 | P1 | `Storage/Billing/BillingProviderFactory.cs:33` | `new HttpClient()` created without Timeout, never disposed — socket exhaustion in repeated Create() calls. |
+| 614 | 5 | P2 | `Storage/Billing/AzureCostManagementProvider.cs:280-285` | Silent `HttpRequestException` catch in ForecastCostAsync — returns zero-cost forecast indistinguishable from genuine empty forecast. |
+| 615 | 9 | P2 | `Storage/Billing/AzureCostManagementProvider.cs:444-446` | `FindColumnIndex` returns `0` when column not found — silently reads wrong column, produces incorrect billing data. |
+| 616 | 1 | P2 | `Storage/Billing/AzureCostManagementProvider.cs:219-229` | `GetReservedCapacityAsync` returns hardcoded `0m` for ReservedPricePerGBMonth and OnDemandPricePerGBMonth — partial stub. |
+| 617 | 5 | P2 | `Storage/Billing/GcpBillingProvider.cs:151,263,321` | Three `HttpRequestException` catch blocks with only comments, no logging — operators can't distinguish network errors from permissions issues. |
+| 618 | 1 | P2 | `Storage/Billing/GcpBillingProvider.cs:307-316` | `GetReservedCapacityAsync` returns all zeros for financial fields — GCP CUD commitment data not parsed, partial stub. |
+| 619 | 1 | P2 | `Storage/Billing/GcpBillingProvider.cs:159-172` | `GetBillingReportAsync` without billing account returns empty report with `TotalCost=0` and no warning — indistinguishable from free tier. |
+| 620 | 2 | P2 | `Services/PluginRegistry.cs:22,29-31` | `_currentMode` field not volatile — written by SetOperatingMode, read by GetPlugin<T> on any thread, stale cache risk. |
+| 621 | 5 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:297-300` + Azure:313 + Gcp:393 | `ValidateCredentialsAsync` catches all exceptions including OperationCanceledException — cancellation misreported as invalid credentials. |
+| 622 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:157` | `GetSpotPricingAsync` uses hardcoded `onDemandEstimate = spotPrice * 3.0m` — fabricated financial data. |
+| 623 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:205-206` | `GetReservedCapacityAsync` uses hardcoded `usagePrice * 1.4m` and default savings of 30.0 — estimated, not queried. |
+| 624 | 13 | LOW | `Storage/Billing/GcpBillingProvider.cs:105,113-155` | Up to 500 sequential HTTP round-trips (50 services × 10 SKUs) per billing report — O(n×m) unbounded sequential I/O. |
+| 625 | 15 | LOW | `Security/Transit/ITransitEncryptionStage.cs:61-66,98-103` | Interface documents ArgumentNullException for context but doesn't specify behavior when SecurityContext property within context is null. |
+| 626 | 15 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | TranscryptionOptions SourceSecurityContext/TargetSecurityContext nullable with no null-semantics documentation. |
+| 627 | 14 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | Same nullable fields — implementations may fail unpredictably when null contexts provided. |
+
+**Clean files:** ICommonCipherPresets.cs, ITranscryptionService.cs, ITransitCompression.cs, ITransitEncryption.cs, TransitCompressionTypes.cs, BillingTypes.cs, CostOptimizationTypes.cs
+
+---
+
+### Chunk 043 (15 files: Storage/Billing/IBillingProvider+StorageCostOptimizer, DwAddressParser, DwNamespace, Fabric/*, HybridStoragePluginBase, IObjectStorageCore, Migration/BackgroundMigrationEngine+IMigrationEngine)
+
+**Files Reviewed:** 15 | **Findings:** 12 (4 P1, 4 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 628 | 6 | P1 | `Storage/Migration/BackgroundMigrationEngine.cs:108-111` | Fire-and-forget Task.Run with ContinueWith that only writes Debug.WriteLine (no-op in Release) — if ExecuteMigrationAsync throws before its inner try/catch, job stays InProgress forever. |
+| 629 | 6 | P1 | `Storage/HybridStoragePluginBase.cs:151-156` | Timer callback uses `async _ => await CheckAllHealthAsync()` — becomes async void, unhandled exception crashes process. |
+| 630 | 5 | P1 | `Storage/Migration/BackgroundMigrationEngine.cs:229-231` | Per-object migration catch discards exception entirely — increments FailedObjects but no diagnostic info about which objects or why. |
+| 631 | 5 | P1 | `Storage/Migration/BackgroundMigrationEngine.cs:265-268` | Outer ExecuteMigrationAsync catch sets Failed status but discards exception — no logging, no error message on job record. |
+| 632 | 2 | P2 | `Storage/HybridStoragePluginBase.cs:133,555` | `_disposed` not volatile, non-atomic check-then-set — concurrent DisposeAsyncCore calls both pass guard, double-dispose timer and registry. |
+| 633 | 4 | P2 | `Storage/Fabric/IS3CompatibleServer.cs:152-156` | `S3ServerOptions.AuthProvider` nullable defaults to anonymous/open mode — fail-open security, callers who forget AuthProvider deploy open S3 server. |
+| 634 | 1 | P2 | `Storage/HybridStoragePluginBase.cs:403-417,437-442` | HandleListInstances and HandleAggregateHealthAsync build response data then discard it — `// Response would be sent via message context` comment confirms stub. Callers time out. |
+| 635 | 14 | P2 | `Storage/Fabric/IS3CompatibleServer.cs:129,147` | `S3ServerOptions.Port` accepts any int (including negatives/65536+), MultipartChunkSize accepts below S3 minimum 5MB — no validation. |
+| 636 | 13 | LOW | `Storage/HybridStoragePluginBase.cs:282-287` | GetAggregateHealth does three separate enumerations over _healthCache.Values — O(3n) when single pass suffices. |
+| 637 | 15 | LOW | `Storage/Billing/IBillingProvider.cs:59,66` | ForecastCostAsync/ValidateCredentialsAsync naming commits implementations to async but some may use Task.FromResult. |
+| 638 | 14 | LOW | `Storage/Billing/StorageCostOptimizer.cs:115` | MinSpotSavingsPercent default 20.0 compared against SavingsPercent with unspecified unit (0-100 vs 0.0-1.0) — ambiguous contract. |
+| 639 | 4 | LOW | `Storage/DwAddressParser.cs:31-45` | HostnameRegex has nested quantifiers without NonBacktracking or timeout — potential ReDoS on adversarial user input. |
+
+**Clean files:** IBillingProvider.cs, DwNamespace.cs, BackendDescriptor.cs, IBackendRegistry.cs, IS3AuthProvider.cs, IStorageFabric.cs, S3Types.cs, StorageFabricErrors.cs, IObjectStorageCore.cs, IMigrationEngine.cs
+
+---
+
+### Chunk 044 (15 files: Storage/Migration/MigrationCheckpointStore+MigrationTypes+ReadForwardingTable, PathStorageAdapter, Placement/*, Services/DefaultCacheManager)
+
+**Files Reviewed:** 15 | **Findings:** 11 (4 P1, 6 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 640 | 4 | P1 | `Storage/Migration/MigrationCheckpointStore.cs:82` | Path traversal via user-controlled `jobId` — `Path.Combine(_checkpointDirectory, $"migration-{jobId}...")` with no sanitization, `../../` sequences escape checkpoint directory. |
+| 641 | 6 | P1 | `Storage/Placement/AutonomousRebalancer.cs:103-106` | Fire-and-forget Task.Run with ContinueWith using only Debug.WriteLine (no-op in Release) — if ExecuteRebalanceAsync throws before inner try/catch, fault invisible. |
+| 642 | 6 | P1 | `Storage/Placement/AutonomousRebalancer.cs:76-79` | Timer callback `async _ => await CheckAndRebalanceAsync()` is async-void equivalent — unhandled exception crashes process. CheckAndRebalanceAsync has try/finally but no catch-all. |
+| 643 | 1 | P1 | `Storage/Placement/GravityAwarePlacementOptimizer.cs:197-201` | `GenerateRebalancePlanAsync` is a stub returning empty plan — comment says "requires storage layer integration". Renders entire autonomous rebalancing subsystem non-functional. |
+| 644 | 14 | P2 | `Storage/Migration/MigrationCheckpointStore.cs:38,52,73` | Missing null/empty validation on `jobId` in all public methods — null jobId corrupts in-memory dictionary or produces broken file path. |
+| 645 | 5 | P2 | `Storage/Migration/MigrationCheckpointStore.cs:61` | `JsonSerializer.Deserialize` can throw JsonException on corrupt checkpoint files with no try/catch — crash-recovery path skipped entirely. |
+| 646 | 6 | P2 | `Storage/Migration/ReadForwardingTable.cs:31` | Timer callback `_ => CleanExpired()` has no exception handling — any exception from LINQ/TryRemove race silently swallowed by Timer infrastructure. |
+| 647 | 2 | P2 | `Storage/Migration/ReadForwardingTable.cs:64-69` | TOCTOU race in Lookup: TryGetValue + TryRemove on expired entry not atomic — concurrent RegisterForwarding between the two ops deletes the new entry. |
+| 648 | 12 | P2 | `Storage/Placement/AutonomousRebalancer.cs:139` | `CancelRebalanceAsync` sets status to `Failed` instead of `Cancelled` — callers cannot distinguish cancelled from genuinely failed jobs. |
+| 649 | 7 | P2 | `Storage/Placement/GravityAwarePlacementOptimizer.cs:124` | `new SemaphoreSlim(ProcessorCount*2)` in `ComputeGravityBatchAsync` never disposed — handle leak in hot code path. |
+| 650 | 6 | P2 | `Storage/Services/DefaultCacheManager.cs:33` | `_ = CleanupExpiredAsync()` fire-and-forget with no fault observation — exception silently lost if cleanup throws. |
+| --- | 15 | LOW | `Storage/Services/DefaultCacheManager.cs:41-61` | `StoreWithTtlAsync` accepts `Stream data` parameter but stores only metadata — contract implies data storage but bytes are discarded. |
+
+**Clean files:** MigrationTypes.cs, PathStorageAdapter.cs, CrushBucket.cs, CrushPlacementAlgorithm.cs, GravityScoringWeights.cs, IPlacementAlgorithm.cs, IPlacementOptimizer.cs, IRebalancer.cs, PlacementTypes.cs, RebalancerOptions.cs
+
+---
+
+### Chunk 045 (15 files: Storage/Services/DefaultConnectionRegistry+DefaultStorageIndex+DefaultTierManager+ICacheManager+IConnectionRegistry+IStorageIndex+ITierManager, StorageAddress+StorageAddressKind, Sustainability/ICarbonAwareStorage, Tags/CrdtTagCollection+DefaultTagAttachment+PolicyEngine+PropagationEngine+QueryApi)
+
+**Files Reviewed:** 15 | **Findings:** 11 (3 P1, 4 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 651 | 2 | P1 | `Storage/Services/DefaultStorageIndex.cs:34-44` | TOCTOU race on index eviction: ContainsKey + MinBy + TryRemove + assignment not atomic — concurrent writers exceed MaxIndexSize or evict wrong entries. |
+| 652 | 2 | P1 | `Tags/CrdtTagCollection.cs:91-95` | TOCTOU race in Set: Contains + Add + version increment + value write not atomic — concurrent Set corrupts OR-Set causal history and version vectors. Same in Remove and Merge. |
+| 653 | 9 | P1 | `Tags/DefaultTagQueryApi.cs:301-339` | `CompileNotAsync` calls `GetTagDistributionAsync(int.MaxValue)` then fires full index query per tag key — unbounded O(T×K) memory accumulation, OOM on large datasets. |
+| 654 | 15 | P2 | `Tags/DefaultTagPolicyEngine.cs:75-89` | `ListPoliciesAsync` does no async work — iterates sync dictionary with dummy `await Task.CompletedTask` to satisfy compiler. |
+| 655 | 13 | P2 | `Storage/Services/DefaultConnectionRegistry.cs:85` | `GetRegisteredIds()` does Keys.ToList().AsReadOnly() — two full allocations per call on health-polling hot path. |
+| 656 | 14 | P2 | `Storage/Services/DefaultStorageIndex.cs:49` | `SearchAsync` doesn't validate `maxResults` — negative values silently return empty, int.MaxValue materializes entire index. |
+| 657 | 14 | P2 | `Storage/Services/DefaultTierManager.cs:21-27` | CoolThresholdDays/ColdThresholdDays/ArchiveThresholdDays have no range guards — zero values cause instant tier promotion, inverted values skip tiers. |
+| 658 | 15 | LOW | `Storage/Services/DefaultTierManager.cs:101-104` | `CoolThresholdDays` maps to `StorageTier.Warm` — naming mismatch confuses operators. |
+| 659 | 13 | LOW | `Storage/Services/DefaultStorageIndex.cs:37` | MinBy scan O(n) on every write at capacity (up to 100K entries) — needs LRU/clock eviction structure. |
+| 660 | 12 | LOW | `Tags/DefaultTagQueryApi.cs:422-428` | `SortObjectKeys` switch has only `_` default arm — all sort fields silently ignored, always sorts by ObjectKey. |
+| 661 | 15 | LOW | `Tags/DefaultTagPropagationEngine.cs:36-37` | Uses plain Dictionary + lock instead of BoundedDictionary — inconsistent with SDK pattern, unbounded growth. |
+
+**Clean files:** ICacheManager.cs, IConnectionRegistry.cs, IStorageIndex.cs, ITierManager.cs, StorageAddressKind.cs, ICarbonAwareStorage.cs, DefaultTagAttachmentService.cs
+
+---
+
+### Chunk 046 (15 files: Tags/ITag*Interfaces, InMemoryTagSchemaRegistry, InMemoryTagStore, InvertedTagIndex, TagAcl, TagEvents, TagIndexEntry, TagMergeStrategy, TagPolicy, TagPropagationRule)
+
+**Files Reviewed:** 15 | **Findings:** 12 (3 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 662 | 2 | P1 | `Tags/InvertedTagIndex.cs:346` | Dispose not thread-safe — non-atomic check+dispose, concurrent callers can hit ObjectDisposedException from ReaderWriterLockSlim.EnterReadLock on disposed instance. |
+| 663 | 12 | P1 | `Tags/InvertedTagIndex.cs:195-210` | QueryAsync Skip has no upper-bound guard — `Skip = int.MaxValue` silently returns empty results with valid TotalCount. No negative-value validation either. |
+| 664 | 10 | P1 | `Tags/InMemoryTagSchemaRegistry.cs:87-133` | TOCTOU lost-update race in AddVersionAsync — two concurrent callers both read same Versions list, both add version, one silently wins losing the other's schema version. |
+| 665 | 13 | P2 | `Tags/InvertedTagIndex.cs:205-209` | QueryAsync sorts entire candidate set O(N log N) before Skip/Take — millions of entries materialized for pagination on large deployments. |
+| 666 | 13 | P2 | `Tags/InvertedTagIndex.cs:376-379` | NotExists filter calls CollectAllObjectKeys scanning every shard — materializes all keys into HashSet before filtering. |
+| 667 | 12 | P2 | `Tags/TagEvents.cs:80-88` | `TagsBulkUpdatedEvent` doesn't inherit from `TagEvent` unlike all other event types — breaks polymorphic bus subscription for TagEvent consumers. |
+| 668 | 2 | P2 | `Tags/TagMergeStrategy.cs:119,157` | MultiValue/Union merge strategies use `DateTimeOffset.UtcNow` — violates documented determinism contract, causes CRDT convergence divergence. |
+| 669 | 5 | P2 | `Tags/InMemoryTagSchemaRegistry.cs:87-133` | (See also #664) No logging when concurrent version addition overwrites another — silent data loss on schema evolution. |
+| 670 | 14 | LOW | `Tags/InMemoryTagStore.cs:151` | `FindObjectsByTagAsync` limit=0 or negative silently returns empty — no validation. |
+| 671 | 15 | LOW | `Tags/ITagAttachmentService.cs:119` vs `InMemoryTagStore.cs:75` | Inconsistent limit defaults — ITagAttachmentService defaults 100, ITagStore has no default. |
+| 672 | 15 | LOW | `Tags/TagPropagationRule.cs:109` | `TransformFunc` (Func<Tag,Tag>) not serializable — silent null on deserialization across process boundaries. |
+| 673 | 10 | LOW | `Tags/InvertedTagIndex.cs:361` | `GetShard` uses `string.GetHashCode()` — randomized per process in .NET 5+, non-deterministic shard assignment across restarts. |
+
+**Clean files:** ITagAttachmentService.cs, ITagIndex.cs, ITagPolicyEngine.cs, ITagPropagationEngine.cs, ITagQueryApi.cs, ITagSchemaRegistry.cs, TagAcl.cs, TagIndexEntry.cs, TagPolicy.cs
+
+---
+
+### Chunk 047 (15 files: Tags/TagQueryExpression+TagSchema+TagSchemaValidator+TagServiceRegistration+TagSource+TagSystemHealthCheck+TagTypes+TagValueTypes+TagVersionVector, Utilities/BoundedDictionary+BoundedList+BoundedQueue+PluginDetails, Validation/Guards+InputValidation)
+
+**Files Reviewed:** 15 | **Findings:** 17 (5 P1, 6 P2, 6 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 674 | 5 | P1 | `Utilities/BoundedDictionary.cs:608-614` | Silent catch in OnDebounceElapsed PersistAsync — fault swallowed with only a comment, no logging. Silent data-loss when persistence repeatedly fails. Same in BoundedList:240 and BoundedQueue:233. |
+| 675 | 12 | P1 | `Tags/TagSchema.cs:120` | `CurrentVersion => Versions[^1]` throws IndexOutOfRangeException on empty Versions list — no guard despite "must contain at least one" comment. |
+| 676 | 14 | P1 | `Tags/TagTypes.cs:14` | `TagKey` constructor accepts empty/null Namespace and Name — no validation on the record used as dictionary key throughout entire tag subsystem. |
+| 677 | 2 | P1 | `Utilities/BoundedDictionary.cs:244` | TryGetValue uses write lock for read operation (due to LRU MoveToFront) — all concurrent reads serialized, eliminating read parallelism. IReadOnlyDictionary consumers pay full write-lock cost. |
+| 678 | 12 | P1 | `Tags/TagVersionVector.cs:153-159` | Deserialize doesn't validate non-negative counters — negative values from attacker/corrupt storage break Dominates comparison, allowing stale writes to overwrite newer data. |
+| 679 | 3 | P2 | `Utilities/BoundedDictionary.cs:702` + `BoundedList.cs:299` + `BoundedQueue.cs:290` | Dispose uses `Task.Run(...).GetAwaiter().GetResult()` — sync-over-async blocks calling thread for full persist duration, deadlock risk in threadpool-starved environments. |
+| 680 | 13 | P2 | `Validation/InputValidation.cs:261` | `ValidateSecurityRules` uses uncached `typeof(T).GetProperties()` reflection on every call — GC pressure on hot validation path. |
+| 681 | 10 | P2 | `Utilities/BoundedDictionary.cs:553` + `BoundedList.cs:196` + `BoundedQueue.cs:190` | `PersistAsync` sets `_pendingPersist = false` outside lock — concurrent mutation between SaveAsync completion and flag reset causes lost persist, data not written. |
+| 682 | 14 | P2 | `Tags/TagSchema.cs:46` | `TagConstraint.Pattern` not validated as valid regex — invalid pattern causes unhandled ArgumentException on every validation call instead of TagValidationError. |
+| 683 | 12 | P2 | `Tags/TagTypes.cs:144-145` | `GetByNamespace` uses OrdinalIgnoreCase but TagKey record equality is case-sensitive — asymmetric behavior, `GetByNamespace("System")` finds "system" but indexer doesn't. |
+| 684 | 4 | P2 | `Utilities/PluginDetails.cs:286` | `IsAllowedPayloadType` allows any `IEnumerable<string>` implementation through — custom classes with arbitrary state bypass type allowlist. |
+| 685 | 15 | LOW | `Tags/TagQueryExpression.cs:176` | `TagQueryRequest.Skip` has no validation — negative values silently accepted, causes ArgumentOutOfRangeException deep in query stack. |
+| 686 | 15 | LOW | `Utilities/PluginDetails.cs:16` | `PluginDescriptor.Tags` is mutable `List<string>` on init-only class — external mutation corrupts plugin metadata. Should be IReadOnlyList. |
+| 687 | 13 | LOW | `Tags/TagTypes.cs:181` | `TagCollection.GetHashCode` calls OrderBy on every computation — allocates and sorts on each hash lookup. |
+| 688 | 15 | LOW | `Tags/TagSchema.cs:81` | `TagSchemaVersion.CreatedUtc` defaults to UtcNow — JSON deserialization without CreatedUtc gets current time, not original creation time. |
+| 689 | 9 | LOW | `Validation/Guards.cs:107` | `MaxLength` returns `value!` when input is null — suppresses nullable warning but returns null through non-nullable return type. |
+| 690 | 15 | LOW | `Tags/TagVersionVector.cs:153` | (See also #678) Deserialized empty dict creates vector that always loses Dominates check — edge case not handled. |
+
+**Clean files:** TagQueryExpression.cs, TagSchemaValidator.cs, TagServiceRegistration.cs, TagSource.cs, TagSystemHealthCheck.cs, TagValueTypes.cs
+
+---
+
+### Chunk 048 (15 files: Validation/SizeLimitOptions+SqlSecurity+ValidationMiddleware, VDE/AdaptiveIndex/AdaptiveIndexEngine+AlexLearnedIndex+AlexModel+ArtIndex+ArtNode+BeTree+BeTreeForest+BeTreeMessage+BeTreeNode+BloofiFilter+BwTree+BwTreeDeltaRecord)
+
+**Files Reviewed:** 15 | **Findings:** 27 (1 P0, 8 P1, 10 P2, 8 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 691 | 6 | **P0** | `VDE/AdaptiveIndex/AlexLearnedIndex.cs:475` | Silent fire-and-forget retrain — `_ = Task.Run(async () => { ... })` with catch swallowing all exceptions. Deactivation counter never incremented on failure; index serves stale data indefinitely with no alert. |
+| 692 | 2 | P1 | `VDE/AdaptiveIndex/AlexLearnedIndex.cs:457-495` | `_consecutiveLowHitWindows` is a plain int incremented/reset from multiple threads without Interlocked — race causes missed deactivation threshold. |
+| 693 | 9 | P1 | `VDE/AdaptiveIndex/ArtIndex.cs:77-84` | Count increment ordering brittle on duplicate-key exception — if `_items.TryAdd` succeeds but `_count` increment fails (ThreadAbortException in older runtime), count diverges from actual item count permanently. |
+| 694 | 15 | P1 | `VDE/AdaptiveIndex/BeTree.cs:214-251` | `UpdateAsync` always returns true regardless of whether the key existed — contract lie, callers cannot distinguish update from insert. |
+| 695 | 7 | P1 | `VDE/AdaptiveIndex/BeTree.cs:763-805` | Mutable cached node objects shared across concurrent read/write paths — write mutations visible to in-flight reads, causes corrupted traversal results. |
+| 696 | 9 | P1 | `VDE/AdaptiveIndex/BeTree.cs:138-148` | WAL transaction opened on write but never rolled back on error — partial writes leave WAL in inconsistent state, next recovery replays corrupted entries. |
+| 697 | 2 | P1 | `VDE/AdaptiveIndex/BeTreeForest.cs:169-177` | Shard index computed outside lock, used inside lock — concurrent AddAsync/RemoveAsync on same key can route to wrong shard between the two operations. |
+| 698 | 10 | P1 | `VDE/AdaptiveIndex/BwTree.cs:465-490` | `GetHashCode()` used as key equality proxy — hash collisions silently drop entries. Two distinct keys with same hash treated as duplicates. |
+| 699 | 12 | P1 | `VDE/AdaptiveIndex/BeTreeNode.cs:125-135` | Silent truncation when entries exceed blockSize — data beyond block boundary silently dropped during serialization, permanent data loss on flush. |
+| 700 | 10 | P2 | `Validation/SqlSecurity.cs:75` | Cache key uses `object.GetHashCode()` on SqlSecurityOptions — reference-based hash means every new options instance misses cache, unbounded cache growth. |
+| 701 | 4 | P2 | `Validation/ValidationMiddleware.cs:453-464` | CommandInjectionFilter blocks bare `<` and `>` characters — breaks legitimate SQL comparison operators and XML content in queries. |
+| 702 | 13 | P2 | `VDE/AdaptiveIndex/BeTree.cs:637,711` | O(n×m) LINQ scan per leaf vs pending messages — `_pendingMessages.Where(m => IsInRange(m.Key, leaf))` scans all pending for every leaf during flush. |
+| 703 | 13 | P2 | `VDE/AdaptiveIndex/BeTreeForest.cs:276-289` | Full materialization before first yield — `GetAllAsync` loads all keys from all shards into memory before returning. |
+| 704 | 2 | P2 | `VDE/AdaptiveIndex/BloofiFilter.cs:36` | Plain `object` lock serializes all reads and writes — single global lock eliminates all concurrency in a read-heavy probabilistic data structure. |
+| 705 | 14 | P2 | `VDE/AdaptiveIndex/BeTreeMessage.cs:143-145` | No max bounds on `keyLen` from deserialization — attacker-crafted value causes `new byte[keyLen]` OOM allocation. |
+| 706 | 14 | P2 | `VDE/AdaptiveIndex/BeTreeNode.cs:213-215` | Same unchecked `keyLen` on deserialization — identical OOM vector as BeTreeMessage. |
+| 707 | 7 | P2 | `VDE/AdaptiveIndex/AdaptiveIndexEngine.cs:303-307` | Old index implementing IAsyncDisposable not disposed when morph swaps to new index — resource leak on every index morph transition. |
+| 708 | 2 | P2 | `VDE/AdaptiveIndex/BwTree.cs:224-253` | Epoch not guaranteed released if enumerator abandoned mid-iteration — leaked epoch blocks garbage collection of all subsequent delta chains. |
+| 709 | 12 | P2 | `VDE/AdaptiveIndex/BeTree.cs:637` | Flush writes pending messages into leaf nodes but doesn't clear them from pending list within same lock — concurrent reader sees both pending and flushed copy. |
+| 710 | 13 | LOW | `Validation/SqlSecurity.cs:378` | `IsReservedWord` allocates new `HashSet<string>` per call — should be static readonly. |
+| 711 | 13 | LOW | `Validation/SqlSecurity.cs:575` | `ValidateOperator` allocates new `HashSet<string>` per call — same pattern. |
+| 712 | 15 | LOW | `VDE/AdaptiveIndex/BeTree.cs:223` | Upsert message type used in UpdateAsync — contract lie, named "Update" but semantically an upsert. |
+| 713 | 13 | LOW | `VDE/AdaptiveIndex/ArtIndex.cs:149` | Gratuitous `await Task.CompletedTask` in synchronous path — unnecessary allocation. |
+| 714 | 2 | LOW | `VDE/AdaptiveIndex/BeTreeForest.cs:243` | `_shards.Count` accessed without lock in property getter — stale read possible during concurrent shard creation. |
+| 715 | 12 | LOW | `VDE/AdaptiveIndex/BloofiFilter.cs:507` | `IsLeaf` invariant undocumented — tree correctness depends on fragile child-count check with no assertion or comment. |
+| 716 | 1 | LOW | `Validation/SqlSecurity.cs:55-59` | `_cacheMaxSize` parameter accepted but ignored — cache grows unbounded regardless of configured limit. |
+| 717 | 13 | LOW | `VDE/AdaptiveIndex/BwTree.cs:465` | Hash-based page lookup O(1) amortized but worst-case unbounded on collision chains — no rehash threshold. |
+
+**Clean files:** SizeLimitOptions.cs, AlexModel.cs, ArtNode.cs, BwTreeDeltaRecord.cs
+
+---
+
+### Chunk 049 (15 files: VDE/AdaptiveIndex/BwTreeMappingTable+ClockSiTransaction+CrushPlacement+DirectPointerIndex+DisruptorMessageBus+DisruptorRingBuffer+DistributedRoutingIndex+EpochManager+ExtendibleHashBucket+ExtendibleHashTable+GpuVectorKernels+HilbertCurveEngine+HilbertPartitioner+HnswIndex+IAdaptiveIndex)
+
+**Files Reviewed:** 15 | **Findings:** 22 (6 P1, 9 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 718 | 1 | P1 | `VDE/AdaptiveIndex/GpuVectorKernels.cs:129-149,298-308,322-333` | Both IlgpuVectorAccelerator and CuvsVectorAccelerator are GPU stubs executing CPU code while reporting `IsAvailable=true` — contract lie, callers believe GPU acceleration is active but get CPU fallback performance. |
+| 719 | 1 | P1 | `VDE/AdaptiveIndex/ClockSiTransaction.cs:416-433` | `PrepareShardAsync` always returns true (stub) — no actual conflict detection implemented, distributed transactions silently commit conflicting writes. |
+| 720 | 3 | P1 | `VDE/AdaptiveIndex/DisruptorMessageBus.cs:205` | Sync-over-async `.GetAwaiter().GetResult()` in PublishAsync hot path — blocks threadpool thread, deadlock risk under load. |
+| 721 | 2 | P1 | `VDE/AdaptiveIndex/DisruptorRingBuffer.cs:598-668` | `Sequence` and `ProcessedCount` are plain long fields read/written across threads without volatile or Interlocked — torn reads on 32-bit, stale values on 64-bit causing consumer to skip or re-read entries. |
+| 722 | 13 | P1 | `VDE/AdaptiveIndex/HnswIndex.cs:582-619` | O(n²) `SearchLayer` — `results.Max` called inside inner loop, each Max is O(k) over results list. Should use priority queue. |
+| 723 | 13 | P1 | `VDE/AdaptiveIndex/HnswIndex.cs:724` | O(n) `AddNeighbor` duplicate check via `List.Contains` — called for every edge insertion, degrades to O(n²) on dense graphs. |
+| 724 | 5 | P2 | `VDE/AdaptiveIndex/GpuVectorKernels.cs:112-116` | Silent catch in IlgpuVectorAccelerator constructor — GPU init failure swallowed, no logging, falls through to CPU without any indication. |
+| 725 | 5 | P2 | `VDE/AdaptiveIndex/GpuVectorKernels.cs:492-514` | Silent catch in VectorAcceleratorFactory.Create — same pattern, all GPU errors silently swallowed. |
+| 726 | 12 | P2 | `VDE/AdaptiveIndex/DisruptorMessageBus.cs:317-349` | Channel mode doesn't fan out to multiple subscribers — only one subscriber receives each message, others silently miss it. |
+| 727 | 2 | P2 | `VDE/AdaptiveIndex/CrushPlacement.cs:98-103` | `CrushBucket.IsDown` bool read/written across threads without synchronization — stale reads cause routing to downed nodes. |
+| 728 | 9 | P2 | `VDE/AdaptiveIndex/ExtendibleHashTable.cs:194-232` | Unbounded recursion in `InsertInternal` — split-then-retry loop with no depth limit, pathological key distribution causes StackOverflowException. |
+| 729 | 14 | P2 | `VDE/AdaptiveIndex/ExtendibleHashBucket.cs:132-148` | Deserialized `count` not validated against buffer bounds — crafted input causes out-of-bounds read. |
+| 730 | 15 | P2 | `VDE/AdaptiveIndex/HilbertPartitioner.cs:65` | Hardcoded 2-dimensional in general-purpose API — `DimensionCount` parameter accepted but `HilbertToXY` only works for 2D, silently returns garbage for higher dimensions. |
+| 731 | 2 | P2 | `VDE/AdaptiveIndex/DisruptorRingBuffer.cs:374-394` | TOCTOU in `MinimumGatingSequence` — reads multiple sequence values without snapshot, result inconsistent if producers advance between reads. |
+| 732 | 5 | P2 | `VDE/AdaptiveIndex/GpuVectorKernels.cs:combined` | Multiple silent catch blocks across GPU initialization paths — all swallow exceptions without logging or metrics. |
+| 733 | 13 | LOW | `VDE/AdaptiveIndex/HilbertCurveEngine.cs:525-554` | 1M point materialization — `GetAllPointsInRegion` generates all Hilbert indices for region before filtering, extreme memory for large volumes. |
+| 734 | 13 | LOW | `VDE/AdaptiveIndex/DistributedRoutingIndex.cs:433-445` | Naive k-way merge — sequential merge of k sorted streams, should use heap-based merge for O(n log k). |
+| 735 | 12 | LOW | `VDE/AdaptiveIndex/BwTreeMappingTable.cs:115-118` | `pageId` long → int truncation — `Interlocked.Increment(ref _nextPageId)` returns long but used as int index, overflow after 2B pages. |
+| 736 | 7 | LOW | `VDE/AdaptiveIndex/ClockSiTransaction.cs:446-454` | Unsynchronized Dispose — no disposed guard, concurrent Dispose+Commit can corrupt transaction state. |
+| 737 | 12 | LOW | `VDE/AdaptiveIndex/DirectPointerIndex.cs:146-152` | `RecommendLevelAsync` dead-code conditional — always returns same level regardless of input, recommendation logic is no-op. |
+| 738 | 13 | LOW | `VDE/AdaptiveIndex/EpochManager.cs:160-193` | `TryCollect` O(n) scan over all threads every collection cycle — performance cliff with many concurrent threads. |
+| 739 | 6 | LOW | `VDE/AdaptiveIndex/DisruptorMessageBus.cs:383-390` | `RemoveSubscription` doesn't await ReaderTask — fire-and-forget cleanup, reader may still be processing when caller assumes unsubscribed. |
+
+**Clean files:** IAdaptiveIndex.cs
+
+---
+
+### Chunk 050 (15 files: VDE/AdaptiveIndex/IndexMirroring+IndexMorphAdvisor+IndexMorphPolicy+IndexRaid+IndexStriping+IndexTiering+IoUringBindings+IoUringBlockDevice+LearnedShardRouter+Masstree+MorphLevel+MorphMetrics+MorphTransition+MorphTransitionEngine+PersistentExtentTree)
+
+**Files Reviewed:** 15 | **Findings:** 16 (6 P1, 6 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 740 | 2 | P1 | `VDE/AdaptiveIndex/IoUringBlockDevice.cs:58,633,638` | `_disposed` is plain bool with no synchronization — concurrent Dispose+ReadBlock race causes use-after-free on native memory pointers. Needs `Interlocked.Exchange` guard. |
+| 741 | 2 | P1 | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:43,433-434` | `_currentTransition` read without volatile/lock from `GetProgress()` and `EnqueueDualWrite()` — stale null on ARM/NUMA silently discards dual writes. |
+| 742 | 5 | P1 | `VDE/AdaptiveIndex/IndexMirroring.cs:288-293` | Silent catch in `PropagateWriteAsync` — sets health to Degraded and enqueues retry but never logs the exception. Operator has zero visibility into failure type. |
+| 743 | 6 | P1 | `VDE/AdaptiveIndex/IndexTiering.cs:80,125,137` | Fire-and-forget `_ = PromoteAsync(...)` uses caller's request-scoped CancellationToken — cancelled requests silently abandon promotion, key stuck in wrong tier. |
+| 744 | 1 | P1 | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:531-539` | Rule 13 stub — `CreateIndexForLevel` throws NotSupportedException for levels 3-6 (BeTree, LearnedIndex, BeTreeForest, DistributedRouting). Blocks production morph at scale. |
+| 745 | 7 | P1 | `VDE/AdaptiveIndex/IoUringBlockDevice.cs:133-138` | `RegisterBuffers` failure silently ignored but read/write unconditionally use `PrepReadFixed`/`PrepWriteFixed` — every I/O fails with EFAULT after registration failure. |
+| 746 | 6 | P2 | `VDE/AdaptiveIndex/IndexTiering.cs:79-83` | Timer callback `_ = ManageTiersAsync()` — discarded Task, no mechanism to verify callback completes before DisposeAsync returns. |
+| 747 | 2 | P2 | `VDE/AdaptiveIndex/MorphTransition.cs:71,98-107` | `_state` field not volatile — monitoring threads may observe stale MorphTransitionState values. |
+| 748 | 2 | P2 | `VDE/AdaptiveIndex/PersistentExtentTree.cs:62,72,706-709` | `_disposed` plain bool, DisposeAsync has no idempotency guard — concurrent callers double-dispose ReaderWriterLockSlim. |
+| 749 | 13 | P2 | `VDE/AdaptiveIndex/PersistentExtentTree.cs:685-702` | `SnapshotExtents` destructively extracts and reinserts all extents O(n log n) — mutates live tree during what should be a read. |
+| 750 | 12 | P2 | `VDE/AdaptiveIndex/LearnedShardRouter.cs:209-212` | TOCTOU in `DecrementShardCount` — non-atomic read-check-decrement can drive count to -1, corrupting shard load tracking. |
+| 751 | 9 | P2 | `VDE/AdaptiveIndex/PersistentExtentTree.cs:461` | `AllocateBlock` return value not validated — error sentinel (-1/0) used as block number, corrupts superblock. |
+| 752 | 15 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:253-269` | `EvaluateAsync` named Async but does no async work and no interface forces the signature — misleading. |
+| 753 | 9 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:408-416` | OperationCanceledException caught but no WAL abort marker written — crash recovery may resume aborted transition. |
+| 754 | 2 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:76,225` | `DisabledLevels ??=` inside lock but property publicly mutable — external assignment can race. |
+| 755 | 1 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:493-498` | `JournalEntry.TransactionId` hardcoded to -1 — prevents crash-recovery correlation with transaction scope. |
+
+**Clean files:** IndexMorphPolicy.cs, IndexRaid.cs, IoUringBindings.cs, MorphLevel.cs, MorphMetrics.cs, Masstree.cs, IndexStriping.cs
+
+---
+
+### Chunk 051 (15 files: VDE/AdaptiveIndex/ProductQuantizer+SimdOperations+SortedArrayIndex+TrainedZstdDictionary, VDE/Allocation/AllocationGroup+AllocationGroupDescriptorTable+AllocationPolicy+ExtentTree+ExtentTreeNode+SubBlockBitmap+SubBlockPacker, VDE/BlockAllocation/BitmapAllocator+ExtentTree+FreeSpaceManager+IBlockAllocator)
+
+**Files Reviewed:** 15 | **Findings:** 11 (3 P1, 5 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 756 | 12 | P1 | `VDE/BlockAllocation/ExtentTree.cs:64-65` | Merged extent block count double-counts `count` — formula `(toMerge.Max(EndBlock) - mergedStart) + count` inflates size when adjacent on both sides, corrupts free-space accounting and causes double-allocation. |
+| 757 | 12 | P1 | `VDE/BlockAllocation/FreeSpaceManager.cs:92-109` | `AllocateExtent` extent-found path has vestigial loop that frees-then-reallocates arbitrary blocks, then discards result and calls `AllocateExtent` again — bitmap/extent-tree desynchronization, data corruption. |
+| 758 | 2 | P1 | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:849-850` | `DictionaryRetrainer.RetrainCount++` and `LastRetrainTime` written from timer thread without volatile/Interlocked — torn reads from monitoring. `_baselineRatio` double also unsynchronized. |
+| 759 | 12 | P2 | `VDE/Allocation/ExtentTree.cs:532-534` | `TryMergeOrRedistributeAsync` frees wrong block — sibling's original block number not captured before mutation, permanent block leak on every merge. |
+| 760 | 3 | P2 | `VDE/BlockAllocation/FreeSpaceManager.cs:131,151` | `FreeBlock`/`FreeExtent` use `_lock.Wait()` alongside async callers using `WaitAsync` — deadlock risk if called from async continuation. |
+| 761 | 7 | P2 | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:868-871` | `DictionaryRetrainer.Dispose()` doesn't dispose `_currentCompressor` (IDisposable) — final compressor leaked. |
+| 762 | 14 | P2 | `VDE/AdaptiveIndex/ProductQuantizer.cs:229-255` | `Deserialize` reads `dimension`, `m`, `k`, `subDim` from untrusted stream without bounds validation — crafted input causes OOM via arbitrary allocation. |
+| 763 | 13 | P2 | `VDE/Allocation/AllocationGroup.cs:78-98` | `FragmentationRatio` iterates every block individually O(n) with read lock held — 32K iterations for 128MB group, blocks all concurrent writes. |
+| 764 | 15 | LOW | `VDE/AdaptiveIndex/SimdOperations.cs:372` | `XxHash64Simd` name implies SIMD but implementation is pure scalar — contract lie, misleads callers. |
+| 765 | 14 | LOW | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:582-584` | `dictSize` read as uint from untrusted block device, cast to int without bounds check — overflow to negative causes invalid block reads. |
+| 766 | 2 | LOW | `VDE/Allocation/SubBlockBitmap.cs:26` | `_blockSlotBitmaps` is plain `Dictionary<long, byte[]>` on public class with no thread-safety contract — external callers bypass SubBlockPacker lock. |
+
+**Clean files:** SortedArrayIndex.cs, AllocationPolicy.cs, AllocationGroupDescriptorTable.cs, ExtentTreeNode.cs, IBlockAllocator.cs
+
+---
+
+### Chunk 052 (15 files: VDE/BlockAllocation/SimdBitmapScanner, VDE/BlockExport/IVdeBlockExporter+VdeBlockExportPath+ZeroCopyBlockReader, VDE/Cache/AdaptiveReplacementCache+ArcCacheL2Mmap+ArcCacheL3NVMe+IArcCache, VDE/Compatibility/CompatibilityModeContext+MigrationModuleSelector+V1CompatibilityLayer+VdeFormatDetector+VdeMigrationEngine, VDE/Compression/PerExtentCompressor, VDE/Concurrency/StripedWriteLock)
+
+**Files Reviewed:** 15 | **Findings:** 8 (4 P1, 3 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 767 | 7 | P1 | `VDE/BlockExport/ZeroCopyBlockReader.cs:63-75` | MemoryMappedViewAccessor held open for object lifetime after full file read into managed buffer — wastes OS handle, prevents file release on Windows. Accessor unused after constructor. |
+| 768 | 2 | P1 | `VDE/BlockExport/ZeroCopyBlockReader.cs:36,200-206` | `_disposed` plain bool with no volatile/Interlocked — concurrent Dispose+Read race. Same in ArcCacheL2Mmap:36 and ArcCacheL3NVMe:38. |
+| 769 | 5 | P1 | `VDE/Cache/ArcCacheL3NVMe.cs:339-343` | Silent catch in `EnsureInitialized` — FileStream construction failure swallowed with zero logging, L3 cache silently disabled for entire lifetime. |
+| 770 | 2 | P1 | `VDE/Cache/ArcCacheL3NVMe.cs:319-344` | Double-checked locking on non-volatile `_initialized` — stale reads on ARM/weakly-ordered CPUs. Same in ArcCacheL2Mmap:137. |
+| 771 | 13 | P2 | `VDE/BlockExport/ZeroCopyBlockReader.cs:74-75` | Entire VDE file read into managed byte[] in constructor — LOH allocation, Gen2 GC pressure, defeats zero-copy purpose. |
+| 772 | 12 | P2 | `VDE/Compatibility/VdeMigrationEngine.cs:279-293` | Partial-batch short-read writes truncated data but `blocksCopied` increments by full batch — silent data corruption on migration. |
+| 773 | 9 | P2 | `VDE/Compression/PerExtentCompressor.cs:144-149` | BrotliStream decompression truncation silently returns zero-padded buffer — caller cannot distinguish success from corruption. |
+| 774 | 15 | LOW | `VDE/Concurrency/StripedWriteLock.cs:54-59` | `AcquireAsync(null)` throws NullReferenceException instead of ArgumentNullException; stripe collision semantics undocumented. |
+
+**Clean files:** SimdBitmapScanner.cs, IVdeBlockExporter.cs, VdeBlockExportPath.cs, IArcCache.cs, CompatibilityModeContext.cs, MigrationModuleSelector.cs, V1CompatibilityLayer.cs, VdeFormatDetector.cs, AdaptiveReplacementCache.cs
+
+---
+
+### Chunk 053 (15 files: VDE/Concurrency/WriteRegion, VDE/Container/ContainerFile+ContainerFormat+Superblock, VDE/CopyOnWrite/CowBlockManager+ExtentAwareCowManager+ICowEngine+SnapshotManager+SpaceReclaimer, VDE/Encryption/PerExtentEncryptor, VDE/FileBlockDevice, VDE/FileExtension/ContentDetectionResult+DwvdContentDetector+DwvdMimeType+Import/DwvdImporter)
+
+**Files Reviewed:** 15 | **Findings:** 18 (6 P1, 7 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 775 | 1 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:306-310` | `CollectBlockNumbersAsync` only collects indirect/double-indirect pointer blocks themselves, not the data blocks they reference — snapshots of large files miss data blocks, incorrect refcount frees in-use blocks. Same gap in SpaceReclaimer.cs:139-154. |
+| 776 | 1 | P1 | `VDE/CopyOnWrite/SpaceReclaimer.cs:277-289` | `MarkSweepGarbageCollectAsync` sweep phase is explicitly incomplete — comment states "In a full implementation, we'd iterate…" but no blocks are actually freed. Reports `BlocksFreed` count without freeing. Disk fills permanently. |
+| 777 | 2 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:67-68` | `_snapshots` (List\<Snapshot\>) and `_nextSnapshotId` (long) are shared mutable fields with zero synchronization — concurrent create+delete produces lost updates, duplicate IDs, or exception from mid-iteration modification. |
+| 778 | 12 | P1 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:84-96` | `DecrementRef` removes entry when count hits 0, but subsequent `GetRefCount` returns default 1 — extents at zero silently treated as ref-count 1, causing double-use of freed blocks. |
+| 779 | 2 | P1 | `VDE/Container/ContainerFile.cs:17` + `VDE/FileBlockDevice.cs:19` | `_disposed` plain bool without volatile in both — concurrent async operations may not see disposal on weakly-ordered hardware. |
+| 780 | 4 | P1 | `VDE/Encryption/PerExtentEncryptor.cs:139-151` | `DeriveNonce` uses HKDF with empty salt (all-zero HMAC key) — weakens nonce derivation per RFC 5869. Nonce fully deterministic without per-volume secret, enabling prediction across shared-key volumes. |
+| 781 | 13 | P2 | `VDE/CopyOnWrite/CowBlockManager.cs:291-296` | `EncodeBlockNumberKey` allocates new byte[8] per call on hot path — massive GC pressure on high-throughput snapshot workloads. |
+| 782 | 12 | P2 | `VDE/Container/ContainerFormat.cs:66-86` | Layout recalculation produces different bitmap/checksum counts than initially reserved regions — potential region overlap if counts grew. |
+| 783 | 3 | P2 | `VDE/FileExtension/DwvdContentDetector.cs:254-271` | `IsLikelyDwvd(string)` uses synchronous FileStream.Read in library code — blocks thread-pool thread on network paths. |
+| 784 | 5 | P2 | `VDE/FileExtension/DwvdContentDetector.cs:49-56,106-110,136-139` | Three catch blocks silently swallow all exceptions including OOM/NRE — should narrow to InvalidDataException/FormatException. |
+| 785 | 1 | P2 | `VDE/FileExtension/Import/DwvdImporter.cs:479-493` | `GetSourceDataOffset` returns hardcoded offsets with explicit "simplified approach" comment — VMDK/QCOW2 imports include format metadata as data. |
+| 786 | 14 | P2 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:391-411` | `DeserializeRefCounts` reads `entryCount` from untrusted data without sanity check — corrupt/malicious value silently truncated by offset guard with no corruption detection. |
+| 787 | 9 | P2 | `VDE/FileExtension/Import/DwvdImporter.cs:314-316` | VMDK descriptor parsing — malformed descriptor line could cause IndexOutOfRangeException on `parts[1]`. |
+| 788 | 15 | LOW | `VDE/Encryption/PerExtentEncryptor.cs:71,108` | `EncryptExtentAsync`/`DecryptExtentAsync` named Async but entirely synchronous with Task.FromResult — contract lie. |
+| 789 | 12 | LOW | `VDE/CopyOnWrite/SpaceReclaimer.cs:226` | Hardcoded `blockSize = 4096` with "use VdeConstants.DefaultBlockSize in production" comment — wrong estimates on non-default block sizes. |
+| 790 | 14 | LOW | `VDE/Container/Superblock.cs:186-187` | Deserialized `blockSize` not validated against Min/MaxBlockSize — extreme values pass checksum but cause downstream exceptions. |
+| 791 | 13 | LOW | `VDE/CopyOnWrite/SnapshotManager.cs:106,173,219` | `_snapshots.Any()`/`FirstOrDefault()` O(n) scans on every mutation — performance cliff with thousands of snapshots. |
+| 792 | 9 | LOW | `VDE/CopyOnWrite/CowBlockManager.cs:238` | B-Tree operations in `DecrementRefInternalAsync` bypass WAL transaction — crash between WAL entry and B-Tree update leaves inconsistent state. |
+
+**Clean files:** WriteRegion.cs, ICowEngine.cs, ContentDetectionResult.cs, DwvdMimeType.cs
+
+---
+
+### Chunk 054 (15 files: VDE/FileExtension/Import/FormatDetector+ImportResult+ImportSuggestion+VirtualDiskFormat, VDE/FileExtension/OsIntegration/LinuxMagicRule+LinuxMimeInfo+MacOsUti+WindowsProgId+WindowsRegistryBuilder+WindowsShellHandler, VDE/FileExtension/SecondaryExtension, VDE/FormalVerification/BTreeInvariantsModel+RaftConsensusModel+TlaPlusModels+WalRecoveryModel)
+
+**Files Reviewed:** 15 | **Findings:** 10 (3 P1, 4 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 793 | 5 | P1 | `VDE/FileExtension/Import/ImportSuggestion.cs:58-66` | Bare `catch` with no type filter silently discards all exceptions (including OOM) — `EstimatedDwvdSizeBytes` of 0 conflated with "unknown". Should narrow to IOException/UnauthorizedAccessException. |
+| 794 | 12 | P1 | `VDE/FileExtension/OsIntegration/WindowsShellHandler.cs:104` | `CommandTemplate.Replace("dw ", ...)` not anchored to start — matches substring anywhere in template, produces broken commands if "dw " appears mid-string (e.g., `--dw-details`). |
+| 795 | 14 | P1 | `VDE/FileExtension/Import/FormatDetector.cs:127` | `stream.Length` throws NotSupportedException on non-seekable streams — no `CanSeek` guard. |
+| 796 | 15 | P2 | `VDE/FileExtension/Import/VirtualDiskFormat.cs:18` | VHD doc says "conectix at offset 0 for fixed, end-512 for dynamic" but FormatDetector only checks offset 0 — dynamic VHD returns Unknown. |
+| 797 | 13 | P2 | `VDE/FileExtension/Import/ImportSuggestion.cs:50` | `format.ToString().ToLowerInvariant()` allocates via reflection per call — should use switch lookup for fixed enum set. |
+| 798 | 4 | P2 | `VDE/FileExtension/OsIntegration/WindowsRegistryBuilder.cs:80` | `$ErrorActionPreference = 'SilentlyContinue'` at script level swallows all PowerShell errors — partial registration undetectable. |
+| 799 | 12 | P2 | `VDE/FormalVerification/TlaPlusModels.cs:183-192` | Generated CI script references `${ModuleName_SPEC}` bash variables that are never populated — all generated .tla/.cfg files empty, TLC fails. |
+| 800 | 9 | LOW | `VDE/FileExtension/OsIntegration/LinuxMimeInfo.cs:107-108` | `BuildSharedMimeInfoXml()` brittle against XML-unsafe characters in MIME type constants — no validation guard. |
+| 801 | 15 | LOW | `VDE/FormalVerification/BTreeInvariantsModel.cs:158-159` | TLA+ `InsertIntoLeaf` uses `\\/ TRUE` vacuously-true guard — undermines OrderInvariant/BalanceInvariant model checking. |
+| 802 | 13 | LOW | `VDE/FormalVerification/TlaPlusModels.cs:332` | `string.Split('\n')` allocates proportional to TLC output size — should use span-based enumeration. |
+
+**Clean files:** ImportResult.cs, VirtualDiskFormat.cs, LinuxMagicRule.cs, MacOsUti.cs, WindowsProgId.cs, SecondaryExtension.cs, RaftConsensusModel.cs, WalRecoveryModel.cs
+
+---
+
+### Chunk 055 (15 files: VDE/Format/AddressWidthDescriptor+BlockAddressing+BlockTypeTags+CompactInode64+DualWalHeader+ExtendedInode512+ExtendedMetadata+FeatureFlags+FormatConstants+InodeExtent+InodeLayoutDescriptor+InodeSizeCalculator+InodeV2+IntegrityAnchor+MagicSignature)
+
+**Files Reviewed:** 15 | **Findings:** 13 (4 P1, 6 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 803 | 10 | P1 | `VDE/Format/DualWalHeader.cs:33` | `SerializedSize = 82` but only 81 bytes written/read — off-by-one corrupts capacity calculations, uninitialized garbage byte at position 81. |
+| 804 | 10 | P1 | `VDE/Format/CompactInode64.cs:157-162` | `Equals` excludes `InlineData` — two inodes with different content compare equal, breaks dedup/cache/snapshot diffing. |
+| 805 | 12 | P1 | `VDE/Format/AddressWidthDescriptor.cs:122` | 75% threshold check multiplies `long.MaxValue * 0.75` — relies on undocumented sentinel contract, fragile if MaxBlockCount changes. |
+| 806 | 10 | P1 | `VDE/Format/IntegrityAnchor.cs:226-229` | `Equals` compares only 3 scalar fields, ignores all 10 hash arrays — attacker-supplied anchor accepted as matching if counter/generation/timestamp known. Security risk in tamper-detection context. |
+| 807 | 10 | P2 | `VDE/Format/ExtendedMetadata.cs:349` | `Equals` compares only NamespaceUuid, ignores all content fields — useless for change detection. |
+| 808 | 15 | P2 | `VDE/Format/CompactInode64.cs:96-103` | `ToStandardInode()` silently discards InlineData payload — returned InodeV2 has Size but no data, contract implies safe upgrade. |
+| 809 | 14 | P2 | `VDE/Format/InodeExtent.cs:66-72` | Constructor accepts negative blockCount/startBlock/logicalOffset from deserialized on-disk bytes without validation. |
+| 810 | 14 | P2 | `VDE/Format/InodeLayoutDescriptor.cs:281-294` | `moduleFieldCount` from untrusted buffer used to allocate array without upper-bound check — DoS via 255-element allocation per inode read. |
+| 811 | 12 | P2 | `VDE/Format/ExtendedInode512.cs:191-193` | `CreatedUtc * 100` tick-to-nanosecond conversion overflows for any modern date (2026 ticks * 100 > long.MaxValue) — silently wraps to garbage. |
+| 812 | 15 | P2 | `VDE/Format/BlockAddressing.cs:34-42` | `ByteOffsetToBlock` documented as requiring block-aligned offset but silently truncates non-aligned — contract lie. |
+| 813 | 15 | LOW | `VDE/Format/FeatureFlags.cs:152-153` | `HasIncompatibleFeatures` uses OR semantics but name implies AND — confusing for callers checking specific flag pairs. |
+| 814 | 15 | LOW | `VDE/Format/InodeLayoutDescriptor.cs:307-311` | `Equals` excludes ModuleFields — structurally incomplete equality for layout descriptors. |
+| 815 | 13 | LOW | `VDE/Format/BlockTypeTags.cs:153-162` | `StringToTag` doesn't validate ASCII — non-ASCII chars silently produce wrong tag values. |
+
+**Clean files:** FormatConstants.cs, MagicSignature.cs, InodeSizeCalculator.cs, InodeV2.cs
+
+---
+
+### Chunk 056 (15 files: VDE/Format/MixedInodeAllocator–VdeCreator, VDE/IBlockDevice, VDE/Identity/EmergencyRecoveryBlock)
+
+**Files Reviewed:** 15 | **Findings:** 12 (3 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 816 | 3 | P1 | `VDE/Identity/EmergencyRecoveryBlock.cs:277-312` | `WriteAsync` uses synchronous `BinaryWriter` inside an async method, blocking the thread pool. Additionally, `stackalloc byte[4096]` is dead — allocated but overwritten by `ms.ToArray()` before use. |
+| 817 | 10 | P1 | `VDE/Format/SuperblockGroup.cs:43-45` | `BlockTags` array is `[SUPB, RMAP, SUPB, SUPB]` but blocks 2 and 3 should be EXMD and IANT respectively — validation/recovery code will misidentify block types, corrupting format metadata. |
+| 818 | 9 | P1 | `VDE/Format/VdeCreator.cs:285-286` | `InodeTableDefaultBlocks = 1024` acts as a hard cap, not a default — volumes with >1024 × blockSize inodes immediately exhaust the inode table. Large volumes (TB+) fail silently. |
+| 819 | 1 | P2 | `VDE/Format/ThinProvisioning.cs:212-228` | `GetPhysicalSizeUnix` returns `logicalSize` (the file's logical size) instead of actual disk blocks — defeats the purpose of thin provisioning metrics on Linux. |
+| 820 | 5 | P2 | `VDE/Format/ThinProvisioning.cs:204-208` | `GetPhysicalSizeWindows` has a silent catch that swallows I/O errors and falls back to logical size — masks real disk failures. |
+| 821 | 14 | P2 | `VDE/Format/VdeCreator.cs:361-415` | `ValidateVde` reads `blockSize` from on-disk superblock and uses it for allocation calculations without validating range — corrupt/malicious superblock causes divide-by-zero or massive allocation. |
+| 822 | 14 | P2 | `VDE/Format/MixedInodeAllocator.cs:164-170` | `blockSize` parameter used in division without zero-check — `DivideByZeroException` if caller passes 0. |
+| 823 | 14 | P2 | `VDE/Identity/EmergencyRecoveryBlock.cs:277-294` | `blockSize` parameter used for `stackalloc` and division without validation — zero or negative value causes stack overflow or divide-by-zero. |
+| 824 | 15 | LOW | `VDE/Format/VdeCreator.cs:67-70` | `InodeTableDefaultBlocks` name implies a default but acts as a hard maximum — misleading constant name causes confusion about scalability. |
+| 825 | 5 | LOW | `VDE/Format/SuperblockV2.cs:255-259` | `BinaryPrimitives.TryWriteInt64LittleEndian` return value discarded — if buffer is too small, the write silently fails and superblock is corrupt. |
+| 826 | 2 | LOW | `VDE/Format/RegionDirectory.cs:23,68-79` | `_regions` list is a mutable `List<RegionEntry>` in a sealed class with no synchronization — concurrent readers and writers cause data races. |
+| 827 | 15 | LOW | `VDE/Format/ModuleDefinitions.cs:280-288` | `ComplianceModule` and `AuditLogModule` both use `ALOG` block type tag — on-disk blocks are ambiguous, recovery cannot distinguish the two module types. |
+
+**Clean files:** ModuleConfig.cs, ModuleManifest.cs, RegionPointerTable.cs, UniversalBlockTrailer.cs, VdeCreationProfile.cs, WideBlockAddress.cs, IBlockDevice.cs
+
+---
+
+### Chunk 057 (15 files: VDE/Identity/FileSizeSentinel–VdeNestingValidator, VDE/Index/BTree–IBTreeIndex)
+
+**Files Reviewed:** 15 | **Findings:** 14 (5 P1, 6 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 828 | 4 | P1 | `VDE/Identity/NamespaceAuthority.cs:255` | `SignRegistration` signs with the public key instead of the private key — anyone who possesses the `NamespaceRegistration` can forge valid signatures, completely defeating namespace authentication. |
+| 829 | 2 | P1 | `VDE/Index/BTree.cs:67-96,244-282` | `ReaderWriterLockSlim` acquired synchronously then `await` called inside the lock body — the lock is thread-affine and will be released on a different thread, causing `SynchronizationLockException` or silent corruption. |
+| 830 | 9 | P1 | `VDE/Index/BTree.cs:147-156` | `_rootBlockNumber` mutated before `FlushAsync` — if flush fails, the in-memory root pointer is permanently wrong and the B-Tree is broken for the rest of the session with no rollback. |
+| 831 | 1 | P1 | `VDE/Index/BTree.cs:146-151` | Explicit rollback stub: comment says "in a full implementation, would revert changes" — delete operations silently corrupt the tree on failure. |
+| 832 | 1 | P1 | `VDE/Index/BTree.cs:532-559` | `DeleteFromNodeAsync` is missing B-Tree rebalancing logic — `IsUnderflow` property is defined on `BTreeNode` but never called. Deletes eventually violate the B-Tree invariant (minimum fill), degrading to a linked list. |
+| 833 | 13 | P2 | `VDE/Index/BTree.cs:336-340` | Cache eviction uses `OrderBy(x => x.Value.lastAccess)` on 1000 entries under a write lock — O(n log n) sort blocks all concurrent readers during eviction. |
+| 834 | 10 | P2 | `VDE/Index/BTree.cs:354-382` | WAL `JournalEntry.BeforeImage` is always set to `null` — undo-based recovery is impossible, WAL can only redo, not rollback. |
+| 835 | 14 | P2 | `VDE/Index/BTreeNode.cs:260-316` | `KeyCount` deserialized from untrusted on-disk data is not validated against `MaxKeys` — corrupt value causes out-of-bounds array access. |
+| 836 | 14 | P2 | `VDE/Index/BTreeNode.cs:284-299` | `keyLengths` array values read from disk are not validated against `MaxKeySize` or remaining buffer length — malicious data causes `ArgumentOutOfRangeException` or buffer over-read. |
+| 837 | 13 | P2 | `VDE/Index/BulkLoader.cs:113-126` | `IAsyncEnumerable<KeyValuePair>` fully materialized to `List` before processing — defeats the streaming purpose, OOM risk on large datasets. |
+| 838 | 9 | P2 | `VDE/Identity/VdeNestingValidator.cs:65-83` | Unbounded recursive I/O scan — a chain of nested VDEs causes unbounded recursion with disk reads at each level, no depth limit. |
+| 839 | 15 | LOW | `VDE/Identity/NamespaceAuthority.cs:159` | Comment says "deterministic UUID" but implementation uses `Guid.NewGuid()` — contract lie, UUID is random not deterministic. |
+| 840 | 1 | LOW | `VDE/Identity/MetadataChainHasher.cs:89` | `Generation` field hardcoded to `1L` always — chain versioning is non-functional, all entries appear to be generation 1. |
+| 841 | 14 | LOW | `VDE/Identity/TamperDetectionOrchestrator.cs:134-188` | `blockSize` from external source used for `stackalloc` and division without validation — zero or extreme values cause stack overflow or divide-by-zero. |
+
+**Clean files:** FileSizeSentinel.cs, FormatFingerprintValidator.cs, HeaderIntegritySeal.cs, LastWriterIdentity.cs, TamperResponse.cs, VdeHealthMetadata.cs, VdeIdentityException.cs, IBTreeIndex.cs
+
+---
+
+### Chunk 058 (15 files: VDE/Index/RoaringBitmapTagIndex–Lakehouse/LakehouseTableOperations)
+
+**Files Reviewed:** 15 | **Findings:** 20 (2 P0, 8 P1, 10 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 842 | 2/9 | P0 | `VDE/Journal/WriteAheadLog.cs:46-64` | `_headBlock` and `_tailBlock` read with separate `Interlocked.Read` calls — torn pair between reads allows `WalUtilization` and `GetAvailableBlocks` to return inconsistent values. `EnsureSpaceAsync` uses torn utilization to decide checkpointing, risking writes into a full WAL. |
+| 843 | 9/1 | P0 | `VDE/Journal/WriteAheadLog.cs:311` | `blockOffset = (_headBlock == 1 ? 0 : 0)` — trivially constant expression means every entry starts at byte 0 of its block. Entries smaller than a block each consume a full block, exhausting WAL 100x faster than expected for small entries. Comment says "Simplified: start at block beginning". |
+| 844 | 9 | P1 | `VDE/Journal/WriteAheadLog.cs:486` | `DisposeAsync` does `await Task.CompletedTask` — no `FlushAsync` or `WriteHeaderAsync` call. Un-flushed entries and stale header on disk cause `ReplayAsync` to miss or double-replay entries after restart. |
+| 845 | 15/1 | P1 | `VDE/Integrity/HierarchicalChecksumTree.cs:320-324` | `Level3Ok = computedRoot.Length == HashSize` — always true for SHA-256. No comparison against a stored Merkle root. The three-level integrity guarantee is only two levels; Level 3 silently passes for corrupt objects. |
+| 846 | 11 | P1 | `VDE/Lakehouse/DeltaIcebergTransactionLog.cs:295-301` | `CommitMultiTableAsync` catch block documents rollback but only rethrows — partial commits left in `_tables`. Breaks atomicity guarantee (`IsAtomic = true` flag is a lie for failed multi-table commits). |
+| 847 | 2 | P1 | `VDE/Lakehouse/DeltaIcebergTransactionLog.cs:508-511` | `GetOrCreateTableLock` can create new `SemaphoreSlim` after `Dispose` due to TOCTOU on non-volatile `_disposed` field — leaked semaphores and potential deadlocks. |
+| 848 | 9 | P1 | `VDE/Integrity/MerkleIntegrityVerifier.cs:449-451` | `GetObjectTreeBaseBlock` computes `_integrityTreeRegionStart + objectInodeNumber * 2048` with no bounds check — large inode numbers write into other regions or off the device end, corrupting data. |
+| 849 | 1 | P1 | `VDE/Index/RoaringBitmapTagIndex.cs:246-291` | `LoadAsync` deserializes bitmaps by hash but never populates `_tagNames` — after restart, reverse mapping is permanently empty. Diagnostic/introspection paths return empty tag names. |
+| 850 | 1 | P1 | `VDE/Lakehouse/LakehouseTableOperations.cs:252` | `OptimizeAsync` records a `compacted_*.parquet` filename in the transaction log but never creates the physical file — `ListActiveFilesAsync` returns phantom paths, readers get file-not-found. |
+| 851 | 1 | P1 | `VDE/Integrity/CorruptionDetector.cs:267` | `GetHealthStatus` always returns `Degraded` for any corruption — `Critical` is unreachable. Comment: "Simplified logic...in production, would check for redundancy/recovery options". |
+| 852 | 1 | P2 | `VDE/Integrity/BlockChecksummer.cs:61,106` | Cache eviction comments say "Simplified...In production, use LRU or similar" — eviction is arbitrary (first iterator key), causing unnecessary I/O storms under cache pressure. |
+| 853 | 1 | P2 | `VDE/Integrity/ChecksumTable.cs:183-184` | Same "In production, use LRU" eviction stub as BlockChecksummer — arbitrary eviction degrades checksum read performance. |
+| 854 | 1 | P2 | `VDE/Journal/CheckpointManager.cs:75` | Comment: "In a real implementation, this would flush specific dirty pages tracked by a buffer pool" — flushes entire device instead of dirty pages, causing latency spikes. |
+| 855 | 9 | P2 | `VDE/Integrity/ChecksumTable.cs:70-84` | `GetChecksumAsync` reads `_blockCache` without acquiring `_lock` while `SetChecksumAsync` writes under lock — concurrent access produces torn 8-byte checksum reads. |
+| 856 | 7 | P2 | `VDE/Lakehouse/DeltaIcebergTransactionLog.cs:357-370` | `GetHistoryAsync` iterates `SortedList` without holding table-level semaphore — concurrent `CommitAsync` causes `InvalidOperationException: Collection was modified`. |
+| 857 | 7 | P2 | `VDE/Journal/CheckpointManager.cs:118-127` | `Dispose()` method exists but class doesn't implement `IDisposable` — `using` statements won't compile, `SemaphoreSlim` leaked if caller doesn't call `Dispose()` manually. |
+| 858 | 5 | P2 | `VDE/Journal/WalTransaction.cs:279-286` | `DisposeAsync` auto-abort catch swallows all errors with no logging — failed abort leaves orphaned `BeginTransaction` marker in WAL, confusing `ReplayAsync`. |
+| 859 | 2 | P2 | `VDE/Lakehouse/LakehouseTableOperations.cs:440-444` | Static `JsonSerializerOptions` not frozen via `MakeReadOnly()` — concurrent first-use serialization in .NET 8+ may race on internal resolver initialization. |
+| 860 | 13 | P2 | `VDE/Index/RoaringBitmapTagIndex.cs:970-975` | `RunContainer.Not()` has dead loop `foreach (ushort v in Enumerate()) { }` — O(n) iteration with no side effects before the real work loop. |
+| 861 | 1 | P2 | `VDE/Integrity/BlockChecksummer.cs:61` | Duplicate of #852 pattern at line 106 — second occurrence of "In production, use LRU" comment in same file. |
+
+**Clean files:** TagBloomFilter.cs, IBlockChecksummer.cs, IWriteAheadLog.cs, JournalEntry.cs
+
+---
+
+### Chunk 059 (15 files: VDE/Lakehouse/TimeTravelEngine–ModuleManagement/ModuleAdditionOptions)
+
+**Files Reviewed:** 15 | **Findings:** 6 (4 P1, 2 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 862 | 1 | P1 | `VDE/Maintenance/OnlineDefragmenter.cs:488-537` | `IdentifyCandidateExtents` uses fabricated block addresses (`baseBlock + j * 2`) with comment "Placeholder source block addresses; in production these come from actual inode extent entries". Phase 2 reads arbitrary disk data and moves it to new locations, corrupting the volume. |
+| 863 | 15 | P1 | `VDE/Maintenance/OnlineDefragmenter.cs:308-341` | `MergeFreeExtentsAsync` performs no merge — returns fabricated estimate `(int)(fragRatio * freeBlocks / 2)`. Phase 1 is a no-op silently reported as successful work. `ExtentsMerged` metric is a lie. |
+| 864 | 1 | P1 | `VDE/ModuleManagement/BackgroundInodeMigration.cs:385` | `CompleteSwapAsync` checkpoint hardcodes `TargetModule = ModuleId.Security` with comment "placeholder; actual module in manifest diff". Crash during swap for any other module breaks recovery — checkpoint mismatch forces "conflicting migration" error. |
+| 865 | 2 | P1 | `VDE/Metadata/InodeTable.cs:183-191,789-798` | Non-atomic cache check-evict-write sequence: `Count` check, `EvictOldestCacheEntry`, then write. Under concurrent load cache grows past `MaxCachedInodes` unboundedly. Eviction may delete inode 0 (valid key) if cache empties between checks. |
+| 866 | 3 | P2 | `VDE/ModuleManagement/FreeSpaceScanner.cs:196-204` | `ReadBitmapBytes()` uses synchronous `Stream.Read` called from async contexts in `ExtentAwareVdeCopy` and `BackgroundInodeMigration` — blocks thread pool threads on large volumes, causing starvation. |
+| 867 | 9 | P2 | `VDE/Metadata/InodeTable.cs:65-75,81-131` | `_rootInode` accessed without synchronization. Concurrent `InitializeAsync` calls both create root inodes, adding duplicate `.` and `..` entries. `_nextInodeNumber` race causes inode number collisions. |
+
+**Clean files:** TimeTravelEngine.cs, DefragmentationPolicy.cs, DirectoryEntry.cs, IInodeTable.cs, InodeStructure.cs, NamespaceTree.cs, FragmentationMetrics.cs, InodePaddingClaim.cs, MigrationCheckpoint.cs, ModuleAdditionOptions.cs, ExtentAwareVdeCopy.cs
+
+---
+
+### Chunk 060 (15 files: VDE/ModuleManagement/ModuleAdditionOrchestrator–PhysicalDevice/DeviceTopology)
+
+**Files Reviewed:** 15 | **Findings:** 18 (5 P1, 8 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 868 | 3 | P1 | `VDE/ModuleManagement/OnlineDefragmenter.cs:435-441` | `RelocateRegionBlocksAsync` uses synchronous `_vdeStream.Read()` in hot block-copy loop inside async method — blocks thread pool for potentially millions of blocks while writes use async correctly. |
+| 869 | 3 | P1 | `VDE/ModuleManagement/OnlineDefragmenter.cs:497-499,545-548` | `UpdateRegionPointersAsync` uses synchronous `_vdeStream.Read()` for region directory and RPT reads inside async method — writes correctly use `WriteAsync`. |
+| 870 | 3 | P1 | `VDE/ModuleManagement/WalJournaledRegionWriter.cs:436-439` | `UpdateWalHeaderAsync` reads WAL header with synchronous `_vdeStream.Read()` — called after every WAL commit, blocking async continuation on every superblock/bitmap update. |
+| 871 | 5 | P1 | `VDE/Mvcc/MvccGarbageCollector.cs:174-178` | Silent catch swallows all exceptions including `IOException` and `OperationCanceledException` — persistent I/O error causes infinite spin with zero reclamation and no operator signal. |
+| 872 | 2 | P1 | `VDE/Mvcc/MvccVersionStore.cs:46-51` | `_nextFreeBlock` (plain `long`) read without volatile/Interlocked in public `UsedBlocks`/`FreeBlocks` properties — on 32-bit hosts non-atomic; on 64-bit hosts may read stale cached value. |
+| 873 | 1 | P2 | `VDE/ModuleManagement/ModuleAdditionOrchestrator.cs:501` | `EvaluateOption3Async` body is entirely synchronous with `await Task.CompletedTask; // Satisfy async contract` — stub comment indicating incomplete async implementation. |
+| 874 | 1 | P2 | `VDE/ModuleManagement/OnlineRegionAddition.cs:259` | `CanAddModuleAsync` performs only synchronous work with `await Task.CompletedTask; // Satisfy async signature` — placeholder async stub. |
+| 875 | 1 | P2 | `VDE/ModuleManagement/OnlineRegionAddition.cs:343` | `UpdateBitmapAllocationAsync` is synchronous with `await Task.CompletedTask; // All WAL entries added synchronously` — unnecessary state machine allocation. |
+| 876 | 9 | P2 | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:364-372` | `ReadSysfsFileAsync` catch-all swallows `OperationCanceledException` — cancellation token becomes non-functional during Linux device discovery. |
+| 877 | 2 | P2 | `VDE/ModuleManagement/OnlineRegionAddition.cs:77-217` | TOCTOU race in `AddModuleRegionsAsync`: superblock read at top, RPT slot found, bitmap updated, WAL committed — no version check at commit time. Concurrent caller can allocate same slot/blocks. |
+| 878 | 12 | P2 | `VDE/Mvcc/MvccManager.cs:247-260` | Snapshot isolation read path returns `currentBuffer` unconditionally without walking version chain — `MvccVersionStore.GetVersionChainAsync` exists but is never invoked. Snapshot isolation does not actually isolate. |
+| 879 | 12 | P2 | `VDE/Mvcc/MvccManager.cs:130` | Serializable conflict check compares `committedTxId` (transaction counter) against `tx.SnapshotSequence` (WAL sequence number) — two independent counters, comparison is meaningless. Produces spurious aborts or misses real conflicts. |
+| 880 | 14 | P2 | `VDE/ModuleManagement/ModuleAdditionOrchestrator.cs:321` | `AnalyzeMultipleAsync` missing null check on `modules` parameter — throws `NullReferenceException` instead of `ArgumentNullException`. |
+| 881 | 15 | LOW | `VDE/ModuleManagement/Tier2FallbackGuard.cs:137-143` | `EnsureTier2Active` always returns `true` unconditionally — guarded failure path in `ModuleAdditionOrchestrator.ExecuteAsync` is dead code. |
+| 882 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:314,538` | `SupportsVolatileWriteCache` hardcoded `false` on both Linux and Windows — callers conservatively flush always, suboptimal for devices that support write-back caching. |
+| 883 | 13 | LOW | `VDE/Mvcc/MvccIsolationEnforcer.cs:201-252` | O(n) scan of `_committedWrites` on every commit — quadratic degradation under sustained throughput without aggressive pruning. |
+| 884 | 13 | LOW | `VDE/Mvcc/MvccVersionStore.cs:219` | `GetVersionChainAsync` allocates `new byte[blockSize]` per chain link in loop — unbounded GC pressure for long version chains; should use `ArrayPool`. |
+| 885 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:565-570` | SATA fixed disk unconditionally mapped to `MediaType.SSD` — spinning rust on SATA misclassified, causes wrong tier placement (warm instead of cold). |
+
+**Clean files:** PaddingInventory.cs, RegionIndirectionLayer.cs, MvccTransaction.cs, DevicePoolDescriptor.cs, DeviceTopology.cs
+
+---
+
+### Chunk 061 (15 files: VDE/PhysicalDevice/IPhysicalBlockDevice–Regions/RaidMetadataRegion)
+
+**Files Reviewed:** 15 | **Findings:** 11 (9 P1, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 886 | 14 | P1 | `VDE/Regions/AuditLogRegion.cs:95` | `ReadFrom` reads `detailsLen` from buffer and uses it to slice without bounds check — corrupt/adversarial value causes uncontrolled `ArgumentOutOfRangeException`. `MaxDetailsLength` (256) not enforced during deserialization. |
+| 887 | 14 | P1 | `VDE/Regions/ComplianceVaultRegion.cs:139-146` | `issuerLen` and `notesLen` read from buffer and used for span slicing without validation — negative or oversized values produce raw exceptions instead of `InvalidDataException`. DoS via large allocation from malicious `issuerLen`. |
+| 888 | 14 | P1 | `VDE/Regions/ComputeCodeCacheRegion.cs:117-120` | `entryPointLen` (ushort, up to 65535) not bounded against `MaxEntryPointNameLength` (128) during deserialization — 64KB allocation per corrupt entry. `blockCount` and `moduleSizeBytes` also unvalidated. |
+| 889 | 14 | P1 | `VDE/Regions/PolicyVaultRegion.cs:80-81` | `dataLength` in `PolicyDefinition.ReadFrom` not validated as non-negative before span slice — direct use of `ReadFrom` outside HMAC-sealed `Deserialize` path allows unchecked allocation. |
+| 890 | 14 | P1 | `VDE/Regions/MetricsLogRegion.cs:358-361` | `sampleCount` from disk unbounded — corrupt value causes unbounded deserialization loop. `maxCapacity`/`compactionThreshold` produce misleading `ArgumentOutOfRangeException` instead of `InvalidDataException`. |
+| 891 | 12 | P1 | `VDE/Regions/AnonymizationTableRegion.cs:323-343` | Serialize/Deserialize block-boundary logic: `blockPayloadEnd` doesn't account for block-0 header in overflow check — last entry near boundary skipped to next block unnecessarily, wasting space. |
+| 892 | 14 | P1 | `VDE/Regions/IntegrityTreeRegion.cs:448-453` | `leafCount` has no upper bound — values near `Int32.MaxValue` cause integer overflow in `NextPowerOfTwo` computation and `new byte[totalNodes][]` allocation, producing `IndexOutOfRangeException` or OOM. |
+| 893 | 4 | P1 | `VDE/Regions/PolicyVaultRegion.cs:112,127` | HMAC key exposed via public `byte[]` property and stored by reference — callers retain array reference and can mutate the live cryptographic key post-construction. |
+| 894 | 2 | P1 | `VDE/Regions/AuditLogRegion.cs:137,188` | `_entries` (`List<AuditLogEntry>`) and `NextSequenceNumber` have no synchronization — concurrent `Append` calls corrupt the list, produce duplicate sequence numbers, and break the hash chain that provides tamper-evidence. |
+| 895 | 14 | LOW | `VDE/Regions/AnonymizationTableRegion.cs:390` | `mappingCount` from buffer not upper-bounded — corrupt value produces `ArgumentOutOfRangeException` instead of `InvalidDataException`. |
+| 896 | 12 | LOW | `VDE/Regions/MetricsLogRegion.cs:136` | `_samples.Count` (int) compared to `(long)(MaxCapacitySamples * CompactionThreshold)` — if `MaxCapacitySamples > Int32.MaxValue`, compaction never triggers since `List.Count` can't exceed `int.MaxValue`. |
+
+**Clean files:** IPhysicalBlockDevice.cs, PhysicalDeviceInfo.cs, CompressionDictionaryRegion.cs, ConsensusLogRegion.cs, CrossVdeReferenceRegion.cs, EncryptionHeaderRegion.cs, IntelligenceCacheRegion.cs, RaidMetadataRegion.cs
+
+---
+
+### Chunk 062 (15 files: VDE/Regions/ReplicationStateRegion–Sql/PredicatePushdownPlanner)
+
+**Files Reviewed:** 15 | **Findings:** 17 (1 P0, 12 P1, 2 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 897 | 1 | P0 | `VDE/Replication/ExtentDeltaReplicator.cs:155-193` | `ComputeDeltaAsync(sinceTransactionId, untilTransactionId)` initializes `changedExtents` as empty list then iterates it — always returns empty delta regardless of actual modifications. Replication never ships any data. |
+| 898 | 2 | P1 | `VDE/Regions/ReplicationStateRegion.cs:209-343` | All mutating methods (`SetVector`, `IncrementVector`, `SetWatermark`, `MarkDirty`, `ClearDirty`) operate on shared arrays with no synchronization — `_dirtyBitmap[byteIndex] |= ...` is a non-atomic read-modify-write causing silent data races. |
+| 899 | 1 | P1 | `VDE/Sql/PredicatePushdownPlanner.cs:380-434` | Three helpers hardcode `valueWidth = 4` for all column types — Int64/Float64/Bool/DateTime columns read wrong bytes. Comment: "assume int32 = 4 bytes as default". |
+| 900 | 1 | P1 | `VDE/Sql/ParquetVdeIntegration.cs:183` | Extent start block hardcoded as `100 + rowGroupIndex * batch.ColumnCount` — magic number unrelated to actual block allocation. Zone maps point to wrong physical addresses. |
+| 901 | 10 | P1 | `VDE/Sql/ColumnarRegionEngine.cs:450-455` | `HashCode.Combine` (non-stable, randomized per-process) used for persistent zone map min/max on String/Binary columns — values meaningless after process restart, causing incorrect query results. |
+| 902 | 14 | P1 | `VDE/Regions/SnapshotTableRegion.cs:127-129` | `labelLen` (ushort) from disk not validated against remaining buffer or `MaxLabelLength` — corrupt value causes `ArgumentOutOfRangeException` on deserialization. |
+| 903 | 14 | P1 | `VDE/Regions/VdeFederationRegion.cs:71-77,198` | `nameLen`/`nsLen` from disk not validated against `MaxNameLength`(32)/`MaxNamespacePathLength`(256) — values up to 65535 cause OOB slice or garbage reads. |
+| 904 | 14 | P1 | `VDE/Regions/TagIndexRegion.cs:620-648` | `keyCount` from on-disk B+-tree not bounded against block payload — corrupt value walks offset past payload boundary into trailer or adjacent block memory. |
+| 905 | 1 | P1 | `VDE/Replication/ExtentDeltaReplicator.cs:163-178` | Dead code: `deviceBlockCount` and `processedExtents` allocated but never used — incomplete implementation skeleton for delta computation scan. |
+| 906 | 12 | P1 | `VDE/Sql/ColumnarRegionEngine.cs:182-184` | Block offset assumes 1 block per column (`RowGroupCount * Columns.Length`), but `blocksNeeded` can exceed 1 for large columns — subsequent row groups overwrite previous data. Data corruption on read-back. |
+| 907 | 2 | P1 | `VDE/Sql/ColumnarRegionEngine.cs:245-253` | Non-atomic disk + memory update for `RowGroupCount`: in-memory `ConcurrentDictionary` replaced then disk block rewritten without lock — concurrent appends lose row group counts. |
+| 908 | 14 | P1 | `VDE/Replication/ExtentDeltaReplicator.cs:405-414` | `dataLength` from network payload not upper-bounded before `data.Slice(offset, dataLength).ToArray()` — malicious delta causes multi-GB allocation or OOM. DoS via replication channel. |
+| 909 | 1 | P2 | `VDE/Sql/PredicatePushdownPlanner.cs:401` | `IsNull => rowValue == 0` — uses zero as null sentinel. Legitimate zero values incorrectly treated as null. Comment: "Simplified null check". |
+| 910 | 14 | P2 | `VDE/Sql/ColumnarRegionEngine.cs:283-295` | `dataLen` from disk not bounded before multi-block allocation — corrupt value causes OOM with no diagnostic. |
+| 911 | 13 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | `AsReadOnlyMemory<T>` documented as "zero-copy" but allocates and copies — misleading comment and unnecessary GC pressure. |
+| 912 | 15 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | Method name implies wrapping semantics but implementation copies — contract lie in name and XML doc. |
+| 913 | 13 | LOW | `VDE/Regions/TagIndexRegion.cs:466-469` | `CountNodes` is O(N) recursive traversal on every `RequiredBlocks` call — should maintain running counter. |
+
+**Clean files:** StreamingAppendRegion.cs, WormImmutableRegion.cs, VdeSeparationManager.cs, ColumnarEncoding.cs, MergeJoinExecutor.cs, IndexOnlyScan.cs
+
+---
+
+### Chunk 063 (15 files: VDE/Sql/PreparedQueryCache–Verification/Tier3VerificationResult)
+
+**Files Reviewed:** 15 | **Findings:** 10 (4 P1, 5 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 914 | 2 | P1 | `VDE/Sql/PreparedQueryCache.cs:150-163` | `PreparedQuery.RecordExecution` reads `ExecutionCount`, computes rolling average, writes back — three non-atomic fields outside any lock. Concurrent calls corrupt stats. |
+| 915 | 4 | P1 | `VDE/Sql/PreparedQueryCache.cs:196-206` | Three static `Regex` patterns compiled without `matchTimeout` — malicious SQL triggers catastrophic backtracking (ReDoS) blocking thread indefinitely. |
+| 916 | 12 | P1 | `VDE/Sql/PreparedQueryCache.cs:270-275` | `Interlocked.Increment` inside `lock` — confused threading model. Stats fields are plain `long` (not volatile); any future lock-free read on 32-bit platform is a silent data race. |
+| 917 | 1 | P1 | `VDE/VdeHealthReport.cs:88-89` | Capacity computed with hardcoded `4096` block size — comment: "Assuming 4K blocks; should use actual BlockSize". All capacity metrics wrong for non-4K configurations. |
+| 918 | 9 | P2 | `VDE/Sql/SpillToDiskOperator.cs:410-414` | Deserialization `break`s on malformed spill block entry with no logging — silently drops remaining entries. Aggregate queries return incomplete results with no error signal. |
+| 919 | 2 | P2 | `VDE/Sql/ZoneMapIndex.cs:180,207-228` | Unsynchronized `Dictionary<long, ZoneMapEntry>` accessed from concurrent async paths — parallel ingestion corrupts dictionary or throws `InvalidOperationException`. |
+| 920 | 9 | P2 | `VDE/Sql/ZoneMapIndex.cs:332-363` | `entryCount` from disk header not upper-bounded — corrupt value causes runaway I/O reading thousands of non-existent blocks. |
+| 921 | 1 | P2 | `VDE/Verification/Tier3BasicFallbackVerifier.cs:196` | `BasicFunctionalityAvailable = true` hardcoded unconditionally — Tier 3 verification is purely declarative (checks descriptions, not behavior). False confidence. |
+| 922 | 14 | P2 | `VDE/VdeStorageStrategy.cs:63` | `ContainerPath` defaults to relative path `"datawarehouse.dwvd"` — resolves to unpredictable CWD. No absolute-path validation. Data silently created in wrong location. |
+| 923 | 13 | LOW | `VDE/Sql/SpillToDiskOperator.cs:353,514,533,587` | Base64 encode/decode for every dictionary key lookup — unnecessary CPU/GC overhead per row in large aggregation workloads. |
+
+**Clean files:** SimdAggregator.cs, VdeConstants.cs, VdeOptions.cs, ThreeTierVerificationSuite.cs, Tier1ModuleVerifier.cs, Tier1VerificationResult.cs, Tier2PipelineVerifier.cs, Tier2VerificationResult.cs, Tier3VerificationResult.cs
+
+---
+
+### Chunk 064 (4 files — FINAL SDK CHUNK: VDE/Verification/TierFeatureMap–Virtualization/IHypervisorSupport)
+
+**Files Reviewed:** 4 | **Findings:** 16 (8 P1, 6 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 924 | 9 | P1 | `VDE/Verification/TierFeatureMap.cs:323-326` | `GetFeatureMap()` casts raw ints `0..18` to `ModuleId` enum as dictionary key — `KeyNotFoundException` if enum is non-contiguous or `FormatConstants.DefinedModules` drifts from actual mapping count. |
+| 925 | 12 | P1 | `VDE/Verification/TierPerformanceBenchmark.cs:421-427` | `1.0 / tier1vs2` division by zero when `tier1Nanos == 0` (guard sets ratio to `0.0`) — produces `Infinity` in analysis string. Same for `tier1vs3`. |
+| 926 | 2 | P1 | `VDE/VirtualDiskEngine.cs:69-186` | `InitializeAsync` has no lock around `_initialized` check+set — concurrent callers double-initialize all subsystems (two `ContainerFile` handles, two WAL instances, two InodeTables on same file). |
+| 927 | 2 | P1 | `VDE/VirtualDiskEngine.cs:33-34` | `_disposed` and `_initialized` are plain `bool` (non-volatile) — stale reads across async continuations cause spurious `InvalidOperationException` or allow use-after-dispose. |
+| 928 | 1 | P1 | `VDE/VirtualDiskEngine.cs:156` | `refCountBTreeRoot` set to `_container.Layout.DataStartBlock` with comment "should be allocated from metadata region" — CoW B-Tree root occupies first user data block, immediate mutual corruption on first write. |
+| 929 | 5 | P1 | `VDE/VirtualDiskEngine.cs:709-712` | `DisposeAsync` swallows all `CheckpointAsync` exceptions with empty catch — dirty data not flushed, WAL not cleared, container left in unrecoverable state with no diagnostic. |
+| 930 | 2 | P1 | `VDE/VirtualDiskEngine.cs:693-722` | `DisposeAsync` sets `_disposed = true` then disposes subsystems non-atomically — concurrent in-flight `StoreAsync` accesses partially-disposed `ContainerFile`, corrupting writes. |
+| 931 | 1 | P2 | `VDE/Verification/TierPerformanceBenchmark.cs:63-65` | Tier 2 benchmark "simulates" plugin indirection with dictionary lookup — understates real overhead. "Simulated" in class docs. |
+| 932 | 1 | P2 | `VDE/VirtualDiskEngine.cs:633` | `TotalInodes = 65536` hardcoded — comment: "Fixed for now; InodeTable should expose this". Health report always wrong for non-default configurations. |
+| 933 | 1 | P2 | `VDE/VirtualDiskEngine.cs:623` | `checksumErrorCount = 0` hardcoded — comment: "CorruptionDetector would need to track this". Health API never reports actual corruption events. |
+| 934 | 14 | P2 | `VDE/VirtualDiskEngine.cs:204-205` | `StoreAsync` validates key non-null but not empty/max-length/null-bytes — empty key maps to VDE root `/`, null bytes corrupt B-Tree. Same gap in Retrieve/Delete/Exists/GetMetadata. |
+| 935 | 9 | P2 | `VDE/VirtualDiskEngine.cs:262-264` | Large-file rejection after all blocks already allocated — blocks leaked because exception bypasses cleanup. Each failed store permanently leaks up to `DirectBlockCount` blocks. |
+| 936 | 15 | P2 | `VDE/VirtualDiskEngine.cs:500-503` | `ListAsync` silently skips missing inodes with no log/metric — index inconsistency (key in B-Tree, inode missing) invisible to operators. |
+| 937 | 9 | P2 | `VDE/VirtualDiskEngine.cs:654` | `scanResult.Events` not null-checked before `.Select()` — `NullReferenceException` in integrity scan path. |
+| 938 | 13 | LOW | `VDE/Verification/TierPerformanceBenchmark.cs:383-402` | Only 1000 iterations with no GC stabilization — allocation-heavy loop produces jittery measurements. |
+| 939 | 14 | LOW | `Virtualization/IHypervisorSupport.cs:201-204` | `TrimAsync` interface takes user-controlled `devicePath` with no contract documentation for path validation guidance. |
+
+**Clean files:** None (all 4 files have findings)
+
+---
+
+## SDK Audit Summary
+
+**Total SDK files scanned:** 964 (65 chunks)
+**Total findings:** 939
+**Severity breakdown:** P0: ~5 | P1: ~350 | P2: ~380 | LOW: ~200
+
+---
+
+## DataWarehouse.Kernel
+
+**Total Kernel files:** 22 (2 chunks of 11 files each)
+
+### Kernel Chunk 1 (11 files: KernelConfiguration–PipelineMigrationEngine)
+
+**Files Reviewed:** 11 | **Findings:** 12 (2 P0, 8 P1, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 940 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~64` | `.Result` on Task in hot pipeline path — blocks thread pool thread and risks deadlock under synchronization context. |
+| 941 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~93` | `.GetAwaiter().GetResult()` on hot pipeline path — same sync-over-async deadlock risk as #940, compounds under load. |
+| 942 | 1 | P0 | `PipelineMigrationEngine.cs:~480-502` | `ReverseStageAsync` is a self-described placeholder that returns unmodified data — pipeline migration rollback is non-functional. |
+| 943 | 6 | P1 | `MemoryPressureMonitor.cs:~56` | GC notification registration task is fire-and-forget — exceptions from GC monitoring silently lost, no fault observation. |
+| 944 | 6 | P1 | `DataWarehouseKernel.cs:~930` | Shutdown audit-log task discarded with `_ =` pattern — if audit logging fails during shutdown, no error is ever surfaced. |
+| 945 | 6 | P1 | `DataWarehouseKernel.cs:~270` | Plugin-load audit-log task discarded with `_ =` pattern — failed audit during plugin load invisible to operators. |
+| 946 | 2 | P1 | `AdvancedMessageBus.cs:~540` | Concurrent `PendingMessage` state mutation in retry path — `RetryCount`, `LastAttempt` written without synchronization from multiple timer callbacks. |
+| 947 | 2 | P1 | `AdvancedMessageBus.cs:~641` | TOCTOU race on `CreateGroup` — `ContainsKey` check then `TryAdd` allows duplicate group initialization under concurrent calls. |
+| 948 | 9 | P1 | `MemoryPressureMonitor.cs:~154` | `CollectStatistics` swallows all exceptions and returns 8GB fallback — persistent GC API failure silently produces wrong memory metrics, causing incorrect pressure decisions. |
+| 949 | 4 | P1 | `AuthenticatedMessageBusDecorator.cs:~219` | Pattern-based subscriptions bypass HMAC authentication entirely — wildcard topic subscribers receive messages without signature verification. |
+| 950 | 7 | P1 | `DataWarehouseKernel.cs:~987` | `WaitAsync` timeout exception uncaught — `TimeoutException` from semaphore wait leaks resources held by the timed-out operation. |
+| 951 | 8 | LOW | `KernelLogger.cs:~318` | `ConsoleLogTarget` used by default in all deployment modes — library code should not write to Console in production deployments. |
+| 952 | 15 | LOW | `AdvancedMessageBus.cs:~84` | `BoundedBoundedDictionary` naming typo + `GetOrAdd` may enqueue duplicate key on concurrent first access. |
+
+**Clean files:** KernelConfiguration.cs, KernelContext.cs, KernelBuilder.cs, MessageBus.cs
+
+---
+
+### Kernel Chunk 2 (11 files: PipelineOrchestrator–KernelStorageService)
+
+**Files Reviewed:** 11 | **Findings:** 14 (4 P1, 5 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 953 | 3 | P1 | `PluginRegistry.cs:216,229` | Sync-over-async `GetAwaiter().GetResult()` in plugin selection path — blocks thread pool during plugin resolution, deadlock risk under SynchronizationContext. |
+| 954 | 1 | P1 | `PipelinePluginIntegration.cs:279` | Access control stub allows all authenticated users regardless of role — comment indicates placeholder authorization logic. |
+| 955 | 1 | P1 | `PipelinePluginIntegration.cs:298` | Compliance mandatory stages stub returns empty list — compliance-required pipeline stages never enforced. |
+| 956 | 2 | P1 | `ContainerManager.cs:491` | Non-atomic read-modify-write on `ContainerUsage` fields — `CurrentSize`, `ObjectCount` updated without Interlocked or lock, corrupted under concurrent container operations. |
+| 957 | 6 | P2 | `PluginLoader.cs:430` | Fire-and-forget plugin shutdown notification — failed notification during unload invisible to orchestrator. |
+| 958 | 5 | P2 | `KernelStorageService.cs:213` | Silent bare `catch { }` in `GetMetadataAsync` — metadata retrieval failure returns null with no logging, indistinguishable from "key not found". |
+| 959 | 5 | P2 | `KernelStorageService.cs:261` | Silent bare `catch { }` in `DeleteMetadataAsync` — delete failure silently swallowed, caller believes deletion succeeded. |
+| 960 | 1 | P2 | `KernelStorageService.cs:275` | `RebuildIndexAsync` is a no-op stub — index corruption cannot be repaired, callers receive false success. |
+| 961 | 4 | P2 | `KnowledgeLake.cs:119` | `Regex` without timeout — user-supplied patterns risk catastrophic backtracking (ReDoS), blocking thread indefinitely. |
+| 962 | 15 | LOW | `PipelinePluginIntegration.cs:49` | `StrategyName` parameter accepted but silently ignored — callers believe they're selecting a strategy but always get default. |
+| 963 | 4 | LOW | `PipelinePolicyManager.cs:620` | Null security context bypasses admin authorization check — missing context treated as "allow" instead of "deny". |
+| 964 | 13 | LOW | `InMemoryStoragePlugin.cs:419` | O(n log n) LRU sort in eviction loop — linear scan with `OrderBy` on every eviction call, quadratic under sustained writes. |
+| 965 | 2 | LOW | `InMemoryStoragePlugin.cs:470` | `_lastMemoryCheck` field mutated from timer callback without synchronization — stale reads cause redundant or missed GC checks. |
+| 966 | 7 | LOW | `KnowledgeLake.cs:40` | Index bags (tag→document mappings) grow without bound — no eviction or size limit, unbounded memory leak over time. |
+
+**Clean files:** PipelineOrchestrator.cs, PipelinePolicyManager.cs, PipelineTransaction.cs, PluginCapabilityRegistry.cs
+
+---
+
+### Kernel Audit Summary
+
+**Total Kernel files scanned:** 22 (2 chunks)
+**Total findings:** 26 (findings #940-966)
+**Severity breakdown:** P0: 3 | P1: 12 | P2: 5 | LOW: 7
+
+---
+
+## DataWarehouse Plugins
+
+### Plugin Chunk 000 (15 files: AedsCore/Adapters/MeshNetworkAdapter–AedsCore/Extensions/PolicyEnginePlugin)
+
+**Files Reviewed:** 15 | **Findings:** 23 (2 P0, 13 P1, 8 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 967 | 6 | P0 | `AedsCore/ClientCourierPlugin.cs:149` | `_ = Task.Run(() => ListenLoopAsync(...))` and `_ = Task.Run(() => HeartbeatLoopAsync(...))` — both background loops fully discarded. Unhandled exceptions silently kill courier while `_isRunning` remains true. No fault observation. |
+| 968 | 1 | P0 | `AedsCore/Extensions/PolicyEnginePlugin.cs:81-88` | `LoadPolicyAsync` is a stub — comment "In production, parse JSON and load rules", body returns `Task.CompletedTask`. File-based policy configuration is non-functional; defaults to allow-all. |
+| 969 | 6 | P1 | `AedsCore/Adapters/MeshNetworkAdapter.cs:65-69` | Timer callback `async _ => await DiscoverTopologyAsync()` coerced to `async void` — unhandled exception crashes process on .NET 6+. |
+| 970 | 6 | P1 | `AedsCore/ClientCourierPlugin.cs:214` | `_ = Task.Run(() => ProcessManifestAsync(manifest, ct))` — per-manifest task unobserved. Processing errors silently lost, unbounded concurrent tasks under load. |
+| 971 | 7 | P1 | `AedsCore/DataPlane/Http3DataPlanePlugin.cs:99-161` | `HttpRequestMessage` and `HttpResponseMessage` not disposed in retry loop — socket/handle leak on every transfer attempt. Same in `FetchDeltaAsync` and `PushPayloadAsync`. |
+| 972 | 7 | P1 | `AedsCore/DataPlane/Http3DataPlanePlugin.cs:367-402` | `HttpRequestMessage`/`HttpResponseMessage` not disposed in `CheckExistsAsync` and `FetchInfoAsync` — handle leak on every HEAD/GET call. |
+| 973 | 5 | P1 | `AedsCore/Extensions/CodeSigningPlugin.cs:184-187` | `catch { return false; }` in `ValidateCertificateChain` — certificate chain failures produce no diagnostic. Misconfigured trust store indistinguishable from rejected cert. |
+| 974 | 5 | P1 | `AedsCore/Extensions/NotificationPlugin.cs:117-141` | Linux `notify-send` and macOS `osascript` catch-all blocks fall back to `Console.WriteLine` with no logging of the exception. |
+| 975 | 8 | P1 | `AedsCore/Extensions/NotificationPlugin.cs:55-157` | `Console.WriteLine` and `Console.Beep()` throughout `NotificationPlugin` — library code bypasses structured logging. |
+| 976 | 1 | P1 | `AedsCore/Extensions/PolicyEnginePlugin.cs:125-143` | `EvaluateCondition` stub — `condition.Contains("true") \|\| !condition.Contains("false")` — all rules match unconditionally. Comment: "production would use proper parser". |
+| 977 | 2 | P1 | `AedsCore/ControlPlane/GrpcControlPlanePlugin.cs:51,138,148` | `_reconnectAttempt` non-atomic `++` from multiple background tasks without volatile/Interlocked. Same pattern in Mqtt and WebSocket control plane plugins. |
+| 978 | 2 | P1 | `AedsCore/ControlPlane/WebSocketControlPlanePlugin.cs:55-56` | `_lastMessageReceived` and `_lastHeartbeatSent` (16-byte `DateTimeOffset`) written/read from different tasks without sync — torn reads on 32-bit ARM edge devices. |
+| 979 | 3 | P1 | `AedsCore/Extensions/DeltaSyncPlugin.cs:171` | `(int)baseStream.Length` — silent integer overflow for streams >2GB, causes `ArgumentOutOfRangeException`. |
+| 980 | 14 | P1 | `AedsCore/Extensions/MulePlugin.cs:115-119` | USB index deserialized manifest IDs used directly in file paths — path traversal via malicious USB index. |
+| 981 | 4 | P1 | `AedsCore/Extensions/NotificationPlugin.cs:108-132` | Command injection via unescaped `title`/`message` in `Process.Start` arguments — manifest payload name with quotes enables RCE on Linux/macOS. |
+| 982 | 1 | P2 | `AedsCore/ClientCourierPlugin.cs:337-338` | Execute action logs warning and does nothing — "requires secure process isolation layer" stub comment. |
+| 983 | 1 | P2 | `AedsCore/ClientCourierPlugin.cs:330-331` | Notify action not wired to `NotificationPlugin` — "platform-specific notification dispatch not yet wired". |
+| 984 | 1 | P2 | `AedsCore/ClientCourierPlugin.cs:423` | Interactive mode sync-back stub — "file change upload not yet wired to data plane". |
+| 985 | 1 | P2 | `AedsCore/Extensions/GlobalDeduplicationPlugin.cs:86` | `QueryServerForDedupAsync` returns empty list — "response would come via subscription" — dedup query non-functional. |
+| 986 | 9 | P2 | `AedsCore/AedsCorePlugin.cs:296-315` | `VerifySignatureAsync` fallback returns `true` on structural validation only (field presence, no crypto) when message bus unavailable. |
+| 987 | 10 | P2 | `AedsCore/Extensions/DeltaSyncPlugin.cs:263-276` | Adler-32 used as chunk discriminator — 32-bit collision space causes silent data corruption in delta reconstruction. |
+| 988 | 12 | P2 | `AedsCore/Extensions/DeltaSyncPlugin.cs:175-207` | `ApplyDeltaAsync` writes modified chunks then unchanged chunks sequentially — output order wrong for interleaved modifications, corrupts reconstruction. |
+| 989 | 9 | P2 | `AedsCore/Extensions/DeltaSyncPlugin.cs:175-207` | Duplicate of ordering issue — modified+unchanged chunks not interleaved correctly in output stream. |
+
+**Clean files:** None (WebTransportDataPlanePlugin.cs closest — all methods throw NotSupportedException)
+
+---
+
+### Plugin Chunk 001 (15 files: AedsCore/Extensions/PreCogPlugin–SemanticSync/Strategies/ConflictResolution/ConflictClassificationEngine)
+
+**Files Reviewed:** 15 | **Findings:** 18 (5 P1, 8 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 990 | 6 | P1 | `AedsCore/Extensions/PreCogPlugin.cs:157` | `_ = MessageBus.PublishAsync(...)` — fire-and-forget feedback publish with no fault observation. |
+| 991 | 1 | P1 | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:155-157` | `VerifyPairing` always returns `true` — comment: "In production, query trust level from server". Complete Zero-Trust authentication bypass. |
+| 992 | 8 | P1 | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:55` | `Console.WriteLine` outputs security-sensitive pairing PIN to stdout — information disclosure in production. |
+| 993 | 8 | P1 | `PluginMarketplace/PluginMarketplacePlugin.cs:122-134` | `Console.Error.WriteLine` for security warnings — bypasses structured logging, invisible in non-console deployments. |
+| 994 | 1 | P1 | `AedsCore/ServerDispatcherPlugin.cs:148-153` | `ProcessJobAsync` simulates delivery with `Task.Delay(10)` — "In a real implementation, this would send the manifest via Control Plane". Jobs always report success. |
+| 995 | 2 | P2 | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:18,53` | `_pendingPins` plain `Dictionary` accessed concurrently without synchronization — corrupt on concurrent registrations. No expiry cleanup. |
+| 996 | 1 | P2 | `AedsCore/Extensions/PreCogPlugin.cs:213-238` | `GetAIPredictionsAsync` publishes request but returns empty list — "AI response will be handled via subscription in production". |
+| 997 | 1 | P2 | `AedsCore/Extensions/SwarmIntelligencePlugin.cs:314-316` | `RequestChunkFromPeerAsync` always returns `null` — "In production, this would wait for response via message subscription". P2P mesh non-functional. |
+| 998 | 5 | P2 | `AedsCore/Scaling/AedsScalingManager.cs:572-574` | Silent catch — `Interlocked.Increment(ref _jobsFailed)` only, no exception logging. Job failure diagnosis impossible. |
+| 999 | 5 | P2 | `SemanticSync/SemanticSyncPlugin.cs:462-475` | Double silent catch in `TrySubscribe` — both inner message handler and outer subscription failures swallowed with no logging. |
+| 1000 | 5 | P2 | `SemanticSync/SemanticSyncPlugin.cs:264-272` | Silent catch in `OnStopCoreAsync` strategy shutdown — "Best-effort" comment but no exception logging. |
+| 1001 | 9 | P2 | `PluginMarketplace/PluginMarketplacePlugin.cs:512-516` | `InstallPluginViaKernelAsync` returns `true` on `TimeoutException` — "treat as potential success". Catalog diverges from kernel state. Same in uninstall. |
+| 1002 | 2 | P2 | `AedsCore/Http2DataPlanePlugin.cs:333,345` | `_bytesTransferred += bytesRead` non-atomic `long` increment from concurrent Read/ReadAsync paths. |
+| 1003 | 15 | LOW | `SemanticSync/SemanticSyncPlugin.cs:231` | `SemanticSyncOrchestrator.StartAsync()` returns `void` not `Task` — naming lie. |
+| 1004 | 10 | LOW | `AedsCore/Scaling/AedsScalingManager.cs:553` | `string.GetHashCode(StringComparison.Ordinal)` for partition routing — non-deterministic across restarts. |
+| 1005 | 4 | LOW | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:50,75` | `Guid.NewGuid()` as client ID — adequate for identifiers but not security tokens. |
+| 1006 | 13 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:660-682` | O(n*m) scan in `GetReverseDependencies` on every uninstall. |
+| 1007 | 12 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:538` | `HasUpdate` set to `true` immediately after install if version differs from latest — misleading. |
+
+**Clean files:** SyncPipeline.cs, EmbeddingClassifier.cs, HybridClassifier.cs, RuleBasedClassifier.cs, ConflictClassificationEngine.cs, IntentManifestSignerPlugin.cs
+
+---
+
+### Plugin Chunk 002 (15 files: SemanticSync/Strategies/ConflictResolution/EmbeddingSimilarityDetector–TamperProof/Pipeline/ReadPhaseHandlers)
+
+**Files Reviewed:** 15 | **Findings:** 14 (5 P1, 7 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1008 | 1 | P1 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:583-619` | `ReconstructMissingShards` uses XOR — comment: "Simple XOR reconstruction for demonstration — Production would use Reed-Solomon". Only recovers single shard failure; RAID-6+ configs silently produce incorrect data. |
+| 1009 | 5 | P1 | `SemanticSync/Strategies/EdgeInference/EdgeInferenceCoordinator.cs:154-158` | Cloud classifier failure swallowed with bare `catch { }` — no logging. Non-connectivity errors (ArgumentNull, deserialization) invisible. |
+| 1010 | 5 | P1 | `SemanticSync/Strategies/EdgeInference/EdgeInferenceCoordinator.cs:277-280` | AI provider `GetEmbeddingsAsync` failure swallowed with bare `catch { }` — hash-based fallback used with no signal that AI path failed. |
+| 1011 | 7 | P1 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:113,162` | `new StreamReader(stream)` not disposed in `LoadManifestAsync` and `FindLatestVersionAsync` — internal buffers leaked. |
+| 1012 | 5 | P1 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:170-173` | Version index fallback `catch { }` too broad — `JsonException`, `OutOfMemoryException` silently fall through to O(1000) probe loop. |
+| 1013 | 7 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:129-146` | `Utf8JsonWriter.Dispose()` doesn't flush; exception path abandons partial MemoryStream. |
+| 1014 | 13 | P2 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:179-200` | `FindLatestVersionAsync` fallback probes up to 1000 versions sequentially — O(n) storage round trips on cold read path. |
+| 1015 | 2 | P2 | `SemanticSync/Strategies/ConflictResolution/EmbeddingSimilarityDetector.cs:62,80,118` | `LastSimilarityScore` mutable property written without sync — concurrent callers get wrong scores. |
+| 1016 | 10 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:76,82-91` | Fidelity enum comparison `to >= from` correct but counterintuitive (enum increases as fidelity decreases) — maintenance trap. |
+| 1017 | 14 | P2 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:114-119` | Deserialized `TamperProofManifest` not validated — null `RaidConfiguration`/`Shards`/`FinalContentHash` causes NullReferenceException deep in reconstruction. |
+| 1018 | 9 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:81-91` | `ApplyTransition` exception mid-loop propagates with no context about which fidelity step failed. |
+| 1019 | 9 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:81-91` | Duplicate — `Downsample` loop has no recovery from partial fidelity reduction. |
+| 1020 | 15 | LOW | `SemanticSync/Strategies/Fidelity/AdaptiveFidelityController.cs:243-248` | `DropOneFidelityLevel` clamps at hardcoded `SyncFidelity.Metadata` — breaks if enum extended. |
+| 1021 | 1 | LOW | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:69-127` | `metadata` parameter accepted but never read — dead parameter misleads callers. |
+
+**Clean files:** SemanticMergeResolver.cs, FederatedSyncLearner.cs, LocalModelManager.cs, BandwidthBudgetTracker.cs, FidelityPolicyEngine.cs, BandwidthAwareSummaryRouter.cs, SummaryGenerator.cs, IAccessLogProvider.cs, IPipelineOrchestrator.cs, IWormStorageProvider.cs
+
+---
+
+### Plugin Chunk 003 (15 files: TamperProof/Pipeline/WritePhaseHandlers–TamperProof/Storage/AzureWormStorage)
+
+**Files Reviewed:** 15 | **Findings:** 19 (1 P0, 14 P1, 3 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1022 | 3 | P0 | `TamperProof/Services/OrphanCleanupService.cs:497-499` | `Dispose(bool)` calls `DisposeAsync().AsTask().Wait()` — sync-over-async deadlock under SynchronizationContext (ASP.NET, test runners). |
+| 1023 | 1 | P1 | `TamperProof/Storage/AzureWormStorage.cs:195-275` | Entire class is simulation — uses in-memory `Dictionary<string, AzureBlobRecord>` instead of Azure SDK. Comment: "Simulated storage for development/testing (in production, would use Azure SDK)". `VerifyImmutabilityConfigurationAsync` unconditionally sets `_immutabilityVerified = true` after `Task.Delay(10)`. |
+| 1024 | 1 | P1 | `TamperProof/Services/ComplianceReportingService.cs:764-768` | `ComputeBlockHash` returns SHA-256 of GUID bytes only — comment: "Placeholder - in production, would compute actual content hash". Attestation Merkle roots built from GUID hashes, not real data. |
+| 1025 | 1 | P1 | `TamperProof/Pipeline/WritePhaseHandlers.cs:470` | XOR parity stub — comment: "simple XOR for now, would use Reed-Solomon in production". Same pattern in `RecoveryService.cs:471`. Multi-parity protection severely less than advertised. |
+| 1026 | 1 | P1 | `TamperProof/Services/SealService.cs:418-421` | `IsSealedAsync` ignores range seals — comment: "For now, we only check direct seals". Range-sealed blocks not protected from modification. |
+| 1027 | 6 | P1 | `TamperProof/Services/BackgroundIntegrityScanner.cs:134` | `Task.Run(...)` launch-time faults not observed at call site — `_scanTask` stored but not awaited until `StopAsync`. |
+| 1028 | 2 | P1 | `TamperProof/Scaling/TamperProofScalingManager.cs:107,488` | `_scanPaused` (bool) and `_currentBpState` (enum) not volatile — tight polling loop may cache stale value, spinning forever. |
+| 1029 | 2 | P1 | `TamperProof/Services/SealService.cs:228-256` | TOCTOU on `_blockSeals.ContainsKey()` then `TryAdd()` — concurrent seal attempts can produce non-deterministic winner. |
+| 1030 | 2 | P1 | `TamperProof/Services/SealService.cs:181,710` | `_rangeSeals` (`List`) guarded by `_rangeSealLock`, but early return inside lock in `SealRangeAsync` bypasses `PersistRangeSealAsync` — partial visibility. |
+| 1031 | 4 | P1 | `TamperProof/Services/ComplianceReportingService.cs:779` | Attestation HMAC key derived from `"attestation-key-{WormMode}"` — fully deterministic from enum value. Attacker can forge attestations. |
+| 1032 | 5 | P1 | `TamperProof/Services/ComplianceReportingService.cs:816-819` | `ParseAttestationToken` bare `catch { return (null, string.Empty); }` — parse failures invisible to forensics. |
+| 1033 | 5 | P1 | `TamperProof/Services/BackgroundIntegrityScanner.cs:484-488` | `DiscoverBlocksAsync` bare `catch` — any exception silently falls through to empty block dictionary. Scan cycle processes zero blocks with no diagnostic. |
+| 1034 | 7 | P1 | `TamperProof/Services/BackgroundIntegrityScanner.cs:475,537,553,566` | `new StreamReader(stream)` not disposed at 4 locations — non-deterministic handle retention under high scan throughput. |
+| 1035 | 9 | P1 | `TamperProof/Services/RecoveryService.cs:651-654` | WORM recovery passes `expectedIntegrityHash` as `actualHash` — incident record shows false "expected == actual", hiding corruption from auditors. |
+| 1036 | 5 | P1 | `TamperProof/Services/SealService.cs:733-736` | `GetCurrentPrincipal()` `catch { // Ignore }` — security exception swallowed, all audit entries attributed to "system". |
+| 1037 | 13 | P2 | `TamperProof/Services/BackgroundIntegrityScanner.cs:498-502` | `blockIds.Contains(pendingId)` on `List<Guid>` — O(n) per lookup, O(n²) total. Should use `HashSet<Guid>`. |
+| 1038 | 14 | P2 | `TamperProof/Services/AuditTrailService.cs:122` | `LogOperationAsync` no null-check on `operation.Details` — null details produce incorrect hash, breaking audit chain integrity. |
+| 1039 | 2 | P2 | `TamperProof/Services/BackgroundIntegrityScanner.cs:362-376` | `corruptedBlockDetails.Add(result)` outside lock — single-threaded now but racy if parallelized. |
+| 1040 | 1 | LOW | `TamperProof/Services/SealService.cs:401` | `SealRangeAsync` returns `sealedCount: 1` always — comment: "For now, we return 1 to indicate the range seal itself". |
+
+**Clean files:** TimeLockRegistration.cs, TamperProofScalingManager.cs, DegradationStateService.cs, MessageBusIntegration.cs, RetentionPolicyService.cs, TamperIncidentService.cs
+
+---
+
+### Plugin Chunk 004 (15 files: TamperProof/Storage/S3WormStorage–Transcoding.Media/Strategies/GPUTexture/DdsTextureStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 26 (2 P0, 9 P1, 10 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1041 | 1 | P0 | `TamperProof/Storage/S3WormStorage.cs:187-288` | Entire class is in-memory `Dictionary` simulation — comment: "Simulated storage for development/testing (in production, would use AWS SDK)". `VerifyObjectLockConfigurationAsync` unconditionally sets `_objectLockVerified = true`. Zero actual S3 Object Lock enforcement. |
+| 1042 | 1 | P0 | `Transcoding.Media/Execution/TranscodePackageExecutor.cs:126-138` | `ParsePackageAsync` sets `sourceData = Array.Empty<byte>()` — comment: "package format doesn't actually include the source data inline". FFmpeg receives empty stdin. All package transcoding broken. |
+| 1043 | 6 | P1 | `TamperProof/TamperProofPlugin.cs:349` | `_ = Task.Run(() => ProcessBlockchainBatchAsync(ct))` — blockchain batch discarded. Anchor loss for all queued objects on exception. |
+| 1044 | 6 | P1 | `TamperProof/TamperProofPlugin.cs:150-161` | Integrity violation alert `_ = Task.Run(...)` with `CancellationToken.None` — can outlive plugin disposal. No backpressure. |
+| 1045 | 10 | P1 | `TamperProof/TimeLock/HsmTimeLockProvider.cs:464-494` | AES-GCM wrapping key generated, used, then zeroed — no decryption path exists. Comment: "in production HSM, this key stays in hardware". Encrypted key material permanently irrecoverable. |
+| 1046 | 12 | P1 | `TamperProof/TimeLock/TimeLockPolicyEngine.cs:97-107` | `ConcurrentBag<TimeLockRule>` duplicate-name check + `Add` not atomic — concurrent threads can insert duplicate rules. `RemoveRule` rebuilds without lock — concurrent adds dropped. |
+| 1047 | 12 | P1 | `Transcoding.Media/Execution/FfmpegExecutor.cs:359-385` | `TryParseProgress` returns raw elapsed seconds, not 0-100 percentage — `progressCallback` documented as "percentage" receives values in thousands for long videos. |
+| 1048 | 5 | P1 | `TamperProof/TimeLock/CloudTimeLockProvider.cs:530-533,576-579` | `DetectCloudProviderAsync` and `VerifyCloudRetentionExpiredAsync` swallow `OperationCanceledException` — cancelled verification returns `true`, incorrectly allowing lock release. |
+| 1049 | 5 | P1 | `Transcoding.Media/MediaTranscodingPlugin.cs:349-352,413-415` | `DetectFormatByMagicBytesAsync` and `DetermineOfficeFormatAsync` swallow all exceptions including cancellation — "format unknown" indistinguishable from "file unreadable". |
+| 1050 | 14 | P1 | `TamperProof/TimeLock/SoftwareTimeLockProvider.cs:203-217` | MultiPartyApproval counts `approverIds.Length` with no cryptographic verification — any caller passing N arbitrary strings satisfies N-of-M approval. Same in Hsm/Cloud providers. |
+| 1051 | 7 | P1 | `Transcoding.Media/Strategies/Camera/CameraFrameSource.cs:125-133` | `Dispose(bool)` explicitly does nothing — sync `using` blocks leak camera handle. Comment: "User must call DisposeAsync()". |
+| 1052 | 1 | P2 | `Transcoding.Media/Strategies/GPUTexture/DdsTextureStrategy.cs:440-482` | `GenerateMipmapChain` fills mipmaps with HMAC pseudo-random bytes, not actual BC1-BC7 block compression — GPU textures contain garbage pixel data. |
+| 1053 | 12 | P2 | `TamperProof/Storage/S3WormStorage.cs:319` | `(int)data.Length` — silent overflow for streams >2GB. |
+| 1054 | 13 | P2 | `TamperProof/TimeLock/TimeLockPolicyEngine.cs:50-88` | `OrderByDescending` on `ConcurrentBag` + `Regex.IsMatch` on every evaluation — full sort + regex compilation per call on hot path. |
+| 1055 | 13 | P2 | `TamperProof/Storage/S3WormStorage.cs:432-492` | `async` methods with only synchronous `lock` blocks — `lock` inside async causes thread-pool starvation under load. |
+| 1056 | 2 | P2 | `TamperProof/Storage/S3WormStorage.cs:185` | `_objectLockVerified` plain bool without volatile/Interlocked — stale reads across threads. |
+| 1057 | 3 | P2 | `Transcoding.Media/MediaTranscodingPlugin.cs:178` | Timer callback `ProcessQueue` may call async operations via sync-over-async — deadlock/starvation risk. |
+| 1058 | 15 | P2 | `TamperProof/Storage/S3WormStorage.cs:237` | `EnforcementMode` returns `HardwareIntegrated` for Compliance mode — but entire provider is in-memory simulation. |
+| 1059 | 14 | P2 | `Transcoding.Media/Execution/TranscodePackageExecutor.cs:107-131` | `reader.ReadInt32()` for field lengths with no bounds check — malicious package causes 2GB allocation. |
+| 1060 | 9 | P2 | `Transcoding.Media/Execution/FfmpegExecutor.cs:229-232` | `process.Start()` return value not checked — `false` return causes downstream NullReferenceException. |
+| 1061 | 12 | P2 | `Transcoding.Media/Execution/MediaFormatDetector.cs:63-65` | EBML header <30 bytes falls through to `return true` (WebM) — MKV files misidentified as WebM. |
+| 1062 | 14 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:284` | `RequiredApprovals` not validated ≥2 — value 0 trivially bypasses multi-party gate. |
+| 1063 | 15 | LOW | `Transcoding.Media/Execution/FfmpegTranscodeHelper.cs` | FFmpeg failure fallback to package taken silently with no log — callers can't distinguish real output from fallback. |
+| 1064 | 9 | LOW | `TamperProof/TimeLock/RansomwareVaccinationService.cs:469-553` | All bus-coordination catch blocks return false/null with no exception logging — vaccination failures undiagnosable. |
+| 1065 | 4 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:623-638` | Content hash includes `UtcNow` timestamp — non-reproducible, useless for integrity verification. Same in Hsm/Software providers. |
+| 1066 | 14 | LOW | `Transcoding.Media/Strategies/GPUTexture/DdsTextureStrategy.cs:321-328` | `ParseDdsDimensions` no validation for negative/extreme width×height — integer overflow in mipmap calculations. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 005 (15 files: Transcoding.Media/Strategies/GPUTexture/KtxTextureStrategy–Transcoding.Media/Strategies/Video/AdvancedVideoStrategies)
+
+**Files Reviewed:** 15 | **Findings:** 29 (8 P1, 14 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1067 | 1 | P1 | `Transcoding.Media/Strategies/Image/AvifImageStrategy.cs:430-462` | `CompressWithAv1` fills buffer with HMAC pseudo-random bytes — not valid AV1 OBU bitstream. Same pattern in WebP `CompressWithVp8`/`CompressLossless`, all RAW `ApplyXxxProcessingPipeline`, and JPEG `ApplyDctCompression`. Every image/RAW transcode produces invalid output. |
+| 1068 | 1 | P1 | `Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs:77-96,313-426` | `Stereo3DVideoStrategy`, `Video360Strategy`, `VrVideoStrategy`, `HdrToneMappingStrategy` return empty `MemoryStream()` from all core methods. `StreamAsyncCore` returns `new Uri("about:blank")`. Complete stubs. |
+| 1069 | 12 | P1 | `Transcoding.Media/Strategies/Streaming/DashStreamingStrategy.cs:93-94` | Health check `var isAccessible = Directory.Exists(segmentDir) \|\| true` — `\|\| true` makes false branch dead code. Always reports healthy. Same in HlsStreamingStrategy. |
+| 1070 | 1 | P1 | `Transcoding.Media/Strategies/ThreeD/GltfModelStrategy.cs:375-380` | `GenerateBinaryBuffer` returns `SHA256.HashData(sourceBytes)` (32 bytes) — not actual GLB binary buffer. Accessor out-of-bounds in any glTF consumer. |
+| 1071 | 5 | P1 | `Transcoding.Media/Strategies/ThreeD/GltfModelStrategy.cs:277-292` | `ParseGltfJson` bare `catch { return new GltfRoot(); }` — malformed JSON silently produces empty root. Callers proceed with corrupt output. |
+| 1072 | 10 | P1 | `Transcoding.Media/Strategies/GPUTexture/KtxTextureStrategy.cs:269-275` | `WriteKtx2Header` writes DFD/KVD/SGD offset and length fields all as zero — KTX2-conformant loaders fail to find sections. Structurally non-conformant files. |
+| 1073 | 12 | P1 | `Transcoding.Media/Strategies/RAW/Cr2RawStrategy.cs:43-45` | `CanonWhiteBalanceTag` and `CanonColorDataTag` both `0x4001` — dead constants. Actual parse at line 343-347 accesses `data[i+9]` beyond bounds check `data.Length - 8`. |
+| 1074 | 3 | P1 | `Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs:57-292` | Public async methods contain no `await` — state machine allocated with no async work. CancellationToken never observed. |
+| 1075 | 14 | P2 | `Transcoding.Media/Strategies/GPUTexture/KtxTextureStrategy.cs:99-100` | `targetWidth`/`targetHeight` default 1024, no power-of-two validation — resolution 0 produces corrupt mipmap chain. |
+| 1076 | 14 | P2 | `Transcoding.Media/Strategies/Image/WebPImageStrategy.cs:111-118` | `TranscodeAsyncCore` missing null/unreadable stream guard and 500MB size check present in JPEG/PNG siblings. |
+| 1077 | 14 | P2 | `Transcoding.Media/Strategies/Image/AvifImageStrategy.cs:108-137` | Same missing input validation as WebP — no stream guard, no size limit for 65536x65536 format. |
+| 1078 | 12 | P2 | `Transcoding.Media/Strategies/Image/AvifImageStrategy.cs:279` | `colorSpace = isHdr ? "nclx" : "nclx"` — both ternary branches identical. SDR path should use `"rICC"` or `"prof"`. |
+| 1079 | 12 | P2 | `Transcoding.Media/Strategies/RAW/Cr2RawStrategy.cs:373-378` | `ExtractIsoSpeed` loop guard `data.Length - 6` but accesses `data[i+8]` and `data[i+9]` — out-of-bounds read for last 3 iterations. |
+| 1080 | 12 | P2 | `Transcoding.Media/Strategies/RAW/ArwRawStrategy.cs:336-344` | `DetectPixelShiftMode` guard `i + 8 < data.Length` but accesses `data[i+9]` — off-by-one out-of-bounds. |
+| 1081 | 12 | P2 | `Transcoding.Media/Strategies/Streaming/CmafStreamingStrategy.cs:105-111` | `targetResolution` smaller than lowest rung (640x360) — `applicableTracks` empty, fallback returns 640x360 track exceeding caller constraint. Same in DASH/HLS. |
+| 1082 | 13 | P2 | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:591-623` | HMAC compression simulation — `hmac.ComputeHash(BitConverter.GetBytes(blockIndex++))` tight loop allocates per-iteration. Same in Avif/WebP. |
+| 1083 | 12 | P2 | `Transcoding.Media/Strategies/GPUTexture/KtxTextureStrategy.cs:260-266` | `supercompressionScheme` maps both `"BasisLZ"` and `"UASTC"` to value `1` — UASTC should be `0` or `2` per KTX2 spec. Loaders misinterpret compression. |
+| 1084 | 10 | P2 | `Transcoding.Media/Strategies/GPUTexture/KtxTextureStrategy.cs:175-213` | `GenerateThumbnailAsyncCore` writes SHA-256 hash as "thumb data" with proprietary `"KTXTHUMB"` header — not a valid image format. |
+| 1085 | 14 | P2 | `Transcoding.Media/Strategies/RAW/DngRawStrategy.cs:357-367` | `ExtractColorMatrix` returns hardcoded sRGB D65 matrix, ignores `data` parameter — all DNG files process with same matrix regardless of camera. |
+| 1086 | 15 | P2 | `Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs:278-292` | `RenderViewportFrameAsync` returns `RenderTimeMs = 0`, `MotionToPhotonMs = 0`, empty `FrameData`. Same: `ConvertToCubemapAsync` returns metadata but no cubemap data. |
+| 1087 | 15 | P2 | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:91-95` | Health check `isOperational = testPixel.Length == 4` — dead code, always true. Same in PngImageStrategy. |
+| 1088 | 12 | P2 | `Transcoding.Media/Strategies/ThreeD/UsdModelStrategy.cs:347-349` | USDZ ZIP parsing — `compressedSize = 0` with data descriptor flag causes infinite loop. No data descriptor scan. |
+| 1089 | 15 | LOW | `Transcoding.Media/Strategies/Streaming/DashStreamingStrategy.cs:125-131` | `ShutdownAsyncCore` comments claim cleanup but body is `return Task.CompletedTask`. Same in HLS. |
+| 1090 | 9 | LOW | `Transcoding.Media/Strategies/RAW/DngRawStrategy.cs:275-285` | `ValidateDngFormat` handles endianness but `ParseDngVersion`/`DetectLinearDng`/`ExtractCameraModel` assume little-endian — big-endian DNG returns garbage. |
+| 1091 | 4 | LOW | `Transcoding.Media/Strategies/Streaming/CmafStreamingStrategy.cs:296-306` | `BuildFfmpegArguments` interpolates `options.VideoCodec`/`AudioCodec` without sanitization — FFmpeg argument injection if user-controlled. Same in DASH/HLS. |
+| 1092 | 2 | LOW | `Transcoding.Media/Strategies/ThreeD/UsdModelStrategy.cs:230-290` | `ParseUsdaScene` counts "variantSet"/"sublayer" keywords including in comments/strings — inflated counters. |
+| 1093 | 9 | LOW | `Transcoding.Media/Strategies/ThreeD/GltfModelStrategy.cs:246-268` | `ExtractGlbBinary` negative `jsonChunkLength` causes `binOffset < 20` — no guard. |
+| 1094 | 7 | LOW | `Transcoding.Media/Strategies/Image/WebPImageStrategy.cs:123,209` | `outputStream` not disposed on exception path before return — buffer held until GC. Same in JPEG/PNG. |
+| 1095 | 9 | LOW | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:313-321` | Error message calls `DetermineQuality(options)` again instead of using existing `quality` local. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 006 (15 files: Transcoding.Media/Strategies/Video/AiProcessingStrategies–UltimateAccessControl/Features/SecurityPostureAssessment)
+
+**Files Reviewed:** 15 | **Findings:** 24 (2 P0, 15 P1, 7 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1096 | 1 | P1 | `Transcoding.Media/Strategies/Video/AiProcessingStrategies.cs:119-627` | Five AI inference methods (`RunInferenceAsync`, `UpscaleAsync`, `DetectObjectsAsync`, `DetectFacesAsync`, `TranscribeAsync`) all return zeroed/empty results — `Confidence=0.0f`, `OutputData=Array.Empty<byte>()`, `Text=""`. |
+| 1097 | 1 | P1 | `Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs:355-364` | `TranscodeAsyncCore` builds GPU encoder args then ignores them — returns empty `MemoryStream()`. `GenerateThumbnailAsyncCore` same. All GPU detection/selection logic is dead code. |
+| 1098 | 1 | P1 | `UltimateAccessControl/Features/AutomatedIncidentResponse.cs:113-170` | Six containment actions (`BlockIpAsync`, `DisableAccountAsync`, `IsolateDeviceAsync`, `SendAlertAsync`, `CreateTicketAsync`, `QuarantineResourceAsync`) only set string fields — no actual firewall/ticketing/OS API calls. Security-critical no-ops. |
+| 1099 | 2 | P1 | `Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs:27-35` | `_activeEncoder`, `_selectedGpuIndex`, `_lastGpuScan` written under `_scanLock` but read without synchronization from `CheckGpuMemory`, `GetEncoderArgs`, `GetHealthStats`. Stale/mismatched encoder-GPU pairing on concurrent access. |
+| 1100 | 2 | P1 | `UltimateAccessControl/Features/BehavioralAnalysis.cs:230-265` | `UserProfile` plain `List<T>` fields mutated in `UpdateProfile` without synchronization. Same profile from `BoundedDictionary.GetOrAdd` shared across concurrent calls for same user. Identical in `MlAnomalyDetection.cs:294-326`. |
+| 1101 | 4 | P0 | `Transcoding.Media/Strategies/Video/H264CodecStrategy.cs:383-401` | User-controlled `CustomMetadata` values (`watermarkText`, `watermarkImagePath`) interpolated into FFmpeg arguments without sanitization — command injection. Same in `H265CodecStrategy.cs:336-369` for `colorSpace`, `colorPrimaries`, `hdrTransfer`. |
+| 1102 | 4 | P0 | `UltimateAccessControl/Features/MfaOrchestrator.cs:96` | `challenge.Code.Equals(response, StringComparison.Ordinal)` — timing-unsafe MFA code comparison enables oracle attacks. Must use `CryptographicOperations.FixedTimeEquals`. |
+| 1103 | 4 | P1 | `UltimateAccessControl/Features/AiSecurityIntegration.cs:142-144` | Intelligence plugin response parsed via `Enum.Parse` without allowlist — compromised plugin returning `"Allow"` bypasses all MFA/approval checks at line 159. |
+| 1104 | 4 | P1 | `UltimateAccessControl/Features/DlpEngine.cs:199-211` | `ComputeSimpleHash` uses 32-bit polynomial hash for DLP content fingerprinting — predictable, trivially colliding. Use SHA-256. |
+| 1105 | 5 | P1 | `Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs:329-333` | `TryDetectNvidiaGpus` bare `catch { return false; }` — all exceptions silently suppressed including OOM. No logging for GPU detection failures. |
+| 1106 | 6 | P1 | `UltimateAccessControl/Features/PrivilegedAccessManager.cs:57-65` | Fire-and-forget `Task.Run` for JIT access revocation — silently fails on exception, cancelled by caller token, lost on process recycle. Security-critical revocation may never fire. |
+| 1107 | 7 | P1 | `Transcoding.Media/Strategies/Video/Av1CodecStrategy.cs:133` | `new MemoryStream(1024*1024)` allocated then never used/disposed — `ExecuteOrPackageAsync` creates its own. Same in `H265CodecStrategy.cs:135`, `Vp9CodecStrategy.cs:123`, `VvcCodecStrategy.cs:119`. 1MB leak per transcode. |
+| 1108 | 9 | P1 | `UltimateAccessControl/Features/AutomatedIncidentResponse.cs:49-57` | Failed containment actions only set string field — no logging, no metric. `PartialSuccess` status indistinguishable from total failure. `StopOnMatch` + failure prevents lower-priority playbooks from executing. |
+| 1109 | 10 | P1 | `UltimateAccessControl/Features/MfaOrchestrator.cs:57-77` | Plaintext MFA code stored in `MfaChallenge` object and returned to caller — should store hash only. |
+| 1110 | 12 | P1 | `UltimateAccessControl/Features/SecurityPostureAssessment.cs:33` | `dimensions.Average(d => d.Score)` ignores `Weight` property — 1.5-weight Authentication treated same as 1.0-weight Compliance. Should use weighted average. |
+| 1111 | 14 | P1 | `UltimateAccessControl/Features/MfaOrchestrator.cs:23-51` | No null/empty validation on `userId`, `deviceId` — null key to `BoundedDictionary`, empty `deviceId` shares trust entry across users. |
+| 1112 | 14 | P1 | `UltimateAccessControl/Features/PrivilegedAccessManager.cs:94-115` | `StartSessionAsync` never validates `jitGrantId` against `_jitGrants` — revoked/expired grants accepted. JIT access model is decorative. |
+| 1113 | 12 | P2 | `UltimateAccessControl/Features/BehavioralAnalysis.cs:156-158` | `profile.Locations.Count` can be 0 → divide-by-zero → `NaN`. `NaN < 0.1` is `false` — new-location deviation silently passes. |
+| 1114 | 12 | P2 | `Transcoding.Media/Strategies/Video/Av1CodecStrategy.cs:314-318` | Two-pass FFmpeg args appended after single-pass args — missing pixel format, resolution, frame rate in second pass. Same in H264/H265 strategies. |
+| 1115 | 13 | P2 | `UltimateAccessControl/Features/BehavioralAnalysis.cs:232-265` | `List<T>.RemoveAt(0)` as sliding window across 6 lists — O(n) per update. Same in `MlAnomalyDetection.UpdateProfile`. Use `Queue<T>`. |
+| 1116 | 13 | P2 | `UltimateAccessControl/Features/DlpEngine.cs:64-91` | No content size limit on DLP scan — 100MB input causes blocking regex across all policies. Also sync async pattern overhead. |
+| 1117 | 1 | P2 | `Transcoding.Media/Strategies/Video/VvcCodecStrategy.cs:214-224` | `CheckEncoderAvailability` hardcodes `IsAvailable: true`, `Version: "1.11.0"` — no actual FFmpeg probe. Misleads package consumers. |
+| 1118 | 14 | P2 | `Transcoding.Media/Strategies/Video/AiProcessingStrategies.cs:228-234` | `AiUpscalingStrategy.Configure` no bounds validation — `tileOverlap >= tileSize`, `scaleFactor <= 0` cause downstream failures. |
+| 1119 | 15 | P2 | `Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs:336-343` | `TryDetectIntelQsv` always returns `false` on Windows — naming lie. Intel QSV silently skipped on most common server platform. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 007 (15 files: UltimateAccessControl/Features/SiemConnector–UltimateAccessControl/Strategies/Advanced/ZkProofCrypto)
+
+**Files Reviewed:** 15 | **Findings:** 22 (0 P0, 16 P1, 6 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1120 | 1 | P1 | `UltimateAccessControl/Features/SiemConnector.cs:206-211` | `SimulateForwardAsync` returns `Task.CompletedTask` with comment "In production, would make actual HTTP/TCP connections." SIEM forwarding is entire class purpose — no transport layer exists. |
+| 1121 | 1 | P1 | `UltimateAccessControl/Strategies/Advanced/HomomorphicAccessControlStrategy.cs:65-69` | Comment admits "Simplified homomorphic evaluation (production would use actual HE library)." Entire check is plaintext admin-role + public-resource prefix. No HE library invoked. |
+| 1122 | 1 | P1 | `UltimateAccessControl/Strategies/Advanced/DecentralizedIdStrategy.cs:68-69` | "Simplified DID verification" — entire check is `did.StartsWith("did:") && did.Length > 10`. No W3C DID resolution, no key verification, no credential check. |
+| 1123 | 1 | P1 | `UltimateAccessControl/Strategies/Advanced/SteganographicSecurityStrategy.cs:68-69` | "Simplified steganographic token extraction" — entire auth check is `carrierData.Length >= 1024`. No LSB extraction, no secret comparison. |
+| 1124 | 2 | P1 | `UltimateAccessControl/Strategies/Advanced/QuantumSecureChannelStrategy.cs:19,85,103` | `_quantumKeys` is plain `Dictionary<string,byte[]>` with no synchronization — strategy declares `MaxConcurrentEvaluations=100`. Concurrent writes cause corruption. |
+| 1125 | 2 | P1 | `UltimateAccessControl/Strategies/Advanced/PredictiveThreatStrategy.cs:72,121-132` | `List<ThreatEvent>` from `BoundedDictionary.GetOrAdd` mutated concurrently — `Add` and `RemoveRange(0,...)` race. Thread-unsafe collection in concurrent evaluation. |
+| 1126 | 2 | P1 | `UltimateAccessControl/Strategies/Advanced/BehavioralBiometricStrategy.cs:106-127` | `UpdateProfile` mutates `BehavioralProfile` without lock — concurrent EMA calculations produce interleaved nonsense. `SampleCount++` not atomic. |
+| 1127 | 5 | P1 | `UltimateAccessControl/Scaling/AclScalingManager.cs:465-498` | `DrainCallback` bare `catch { }` — all exceptions silently suppressed. If backing store misconfigured, audit entries lost forever with no indication. |
+| 1128 | 6 | P1 | `UltimateAccessControl/Scaling/AclScalingManager.cs:465` | `DrainCallback` declared `async void` — unhandled exception crashes process. Fire-and-forget timer callback anti-pattern. |
+| 1129 | 9 | P1 | `UltimateAccessControl/Scaling/AclScalingManager.cs:382-388` | `InvalidatePolicyCache()` is documented no-op — body is only comments explaining why cache can't be cleared. Callers make decisions on stale policies for up to 30s TTL. |
+| 1130 | 10 | P1 | `UltimateAccessControl/Features/ThreatIntelligenceEngine.cs:52-53` | Caller-supplied `ThreatIndicator` mutated in-place (`FeedId`, `AddedAt`) and stored by reference — external mutation corrupts stored data. |
+| 1131 | 12 | P1 | `UltimateAccessControl/Scaling/AclScalingManager.cs:399-404` | `GetThreshold` returns `null` when value is `0.0` — legitimate zero-tolerance threshold silently ignored. Security bypass for zero-configured thresholds. |
+| 1132 | 12 | P1 | `UltimateAccessControl/Strategies/Advanced/ZkProofCrypto.cs:104-106` | `GenerateProofAsync` zeroes caller's private key buffer in `finally` via `CryptographicOperations.ZeroMemory(privateKey)`. Second proof from same key signs over all-zero bytes. |
+| 1133 | 14 | P1 | `UltimateAccessControl/Features/SiemConnector.cs:184-188` | RFC 5424 structured data embeds `EventType`, `UserId`, `ResourceId` via interpolation without escaping `"` or `]` — syslog injection. |
+| 1134 | 14 | P1 | `UltimateAccessControl/Scaling/AclScalingManager.cs:432-438` | `ComputePolicyCacheKey` hashes only `SubjectId|ResourceId|Action` — omits `Roles`, `IP`, `Attributes`, `Location`. Different-privilege requests share cached decision → authorization bypass during TTL. |
+| 1135 | 15 | P1 | `UltimateAccessControl/Strategies/Advanced/HomomorphicAccessControlStrategy.cs:77-83` | Metadata claims `encryption_scheme=BFV`, `security_level=128-bit`, `plaintext_exposure=false` — all false. Purely plaintext evaluation. |
+| 1136 | 15 | P1 | `UltimateAccessControl/Strategies/Advanced/DecentralizedIdStrategy.cs:73-82` | Metadata claims `w3c_compliant=true` — false compliance claim in security audit trail. No DID resolution performed. |
+| 1137 | 9 | P2 | `UltimateAccessControl/Scaling/AclScalingManager.cs:529-539` | `ReconfigureLimitsAsync` updates `_maxConcurrentEvaluations` field but does NOT resize `_evaluationThrottle` SemaphoreSlim — concurrency limit change has no effect. |
+| 1138 | 12 | P2 | `UltimateAccessControl/Strategies/Advanced/ZkProofCrypto.cs:278-303` | `Deserialize` reads length-prefixed fields without bounds validation — attacker-crafted proof triggers 2GB allocation → DoS. |
+| 1139 | 14 | P2 | `UltimateAccessControl/Features/ThreatIntelligenceEngine.cs:44-48` | `AddIndicators` no validation on individual indicator `Value` — null/empty stored as key, causes false positive threat matches. |
+| 1140 | 15 | P2 | `UltimateAccessControl/Strategies/Advanced/QuantumSecureChannelStrategy.cs:88-98` | `GenerateQuantumKey` and `GenerateClassicalKey` are byte-identical methods — metadata claims "BB84 protocol" and "quantum security level" when both use `RandomNumberGenerator`. |
+| 1141 | 15 | P2 | `UltimateAccessControl/Strategies/Advanced/SteganographicSecurityStrategy.cs:74-82` | Metadata claims `steganographic_method=lsb-embedding`, `covert_channel_active=true` — no steganography performed. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 008 (15 files: ClearanceBadgingStrategy–DacStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 18 (2 P0, 12 P1, 4 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1142 | 1 | P0 | `UltimateAccessControl/Strategies/Clearance/CrossDomainTransferStrategy.cs:218-240` | `SanitizeDataAsync`, `InspectContentAsync`, `VerifyMutualAuthenticationAsync` all return `true`/empty results — cross-domain security guards are complete stubs allowing unrestricted classified data transfer. |
+| 1143 | 4 | P0 | `UltimateAccessControl/Strategies/Clearance/ClearanceValidationStrategy.cs:113-124` | `ValidateClearanceLevelAsync` returns `IsValid=true, GrantedLevel=requestedLevel` when `_clearanceFrameworks` is empty (misconfiguration). Fail-open on missing framework config allows any clearance level. |
+| 1144 | 1 | P1 | `UltimateAccessControl/Strategies/Clearance/ClearanceBadgingStrategy.cs:95-110` | `VerifyBadgeAsync` stub — always returns `IsValid=true` with hardcoded `BadgeStatus=Active`. No actual badge verification performed. |
+| 1145 | 1 | P1 | `UltimateAccessControl/Strategies/Clearance/ClearanceBadgingStrategy.cs:127-145` | `RevokeBadgeAsync` records revocation in local dictionary but does not propagate to any external system — revoked badges still pass `VerifyBadgeAsync` on other nodes. |
+| 1146 | 1 | P1 | `UltimateAccessControl/Strategies/Clearance/CrossDomainTransferStrategy.cs:178-195` | `BuildTransferManifestAsync` generates manifest with hardcoded `ClassificationGuide="default"` and `HandlingCaveats=[]` regardless of actual data classification. |
+| 1147 | 1 | P1 | `UltimateAccessControl/Strategies/Core/AbacStrategy.cs:89-102` | `EvaluatePolicyAsync` returns `AccessDecision.Permit` when no matching policies found (fail-open). Should deny by default per least-privilege. |
+| 1148 | 1 | P1 | `UltimateAccessControl/Strategies/Core/AclStrategy.cs:112-130` | `CheckPermissionAsync` returns `Allowed=true` when ACL entry not found for resource (fail-open). Missing ACL = full access. |
+| 1149 | 1 | P1 | `UltimateAccessControl/Strategies/Core/CapabilityStrategy.cs:76-93` | `ValidateCapabilityAsync` stub — always returns `IsValid=true, RemainingUses=int.MaxValue`. No capability token validation. |
+| 1150 | 1 | P1 | `UltimateAccessControl/Strategies/Core/AccessAuditLoggingStrategy.cs:88-101` | `ForwardToSiemAsync` is no-op (`Task.CompletedTask`). Audit events never leave the process — compliance audit trail incomplete. |
+| 1151 | 2 | P1 | `UltimateAccessControl/Strategies/Core/DacStrategy.cs:134-148` | `TransferOwnershipAsync` modifies `_ownershipMap` ConcurrentDictionary but doesn't update associated ACL entries — previous owner retains access after transfer. |
+| 1152 | 4 | P1 | `UltimateAccessControl/Strategies/Clearance/CrossDomainTransferStrategy.cs:252-268` | `ApplyDowngradeAsync` returns data unmodified — claims to downgrade classification but performs no redaction, sanitization, or relabeling. |
+| 1153 | 14 | P1 | `UltimateAccessControl/Strategies/Core/AbacStrategy.cs:145-158` | `EvaluateCondition` uses string comparison for numeric attributes (`Age > 18` compared as strings) — `"9" > "18"` evaluates true. |
+| 1154 | 9 | P2 | `UltimateAccessControl/Strategies/Clearance/ClearanceValidationStrategy.cs:156-170` | `ReconfigureLimitsAsync` updates `_maxConcurrentValidations` but does not resize the backing `SemaphoreSlim` — concurrency limit change is ineffective. |
+| 1155 | 12 | P2 | `UltimateAccessControl/Strategies/Core/AbacStrategy.cs:172-185` | `ParseTimeRange` uses `DateTime.Parse` without `CultureInfo.InvariantCulture` — locale-dependent parsing causes policy evaluation failures in non-US locales. |
+| 1156 | 14 | P2 | `UltimateAccessControl/Strategies/Core/AclStrategy.cs:165-180` | `SerializeAcl` writes ACL entries without escaping delimiter characters in principal names — injection of `|` in username corrupts serialized ACL. |
+| 1157 | 15 | P2 | `UltimateAccessControl/Strategies/Core/CapabilityStrategy.cs:108-118` | Metadata claims `capability_model=SPKI/SDSI`, `delegation_depth=configurable` — neither SPKI nor delegation is implemented. |
+
+**Clean files:** CompartmentalizationStrategy, NatoClearanceStrategy, UsGovClearanceStrategy, FiveEyesClearanceStrategy, EscortRequirementStrategy, CustomClearanceFrameworkStrategy, ClearanceExpirationStrategy, DacStrategy
+
+---
+
+### Plugin Chunk 009 (15 files: DynamicAuthorizationStrategy–EntropyAnalysisStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 21 (0 P0, 6 P1, 9 P2, 6 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1158 | 1 | P1 | `UltimateAccessControl/Strategies/Core/DynamicAuthorizationStrategy.cs:94-112` | `EvaluateRiskAsync` returns hardcoded `RiskScore=0.1` (low risk) for all requests — no actual risk computation. All requests treated as low-risk. |
+| 1159 | 1 | P1 | `UltimateAccessControl/Strategies/Core/FederatedIdentityStrategy.cs:142-160` | `ValidateTokenAsync` for JWT uses `TokenValidationParameters` with `ValidateLifetime=false` — expired tokens accepted indefinitely. |
+| 1160 | 1 | P1 | `UltimateAccessControl/Strategies/Core/FederatedIdentityStrategy.cs:468-480` | `ValidateSamlAssertionAsync` hardcodes `SubjectId="saml-subject"`, `Issuer="saml-issuer"` — no actual SAML XML parsing or signature verification. |
+| 1161 | 1 | P1 | `UltimateAccessControl/Strategies/Core/FederatedIdentityStrategy.cs:493-504` | `ValidateWsFederationAsync` always returns `IsValid=true` with hardcoded claims — no WS-Federation token validation performed. |
+| 1162 | 1 | P1 | `UltimateAccessControl/Strategies/Core/MultiTenancyIsolationStrategy.cs:88-103` | `VerifyTenantIsolationAsync` checks tenant ID prefix match only — `tenant-admin` prefix matches `tenant-admin-evil`, allowing cross-tenant access. |
+| 1163 | 1 | P1 | `UltimateAccessControl/Strategies/Core/ZeroTrustStrategy.cs:115-132` | `VerifyDevicePostureAsync` stub — returns `IsCompliant=true, TrustScore=0.95` for all devices. No actual device posture check. |
+| 1164 | 1 | P2 | `UltimateAccessControl/Strategies/Core/HrBacStrategy.cs:78-92` | `EvaluateHierarchyAsync` walks parent chain without cycle detection — circular role hierarchy causes `StackOverflowException`. |
+| 1165 | 1 | P2 | `UltimateAccessControl/Strategies/Core/PolicyBasedAccessControlStrategy.cs:134-148` | `CompilePolicyAsync` returns pre-built delegate regardless of policy text — policy language parser is stub. |
+| 1166 | 1 | P2 | `UltimateAccessControl/Strategies/DataProtection/AnonymizationStrategy.cs:96-112` | `AnonymizeFieldAsync` for `Email` type replaces with `anonymous@example.com` — all anonymized records share same email, enabling re-identification via join. |
+| 1167 | 1 | P2 | `UltimateAccessControl/Strategies/DataProtection/DifferentialPrivacyStrategy.cs:88-105` | `AddNoiseAsync` adds Laplace noise with hardcoded `epsilon=1.0` regardless of configured privacy budget — privacy guarantees not honored. |
+| 1168 | 1 | P2 | `UltimateAccessControl/Strategies/DataProtection/DlpStrategy.cs:92-108` | `ScanContentAsync` matches only exact string patterns — no regex, no ML classification. DLP catches `"SSN: 123-45-6789"` but misses `"SSN:123-45-6789"` (no space). |
+| 1169 | 1 | P2 | `UltimateAccessControl/Strategies/DataProtection/EntropyAnalysisStrategy.cs:78-95` | `AnalyzeEntropyAsync` computes Shannon entropy but thresholds are hardcoded (>4.5 = suspicious) — no calibration for data type. Base64 content always flagged as suspicious. |
+| 1170 | 2 | P2 | `UltimateAccessControl/Strategies/Core/FederatedIdentityStrategy.cs:205-220` | Token refresh uses `ConcurrentDictionary` for token cache but `GetOrAdd` with async factory has race — two threads may both execute token refresh for same key. |
+| 1171 | 14 | P2 | `UltimateAccessControl/Strategies/DataProtection/AnonymizationStrategy.cs:128-140` | `GenerateConsistentPseudonym` uses `MD5.HashData` — MD5 collision attacks allow different inputs to produce same pseudonym, breaking pseudonymization uniqueness. |
+| 1172 | 14 | P2 | `UltimateAccessControl/Strategies/DataProtection/DifferentialPrivacyStrategy.cs:122-135` | `SampleLaplace` uses `Random.Shared` (not crypto-secure) — noise distribution is predictable, weakening differential privacy guarantees. |
+| 1173 | 15 | LOW | `UltimateAccessControl/Strategies/Core/DynamicAuthorizationStrategy.cs:125-135` | Metadata claims `risk_engine=ml-based`, `context_factors=15` — no ML model, only hardcoded score. |
+| 1174 | 15 | LOW | `UltimateAccessControl/Strategies/Core/ZeroTrustStrategy.cs:148-158` | Metadata claims `device_posture=continuous`, `attestation=tpm-based` — no device check, no TPM attestation. |
+| 1175 | 15 | LOW | `UltimateAccessControl/Strategies/Core/MultiTenancyIsolationStrategy.cs:120-128` | Metadata claims `isolation_model=full-namespace`, `cross_tenant=blocked` — prefix check doesn't provide namespace isolation. |
+| 1176 | 15 | LOW | `UltimateAccessControl/Strategies/Core/PolicyBasedAccessControlStrategy.cs:162-170` | Metadata claims `policy_language=cedar-like`, `evaluation=compiled` — no Cedar-like language parser exists. |
+| 1177 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/DlpStrategy.cs:125-132` | Metadata claims `detection_methods=[regex,ml,fingerprint]` — only exact string match implemented. |
+| 1178 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/EntropyAnalysisStrategy.cs:108-115` | Metadata claims `analysis_mode=adaptive` — thresholds are hardcoded, no adaptation. |
+
+**Clean files:** HierarchyVerificationStrategy, MacStrategy, RbacStrategy, ReBacStrategy, DataMaskingStrategy
+
+---
+
+### Plugin Chunk 010 (15 files: PseudonymizationStrategy–EncryptedFileIdentityStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 33 (1 P0, 24 P1, 8 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1179 | 1 | P1 | `UltimateAccessControl/Strategies/Duress/AntiForensicsStrategy.cs:104-107` | `SecureMemoryWipeAsync` calls `GC.Collect` then `Task.CompletedTask` — GC does NOT wipe memory. Sensitive data in managed memory is neither zeroed nor overwritten. |
+| 1180 | 15 | P1 | `UltimateAccessControl/Strategies/Duress/AntiForensicsStrategy.cs:100-116` | Method named `SecureMemoryWipeAsync` performs only GC collect. No memory zeroing, no pinned buffer overwrite, no `Array.Clear` on sensitive fields. |
+| 1181 | 1 | P1 | `UltimateAccessControl/Strategies/Duress/ColdBootProtectionStrategy.cs:107-122` | `EncryptSensitiveMemoryAsync` does only `GC.Collect` + `Task.CompletedTask`. No actual memory encryption performed. |
+| 1182 | 15 | P1 | `UltimateAccessControl/Strategies/Duress/ColdBootProtectionStrategy.cs:148-160` | `ProtectSensitiveDataAsync` logs debug and does nothing. Comment says "Ensure sensitive data is not cached in plaintext" but code doesn't do this. |
+| 1183 | 1 | P1 | `UltimateAccessControl/Strategies/Duress/DuressKeyDestructionStrategy.cs:97-100` | Key destruction logs "message bus integration pending" and adds key ID to `keysDestroyed` without destroying anything. Returns false `keys_destroyed` metadata. |
+| 1184 | 15 | P0 | `UltimateAccessControl/Strategies/Duress/DuressKeyDestructionStrategy.cs:98-114` | `keys_destroyed` metadata reports keys destroyed when no destruction occurred. Duress system falsely confirms key destruction — real data remains accessible. |
+| 1185 | 1 | P1 | `UltimateAccessControl/Strategies/Duress/DuressPhysicalAlertStrategy.cs:214-229` | `TriggerModbusAlertAsync` logs "would be triggered" and returns `true` without sending any Modbus signal. |
+| 1186 | 1 | P1 | `UltimateAccessControl/Strategies/Duress/DuressPhysicalAlertStrategy.cs:231-246` | `TriggerOpcUaAlertAsync` logs "would be triggered" and returns `true` without sending any OPC-UA alarm. |
+| 1187 | 15 | P1 | `UltimateAccessControl/Strategies/Duress/DuressPhysicalAlertStrategy.cs:144-149` | `physical_alerts` metadata contains "Modbus"/"OPC-UA" even though alerts never sent — trigger methods always return `true`. |
+| 1188 | 1 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/BlockchainIdentityStrategy.cs:57` | Blockchain identity verification reduces to `context.SubjectId.Length > 0`. No ledger lookup, no signature verification, no DID resolution. |
+| 1189 | 15 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/BlockchainIdentityStrategy.cs:67` | Metadata reports `storage_type=distributed-ledger` but no blockchain or ledger consulted. |
+| 1190 | 1 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/EmbeddedSqliteIdentityStrategy.cs:58` | SQLite identity check reduces to `context.SubjectId.Length > 0`. No SQLite database opened or queried. |
+| 1191 | 15 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/EmbeddedSqliteIdentityStrategy.cs:65-70` | Metadata claims `encryption=AES-256`, `offline_capable=true` — neither implemented. |
+| 1192 | 1 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/EncryptedFileIdentityStrategy.cs:70` | Credential verification is `credentials.Length >= 64`. No file read, no Argon2id KDF, no AES-256-GCM. Comment says "Simplified implementation" — Rule 13 violation. |
+| 1193 | 15 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/EncryptedFileIdentityStrategy.cs:77-81` | Metadata claims `encryption_algorithm=AES-256-GCM`, `kdf=Argon2id` — neither performed. |
+| 1194 | 4 | P1 | `UltimateAccessControl/Strategies/Duress/DuressDeadDropStrategy.cs:162-163` | `EncryptEvidenceAsync` catch falls back to returning **unencrypted evidence**. Raw sensitive duress data transmitted in plaintext on encryption failure. |
+| 1195 | 4 | P1 | `UltimateAccessControl/Strategies/Duress/DuressDeadDropStrategy.cs:141-143` | Missing `EncryptionKey` config generates random ephemeral key per call. Dead drop recipient cannot decrypt — key discarded immediately after encryption. |
+| 1196 | 4 | P1 | `UltimateAccessControl/Strategies/Duress/DuressDeadDropStrategy.cs:172-173` | `CarrierImagePath` from config passed to `File.ReadAllBytesAsync` without path validation — path traversal. |
+| 1197 | 4 | P1 | `UltimateAccessControl/Strategies/Duress/DuressDeadDropStrategy.cs:243-246` | Dead drop writes to `Path.Combine(location, filename)` where `location` from config without canonicalization — path traversal write. |
+| 1198 | 7 | P1 | `UltimateAccessControl/Strategies/Duress/DuressDeadDropStrategy.cs:233-235` | `new HttpClient()` created per call inside `ExfiltrateDataAsync` instead of using existing `SharedHttpClient` field — socket exhaustion under load. |
+| 1199 | 2 | P1 | `UltimateAccessControl/Strategies/DataProtection/PseudonymizationStrategy.cs:63-73` | `Pseudonymize` check-then-write on `_pseudonymMap` without lock. Two threads may both compute HMAC and write, corrupting consistency if key is mutable. |
+| 1200 | 2 | P1 | `UltimateAccessControl/Strategies/DataProtection/TokenizationStrategy.cs:54-61` | `Tokenize` check-then-write on `_reverseVault`/`_tokenVault` without atomicity. Two concurrent calls for same data generate two different tokens, one permanently non-detokenizable. |
+| 1201 | 4 | P2 | `UltimateAccessControl/Strategies/Duress/EvilMaidProtectionStrategy.cs:132-134` | TPM detection on Windows checks `Directory.Exists("C:\\Windows\\System32\\tpm.sys")` — `tpm.sys` is a file, not directory. Always returns false → TPM never detected on Windows. |
+| 1202 | 12 | P1 | `UltimateAccessControl/Strategies/Duress/EvilMaidProtectionStrategy.cs:132-134` | `Directory.Exists` on a file path is logic bug. Windows TPM detection permanently broken — feature dead on Windows. |
+| 1203 | 12 | P1 | `UltimateAccessControl/Strategies/Duress/EvilMaidProtectionStrategy.cs:192-207` | `VerifyBootIntegrityAsync` returns `IsValid=true` when no stored measurement exists (first boot, TPM unavailable). Fail-open instead of fail-secure. |
+| 1204 | 9 | P1 | `UltimateAccessControl/Strategies/Duress/DuressNetworkAlertStrategy.cs:128-135` | `Task.WhenAll` catch logs only first exception. Multi-channel alert failures beyond first silently discarded. |
+| 1205 | 13 | P2 | `UltimateAccessControl/Strategies/Duress/DuressNetworkAlertStrategy.cs:222` | `recipients.Count()` re-enumerates IEnumerable inside log call — double enumeration, potentially different count. |
+| 1206 | 2 | P2 | `UltimateAccessControl/Strategies/Duress/DuressMultiChannelStrategy.cs:18,63-64` | `_alertStrategies` is plain `List<T>` with concurrent read+write from `RegisterAlertStrategy`/`EvaluateAccessCoreAsync` — undefined behavior. |
+| 1207 | 4 | P2 | `UltimateAccessControl/Strategies/Duress/DuressNetworkAlertStrategy.cs:200-210` | SMTP email body interpolates `SubjectId`, `ResourceId`, etc. without sanitization — SMTP header injection possible. |
+| 1208 | 9 | P2 | `UltimateAccessControl/Strategies/Duress/PlausibleDeniabilityStrategy.cs:118-120` | `Path.GetDirectoryName(realVolumePath)` returns null for root paths → null-coalescing produces unintended path. |
+| 1209 | 4 | P2 | `UltimateAccessControl/Strategies/Duress/PlausibleDeniabilityStrategy.cs:118-120` | Decoy path from unvalidated `context.ResourceAttributes` — path traversal via `Path.Combine`. |
+| 1210 | 7 | P2 | `UltimateAccessControl/Strategies/Duress/SideChannelMitigationStrategy.cs:28` | `RandomNumberGenerator.Create()` stored as field but never used or disposed. All code uses static methods instead. Unused resource leak. |
+| 1211 | 9 | P2 | `UltimateAccessControl/Strategies/Duress/SideChannelMitigationStrategy.cs:142` | `AddTimingNoiseAsync` computes `(int)(remainingMs * 0.5)` without checking positive — negative value causes `RandomNumberGenerator.GetInt32` to throw, silently caught. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 011 (15 files: IdentityMigrationStrategy–OAuth2Strategy)
+
+**Files Reviewed:** 15 | **Findings:** 28 (6 P0, 6 P1, 13 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1212 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/IdentityMigrationStrategy.cs:57` | `EvaluateAccessCoreAsync` grants access to any non-empty `SubjectId`. No actual migration logic, credential verification, or state consultation. |
+| 1213 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/LiteDbIdentityStrategy.cs:57` | Access granted if `SubjectId.Length > 0`. No LiteDB opened or queried. Stub accepts any non-empty subject. |
+| 1214 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/OfflineAuthenticationStrategy.cs:57` | Offline auth grants access to any non-empty `SubjectId`. No local credential store consulted. |
+| 1215 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/PasswordHashingStrategy.cs:57` | Reports `algorithm=Argon2id` in metadata but performs no hashing. Access purely `SubjectId.Length > 0`. |
+| 1216 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/RocksDbIdentityStrategy.cs:57` | Claims `storage_engine=RocksDB` but opens no database. Identity granted to any non-empty subject. |
+| 1217 | 1 | P0 | `UltimateAccessControl/Strategies/EmbeddedIdentity/SessionTokenStrategy.cs:57` | Reports `token_type=JWT` but does no JWT parsing or signature verification. Access granted to any non-empty `SubjectId`. |
+| 1218 | 15 | P1 | `UltimateAccessControl/Strategies/EmbeddedIdentity/PasswordHashingStrategy.cs:66` | Named "Password Hashing Strategy" and advertises `algorithm=Argon2id` — zero hashing anywhere in implementation. |
+| 1219 | 1 | P1 | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:714` | `VerifyFido2Signature` for ES256 returns `signature.Length >= 64 && signedData.Length > 0` — length check, not cryptographic verification. Same for RS256 (728) and EdDSA (740). Authentication bypass. |
+| 1220 | 15 | P1 | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:665` | Method named `VerifyFido2Signature` called in auth path issuing `IsGranted=true`. Does not verify any signature — structural stub. |
+| 1221 | 1 | P1 | `UltimateAccessControl/Strategies/Identity/KerberosStrategy.cs:334-342` | `ValidateKerberosTicket` accepts any ticket with pvno byte pattern, returns hardcoded `user@{realm}`. No SSPI/GSSAPI decryption. |
+| 1222 | 2 | P1 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:33-34` | `_tokenCache` and `_jwksCache` are plain `Dictionary` with no locking in concurrent async path. Corrupt state or throw on concurrent access. |
+| 1223 | 2 | P1 | `UltimateAccessControl/Strategies/Identity/IamStrategy.cs:478` | `LogAudit` uses `_auditLog.AddOrUpdate` with `list.Add(evt)` in delegate — `List<T>.Add` not thread-safe, concurrent calls corrupt the list. |
+| 1224 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:652` | `ParseAttestationObject` bare `catch { return (..., false); }` swallows all exceptions silently. |
+| 1225 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:749` | `VerifyFido2Signature` bare `catch { return false; }` — programming errors masked as auth failures. |
+| 1226 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:485` | `VerifyJwtSignatureAsync` bare `catch { return false; }` — network errors and bugs silently treated as invalid signatures. |
+| 1227 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:538-541` | `VerifyRsaSignature` bare `catch { return false; }` — RSA key import failures silently swallowed. |
+| 1228 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:574` | `VerifyEcdsaSignature` bare `catch { return false; }`. |
+| 1229 | 5 | P2 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:602` | `VerifyHmacSignature` bare `catch { return false; }`. |
+| 1230 | 5 | P2 | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:731` | `NotifyHandlersAsync` bare `catch` with comment "Log but don't fail" — no actual logging. |
+| 1231 | 5 | P2 | `UltimateAccessControl/Strategies/Honeypot/CanaryStrategy.cs:336-339` | `SendAlertsAsync` bare `catch` with comment "Log but don't fail on channel errors" — no logging despite comment. |
+| 1232 | 7 | P2 | `UltimateAccessControl/Strategies/Identity/OAuth2Strategy.cs:46` | `new HttpClient()` in constructor, no `IDisposable` on strategy — socket pool and handles leaked. |
+| 1233 | 6 | P2 | `UltimateAccessControl/Strategies/Honeypot/CanaryStrategy.cs:369` | Timer callback `async _ => await RotateCanariesAsync()` — exceptions silently swallowed by timer infrastructure. |
+| 1234 | 6 | P2 | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:573-578` | Timer callbacks for `RotateEnvironments`/`PerformAdaptation` — exceptions terminate timer silently. |
+| 1235 | 9 | P2 | `UltimateAccessControl/Strategies/Identity/IamStrategy.cs:184-190` | Account lockout mutates `user.FailedLoginAttempts++` without synchronization — race condition on concurrent auth failures for same user. |
+| 1236 | 4 | P2 | `UltimateAccessControl/Strategies/Identity/IamStrategy.cs:422-424` | `VerifyPassword` uses `computedHash == hash` string equality instead of constant-time comparison for auth hash comparison. |
+| 1237 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/CanaryStrategy.cs:605` | `_alertQueue.FirstOrDefault` O(n) linear scan of ConcurrentQueue (up to 10K alerts). Should use indexed dictionary. |
+| 1238 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:754` | `_eventQueue.ToArray().Where(...)` materializes entire queue (10K) on every adaptation tick. |
+| 1239 | 12 | LOW | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:471-475` | `credential.SignCount` updated from authenticator data then incremented again — double-increment causes stored count to be ahead of reality, rejecting valid authenticator on next use. |
+
+**Clean files:** EphemeralSharingStrategy, JwksTypes, LdapStrategy
+
+---
+
+### Plugin Chunk 012 (15 files: OidcStrategy–HardwareTokenStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 25 (2 P0, 19 P1, 4 P2)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1240 | 2 | P1 | `UltimateAccessControl/Strategies/Identity/OidcStrategy.cs:23-24` | `_discoveryCache` and `_jwksCache` are plain `Dictionary<>`, not thread-safe. Concurrent OIDC validation calls race on cache reads/writes. |
+| 1241 | 4 | P1 | `UltimateAccessControl/Strategies/Identity/OidcStrategy.cs:58-59` | `ValidateSignature` configurable to `false` with no warning/audit log. Misconfiguration silently disables all JWT signature enforcement. |
+| 1242 | 4 | P0 | `UltimateAccessControl/Strategies/Identity/SamlStrategy.cs:125-133` | Authentication bypass: when `_certificate != null` but assertion has no `<Signature>` element, `signatureNode` is null and verification skipped entirely — unsigned assertions accepted. |
+| 1243 | 14 | P1 | `UltimateAccessControl/Strategies/Identity/RadiusStrategy.cs:24` | `_sharedSecret` defaults to empty string. Omitting config makes all RADIUS packets trivially forgeable. |
+| 1244 | 4 | P1 | `UltimateAccessControl/Strategies/Identity/RadiusStrategy.cs:222-241` | `ParseAccessResponse` does not verify response authenticator (RFC 2865 §3). Attacker can spoof Access-Accept for any Identifier. |
+| 1245 | 4 | P1 | `UltimateAccessControl/Strategies/Identity/TacacsStrategy.cs:130` | `Random.Shared.Next()` for TACACS+ session ID — not cryptographically secure, enables session fixation. |
+| 1246 | 5 | P1 | `UltimateAccessControl/Strategies/Identity/ScimStrategy.cs:109,135,159,178` | Four public SCIM methods contain `catch { return null/false; }` with no logging. HTTP errors, serialization failures silently swallowed. |
+| 1247 | 1 | P1 | `UltimateAccessControl/Strategies/Integrity/BlockchainAnchorStrategy.cs:91-93` | `BlockHeight=0`, `Status="pending"` never updated — no actual blockchain submission. `TransactionId` returned implying anchoring happened. |
+| 1248 | 15 | P1 | `UltimateAccessControl/Strategies/Integrity/BlockchainAnchorStrategy.cs:90` | `Status="pending"` never transitions to "confirmed". Metadata misleads callers into believing real blockchain transaction in progress. |
+| 1249 | 2 | P1 | `UltimateAccessControl/Strategies/Integrity/ImmutableLedgerStrategy.cs:123-153` | `AppendEntry` non-atomic read-modify-write. Concurrent appends for same ledger can interleave, losing entries and corrupting append-only guarantee. |
+| 1250 | 13 | P2 | `UltimateAccessControl/Strategies/Integrity/ImmutableLedgerStrategy.cs:149` | `Concat(new[]{entry}).ToList()` copies entire list on every append — O(N²) over ledger lifetime. |
+| 1251 | 2 | P1 | `UltimateAccessControl/Strategies/Integrity/IntegrityStrategy.cs:143-148` | `VerifyIntegrityAsync` reads record, creates `with` expression, stores back without lock. Concurrent verifications race on `VerificationCount`. |
+| 1252 | 12 | P1 | `UltimateAccessControl/Strategies/Integrity/MerkleTreeStrategy.cs:108-137` | `GenerateProof` sibling-detection condition uses wrong index tracking after first level. Proofs for non-zero leaf indices produce incorrect hashes → fail `VerifyProof`. |
+| 1253 | 2 | P1 | `UltimateAccessControl/Strategies/Integrity/TamperProofStrategy.cs:127-151` | `AppendBlock` same non-atomic read-modify-write race as ImmutableLedger. Concurrent calls drop blocks, break hash chain. |
+| 1254 | 13 | P2 | `UltimateAccessControl/Strategies/Integrity/TamperProofStrategy.cs:147` | Same O(N²) Concat+ToList pattern on every block append. |
+| 1255 | 1 | P1 | `UltimateAccessControl/Strategies/Integrity/TsaStrategy.cs:97` | `Policy = "1.2.3.4.5"` placeholder OID. RFC 3161 requires valid registered OID. Compliant verifier would reject tokens. |
+| 1256 | 12 | P2 | `UltimateAccessControl/Strategies/Integrity/WormStrategy.cs:185-190` | `_records` updated before `CanModify` call, but stale `record` variable used for metadata — `ModificationAttempts` in denial response is off-by-one. |
+| 1257 | 1 | P0 | `UltimateAccessControl/Strategies/Mfa/HardwareTokenStrategy.cs:438-442` | `VerifyFido2Signature` stub: creates ECDsa but never imports key or calls VerifyData. Returns `signature.Length >= 64` — any 64-byte array passes FIDO2 MFA. Complete security bypass. |
+| 1258 | 1 | P1 | `UltimateAccessControl/Strategies/Mfa/HardwareTokenStrategy.cs:284-285` | `ValidateYubicoOtpAsync` validates modhex structure only — no AES counter/session/timestamp verification. Replay attacks fully possible. |
+| 1259 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/HardwareTokenStrategy.cs:211,291` | `token.UseCount++` and `token.LastUsed` mutated without synchronization in concurrent evaluation paths. Lost counter updates break replay protection. |
+| 1260 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/EmailOtpStrategy.cs:120-121` | `session.AttemptsUsed++` mutated in-place without lock. Two concurrent calls both pass attempt limit check, allowing more than max attempts. |
+| 1261 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/EmailOtpStrategy.cs:251-263` | `CheckRateLimit` calls `RemoveAll`/`Add` on shared `List<DateTime>` without lock. Concurrent OTP sends corrupt rate limit counter. |
+| 1262 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/BiometricStrategy.cs:205-215` | TOCTOU race: `GetOrAdd` + count check outside lock. Two concurrent enrollments both pass limit check, exceeding `MaxTemplatesPerUser`. |
+| 1263 | 15 | P2 | `UltimateAccessControl/Strategies/Mfa/BiometricStrategy.cs:275-306` | `IsAvailableAsync` always returns `Available=true` for all biometric types regardless of hardware state. |
+| 1264 | 12 | P2 | `UltimateAccessControl/Strategies/Mfa/BiometricStrategy.cs:312-334` | `ComputeSimilarity` silently truncates mismatched-length templates — partial comparison inflates similarity, increasing false acceptance. |
+
+**Clean files:** None
+
+---
+
+### Plugin Chunk 013 (15 files: HotpStrategy–IpsStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 27 (1 P0, 18 P1, 5 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1265 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/HotpStrategy.cs:92-93` | `HotpUserData.Counter` read-modify-write not atomic. Concurrent evaluation for same user can read stale counter, accepting two OTPs for same window. |
+| 1266 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/HotpStrategy.cs:196-197` | Same race in `ResynchronizeCounter`: non-atomic counter update. Two simultaneous resyncs diverge counter. |
+| 1267 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/TotpStrategy.cs:95-106` | TOTP replay protection TOCTOU race: two concurrent requests with same code both read "not present", both pass replay check — defeating entire replay protection. |
+| 1268 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/PushNotificationStrategy.cs:267-272` | `PushChallengeSession.Responded`/`Approved` mutated without sync while `WaitForResponseAsync` polls concurrently. Cross-thread read/write can tear on ARM. |
+| 1269 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/SmartCardStrategy.cs:255-295` | `GetOrAdd` returns list, but `lock(userCards)` not applied to earlier count/duplicate checks. Concurrent `RegisterCard` bypasses limit and duplicate checks. |
+| 1270 | 2 | P1 | `UltimateAccessControl/Strategies/Mfa/SmsOtpStrategy.cs:249-261` | `CheckRateLimit` reads/mutates shared `List<DateTime>` without lock. Concurrent sends corrupt rate limit. |
+| 1271 | 12 | P1 | `UltimateAccessControl/Strategies/Mfa/HotpStrategy.cs:104` | Counter-drift always evaluates to `0` — computed after counter already mutated. Drift should be calculated before mutation. |
+| 1272 | 12 | P1 | `UltimateAccessControl/Strategies/Mfa/HotpStrategy.cs:199-204` | `ResynchronizeCounter` drift always yields `-2` — computed from already-mutated counter. |
+| 1273 | 12 | P1 | `UltimateAccessControl/Strategies/Mfa/MlsStrategy.cs:53-54` | MLS Bell-LaPadula only handles "read"/"write" actions. Any other action (delete, execute, empty) silently denied as "MLS policy violation" with no diagnostic. |
+| 1274 | 1 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:541-546` | `CheckSgxAvailability()` stub always returns `true` with "For simulation" comment. SGX access granted on any machine without hardware. |
+| 1275 | 1 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:813-817` | `CheckTpmAvailability()` stub always returns `true`. TPM access granted regardless of hardware. |
+| 1276 | 1 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:824-832` | `GetCurrentPcrValues()` returns hardcoded constant strings as PCR values. Policy check always passes/fails based on fake static values, never reflecting actual platform state. |
+| 1277 | 4 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:554-558` | `DeriveSealingKey` uses `SHA256.HashData` as KDF without salt/HKDF. Public `measurementHash` + `enclaveId` → attacker can compute sealing key. |
+| 1278 | 4 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:494` | SGX `SealDataAsync` truncates `enclaveId` with `.PadRight(32).Substring(0,32)`. Crafted 32-char-prefix ID matches any same-prefix enclave, enabling cross-enclave data access. |
+| 1279 | 4 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:170-190` | `EncryptInIsolationAsync`/`DecryptInIsolationAsync` use AES-CBC without authentication. Padding oracle attack possible. |
+| 1280 | 4 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:486-503` | `SgxEnclaveStrategy.SealDataAsync` and `TpmBindingStrategy.SealDataAsync` also use AES-CBC without auth. Same padding oracle vulnerability. |
+| 1281 | 4 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:1044-1068` | `ConfidentialComputingStrategy.EncryptInContextAsync` likewise uses unauthenticated AES-CBC. |
+| 1282 | 4 | P0 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:1077` | `GenerateAttestationReport` includes `MeasurementHash = Convert.ToHexString(SHA256.HashData(context.EncryptionKey))` — encryption key hash in public attestation report enables offline brute-force of short keys. |
+| 1283 | 14 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:205-214` | `DecryptInIsolationAsync` doesn't validate `encryptedData.Length >= 16` before `Buffer.BlockCopy` — short input throws unguarded exception. |
+| 1284 | 14 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:800-808` | `TpmBindingStrategy.UnsealDataAsync` doesn't validate `sealedData.Length >= 16` before IV extraction. |
+| 1285 | 14 | P1 | `UltimateAccessControl/Strategies/MicroIsolation/MicroIsolationStrategies.cs:515-520` | `SgxEnclaveStrategy.UnsealDataAsync` doesn't validate `sealedData.Length >= 48` before `BlockCopy` calls. |
+| 1286 | 2 | P1 | `UltimateAccessControl/Strategies/NetworkSecurity/DdosProtectionStrategy.cs:67-71` | Rate-limit window reset non-atomic read-modify-write. Two concurrent threads both get original entry, both compute independent counts — rate limit bypassable under concurrency. |
+| 1287 | 15 | P2 | `UltimateAccessControl/Strategies/NetworkSecurity/FirewallRulesStrategy.cs:91` | `FirewallRule` declares `Port` property accepted by `AddRule`, but `MatchesPattern`/`EvaluateAccessCoreAsync` never read `Port`. Port-based filtering silently ignored. |
+| 1288 | 14 | P2 | `UltimateAccessControl/Strategies/Mfa/SmartCardStrategy.cs:165-173` | Revocation checked after signature verified and `card.LastUsed`/`UseCount` mutated. Revoked card metrics updated before revocation detected. |
+| 1289 | 12 | P2 | `UltimateAccessControl/Strategies/Mfa/TotpStrategy.cs:198` | `ValidateTotp` always passes `DefaultDigits` (6) instead of `userData.Digits`. Users provisioned with non-default digit count always fail auth. |
+| 1290 | 13 | P2 | `UltimateAccessControl/Strategies/Mfa/PushNotificationStrategy.cs:177` | `_activeChallenges.Count(...)` full linear scan on every `CreateChallengeAsync` — O(n) with many concurrent challenges. |
+| 1291 | 12 | P2 | `UltimateAccessControl/Strategies/MilitarySecurity/MilitarySecurityStrategy.cs:91-93` | `CheckClearance` returns `true` when both indices are `-1` (unknown clearance). Unrecognized clearance string grants access. |
+
+**Clean files:** CdsStrategy, CuiStrategy, ItarStrategy, SciStrategy, IpsStrategy, SmsOtpStrategy
+
+---
+
+### Plugin Chunk 014 (15 files: SdWanStrategy–CedarStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 20 (12 P0, 5 P1, 2 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1292 | 4 | P0 | `UltimateAccessControl/Strategies/NetworkSecurity/WafStrategy.cs:53` | `Regex.IsMatch` on `requestData` with no timeout — ReDoS via crafted input with catastrophic backtracking on SQL keyword alternation pattern. |
+| 1293 | 1 | P1 | `UltimateAccessControl/Strategies/NetworkSecurity/WafStrategy.cs:53-54` | WAF SQL/XSS patterns miss common variants (hex encoding, EXEC, CAST, comment injection, encoded XSS). Named "OWASP Top 10" but covers a fraction. |
+| 1294 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/AwsIamStrategy.cs:57` | `SubjectId.Length > 0` is sole check. No AWS STS validation, no IAM policy eval. Identical stub pattern in all 10 PlatformAuth files. |
+| 1295 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/CaCertificateStrategy.cs:57` | Same stub — no X509 validation, no chain building, no CRL/OCSP. |
+| 1296 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/EntraIdStrategy.cs:57` | Same stub — no MSAL/JWT verification, no tenant/audience check. |
+| 1297 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/GcpIamStrategy.cs:57` | Same stub — no GCP IAM API call. |
+| 1298 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/LinuxPamStrategy.cs:57` | Same stub — no P/Invoke to `pam_authenticate`. |
+| 1299 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/MacOsKeychainStrategy.cs:57` | Same stub — no Security framework interop. |
+| 1300 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/SshKeyAuthStrategy.cs:57` | Same stub — no SSH key verification. Claims `key_type=ed25519` in metadata. |
+| 1301 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/SssdStrategy.cs:57` | Same stub — no D-Bus/socket call to sssd. |
+| 1302 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/SystemdCredentialStrategy.cs:57` | Same stub — no systemd-creds interaction. |
+| 1303 | 1 | P0 | `UltimateAccessControl/Strategies/PlatformAuth/WindowsIntegratedAuthStrategy.cs:57` | Same stub — no NTLM/Kerberos/SSPI. |
+| 1304 | 2 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CasbinStrategy.cs:147-157` | `AddRoleForUser` non-atomic read-check-modify-write TOCTOU race on `_roleAssignments`. |
+| 1305 | 2 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CasbinStrategy.cs:162-184` | `GetRolesForUser` iterates while `AddRoleForUser` concurrently mutates inner `List<string>` — `InvalidOperationException` or torn reads. |
+| 1306 | 7 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:39` | `new HttpClient()` field with no `IDisposable` — socket handle leaks on teardown. |
+| 1307 | 1 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:219-241` | `EvaluateCondition` returns `true` for time-based conditions and unrecognized conditions. Cedar `when`/`unless` clauses silently disabled. Comment confirms placeholder. |
+| 1308 | 5 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:315` | Remote-evaluation catch swallows all exceptions into deny with only `ex.Message`. No logging, no metric, transient failures indistinguishable from auth errors. |
+| 1309 | 14 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:81` | `_httpClient.Timeout` set in `InitializeAsync` after construction — requests before init use default 100s timeout. |
+| 1310 | 12 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CasbinStrategy.cs:162-184` | `GetRolesForUser` only resolves one level of role inheritance. Deep hierarchy silently stops at depth 2. |
+| 1311 | 13 | LOW | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:39` | `new HttpClient()` bypasses connection pooling → socket exhaustion under load. |
+
+**Clean files:** SdWanStrategy, VpnStrategy
+
+---
+
+### Plugin Chunk 015 (15 files: CerbosStrategy–SteganographyStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 15 (0 P0, 7 P1, 5 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1312 | 5 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CerbosStrategy.cs:280` | `CheckMultipleActionsAsync` bare `catch {}` swallows all exceptions including `OperationCanceledException`. Cancellation invisible, network failures silently deny. |
+| 1313 | 5 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/PermifyStrategy.cs:259` | `FilterResourcesAsync` bare `catch {}` returns empty allow-list. Network/auth errors cause silent denial with no diagnostics. |
+| 1314 | 4 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/XacmlStrategy.cs:288-295` | `string-regexp-match` uses uncached user-controlled regex with no timeout — ReDoS possible via crafted policy pattern. |
+| 1315 | 10 | P1 | `UltimateAccessControl/Strategies/Steganography/AudioSteganographyStrategy.cs:393` | AIFF 80-bit sample-rate parsing stubbed — always defaults to 44100. Non-standard AIFF files silently misread, corrupting capacity calculations. |
+| 1316 | 4 | P1 | `UltimateAccessControl/Strategies/Steganography/AudioSteganographyStrategy.cs:787-797` | `GeneratePnSequence` uses `new Random(12345)` hardcoded seed. PN sequence is deterministic and public — spread-spectrum provides zero security. |
+| 1317 | 1 | P1 | `UltimateAccessControl/Strategies/Steganography/LsbEmbeddingStrategy.cs:318-321` | `ValidateMagic` always returns `true`. Comment says "Simplified - in production check actual magic bytes." Any byte array passes as valid embedded image. |
+| 1318 | 12 | P1 | `UltimateAccessControl/Strategies/Steganography/LsbEmbeddingStrategy.cs:583-587` | `ReconstructImage` returns raw pixel data without file header. Output is not a valid image file — any consumer writing to disk fails. |
+| 1319 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/CerbosStrategy.cs:39` | `HttpClient` field initializer, no `IDisposable` — socket leak on teardown. |
+| 1320 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/OpaStrategy.cs:33` | Same `HttpClient` field pattern — socket leak. |
+| 1321 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/PermifyStrategy.cs:38` | Same `HttpClient` field pattern. |
+| 1322 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/ZanzibarStrategy.cs:37` | Same `HttpClient` field pattern. |
+| 1323 | 1 | P2 | `UltimateAccessControl/Strategies/Steganography/ShardDistributionStrategy.cs:717-718` | `ReconstructFromErasure` throws `NotImplementedException` — reachable at runtime when ErasureCoding mode selected and data shards lost. |
+| 1324 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:453` | `OrderBy(_ => Guid.NewGuid())` for shuffling — not cryptographically secure, non-uniform distribution. |
+| 1325 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:624-627` | PBKDF2 uses static salt `"DecoyLayersSalt2024"`. Shared salt weakens derivation. |
+| 1326 | 1 | LOW | `UltimateAccessControl/Strategies/Steganography/SteganographyStrategy.cs:541-542` | `HideInVideo` hardcodes `videoHeaderSize=512` for all formats. Wrong for most containers, silently corrupts video. |
+
+**Clean files:** CapacityCalculatorStrategy, CarrierSelectionStrategy, DctCoefficientHidingStrategy, SteganalysisResistanceStrategy, ExtractionEngineStrategy
+
+---
+
+### Plugin Chunk 016 (15 files: UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy–UltimateBlockchain/Strategies/Network/SpiffeSpireStrategy)
+**Files Reviewed:** 15 | **Findings:** 20 (0 P0, 5 P1, 9 P2, 6 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1327 | 1 | P1 | `UltimateAccessControl/Strategies/ThreatResponse/SoarIntegrationStrategy.cs:341-365` | `ExecutePlaybookStepsAsync` — all SOAR response actions (isolate host, block IP, disable user, scan endpoint) are stubs returning `true`. Incident response automation will appear to succeed without taking any action. |
+| 1328 | 1 | P1 | `UltimateAccessControl/Strategies/ThreatResponse/SoarIntegrationStrategy.cs:284-310` | `SendWebhookAlertAsync` constructs JSON payload but no `HttpClient` is available — method body incomplete. Alert notifications silently fail. |
+| 1329 | 2 | P1 | `UltimateAccessControl/Strategies/ZeroTrust/MtlsStrategy.cs:310-320` | `CheckCertificateRevocationAsync` — OCSP and CRL checks are stubbed (`return false` = not revoked). Revoked client certs pass mTLS validation. |
+| 1330 | 2 | P1 | `UltimateAccessControl/Strategies/ZeroTrust/MtlsStrategy.cs:335-350` | `ValidateCertificateChainAsync` — chain verification is placeholder. Self-signed or untrusted intermediates are accepted. |
+| 1331 | 2 | P1 | `UltimateBlockchain/Strategies/Network/SpiffeSpireStrategy.cs:187-210` | `ValidateJwtSvidAsync` — JWT signature verification is not performed. Token is decoded but `alg` and signature fields are ignored. Any crafted JWT is accepted. |
+| 1332 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:145` | `_ipReputationScores` is a plain `Dictionary<string, double>` accessed from async paths without synchronization. Race conditions on concurrent threat updates. |
+| 1333 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:146` | `_behavioralPatterns` is a plain `List<BehavioralPattern>` with same thread-safety issue. |
+| 1334 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:147` | `_threatIntelFeeds` is a plain `List<ThreatIntelFeed>` with same thread-safety issue. |
+| 1335 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/ContextualThreatStrategy.cs:98` | `_contextFactors` plain `Dictionary` not thread-safe for concurrent reads/writes during context evaluation. |
+| 1336 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/ContextualThreatStrategy.cs:99` | `_historicalPatterns` plain `List` — same thread-safety gap. |
+| 1337 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/PredictiveThreatStrategy.cs:112` | `_threatModels` plain `Dictionary` not thread-safe. |
+| 1338 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/PredictiveThreatStrategy.cs:113` | `_predictionHistory` plain `List` — same issue. |
+| 1339 | 12 | P2 | `UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy.cs:475-485` | `CheckWatermarkHealthAsync` uses `|| true` in detection condition — health check always reports watermark as present even when detection fails. |
+| 1340 | 13 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/SoarIntegrationStrategy.cs:105-115` | `EnrichIncidentAsync` performs sequential HTTP-style enrichment calls with no parallelism. For 5+ enrichment sources, latency compounds linearly. |
+| 1341 | 15 | LOW | `UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy.cs:42` | Class is `WatermarkEmbeddingStrategy` but handles both embedding and detection. Name suggests embedding only. |
+| 1342 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:35` | `GetThreatProfile` returns `ThreatProfile` but XML doc says "risk assessment." Naming mismatch. |
+| 1343 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/ContextualThreatStrategy.cs:38` | `EvaluateContext` returns `ContextEvaluation` but property is called `ThreatLevel`. Inconsistent. |
+| 1344 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/ContinuousVerificationStrategy.cs:188` | `VerifySessionContinuity` logs at `Debug` level even on verification failure. Should be `Warning`. |
+| 1345 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/DeviceTrustStrategy.cs:142` | `AssessDeviceTrust` returns percentage score but no documentation of scale or thresholds. |
+| 1346 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/MtlsStrategy.cs:355` | Method `ValidateCertificateChainAsync` has `async` modifier but no `await` — produces compiler warning. |
+
+**Clean files:** ThreatDetectionStrategy, MicroSegmentationStrategy, ServiceMeshStrategy
+
+---
+
+### Plugin Chunk 017 (15 files: UltimateBlockchain/Strategies/Network/X509CertStrategy–UltimateCompliance/Reporting/ComplianceReportGenerator)
+**Files Reviewed:** 15 | **Findings:** 22 (1 P0, 11 P1, 8 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1347 | 4 | P0 | `UltimateBlockchain/Strategies/Network/SpiffeSpireStrategy.cs:187-210` | SPIFFE JWT SVID signature is never verified — `ValidateJwtSvidAsync` decodes claims but does not check `alg` or signature. Any forged SVID is accepted as authentic. |
+| 1348 | 4 | P1 | `UltimateBlockchain/Strategies/Network/X509CertStrategy.cs:165-178` | `ValidateCertificateChainAsync` builds X509Chain but uses default `RevocationMode` — OCSP/CRL failures cause silent fallback to accepting revoked certs in offline environments. |
+| 1349 | 4 | P1 | `UltimateBlockchain/Strategies/Network/X509CertStrategy.cs:182-195` | SAN parsing splits on `,` and `:` — fails for SAN entries containing literal commas (e.g., `O=Acme, Inc.`) leading to identity mismatch. |
+| 1350 | 2 | P1 | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:240-244` | `ReconfigureLimitsAsync` disposes old semaphore immediately — any in-flight `AppendBlockAsync` holding the old semaphore will crash on `Release()`. |
+| 1351 | 6 | P1 | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:241-244` | Race window: new `_writeSemaphore` is assigned before `oldSemaphore.Dispose()`, but concurrent readers may still reference the old instance. |
+| 1352 | 5 | P1 | `UltimateBlockchain/Services/BlockchainJournalService.cs:156-168` | Journal write failure caught and logged but not re-thrown. Caller believes journal entry succeeded, breaking blockchain audit trail continuity. |
+| 1353 | 6 | P1 | `UltimateBlockchain/Services/BlockchainJournalService.cs:210-225` | `WriteGenesisBlockAsync` calls `Fire-and-forget` task for initial chain validation without await. Validation failure unobserved, genesis integrity unknown. |
+| 1354 | 1 | P1 | `UltimateBlockchain/Services/BlockchainPolicyBridge.cs:89-102` | `TranslatePolicyToBlockchainRules` — returns hardcoded empty rule set. Policy-to-chain translation non-functional. |
+| 1355 | 1 | P1 | `UltimateBlockchain/Services/ComplianceGapAnalyzer.cs:145-172` | `AnalyzeComplianceGapsAsync` — AI-based gap analysis is stubbed. Returns `"No gaps detected"` unconditionally. |
+| 1356 | 2 | P1 | `UltimateBlockchain/Services/ComplianceGapAnalyzer.cs:89-112` | `GenerateRemediationPlanAsync` calls external AI endpoint but timeout is hardcoded at 5s with no retry. Transient API failures abort remediation planning. |
+| 1357 | 2 | P1 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:267-275` | `GenerateHtmlReport` builds HTML by string concatenation without encoding user-supplied field values. XSS if report rendered in browser. |
+| 1358 | 2 | P1 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:312-320` | `ExportToPdfAsync` shells out to `wkhtmltopdf` using `Process.Start` with unsanitized file paths. Path injection possible. |
+| 1359 | 2 | P2 | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:163-172` | `TryGetValidation` calls `GetOrDefault` then `ContainsKey` — two cache lookups for one operation. TOCTOU race: entry can be evicted between calls. |
+| 1360 | 7 | P2 | `UltimateBlockchain/Services/BlockchainJournalService.cs:45` | `FileStream` opened in constructor with no `Dispose` path — resource leak if service is abandoned. |
+| 1361 | 13 | P2 | `UltimateBlockchain/Strategies/Network/X509CertStrategy.cs:65-72` | Certificate parsing creates new `X509Certificate2` per validation call without caching — expensive ASN.1 parsing repeated for every request. |
+| 1362 | 8 | P2 | `UltimateBlockchain/Services/BlockchainJournalService.cs:198` | `Console.WriteLine` for genesis block creation diagnostic — should use structured logger. |
+| 1363 | 9 | P2 | `UltimateBlockchain/Services/ComplianceGapAnalyzer.cs:56-62` | `HttpClient` created per-call in `AnalyzeComplianceGapsAsync` — socket exhaustion under load. |
+| 1364 | 2 | P2 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:89-95` | `_reportCache` is `Dictionary<string, byte[]>` without size bounds. Large report generation caches grow unbounded. |
+| 1365 | 2 | P2 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:155-165` | `GenerateCsvReportAsync` does not escape fields containing commas, quotes, or newlines. Broken CSV output. |
+| 1366 | 10 | LOW | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:201-212` | Metric `cache.block.hitRate` computed inline — HitRatio already available from `CacheStatistics`. Redundant. |
+| 1367 | 10 | LOW | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:42` | `TamperProofAuditLog` is a `List<string>` — thread-unsafe for concurrent report generation, and "tamper-proof" name is misleading for an in-memory list. |
+
+**Clean files:** DataSovereigntyEnforcer, ComplianceMigrationGuide
+
+---
+
+### Plugin Chunk 018 (15 files: UltimateCompliance/Scaling/ComplianceScalingManager–UltimateCompliance/Strategies/AsiaPacific/CslStrategy)
+**Files Reviewed:** 15 | **Findings:** 11 (0 P0, 4 P1, 5 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1368 | 6 | P1 | `UltimateCompliance/Services/ComplianceAlertService.cs:114` | `_ = ScheduleEscalationAsync(alert, cancellationToken)` discards task with no error observation. Synchronous exceptions silently swallowed; caller's CancellationToken cancels escalation mid-flight with no logging. |
+| 1369 | 2 | P1 | `UltimateCompliance/Services/ComplianceAlertService.cs:74,109` | `_deduplicationCache` and `_alertHistory` BoundedDictionary accessed from concurrent callers without lock. TOCTOU race: two concurrent calls with same alert key both pass duplicate check. |
+| 1370 | 12 | P1 | `UltimateCompliance/Services/ChainOfCustodyExporter.cs:25` | `DefaultHmacKey` derived from hardcoded constant `"DataWarehouse-ChainOfCustody-Seal"`. SHA256 of known string is publicly computable — any attacker can forge valid HMAC seal on documents. Undermines legal-discovery tamper detection. |
+| 1371 | 2 | P1 | `UltimateCompliance/Services/ComplianceDashboardProvider.cs:25,90,101` | `_lastCheckTimestamp` plain DateTime read/written without sync. `_frameworkStatuses` BoundedDictionary written per framework while `GetCurrentIntegrityStatus()` reads `.Values` concurrently — no lock around enumerate-and-update. |
+| 1372 | 13 | P2 | `UltimateCompliance/Services/ComplianceReportService.cs:377-422` | `IsEvidenceApplicableToControl` rebuilds full `categoryMapping` dictionary (24 keys, each with HashSet) on every call. O(N×M×24) allocations per report. Should be `static readonly`. |
+| 1373 | 13 | P2 | `UltimateCompliance/Services/ComplianceReportService.cs:425-451` | `DetermineApplicableFrameworks` similarly reconstructs `crossFrameworkMap` on every call. Move to `static readonly`. |
+| 1374 | 14 | P2 | `UltimateCompliance/Services/ComplianceReportService.cs:500` | `ComplianceReportPeriod` record has no validation: `End` can be before `Start`, either can be `DateTime.MinValue`. Bounds interpolated into report text without guard. |
+| 1375 | 15 | P2 | `UltimateCompliance/Scaling/ComplianceScalingManager.cs:256-260` | `InvalidateCache()` documented as "invalidates cached compliance results" but body is empty. False contract — callers get stale results for up to `_resultTtl` (5 min). |
+| 1376 | 12 | P2 | `UltimateCompliance/Services/TamperIncidentWorkflowService.cs:46` | Incident ID sequence resets on service restart. Same-day restart causes ID collision — `_incidents[incidentId]` silently overwrites existing ticket, destroying evidence chain. |
+| 1377 | 9 | LOW | `UltimateCompliance/Services/ComplianceAlertService.cs:93-96` | Channel delivery failures captured in `failures` list but no logging of exception. Critical/Emergency channel failures invisible without caller inspection of `AlertResult`. |
+| 1378 | 14 | LOW | `UltimateCompliance/Strategies/Americas/PipedaStrategy.cs:39` | Attribute key `"AppropiateSafeguards"` is typo — correct is `"AppropriateSafeguards"`. Callers using correct spelling never satisfy check, causing permanent spurious PIPEDA-004 violation. |
+
+**Clean files:** ChileDataStrategy, ColombiaDataStrategy, Law25Strategy, LeyProteccionStrategy, LfpdpppStrategy, LgpdStrategy, AppiStrategy, CslStrategy
+
+---
+
+### Plugin Chunk 019 (15 files: UltimateCompliance/Strategies/AsiaPacific/DslStrategy–UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy)
+**Files Reviewed:** 15 | **Findings:** 18 (0 P0, 5 P1, 9 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1379 | 6 | P1 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:41` | `base.InitializeAsync(...)` return value discarded — base task never awaited, initialization work/exceptions silently lost. |
+| 1380 | 8 | P1 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:216` | `Console.WriteLine` for security-critical audit chain tampering event. In non-console deployments (service host, container), event silently disappears. |
+| 1381 | 1 | P1 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:302-305` | `FlushAuditQueueAsync` batches entries then does nothing — comment says "In production, write to persistent storage" with `await Task.CompletedTask`. Rule 13 stub: every queued audit entry silently discarded. |
+| 1382 | 2 | P1 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:184-185` | `_previousHash` plain `string?` read/written without sync in concurrent `CheckComplianceCoreAsync`. Data race: two threads read same previous hash, producing broken blockchain link. |
+| 1383 | 2 | P1 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:26-27` | `_immutableMode`/`_blockchainMode` plain bools written in `InitializeAsync`, read from timer callback and concurrent calls without `volatile` or memory barrier. |
+| 1384 | 6 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:60-64` | Timer callback `async _ => await FlushAuditQueueAsync(ct)` — async void-equivalent swallows all exceptions. Process crash or silent loss. |
+| 1385 | 7 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:25` | `_flushTimer` created in `InitializeAsync` but no `Dispose` override visible. Timer handle leaks if not disposed in `ShutdownAsyncCore`. |
+| 1386 | 12 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:191-218` | `GenerateChainEntryAsync` declared `async` with no `await` and never observes CancellationToken. Unnecessary state-machine overhead; CancellationToken is contract lie. |
+| 1387 | 10 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:221-239` | `VerifyChainIntegrity` recomputes hash from entry fields, but `_previousHash` race (#1382) means verified hash may not match stored, producing false-positive tamper detections. |
+| 1388 | 15 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:325-326` | `AuditEntry` declares `Hash`/`PreviousHash` as mutable `{ get; set; }` but documented as "immutable audit entry". Mutable hash fields undermine tamper-evident guarantee. |
+| 1389 | 14 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:263-271` | `IsAuditRequired` calls `context.DataClassification.Contains(...)` without null guard. NullReferenceException if `DataClassification` is null. Same in `DetermineFrameworks`. |
+| 1390 | 14 | P2 | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:39-67` | `InitializeAsync` doesn't validate `flushIntervalSeconds` for positive/non-zero. Value of 0 causes Timer to fire continuously. |
+| 1391 | 15 | P2 | `UltimateCompliance/Strategies/AsiaPacific/PdpaVnStrategy.cs:42,56` | Two distinct violations both use code `"PDPA-VN-026"` — cross-border transfer and data localization. Duplicate codes break downstream keying. |
+| 1392 | 15 | LOW | `UltimateCompliance/Strategies/AsiaPacific/PdpaPhStrategy.cs:14` | Class `PdpaPhStrategy` but regulation is officially "Data Privacy Act" (DPA), not PDPA. `Framework` returns `"DPA-PH"` while `StrategyId` is `"pdpa-ph"` — naming inconsistency. |
+| 1393 | 15 | LOW | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:36` | `Framework` returns `"Audit-Based"` — not a real compliance framework identifier. Should use `"CROSS-FRAMEWORK"` or `"INTERNAL"`. |
+| 1394 | 13 | LOW | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:222` | `chain.Entries.ToArray()` in `VerifyChainIntegrity` copies potentially thousands of entries on every enqueue. O(n) per append. |
+| 1395 | 9 | LOW | `UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs:159-189` | `GenerateAuditEntryAsync` declared `async` with no `await`. Unnecessary state-machine allocation. |
+
+**Clean files:** DslStrategy, KPipaStrategy, NzPrivacyStrategy, PdpaIdStrategy, PdpaMyStrategy, PdpaSgStrategy, PdpaThStrategy, PdpaTwStrategy, PdpbStrategy, PdpoHkStrategy, PiplStrategy, PrivacyActAuStrategy
+
+---
+
+### Plugin Chunk 020 (15 files: UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy–UltimateCompliance/Strategies/Geofencing/ReplicationFenceStrategy)
+**Files Reviewed:** 15 | **Findings:** 37 (5 P0, 15 P1, 15 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1396 | 3 | P1 | `UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs:34` | `base.InitializeAsync(...)` called without `await` — returned Task discarded. Base initialization may not complete before method returns. |
+| 1397 | 6 | P1 | `UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs:57` | Timer callback `async _ => await RunContinuousChecksAsync(ct)` is async void-equivalent. Unhandled exceptions silently swallowed. |
+| 1398 | 2 | P1 | `UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs:41-45` | `_rulesByFramework[rule.Framework]` read-then-write TOCTOU race on BoundedDictionary. Two threads could both create new List. |
+| 1399 | 9 | P2 | `UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs:192` | `CheckRuleAsync` declared `async` with no `await`. Unnecessary state machine. |
+| 1400 | 3 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:34` | `base.InitializeAsync(...)` not awaited. Task discarded. |
+| 1401 | 6 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:43` | Fire-and-forget timer callback wrapping `GenerateScheduledReportsAsync`. Exceptions silently swallowed. |
+| 1402 | 8 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:337` | `Console.WriteLine` in production timer callback for report generation. Must use structured logger. |
+| 1403 | 1 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:285-289` | `CalculateAvailability` returns hardcoded `0.999` — placeholder appearing in SOC2 reports. Misleads auditors. |
+| 1404 | 1 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:298-301` | `CalculateIncidentReadiness` returns hardcoded `1.0` or `0.5`. No real computation. |
+| 1405 | 2 | P1 | `UltimateCompliance/Strategies/Automation/ComplianceReportingStrategy.cs:126-135` | `LogComplianceEventAsync` ContainsKey→assign TOCTOU race, plus `List<ComplianceEvent>` not thread-safe for concurrent `Add`. |
+| 1406 | 3 | P1 | `UltimateCompliance/Strategies/Automation/ContinuousComplianceMonitoringStrategy.cs:37` | `base.InitializeAsync(...)` not awaited. |
+| 1407 | 6 | P2 | `UltimateCompliance/Strategies/Automation/ContinuousComplianceMonitoringStrategy.cs:62-67` | Both `_monitoringTimer` and `_snapshotTimer` callbacks swallow exceptions silently. |
+| 1408 | 2 | P1 | `UltimateCompliance/Strategies/Automation/ContinuousComplianceMonitoringStrategy.cs:166-192` | `ComplianceMetric` fields `TotalChecks`, `ViolationCount`, etc. are plain long/double mutated directly from concurrent threads. No Interlocked/lock. |
+| 1409 | 3 | P1 | `UltimateCompliance/Strategies/Automation/PolicyEnforcementStrategy.cs:33` | `base.InitializeAsync(...)` not awaited. |
+| 1410 | 1 | P1 | `UltimateCompliance/Strategies/Automation/PolicyEnforcementStrategy.cs:185-190` | `ExecuteRemediationAsync` body is `await Task.CompletedTask` with comment "would integrate with actual remediation." BlockOnViolation/AutoRemediation policies silently do nothing. |
+| 1411 | 12 | P1 | `UltimateCompliance/Strategies/Automation/PolicyEnforcementStrategy.cs:206-213` | Violation log cleanup O(n log n) on every write past 10K, not thread-safe. |
+| 1412 | 3 | P1 | `UltimateCompliance/Strategies/Automation/RemediationWorkflowsStrategy.cs:31` | `base.InitializeAsync(...)` not awaited. |
+| 1413 | 6 | P2 | `UltimateCompliance/Strategies/Automation/RemediationWorkflowsStrategy.cs:51-55` | Timer callback exceptions silently swallowed. |
+| 1414 | 1 | P2 | `UltimateCompliance/Strategies/Automation/RemediationWorkflowsStrategy.cs:256-272` | `ExecuteStepAsync` simulates all actions with `Task.Delay(100)` and hardcoded success strings. Rule 13 stub. |
+| 1415 | 1 | P2 | `UltimateCompliance/Strategies/Automation/RemediationWorkflowsStrategy.cs:281-285` | `RollbackWorkflowAsync` calls only `Task.Delay(100)` per step. Rollback is entirely stub. |
+| 1416 | 4 | P0 | `UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs:596-600` | `VerifyApprovalSignature` accepts any string length >= 32 as valid signature. Zero cryptographic verification in admin-bypass prevention system. |
+| 1417 | 4 | P0 | `UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs:603-607` | `VerifyCommitment` returns true for any non-empty `CommitmentHash`. Tamper-detection commitment scheme inoperative. |
+| 1418 | 4 | P0 | `UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs:566-571` | `ValidateInitiator` accepts any non-empty string. No authorization/role/allowlist validation. |
+| 1419 | 1 | P2 | `UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs:627-648` | `GenerateShare` is fake Shamir Secret Sharing — XORs with unretained random bytes. Shares cannot be recombined. |
+| 1420 | 2 | P2 | `UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs:664-665` | `_auditChainHash` plain `string?` read/written concurrently without sync. Chain hash corruption. |
+| 1421 | 1 | P2 | `UltimateCompliance/Strategies/Geofencing/AttestationStrategy.cs:420-424` | `CollectTpmAttestationAsync` uses `Task.Delay(10)` and local SHA-256 hash. Not real TPM PCR quote. Rule 13 stub. |
+| 1422 | 1 | P2 | `UltimateCompliance/Strategies/Geofencing/AttestationStrategy.cs:451-472` | `CollectSecureEnclaveAttestationAsync` uses `Task.Delay(10)` and local hash. No SGX/TrustZone. Rule 13 stub. |
+| 1423 | 1 | P2 | `UltimateCompliance/Strategies/Geofencing/AttestationStrategy.cs:484-516` | `CollectGpsAttestationAsync`/`CollectNetworkLocationAttestationAsync` return hardcoded `Lat=0, Lon=0`. No GPS integration. |
+| 1424 | 15 | P2 | `UltimateCompliance/Strategies/Geofencing/ComplianceAuditStrategy.cs:485-503` | `EnforceMemoryLimits` drains and re-enqueues half ConcurrentBag, silently discarding audit records needed for 7-year legal retention. |
+| 1425 | 4 | P0 | `UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs:685-700` | `IpStackProvider.LookupAsync` always returns hardcoded `CountryCode = "US"` regardless of IP. Silently bypasses all non-US sovereignty checks. |
+| 1426 | 4 | P0 | `UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs:588-592` | `MaxMindProvider.InitializeDatabaseReader` catches all exceptions, silently sets `_reader = null`. Primary geo provider quietly disabled with no indication. |
+| 1427 | 5 | P1 | `UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs:696-700` | `IpStackProvider.LookupAsync` bare `catch { return null; }` swallows all exceptions including `OperationCanceledException`. |
+| 1428 | 13 | P2 | `UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs:179-192` | `BatchResolveAsync` writes to `BoundedDictionary` from parallel tasks without sync. Thread safety unclear. |
+| 1429 | 10 | P1 | `UltimateCompliance/Strategies/Geofencing/DynamicReconfigurationStrategy.cs:618-625` | `NotifyListeners` bare `catch { }` swallows all exceptions including OCE. Listener failures invisible. |
+| 1430 | 12 | P2 | `UltimateCompliance/Strategies/Geofencing/DataTaggingStrategy.cs:619` | `ParseTemplateFromConfig` catches all exceptions, returns null. Malformed configs silently ignored. |
+| 1431 | 15 | LOW | `UltimateCompliance/Strategies/Geofencing/ReplicationFenceStrategy.cs:171` | Audit mode returns `IsAllowed = true` for sovereignty violations. Behavior vs name mismatch. |
+| 1432 | 7 | P2 | `All 5 Automation strategies` | Timer fields allocated in `InitializeAsync` but never disposed. Timers continue firing after shutdown. |
+
+**Clean files:** RegionRegistryStrategy, GeofencingStrategy, CrossBorderExceptionsStrategy
+
+---
+
+### Plugin Chunk 021 (15 files: UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy–UltimateCompliance/Strategies/Industry/Soc1Strategy)
+**Files Reviewed:** 15 | **Findings:** 17 (0 P0, 7 P1, 7 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1433 | 1 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:448-461` | `ResolveSourceIpAsync` hardcodes `"US"` jurisdiction for all IPs. Comment says "placeholder for async message bus call." Full geolocation signal path non-functional. |
+| 1434 | 12 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:534-539` | Operator precedence bug in `DetermineSensitivity`: `s.Reason.Contains("ID")` outside `Any()` lambda due to `||` precedence. Any signal with "ID" in reason triggers `Restricted`. |
+| 1435 | 2 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:36-40` | `_piiPatterns` and `_jurisdictionRegulations` plain `Dictionary<>` written in `InitializeAsync`, read concurrently. No sync for reconfiguration. |
+| 1436 | 5 | P1 | `UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs:554-595` | `ParseNodeFromConfig` and `ParsePolicyFromConfig` both have bare `catch { return null; }`. Config errors silently drop nodes/policies with no log. |
+| 1437 | 4 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:270-376` | PII regexes have high false-positive rates (EU-PASSPORT matches SKUs, US-DRIVERS-LICENSE matches product codes). `RU-INN` alternation precedence bug: `\b\d{10}|\d{12}\b` — `\b` only applies to first alternative. |
+| 1438 | 4 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:398-426` | `AnalyzePiiPatterns` runs ~24 regexes on full data content with no length guard or `MatchTimeout`. ReDoS risk on large/crafted payloads. |
+| 1439 | 4 | P1 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:556-559` | `GenerateCacheKey` uses raw string concatenation `{ResourceId}:{SourceIp}:...`. Separator collision produces wrong classification for different resources. |
+| 1440 | 12 | P2 | `UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs:496-499` | Audit log trim uses `ConcurrentBag.TryTake` which removes random entries, not oldest. TOCTOU race on Count→TryTake. |
+| 1441 | 15 | P2 | `UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs:252-255` | `GetRecentEvents` calls `Take(count)` on ConcurrentBag — returns arbitrary order, not chronological despite name. |
+| 1442 | 14 | P2 | `UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs:110-178` | `ValidateWrite` doesn't guard `request.DataClassification` for null. NullReferenceException at `StartsWith`. |
+| 1443 | 12 | P2 | `UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs:456` | Audit-mode approved writes recorded as rejections in stats. Statistics permanently wrong. |
+| 1444 | 13 | P2 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:183-188` | `GetCacheStats` calls `ToArray()` then iterates 3 times with `.Count()`. Single pass would be O(n) vs O(3n). |
+| 1445 | 14 | P2 | `UltimateCompliance/Strategies/ISO/Iso27001Strategy.cs:188-195` | `CheckOperationalControls` fires only recommendation when `controlCount == 0`. Should be violation for zero implemented controls. |
+| 1446 | 11 | P2 | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:35` | `_classificationCache` BoundedDictionary stores full `DataContent` strings (arbitrarily large) inside cache entries. Memory pressure uncapped. |
+| 1447 | 15 | LOW | `UltimateCompliance/Strategies/ISO/Iso27701Strategy.cs:102-107` | Data-minimization threshold of 30 fields is undocumented magic number with no ISO 27701 basis. |
+| 1448 | 14 | LOW | `UltimateCompliance/Strategies/Industry/NydfsStrategy.cs:48` | Attribute key `"MultiFactor Authentication"` contains space. Callers using camelCase key always trigger false Critical MFA violation. |
+| 1449 | 15 | LOW | `UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs:35` | Cache stores full input content — should store only derived result (jurisdiction, confidence) not full data payload. |
+
+**Clean files:** Iso22301Strategy, Iso27002Strategy, Iso27017Strategy, Iso27018Strategy, Iso31000Strategy, Iso42001Strategy, HitrustStrategy, MasStrategy, NercCipStrategy, Soc1Strategy
+
+---
+
+### Plugin Chunk 022 (15 files: UltimateCompliance/Strategies/Industry/Soc3Strategy–UltimateCompliance/Strategies/Innovation/SelfHealingComplianceStrategy)
+**Files Reviewed:** 15 | **Findings:** 10 (0 P0, 4 P1, 5 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1450 | 12 | P1 | `UltimateCompliance/Strategies/Industry/Soc3Strategy.cs:65-68` + 8 more files | `isCompliant` and `status` computed independently — self-contradicting when only Medium violations: `IsCompliant=true` alongside `Status=PartiallyCompliant`. Affects Soc3, SwiftCscf, AiAssistedAudit, AutomatedDsar, ComplianceAsCode, CrossBorderDataFlow, PredictiveCompliance, PrivacyPreservingAudit, RealTimeCompliance. |
+| 1451 | 12 | P1 | `UltimateCompliance/Strategies/Innovation/QuantumProofAuditStrategy.cs:114-117` | Status mapping diverges from all other strategies: High violations → `PartiallyCompliant` instead of `NonCompliant`. Same in SelfHealingComplianceStrategy. |
+| 1452 | 12 | P1 | `UltimateCompliance/Strategies/Innovation/BlockchainAuditTrailStrategy.cs:117-120` | Uses `== ViolationSeverity.Critical` instead of `>=`. High violations don't trigger `NonCompliant`. Same in DigitalTwinCompliance, NaturalLanguagePolicy. |
+| 1453 | 15 | P1 | `All 15 files` | Systematic indentation violation: `IncrementCounter(...)` indented at wrong level across all files, betraying copy-paste template issue. |
+| 1454 | 14 | P2 | `UltimateCompliance/Strategies/Innovation/AutomatedDsarStrategy.cs:24-25` | Missing null guard on `context.OperationType` before `.Contains()`. NRE if null. Same in DigitalTwinCompliance. |
+| 1455 | 14 | P2 | `UltimateCompliance/Strategies/Innovation/DigitalTwinComplianceStrategy.cs:43-44` | `LastSyncTime` attribute cast to `DateTime` directly. Other types (DateTimeOffset, string) silently fail — violation always raised. |
+| 1456 | 12 | P2 | `UltimateCompliance/Strategies/Innovation/DigitalTwinComplianceStrategy.cs:40-55` | Redundant double-lookup of `HasDigitalTwin` attribute. Second TryGetValue unnecessary. |
+| 1457 | 12 | P2 | `UltimateCompliance/Strategies/Innovation/SelfHealingComplianceStrategy.cs:55-71` | Same redundant double-lookup: `AutoRemediationEnabled` looked up twice. |
+| 1458 | 13 | P2 | `UltimateCompliance/Strategies/Innovation/QuantumProofAuditStrategy.cs:134,143` | Per-call array allocations `new[] { "Dilithium", ... }`. Should be `static readonly` fields. |
+| 1459 | 15 | LOW | `BlockchainAuditTrailStrategy, QuantumProofAuditStrategy, SelfHealingComplianceStrategy` | `GetConfigValue<T>` identical copy-pasted into 3 files. Should be on base class. |
+
+**Clean files:** None fully clean (all share #1450/#1453). Least issues: PredictiveComplianceStrategy, PrivacyPreservingAuditStrategy, RegTechIntegrationStrategy, RealTimeComplianceStrategy
+
+---
+
+### Plugin Chunk 023 (15 files: UltimateCompliance/Strategies/Innovation/SmartContractComplianceStrategy–UltimateCompliance/Strategies/NIST/Nist80053Strategy)
+**Files Reviewed:** 15 | **Findings:** 14 (0 P0, 4 P1, 7 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1460 | 12 | P1 | `UltimateCompliance/Strategies/Innovation/SmartContractComplianceStrategy.cs:76` + 12 more files | `isCompliant`/`status` self-contradiction: Critical-only scenario → `IsCompliant=false, Status=PartiallyCompliant`. Affects SmartContract, UnifiedOntology, all 9 MEA strategies, Nist800171, Nist800172, Nist80053. |
+| 1461 | 15 | P1 | `UltimateCompliance/Strategies/MiddleEastAfrica/DipdStrategy.cs:13-14` | "DIPD" is not a real regulation acronym. Should be "DIFC-DPL" (DIFC Data Protection Law). |
+| 1462 | 12 | P1 | `UltimateCompliance/Strategies/MiddleEastAfrica/PopiaStrategy.cs:37-43` | POPIA-003 violation only fires when `PriorAuthorization` key absent. `false` value silently passes. Should use `|| authObj is not true`. |
+| 1463 | 12 | P1 | `UltimateCompliance/Strategies/NIST/Nist80053Strategy.cs:73-77` | IA-001 auth check only fires for `"confidential"` classification. `"secret"` classification (used in SC checks) doesn't trigger violation. |
+| 1464 | 14 | P2 | `All 15 files` | `CheckComplianceCoreAsync` never validates `context` non-null before dereferencing. NRE bypasses normal result path. |
+| 1465 | 13 | P2 | `UltimateCompliance/Strategies/Innovation/ZeroTrustComplianceStrategy.cs:116-119` + all files | `violations.Count == 0` then `violations.Any(...)` iterates list twice. Same pattern across all 15 files. |
+| 1466 | 14 | P2 | `UltimateCompliance/Strategies/MiddleEastAfrica/DipdStrategy.cs:39` | `ResponseDays` check only works with `int`. `string`/`long` types silently fail. Same in KdpaStrategy. |
+| 1467 | 14 | P2 | `UltimateCompliance/Strategies/MiddleEastAfrica/AdgmStrategy.cs:29` | `context.DataClassification.Equals(...)` no null guard. NRE if null. Same in EgyptPdp, QatarPdpl, Nist80053. |
+| 1468 | 14 | P2 | `UltimateCompliance/Strategies/MiddleEastAfrica/BahrainPdpStrategy.cs:29` | `context.DataSubjectCategories.Contains(...)` no null guard. Same in PdplSa. |
+| 1469 | 14 | P2 | `UltimateCompliance/Strategies/MiddleEastAfrica/NdprStrategy.cs:34` | `context.OperationType.Equals(...)` no null guard. Same in Dipd, Kdpa, Popia, Nist800171, Nist80053. |
+| 1470 | 9 | P2 | `UltimateCompliance/Strategies/Innovation/ZeroTrustComplianceStrategy.cs:131-153` | `GenerateRecommendations` iterates violations 6 times. Brittle if codes renamed. Should use Dictionary lookup. |
+| 1471 | 2 | LOW | `All 15 files` | Systematic indentation: `IncrementCounter` misaligned. Copy-paste template issue. |
+| 1472 | 15 | LOW | `UltimateCompliance/Strategies/NIST/Nist800172Strategy.cs:50-55` | Violation codes `NIST800172-3.1e` etc. don't match official numbering `3.1.1e`. Breaks automated cross-reference. |
+| 1473 | 9 | LOW | `UltimateCompliance/Strategies/NIST/Nist800171Strategy.cs:114` | `isCompliant` true with Medium-only violations but `Status=PartiallyCompliant`. Callers checking only `IsCompliant` get wrong answer. |
+
+**Clean files:** None fully clean. Least issues: UnifiedComplianceOntologyStrategy, EgyptPdpStrategy, KdpaStrategy, NdprStrategy, QatarPdplStrategy
+
+---
+
+### Plugin Chunk 024 (15 files: PassportIssuanceStrategy–DataAnonymizationStrategy)
+**Files Reviewed:** 15 | **Findings:** 28 (0 P0, 10 P1, 11 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1474 | 1 | P1 | `UltimateCompliance/Strategies/Identity/PassportIssuanceStrategy.cs:45-50` | `InitializeAsync` calls `base.InitializeAsync()` but does not await the result. Fire-and-forget base init. |
+| 1475 | 1 | P1 | `UltimateCompliance/Strategies/Identity/PassportRenewalStrategy.cs:42-47` | Same unawaited `base.InitializeAsync()` pattern as PassportIssuanceStrategy. |
+| 1476 | 1 | P1 | `UltimateCompliance/Strategies/Identity/PassportRevocationStrategy.cs:40-45` | Same unawaited `base.InitializeAsync()` pattern. |
+| 1477 | 4 | P1 | `UltimateCompliance/Strategies/Identity/PassportIssuanceStrategy.cs:78-82` | Signing key length not validated before use. Accepts any non-null key regardless of cryptographic strength. |
+| 1478 | 12 | P1 | `UltimateCompliance/Strategies/Identity/PassportVerificationStrategy.cs:55-70` | Signature verification uses different JSON serialization options than issuance (different property ordering). Verification will always fail for valid passports. |
+| 1479 | 1 | P1 | `UltimateCompliance/Strategies/Identity/DigitalIdentityStrategy.cs:60-65` | Identity verification stub — `VerifyIdentityAsync` returns hardcoded success for any input. |
+| 1480 | 14 | P1 | `UltimateCompliance/Strategies/Identity/CredentialIssuanceStrategy.cs:48` | No validation that credential claims are non-empty before issuance. Empty credential can be issued. |
+| 1481 | 10 | P1 | `UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs:88-95` | Consent withdrawal race condition: read-check-delete not atomic. Concurrent withdrawals could double-process. |
+| 1482 | 10 | P1 | `UltimateCompliance/Strategies/Privacy/KeyRotationStrategy.cs:62-70` | Key rotation race condition: old key can be used for encryption after rotation starts but before propagation completes. |
+| 1483 | 4 | P1 | `UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs:35` | Default anonymization salt is hardcoded `"default-salt"`. All deployments share same salt, defeating anonymization. |
+| 1484 | 14 | P2 | `UltimateCompliance/Strategies/Identity/PassportIssuanceStrategy.cs:90-95` | Passport expiry date not validated — can issue passport with past expiry date. |
+| 1485 | 9 | P2 | `UltimateCompliance/Strategies/Identity/PassportRenewalStrategy.cs:55-60` | Renewed passport does not invalidate old passport. Both remain valid simultaneously. |
+| 1486 | 15 | P2 | `UltimateCompliance/Strategies/Identity/PassportRevocationStrategy.cs:50` | `RevokeAsync` returns success even when passport ID not found. Name implies revocation happened. |
+| 1487 | 14 | P2 | `UltimateCompliance/Strategies/Identity/PassportVerificationStrategy.cs:40` | No check that passport has not expired before signature verification. Expired passports verify as valid. |
+| 1488 | 9 | P2 | `UltimateCompliance/Strategies/Identity/DigitalIdentityStrategy.cs:80-85` | Identity attribute update does not verify caller owns the identity. Any caller can modify any identity. |
+| 1489 | 14 | P2 | `UltimateCompliance/Strategies/Identity/CredentialIssuanceStrategy.cs:65-70` | Credential revocation list not checked during verification. Revoked credentials still verify as valid. |
+| 1490 | 9 | P2 | `UltimateCompliance/Strategies/Identity/CredentialVerificationStrategy.cs:42-48` | Credential schema validation missing — accepts credentials with arbitrary/missing required fields. |
+| 1491 | 14 | P2 | `UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs:45-50` | Consent purpose not validated against allowed purposes enum. Arbitrary purpose strings accepted. |
+| 1492 | 1 | P2 | `UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs:100-110` | Double opt-in token validation is stub — always returns true for non-empty token string. |
+| 1493 | 14 | P2 | `UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs:55-60` | k-anonymity parameter not validated. k=0 or k=1 accepted, providing no anonymization guarantee. |
+| 1494 | 9 | P2 | `UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs:70-75` | Differential privacy epsilon not bounded. Epsilon > 100 provides zero privacy but no warning. |
+| 1495 | 13 | LOW | `UltimateCompliance/Strategies/Identity/PassportIssuanceStrategy.cs:100` | New GUID generated per passport field rather than reusing — unnecessary allocation. |
+| 1496 | 2 | LOW | `UltimateCompliance/Strategies/Identity/DigitalIdentityStrategy.cs:90` | Identity store is plain Dictionary, not ConcurrentDictionary. Single-threaded assumption. |
+| 1497 | 15 | LOW | `UltimateCompliance/Strategies/Identity/CredentialIssuanceStrategy.cs:30` | Class named `CredentialIssuanceStrategy` but also handles verification. Should be split or renamed. |
+| 1498 | 13 | LOW | `UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs:120` | LINQ `.Where().FirstOrDefault()` used where `.FirstOrDefault(predicate)` suffices. |
+| 1499 | 2 | LOW | `UltimateCompliance/Strategies/Privacy/KeyRotationStrategy.cs:80` | Key history stored in unbounded List. Long-running systems accumulate without limit. |
+| 1500 | 13 | LOW | `UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs:90` | String concatenation in loop for building anonymized output. Should use StringBuilder. |
+| 1501 | 15 | LOW | `UltimateCompliance/Strategies/Privacy/KeyRotationStrategy.cs:25` | `KeyRotationStrategy` name suggests rotation scheduling but class only performs single rotation. |
+
+**Clean files:** NistCsfStrategy (LOW only), NistPrivacyStrategy (LOW only)
+
+---
+
+### Plugin Chunk 025 (15 files: RightToBeForgottenStrategy–PciDss4Strategy)
+**Files Reviewed:** 15 | **Findings:** 23 (0 P0, 6 P1, 10 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1502 | 1 | P1 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:55-65` | `DeleteDataAsync` is Rule 13 stub — logs deletion request but does not actually delete any data. Returns success. |
+| 1503 | 1 | P1 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:70-80` | `DiscoverDataLocations` stub — returns hardcoded list of 3 generic locations regardless of actual data distribution. |
+| 1504 | 1 | P1 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:85-95` | Erasure verification fabricates record counts — returns `RecordsDeleted=random(50,200)` with fake proof-of-erasure hash. |
+| 1505 | 1 | P1 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:100-110` | `NotifyThirdParties` stub — builds notification list but never sends. Returns success for all parties. |
+| 1506 | 4 | P1 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:115-120` | Identity verification bypass — `VerifyRequesterIdentity` accepts any non-empty email as verified identity. |
+| 1507 | 12 | P1 | `UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs:45-50` | Inverted criticality check — marks "essential" entities as low-risk and "important" as high-risk. NIS2 Directive is opposite. |
+| 1508 | 12 | P2 | `UltimateCompliance/Strategies/Regulations/PciDss4Strategy.cs:60-65` | PAN masking in email notifications uses `Substring(0,6) + "****" + Substring(-4)`. Negative index throws on short PANs. |
+| 1509 | 14 | P2 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:40` | No validation that erasure request contains required fields (subject ID, legal basis, scope). |
+| 1510 | 9 | P2 | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:125-130` | Erasure deadline calculation doesn't account for weekends/holidays. GDPR requires 30 calendar days, not business days. |
+| 1511 | 14 | P2 | `UltimateCompliance/Strategies/Regulations/PciDss4Strategy.cs:75-80` | Card data environment scope not validated. Accepts empty CDE boundary definition. |
+| 1512 | 9 | P2 | `UltimateCompliance/Strategies/Regulations/PciDss4Strategy.cs:90-95` | Requirement 3.4 — stored PAN encryption check only verifies field name contains "pan", not actual encryption status. |
+| 1513 | 14 | P2 | `UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs:60` | Incident reporting deadline not configurable. Hardcoded 24h but NIS2 has different deadlines per entity type. |
+| 1514 | 12 | P2 | `UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs:70-75` | Supply chain risk score calculation divides by supplier count without zero check. DivideByZeroException for entities with no suppliers. |
+| 1515 | 9 | P2 | `UltimateCompliance/Strategies/Privacy/DataMinimizationStrategy.cs:45-50` | Retention period comparison uses string comparison on dates (`"2025-01-01" > "2024-12-31"`). Locale-dependent. |
+| 1516 | 1 | P2 | `UltimateCompliance/Strategies/Privacy/DataMinimizationStrategy.cs:60-65` | `PurgeExpiredData` stub — identifies expired records but does not delete them. Logs "would purge N records". |
+| 1517 | 14 | P2 | `UltimateCompliance/Strategies/Privacy/PrivacyImpactAssessmentStrategy.cs:40` | Risk score not bounded. Accepts negative values which reverse risk priority ordering. |
+| 1518 | 13 | LOW | `UltimateCompliance/Strategies/Privacy/RightToBeForgottenStrategy.cs:135` | String interpolation in hot logging path. Should use structured logging parameters. |
+| 1519 | 2 | LOW | `UltimateCompliance/Strategies/Privacy/DataMinimizationStrategy.cs:75` | Retention policy store is plain Dictionary. Not thread-safe for concurrent policy updates. |
+| 1520 | 15 | LOW | `UltimateCompliance/Strategies/Privacy/PrivacyImpactAssessmentStrategy.cs:25` | Class named "Assessment" but only computes risk score. No assessment report generation. |
+| 1521 | 13 | LOW | `UltimateCompliance/Strategies/Regulations/PciDss4Strategy.cs:105` | Requirement enumeration allocates new list per check. Could be static readonly. |
+| 1522 | 2 | LOW | `UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs:80` | Incident log is unbounded List<>. Long-running systems accumulate without limit. |
+| 1523 | 15 | LOW | `UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs:15` | `Nis2Strategy` — class doc says "NIS Directive" (v1) but implements NIS2 requirements. Confusing. |
+| 1524 | 13 | LOW | `UltimateCompliance/Strategies/Privacy/PrivacyImpactAssessmentStrategy.cs:55` | LINQ chain `.Select().Where().OrderBy().ToList()` materializes intermediate collections unnecessarily. |
+
+**Clean files:** CyberResilienceActStrategy, EPrivacyStrategy, GdprStrategy, HipaaStrategy
+
+---
+
+### Plugin Chunk 026 (15 files: Soc2Strategy–SovereigntyMeshStrategies)
+**Files Reviewed:** 15 | **Findings:** 18 (0 P0, 5 P1, 8 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1525 | 5 | P2 | `UltimateCompliance/Strategies/Regulations/Soc2Strategy.cs:35` | `IncrementCounter` indentation wrong — unindented call at body start before local variable declarations. Same pattern across all 11 framework strategies and both regulation strategies. |
+| 1526 | 12 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshOrchestratorStrategy.cs:187-212` | Duplicate dead-code block — inner `if (passport == null)` guard identical to outer check. Inner check unreachable, hides actual intent. |
+| 1527 | 5 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshOrchestratorStrategy.cs:659-664` | Silent catch in `RunCrossBorderProtocolAsync`: `catch (Exception)` swallows all exceptions including `OperationCanceledException` with only counter increment, no logging. |
+| 1528 | 9 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshOrchestratorStrategy.cs:93` | Double-checked lock incorrect: `_meshInitialized` is volatile bool but dependent sub-strategy fields (`_zoneRegistry`, `_zoneEnforcer`) are not volatile. Writes may not be visible to threads observing flag=true. |
+| 1529 | 2 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:196-200` | `RegisterRegulatoryChange` race: `BoundedDictionary.GetOrAdd` plus `lock(changes)` is safe for list mutation, but `TransferThroughChannelAsync` at 624-625 mutates channel without sync. |
+| 1530 | 10 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:624-625` | Race condition: `channel.TransferCount++` and `channel.LastTransferAt` unsynchronized. Concurrent transfers produce lost updates. |
+| 1531 | 9 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:564` | `CreateSecureChannelAsync`: `_sovereignKeys[id]` throws `KeyNotFoundException` if key evicted from BoundedDictionary. Should use TryGetValue. |
+| 1532 | 4 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:576-577` | Key derivation `HMACSHA256(sourceKey).ComputeHash(destKey)` is one-directional. A→B derives different key than B→A. Bidirectional channels cannot use symmetrically. |
+| 1533 | 14 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyEnforcementInterceptor.cs:81-102` | `InterceptWriteAsync` does not validate `objectId`/`destinationLocation` for null. NRE inside `EvaluateAndTranslateAsync`. |
+| 1534 | 14 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyEnforcementInterceptor.cs:116-143` | `InterceptReadAsync` does not validate `objectId`/`requestorLocation` for null. Same issue as #1533. |
+| 1535 | 12 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/DeclarativeZoneRegistry.cs:45-55` | `InitializeAsync` registers zones before calling `base.InitializeAsync`. If base throws, zones already registered → half-initialized state. |
+| 1536 | 13 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:859-869` | `GetApplicablePolicy` returns first matching policy from BoundedDictionary which has no ordering guarantee. Multiple overlapping policies → non-deterministic results. |
+| 1537 | 13 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:877-898` | `RecordViolation` locks on retrieved list but `GetOrAdd` outside lock. Two threads may independently observe `Count > 100`, briefly exceeding cap. |
+| 1538 | 8 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:553` | `return await Task.FromResult(embassy)` — pointless allocation. Same at lines 591, 627. |
+| 1539 | 15 | LOW | `UltimateCompliance/Strategies/Regulations/Sox2Strategy.cs:13` | Class `Sox2Strategy` but StrategyId is `"sox"`. "SOX 2" is not a real standard. Naming confusion. |
+| 1540 | 15 | LOW | `UltimateCompliance/Strategies/Regulations/Soc2Strategy.cs:669-683` | `InitializeAsyncCore`/`ShutdownAsyncCore` indented at wrong level — appears outside class's `#endregion`. Systemic across all 11 SecurityFrameworks + 2 Regulation files. |
+| 1541 | 1 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:1042` | `CrossBorderTransferControlStrategy.CheckComplianceCoreAsync` uses `NonCompliant` directly instead of `PartiallyCompliant` for medium-only violations. Inconsistent with other strategies. |
+| 1542 | 15 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshStrategies.cs:196` | `RegisterRegulatoryChange` is sync `void` on otherwise-async class. Should be `Task RegisterRegulatoryChangeAsync`. |
+
+**Clean files:** BsiC5Strategy, CisControlsStrategy, CisTop18Strategy, CobitStrategy, CsaStarStrategy, EnsStrategy, IsoIec15408Strategy, IsraelNcsStrategy, ItilStrategy, Soc2Strategy (cosmetic only)
+
+---
+
+### Plugin Chunk 027 (15 files: SovereigntyObservabilityStrategy–StateRampStrategy)
+**Files Reviewed:** 15 | **Findings:** 17 (0 P0, 4 P1, 5 P2, 8 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1543 | 5 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs:95` | `base.InitializeAsync()` result not awaited — fire-and-forget. Base class async initialization silently discarded. |
+| 1544 | 10 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs:120-126` | Race condition in `IncrementCounterAsync`: `AddOrUpdate` uses `Interlocked.Add(ref current, value)` on a stack-local copy. Counter increments are lost under concurrency. |
+| 1545 | 6 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs:102` | `base.InitializeAsync()` return value discarded (fire-and-forget). Same defect as #1543. |
+| 1546 | 15 | P1 | `UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs:277` | `GetEnforcementAuditAsync` has `Async` suffix but returns synchronous `IReadOnlyList<>` not `Task<>`. Contract lie — callers expect awaitable. |
+| 1547 | 2 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs:169-185` | `GetMetricsSnapshotAsync` iterates `_distributions` without protection against concurrent structural modifications. May skip/double-count entries. |
+| 1548 | 12 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs:566-570` | Broad silent catch in `FindAllowedBackendsForObject` — catches all non-cancellation exceptions with only counter increment, no logging. Configuration errors silently exclude backends. |
+| 1549 | 12 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs:579-587` | `ExtractEuCountry` uses substring matching (`Contains("-de")`, `Contains("-se")`) that will misclassify backends (e.g., `-se` matches `southeast`). |
+| 1550 | 13 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs:469-473` | `CacheResult` triggers `EvictExpiredCacheEntries()` every 50th write — O(n) full scan on hot path. Should use background/time-based eviction. |
+| 1551 | 13 | P2 | `UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs:519-522` | `RecordAudit` uses `List.RemoveAt(0)` to cap at 500 entries — O(n) shift. Queue<T> gives O(1). |
+| 1552 | 5 | LOW | `UltimateCompliance/Strategies/USFederal/CjisStrategy.cs:27` + all 11 files | `IncrementCounter` inconsistent indentation across all 11 USFederal strategy files. Systemic template issue. |
+| 1553 | 14 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs:158-160` | `objectTags ??= new Dictionary<>()` assigns to local copy of parameter — no effect on caller. Misleading. |
+| 1554 | 14 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs:221-254` | Dead code: first `SovereigntyZoneBuilder` chain (lines 233-237) constructed but never used. Second builder at 240-253 is the one registered. |
+| 1555 | 9 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyZoneStrategy.cs` | `Build()` validates zoneId/name but not that jurisdictions is non-empty. Zone with no jurisdictions silently unreachable. |
+| 1556 | 14 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs:74-79` | `ArgumentNullException.ThrowIfNull` used for whitespace checks — should be `ArgumentException` for blank strings. |
+| 1557 | 4 | LOW | `UltimateCompliance/Strategies/USFederal/ItarStrategy.cs:15-18` | ITAR restricted countries hardcoded (`CN,RU,IR,KP,SY,CU,VE`). Regulatory lists change — should be configurable. Same in EarStrategy. |
+| 1558 | 9 | LOW | `UltimateCompliance/Strategies/USFederal/FismaStrategy.cs:103-106` | `AtoExpirationDate` cast as `DateTime` not `DateTimeOffset`. Timezone-dependent comparison with `DateTime.UtcNow`. Same in CjisStrategy, SoxComplianceStrategy, StateRampStrategy. |
+| 1559 | 3 | LOW | `UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs:95` | Even if #1543 fixed, `InitializeAsync` override doesn't pass cancellation token to body work beyond base call. |
+
+**Clean files:** CoppaStrategy, Dfars252Strategy, FerpaStrategy, GlbaStrategy, CmmcStrategy, SovereigntyZoneStrategy (LOW only)
+
+---
+
+### Plugin Chunk 028 (15 files: TxRampStrategy–Sec17a4WormStrategy)
+**Files Reviewed:** 15 | **Findings:** 9 (0 P0, 1 P1, 3 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1560 | 9 | P1 | `UltimateCompliance/Strategies/USFederal/TxRampStrategy.cs:137` + all 15 files | `context.OperationType.Equals(...)` called without null guard. NRE if OperationType null. Same pattern in all USState, USFederal, and WORM strategies in this batch. |
+| 1561 | 15 | P2 | `UltimateCompliance/Strategies/USFederal/TxRampStrategy.cs:25-49` + all 15 files | `CheckComplianceCoreAsync` is entirely synchronous (returns `Task.FromResult`). Method name promises async I/O but no await anywhere. |
+| 1562 | 12 | P2 | `UltimateCompliance/Strategies/WORM/FinraWormStrategy.cs:143` + `Sec17a4WormStrategy.cs:139` | WORM strategies use `violations.Count == 0` for isCompliant while all other strategies use `!violations.Any(v => Severity >= High)`. Stricter but undocumented inconsistency. |
+| 1563 | 14 | P2 | `All 15 files` | `IncrementCounter(...)` indented at column 8 while method body at column 12. Systemic paste/generation error across all 15 files. |
+| 1564 | 14 | LOW | `UltimateCompliance/Strategies/USState/CpaStrategy.cs:24` | `UniversalOptOutHonored` checked unconditionally regardless of OperationType. May generate false positives for non-sale operations. |
+| 1565 | 14 | LOW | `UltimateCompliance/Strategies/USState/NyShieldStrategy.cs:37` | `EncryptionImplemented` checked unconditionally for every operation type. False positives for read/audit operations. |
+| 1566 | 14 | LOW | `UltimateCompliance/Strategies/WORM/Sec17a4WormStrategy.cs:59-71` | Retention period check uses `is int` pattern match. `long`/`double` from JSON deserializer silently fails. Same in FinraWormStrategy. |
+| 1567 | 13 | LOW | `UltimateCompliance/Strategies/WORM/FinraWormStrategy.cs:158-184` + `Sec17a4WormStrategy.cs:161-184` | `GenerateRecommendations` O(N×M) using `violations.Any()` per check code. Should use HashSet. |
+| 1568 | 15 | LOW | `All 15 files` | Mixed indentation: `InitializeAsyncCore`/`ShutdownAsyncCore` at shallower indent than class body. Systemic formatting issue. |
+
+**Clean files:** None fully clean. Least issues: all USState strategies share only systemic issues (#1560, #1563, #1568).
+
+---
+
+### Plugin Chunk 029 (15 files: WormRetentionStrategy–PpmdStrategy)
+**Files Reviewed:** 15 | **Findings:** 20 (0 P0, 5 P1, 10 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1569 | 5 | P1 | `UltimateCompliance/UltimateCompliancePlugin.cs:453` | Silent catch in `DiscoverAndRegisterStrategiesAsync` swallows all exceptions during strategy instantiation. Failed strategies silently skipped with no logging. |
+| 1570 | 6 | P1 | `UltimateCompliance/UltimateCompliancePlugin.cs:360` | Fire-and-forget: `MessageBus.Subscribe(IntelligenceTopics.RequestPIIDetection, ...)` return value (IDisposable) not stored in `_subscriptions`. Never unsubscribed on dispose. |
+| 1571 | 7 | P1 | `UltimateCompression/Strategies/Archive/SevenZipStrategy.cs:134` | `lzmaStream` (MemoryStream) not disposed. Created, used for ToArray(), but never wrapped in `using`. |
+| 1572 | 10 | P1 | `UltimateCompression/Scaling/CompressionScalingManager.cs:369-378` | Race condition in `ReconfigureLimitsAsync`: `_currentLimits` updated before new semaphore created. Concurrent readers see inconsistent mixed state. |
+| 1573 | 2 | P1 | `UltimateCompression/Scaling/CompressionScalingManager.cs:91-94` | Multiple mutable fields (`_chunkSemaphore`, `_currentLimits`, `_chunkSize`) read/written without synchronization. Semaphore replaced while tasks still waiting on old one → disposed while in use. |
+| 1574 | 12 | P2 | `UltimateCompliance/Strategies/WORM/WormStorageStrategy.cs:28-30` | Logic bug: write-once check fires when `IsWormProtected` absent OR true. Should only fire when true. Non-WORM records incorrectly flagged. |
+| 1575 | 13 | P2 | `UltimateCompression/Strategies/ContextMixing/NnzStrategy.cs:308` | `GetFeatures` allocates `new double[NumInputs]` per bit (~8M allocations per MB). Should reuse pre-allocated array. |
+| 1576 | 13 | P2 | `UltimateCompression/Strategies/ContextMixing/PpmStrategy.cs:196` | `EncodeSymbol` allocates `new HashSet<byte>()` per byte (~100M for 100MB input). Should reuse cleared set. Same in DecodeSymbol:243. |
+| 1577 | 13 | P2 | `UltimateCompression/Strategies/ContextMixing/PpmdStrategy.cs:200,250` | Same hot-loop HashSet allocation as #1576 in EncodeSymbol and DecodeSymbol. |
+| 1578 | 13 | P2 | `UltimateCompression/Strategies/ContextMixing/CmixStrategy.cs:261-285` | `GradientMixer.Predict` 256K array access + Math.Log/Exp per bit. CompressionMemoryUsage=1GB understates actual CPU/memory profile. |
+| 1579 | 14 | P2 | `UltimateCompliance/UltimateCompliancePlugin.cs:95-98` | `RegisterStrategy` does not validate parameter. `RegisterStrategy(null)` → NRE at `_strategies[strategy.StrategyId]`. |
+| 1580 | 14 | P2 | `UltimateCompliance/UltimateCompliancePlugin.cs:103-111` | `CheckComplianceAsync` does not validate `context` for null. Propagates unchecked to strategy. |
+| 1581 | 9 | P2 | `UltimateCompression/Strategies/Archive/TarStrategy.cs:197-199` | TAR header offset bug: version field at 264-265, owner name starts at 265, overwriting version's second byte. Corrupt USTAR headers. |
+| 1582 | 9 | P2 | `UltimateCompression/Strategies/Archive/TarStrategy.cs:236-237` | `Convert.ToInt32(sizeOctal, 8)` without bounds check on malformed octal. FormatException/OverflowException not translated to InvalidDataException. |
+| 1583 | 9 | P2 | `UltimateCompression/Strategies/Archive/XzStrategy.cs:136` | XZ magic bytes manually written during compression then skipped during decompression, but XZStream expects magic bytes present. Round-trip likely broken. |
+| 1584 | 15 | P2 | `UltimateCompression/Strategies/Archive/RarStrategy.cs:19-28` | Contract lie: `RarStrategy` writes custom proprietary format using Deflate, not RAR. Not readable by unrar/WinRAR. "RAR-compatible headers" comment misleading. |
+| 1585 | 9 | LOW | `UltimateCompliance/Strategies/WORM/WormRetentionStrategy.cs:21` + 2 more | `IncrementCounter` indentation inconsistent across all 3 WORM files. |
+| 1586 | 13 | LOW | `UltimateCompression/Strategies/ContextMixing/PaqStrategy.cs:263-309` | `LogisticMixer.Update` context hashes shared between encoder/decoder without per-byte reset. Maintained by symmetry but differs from PAQ8 reference. |
+| 1587 | 7 | LOW | `UltimateCompression/Strategies/Archive/XzStrategy.cs:179-181` | `XZStream` doesn't respect `leaveOpen` parameter. Disposes input stream regardless. Breaks contract with other strategies. |
+| 1588 | 12 | LOW | `UltimateCompression/Strategies/Archive/SevenZipStrategy.cs:150-161` | `GetDictionarySize()` is dead code — never called. `_dictionarySize` always 8MB default. |
+
+**Clean files:** WormRetentionStrategy, WormVerificationStrategy (LOW cosmetic only)
+
+---
+
+### Plugin Chunk 030 (15 files: ZpaqStrategy–GipfeligStrategy)
+**Files Reviewed:** 15 | **Findings:** 17 (0 P0, 6 P1, 9 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1589 | 9 | P1 | `UltimateCompression/Strategies/Delta/BsdiffStrategy.cs:126` | Dead unreachable empty-input guard: line 121 returns on `Length==0`, so `CreateEmptyBlock()` at 126 never called. Empty input produces invalid headerless output, breaking round-trip. |
+| 1590 | 12 | P1 | `UltimateCompression/Strategies/Delta/BsdiffStrategy.cs:265-266` | Integer underflow: `extraData` size subtracts `controlLen + diffLen` that were already consumed from stream. Produces negative/too-small allocation → corrupt decompression. |
+| 1591 | 13 | P1 | `UltimateCompression/Strategies/Delta/BsdiffStrategy.cs:326-338` | `BuildSuffixArray` uses `Array.Sort` with O(n²) byte-array comparator. O(n² log n) worst case. Non-terminating for inputs approaching 100MB limit. |
+| 1592 | 12 | P1 | `UltimateCompression/Strategies/Delta/DeltaStrategy.cs:254-255` | Streaming header writes placeholder `originalLength=0` and never seeks back to patch. Streaming decompression returns empty → silent data loss. `SupportsStreaming=true` is false. |
+| 1593 | 9 | P1 | `UltimateCompression/Strategies/Delta/XdeltaStrategy.cs:311-318` | Missing check on COPY `ReadByte()` return -1. Blindly cast to `(byte)` writes 0xFF. Silent data corruption on malformed input. VcdiffStrategy has correct guard. |
+| 1594 | 9 | P1 | `UltimateCompression/Strategies/Emerging/DensityStrategy.cs:183-188` | `compressedLength` header field written but unused in decompress loop — reads directly from stream ignoring boundary. Stream corruption silently ignored. |
+| 1595 | 13 | P2 | `UltimateCompression/Strategies/Delta/ZdeltaStrategy.cs:144-147` | `List<int>[16384]` allocated per call — 16K heap objects per compression. Should use flat array with chaining. |
+| 1596 | 13 | P2 | `UltimateCompression/Strategies/Delta/VcdiffStrategy.cs:146-259` | Hash table `List<int>` values grow unbounded — millions of entries for large inputs. O(n) inner scan per bucket. |
+| 1597 | 13 | P2 | `UltimateCompression/Strategies/Delta/XdeltaStrategy.cs:142` | Same unbounded `Dictionary<uint, List<int>>` pattern as Vcdiff. O(n) bucket scan risk. |
+| 1598 | 12 | P2 | `UltimateCompression/Strategies/Domain/AvifLosslessStrategy.cs:286-287` | `RangeEncode` step can become 0 when range < 256. `high = low - 1` inverts interval → infinite loop or garbage output. |
+| 1599 | 12 | P2 | `UltimateCompression/Strategies/Domain/JxlLosslessStrategy.cs:209` | LINQ `.Count(f => f > 0)` on int[256] in compression hot path — unnecessary enumerator allocation. |
+| 1600 | 9 | P2 | `UltimateCompression/Strategies/Domain/DnaCompressionStrategy.cs:279-280` | `BuildHuffmanTree` returns `heap.Min!` — NRE if frequencies empty. No guard beyond `input.Length == 0`. |
+| 1601 | 13 | P2 | `UltimateCompression/Strategies/Emerging/GipfeligStrategy.cs:145` | `ArrayPool.Rent` immediately followed by `.ToArray()` copy — pool benefit completely negated. |
+| 1602 | 13 | P2 | `UltimateCompression/Strategies/Emerging/GipfeligStrategy.cs:363-365` | `DecompressBlock` reads literals byte-by-byte in tight loop. Should use buffer read for 128KB blocks. |
+| 1603 | 15 | P2 | `UltimateCompression/Strategies/Emerging/GipfeligStrategy.cs:26-57` | `SupportsParallelCompression=true` but implementation is sequential `for` loop. No parallel mechanism. Contract lie. |
+| 1604 | 14 | LOW | `UltimateCompression/Strategies/Delta/DeltaStrategy.cs:249-258` | `DeltaCompressionStream.Write` doesn't validate buffer/offset/count. Violates Stream contract. |
+| 1605 | 15 | LOW | `UltimateCompression/Strategies/ContextMixing/ZpaqStrategy.cs:365-391` | `ContextModel.Update` updates all 8 bit-position slots identically — 8× memory/CPU for zero benefit. Equivalent to single-slot model. |
+
+**Clean files:** ApngStrategy, FlacStrategy, TimeSeriesStrategy, WebpLosslessStrategy
+
+---
+
+### Plugin Chunk 031 (15 files: LizardStrategy–LzfseStrategy)
+**Files Reviewed:** 15 | **Findings:** 27 (0 P0, 8 P1, 12 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1606 | 10 | P1 | `UltimateCompression/Strategies/Emerging/LizardStrategy.cs:269` | `FindMatchLength` bounds check only constrains `data.Length - pos2`, not `pos1`. Array index out of bounds when both positions near end. |
+| 1607 | 12 | P1 | `UltimateCompression/Strategies/Emerging/LizardStrategy.cs:354-361` | Match-copy MemoryStream bug: `output.Position = output.Length` inside loop diverges when Length grows during overlapping match copy → data corruption. |
+| 1608 | 12 | P1 | `UltimateCompression/Strategies/Emerging/OodleStrategy.cs:363-370` | Same MemoryStream match-copy bug as Lizard. `Length` as write-position proxy fails for overlapping matches. |
+| 1609 | 12 | P1 | `UltimateCompression/Strategies/Emerging/ZlingStrategy.cs:353-360` | Same MemoryStream match-copy bug. Shared flawed helper pattern across Lizard/Oodle/Zling. |
+| 1610 | 9 | P1 | `UltimateCompression/Strategies/EntropyCoding/AnsStrategy.cs:41-42` | `_tableLogSize`/`_precision` fields hold hardcoded defaults, never configurable. Validation in InitializeAsync is dead code masking contract lie. |
+| 1611 | 9 | P1 | `UltimateCompression/Strategies/EntropyCoding/RleStrategy.cs:308-311` | Streaming path writes zero-length placeholder header never patched on Dispose. Decompression returns empty → silent data loss. |
+| 1612 | 1 | P1 | `UltimateCompression/Strategies/Generative/GenerativeCompressionStrategy.cs:1873-1877` | Rule 13 stub: `GpuMatrixMultiply` claims GPU but unconditionally calls `CpuMatrixMultiply`. `_gpuAvailable` can be true. Same for `GpuApplyGradients`:1914. |
+| 1613 | 13 | P1 | `UltimateCompression/Strategies/Emerging/OodleStrategy.cs:144-220` | O(n²) compression: `CompressBlock` builds unbounded `Dictionary<uint, List<int>>`. Inner `foreach` walks unbounded lists. Thousands of heap allocations per 256KB block. |
+| 1614 | 13 | P2 | `UltimateCompression/Strategies/Emerging/ZlingStrategy.cs:184,202` | O(n) `IndexOf` + `RemoveAt` + `Insert(0,...)` on `List<int>` per matched symbol in MTF transform. Should use array/linked-list. |
+| 1615 | 9 | P2 | `UltimateCompression/Strategies/Emerging/LizardStrategy.cs:295,297` | `originalLength`/`compressedLength` from header used without non-negative/bounded check. `Int32.MaxValue` → OOM instead of InvalidDataException. |
+| 1616 | 9 | P2 | `UltimateCompression/Strategies/Emerging/OodleStrategy.cs:310,327` | Same missing header field validation. Crafted stream can allocate arbitrary memory. |
+| 1617 | 9 | P2 | `UltimateCompression/Strategies/Emerging/ZlingStrategy.cs:297-299` | Same missing header validation pattern as Lizard/Oodle. |
+| 1618 | 9 | P2 | `UltimateCompression/Strategies/EntropyCoding/AnsStrategy.cs:221-222` | Unchecked `stream.Read` return value — partial read silently produces corrupt decompressed output. |
+| 1619 | 9 | P2 | `UltimateCompression/Strategies/EntropyCoding/RansStrategy.cs:218-219` | Same unchecked `stream.Read` as ANS. |
+| 1620 | 9 | P2 | `UltimateCompression/Strategies/EntropyCoding/HuffmanStrategy.cs:213-214` | Same unchecked `stream.Read` pattern. |
+| 1621 | 13 | P2 | `UltimateCompression/Strategies/LzFamily/Lz78Strategy.cs:209` | `List<byte>` as output buffer — `AddRange(prefix)` causes O(n) copies per dictionary entry. Should use MemoryStream. |
+| 1622 | 12 | P2 | `UltimateCompression/Strategies/EntropyCoding/HuffmanStrategy.cs:254-259` | `HuffmanNode.Frequency` set on parent but never read back in `TraverseForLengths`. Dead field maintenance. |
+| 1623 | 9 | P2 | `UltimateCompression/Strategies/Generative/GenerativeCompressionStrategy.cs:1853` | Silent catch in `DetectGpuAvailability` — `_gpuAvailable` drives behavior paths but exception swallowed without logging. |
+| 1624 | 14 | P2 | `UltimateCompression/Strategies/LzFamily/LzfseStrategy.cs:329-332` | `Hash4` `BitConverter.ToUInt32(data, pos)` requires `pos+4 <= Length`. Safe in current callers but no defensive guard in method itself. |
+| 1625 | 15 | P2 | `UltimateCompression/Strategies/LzFamily/LzfseStrategy.cs:339-398` | `FseEncode` naming lie: `0x02` path writes raw bytes unchanged. No actual entropy encoding applied. Frequency table written but unused. |
+| 1626 | 9 | P2 | `UltimateCompression/Strategies/Generative/GenerativeCompressionStrategy.cs:1609-1610` | `DecompressGenerative` silently returns empty for zero length. Truncated data silently short-reads without signaling. |
+| 1627 | 13 | LOW | `UltimateCompression/Strategies/Emerging/OodleStrategy.cs:193-196` | Inner-loop hash entries for matched region never pruned. O(n) list growth per position. |
+| 1628 | 15 | LOW | `UltimateCompression/Strategies/EntropyCoding/AnsStrategy.cs:376-391` | `EncodeSymbol` state logic differs from canonical tANS formula. Round-trips by symmetry only. |
+| 1629 | 14 | LOW | `UltimateCompression/Strategies/EntropyCoding/RleStrategy.cs:40,42` | `_minRunLength`/`_maxRunLength` validated but `CompressCore` uses constant `MinRunLength=3`. Config silently ignored. |
+| 1630 | 14 | LOW | `UltimateCompression/Strategies/EntropyCoding/ArithmeticStrategy.cs:41-43` | `_precisionBits`/`_modelUpdateFrequency` validated but never used. Config has no effect. |
+| 1631 | 14 | LOW | `UltimateCompression/Strategies/EntropyCoding/RansStrategy.cs:41-42` | `_interleavedStreams`/`_precisionBits` validated but never used. Config has no effect. |
+| 1632 | 15 | LOW | `UltimateCompression/Strategies/LzFamily/GZipStrategy.cs:151-154` | `EstimateCompressedSize` returns 275 bytes for 1-byte input. Conservative but documented. |
+
+**Clean files:** DeflateStrategy, Lz4Strategy, Lz77Strategy, GZipStrategy (LOW only)
+
+---
+
+### Plugin Chunk 032 (15 files: LzmaStrategy–GZipTransitStrategy)
+**Files Reviewed:** 15 | **Findings:** 17 (0 P0, 5 P1, 7 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1633 | 10 | P1 | `UltimateCompression/Strategies/LzFamily/LzmaStrategy.cs:305-310` | Silent fallback to Deflate when LZMA encode fails. No format tag written — decompress assumes LZMA, reads garbage. Data corruption on round-trip. |
+| 1634 | 10 | P1 | `UltimateCompression/Strategies/LzFamily/Lzma2Strategy.cs:305-310` | Same silent Deflate fallback as LZMA. Decompress expects LZMA2 framing, gets raw Deflate → corrupt output. |
+| 1635 | 10 | P1 | `UltimateCompression/Strategies/LzFamily/LzmaStrategy.cs:348-365` | `EncodeChunked` Deflate fallback path writes no frame tag. `DecodeChunked` reads first byte as LZMA property byte → wrong dictionary size → silent corruption. |
+| 1636 | 10 | P1 | `UltimateCompression/Strategies/LzFamily/Lzma2Strategy.cs:348-365` | Identical EncodeChunked/DecodeChunked Deflate fallback bug as LZMA. |
+| 1637 | 12 | P1 | `UltimateCompression/Strategies/LzFamily/LzxStrategy.cs:310-315` | Match position off-by-one: `matchPos` should be `windowPos - matchDistance` not `windowPos - matchDistance - 1`. Shifts every back-reference by 1 byte → broken round-trip. |
+| 1638 | 9 | P2 | `UltimateCompression/Strategies/LzFamily/LzxStrategy.cs:243-246` | Unchecked `stream.Read()` return value in `DecompressCore`. Partial read silently produces corrupt output. |
+| 1639 | 12 | P2 | `UltimateCompression/Strategies/Transit/AdaptiveTransitStrategy.cs:285-290` | `SelectDecompressionAlgorithm` always returns Zstd regardless of what algorithm compressed the data. Round-trip broken for non-Zstd. |
+| 1640 | 15 | P2 | `UltimateCompression/Strategies/Transit/AdaptiveTransitStrategy.cs:180-185` | `EstimateCompressionRatio` returns hardcoded 0.65 for all algorithms. Naming lie — no estimation performed. |
+| 1641 | 13 | P2 | `UltimateCompression/Strategies/LzFamily/LzxStrategy.cs:160-180` | BWT implementation uses O(n² log n) suffix sort via `Array.Sort` with byte-array comparator. Non-terminating for large inputs. |
+| 1642 | 13 | P2 | `UltimateCompression/Strategies/LzFamily/LzhStrategy.cs:260-280` | `DecodeSymbol` walks Huffman tree one bit at a time via `ReadBit()` — O(n) per symbol. Should use table-based decode. |
+| 1643 | 9 | P2 | `UltimateCompression/Strategies/Transit/BrotliTransitStrategy.cs:215-218` | `TransitDecompress` reads entire input into `byte[]` before decompressing. Defeats streaming purpose for large payloads. |
+| 1644 | 12 | P2 | `UltimateCompression/Strategies/LzFamily/LzoStrategy.cs:195-200` | Encoder writes literal-length as single byte (max 255). Decoder reads multi-byte length. Mismatch for literals >255 bytes → decode reads wrong offset → corrupt output. |
+| 1645 | 14 | LOW | `UltimateCompression/Strategies/LzFamily/LzmaStrategy.cs:40-42` | `_dictionarySize` and `_matchFinder` validated in InitializeAsync but never used in CompressCore. Config silently ignored. |
+| 1646 | 14 | LOW | `UltimateCompression/Strategies/LzFamily/Lzma2Strategy.cs:40-42` | Same unused config fields as LZMA. |
+| 1647 | 14 | LOW | `UltimateCompression/Strategies/LzFamily/LzhStrategy.cs:40-42` | `_slidingWindowSize` validated but CompressCore uses hardcoded 4096. Config ignored. |
+| 1648 | 15 | LOW | `UltimateCompression/Strategies/Transit/LZ4TransitStrategy.cs:180-182` | `EstimateCompressionRatio` returns constant 0.7 regardless of data. Minor naming inaccuracy. |
+| 1649 | 15 | LOW | `UltimateCompression/Strategies/Transit/BrotliTransitStrategy.cs:175-178` | `EstimateCompressionRatio` returns constant 0.6. Same pattern as LZ4Transit. |
+
+**Clean files:** SnappyStrategy, ZstdStrategy, BrotliTransitStrategy (LOW only), DeflateTransitStrategy, GZipTransitStrategy
+
+---
+
+### Plugin Chunk 033 (15 files: LZ4TransitStrategy–SgxStrategy)
+**Files Reviewed:** 15 | **Findings:** 18 (0 P0, 6 P1, 9 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1650 | 12 | P1 | `UltimateCompression/Strategies/Transit/LZ4TransitStrategy.cs:225-230` | Decompression allocates output buffer as `compressedData.Length * 2`. LZ4 can achieve >10x ratio → buffer too small → `ArgumentOutOfRangeException` or truncated output. |
+| 1651 | 6 | P1 | `UltimateCompute/Strategies/Compute/JobSchedulerStrategy.cs:310-315` | Fire-and-forget `Task.Run` for job execution. Callers awaiting job completion hang indefinitely if task faults — exception swallowed, `TaskCompletionSource` never completed. |
+| 1652 | 2 | P1 | `UltimateCompute/Scaling/WasmScalingManager.cs:189-195` | `ReconfigureLimitsAsync` disposes old `SemaphoreSlim` and creates new one without lock. Concurrent `WaitAsync` callers on disposed semaphore → `ObjectDisposedException`. |
+| 1653 | 2 | P1 | `UltimateCompute/Scaling/WasmScalingManager.cs:87-89` | `_maxConcurrent` and `_currentLimits` read without volatile/lock in `GetScalingMetrics` and `CurrentBackpressureState`. Torn reads on 64-bit fields possible on 32-bit runtime. |
+| 1654 | 4 | P1 | `UltimateCompute/Strategies/Container/KataContainersStrategy.cs:280-285` | Command injection: `_containerName` interpolated directly into shell command string passed to `Process.Start`. Attacker-controlled container name can inject arbitrary commands. |
+| 1655 | 4 | P1 | `UltimateCompute/Strategies/Container/PodmanStrategy.cs:275-280` | Same command injection vulnerability as KataContainers. Container name unsanitized in shell command. |
+| 1656 | 4 | P2 | `UltimateCompute/Strategies/Compute/JobSchedulerStrategy.cs:340-345` | Path traversal: `task.Id` used directly in file path construction without sanitization. Crafted task ID with `../` can write outside job directory. |
+| 1657 | 4 | P2 | `UltimateCompute/Strategies/Compute/ResourceManagerStrategy.cs:290-295` | Same path traversal via unsanitized resource ID in file path construction. |
+| 1658 | 5 | P2 | `UltimateCompute/Strategies/Container/KataContainersStrategy.cs:310-315` | Silent catch around container cleanup — if cleanup fails, resources leak. Exception swallowed without logging. |
+| 1659 | 5 | P2 | `UltimateCompute/Strategies/Container/PodmanStrategy.cs:305-310` | Same silent catch in container cleanup as KataContainers. |
+| 1660 | 7 | P2 | `UltimateCompute/UltimateComputePlugin.cs:185-190` | Event subscription in InitializeAsync never unsubscribed in Dispose. Message bus subscription leak across plugin reload cycles. |
+| 1661 | 14 | P2 | `UltimateCompression/Strategies/Transit/SnappyTransitStrategy.cs:140-145` | Transit strategies require parameterless constructor for factory instantiation but none provided. Factory `Activator.CreateInstance` will throw. |
+| 1662 | 5 | P2 | `UltimateCompute/Strategies/Container/RunscStrategy.cs:290-295` | Silent catch in container start. Process launch failure silently returns null container handle. Caller NPE later. |
+| 1663 | 5 | P2 | `UltimateCompute/Strategies/Container/YoukiStrategy.cs:285-290` | Same silent catch pattern as RunscStrategy in container lifecycle. |
+| 1664 | 2 | P2 | `UltimateCompute/Strategies/Container/RunscStrategy.cs:180-185` | `_containerCount` incremented/decremented with non-atomic `++`/`--`. Race under concurrent container starts. |
+| 1665 | 14 | LOW | `UltimateCompute/Strategies/Enclave/ConfidentialVmStrategy.cs:40-45` | `_attestationEndpoint` config validated but used only in stub `AttestAsync` that returns hardcoded success. |
+| 1666 | 14 | LOW | `UltimateCompute/Strategies/Enclave/NitroEnclavesStrategy.cs:40-45` | Same unused attestation config as ConfidentialVm. |
+| 1667 | 14 | LOW | `UltimateCompute/Strategies/Enclave/SevStrategy.cs:40-45` | Same unused attestation config pattern. |
+
+**Clean files:** NullTransitStrategy, DataLocalityPlacementStrategy, SnappyTransitStrategy (P2 only), ZstdTransitStrategy
+
+---
+
+### Plugin Chunk 034 (15 files: RunscStrategy–SgxStrategy)
+**Files Reviewed:** 15 | **Findings:** 27 (0 P0, 8 P1, 12 P2, 7 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1668 | 1 | P1 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:201-208` | `ExecuteLocalFunctionAsync` is a Rule 13 stub — returns fake string `"Local function executed: {code.Length} chars"` without executing any code. Comment admits "Roslyn would be ideal". |
+| 1669 | 4 | P1 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:146` | `ExecuteAzureFunctionAsync` instantiates `new HttpClient()` per request. Socket exhaustion under load (TIME_WAIT accumulation). Should use IHttpClientFactory or shared instance. |
+| 1670 | 4 | P1 | `UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs:133-134` | Path injection in volume mounts: user-supplied `AllowedFileSystemPaths` embedded directly into `docker create` CLI as `-v "{path}:{path}:ro"` without sanitization. Shell metacharacters can mount unintended host directories. |
+| 1671 | 4 | P1 | `UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs:139-141` | Environment variable injection: `key`/`value` from `task.Environment` embedded into CLI as `-e "{key}={value}"` without escaping. Values containing `"` or `\n` escape argument boundary. |
+| 1672 | 4 | P1 | `UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs:144-146` | Command injection: `command` inserted as `sh -c "{command}"` with only naive `Replace("\"", "\\\"")`. Shell metacharacters (`$`, backtick, `\n`, `;`) not escaped — breaks sandbox isolation. |
+| 1673 | 4 | P1 | `UltimateCompute/Strategies/Enclave/SgxStrategy.cs:66` | Path traversal: `keyPath` from `task.Metadata["signing_key"]` passed to `sgx_sign -key` without validation. Attacker-controlled task can read any private key on host filesystem. |
+| 1674 | 4 | P1 | `UltimateCompute/Strategies/Enclave/SgxStrategy.cs:71` | Arbitrary executable: `appHost` from `task.Metadata["app_host"]` overrides default without whitelist. Caller can execute any binary on host. |
+| 1675 | 4 | P1 | `UltimateCompute/Strategies/Enclave/ConfidentialVmStrategy.cs:49-55` | Unsanitized `provider` value used as discriminant to select arbitrary tools via ternary. Future string interpolation of `provider` would be instantly exploitable. Fragile security pattern. |
+| 1676 | 5 | P2 | `UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs:101-111` | `PullImageAsync` catches all non-cancellation exceptions with comment "Image may already exist locally". Registry auth failures, network errors silently swallowed. |
+| 1677 | 1 | P2 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:595` | `GpuComputeAbstractionStrategy.ExecuteAsync` non-CUDA path returns stub `"GPU compute completed"`. `SupportedLanguages` advertises `["cuda", "opencl", "hlsl"]` but only CUDA implemented. |
+| 1678 | 9 | P2 | `UltimateCompute/Strategies/Enclave/NitroEnclavesStrategy.cs:70` | Enclave ID assigned from `runResult.StandardOutput.Trim()` without validation. Multi-line or unexpected output → malformed ID → cleanup and console read fail silently. |
+| 1679 | 9 | P2 | `UltimateCompute/Strategies/Enclave/ConfidentialVmStrategy.cs:57-59` | `sevctl verify --attestation-report` result captured but ExitCode never checked. Failed attestation doesn't prevent workload launch — undermines confidential-computing guarantee. |
+| 1680 | 9 | P2 | `UltimateCompute/Strategies/Enclave/SevStrategy.cs:41` | `sevctl export --full` result captured but ExitCode never checked. SEV not available → continues to launch QEMU guest without SEV protections. |
+| 1681 | 9 | P2 | `UltimateCompute/Strategies/Enclave/SevStrategy.cs:54-55` | `sevctl measurement build` result ExitCode never checked. Measurement failure should abort launch — enclave image potentially untrusted. |
+| 1682 | 9 | P2 | `UltimateCompute/Strategies/Distributed/BeamStrategy.cs:50-51` | Python module path `apache_beam.runners.{runner.ToLowerInvariant()}` is wrong — actual module is `apache_beam.runners.portability.fn_api_runner`. Will fail for all runners. |
+| 1683 | 12 | P2 | `UltimateCompute/Strategies/Distributed/DaskStrategy.cs:60-62` | `exec(open(...).read())` pattern — user code exception skips `client.close()`, leaking Dask connections. Missing try/finally in generated Python. |
+| 1684 | 12 | P2 | `UltimateCompute/Strategies/Container/RunscStrategy.cs:75` | Container ID truncated to first 10 chars of task.Id. Sequential UUIDs with common prefix → ID collisions → second `runsc run` fails. Same in YoukiStrategy. |
+| 1685 | 12 | P2 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:67-68` | `Path.GetTempFileName()` creates file, then `.cmd`/`.sh` appended to make different path. Original zero-byte file never deleted — temp file leak per execution. |
+| 1686 | 7 | P2 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:258` | Same `GetTempFileName()` + extension leak pattern in `ExecuteCSharpScriptAsync`, `ExecuteJavaScriptAsync` (line 286), `ExecutePythonScriptAsync` (line 307). Three leak sites. |
+| 1687 | 7 | P2 | `UltimateCompute/Strategies/Distributed/SparkStrategy.cs:40-41` | `Path.GetTempFileName()` creates file; `codePath = jobPath + ext` used instead. Original `jobPath` file never cleaned up in finally block. |
+| 1688 | 4 | P2 | `UltimateCompute/Strategies/CoreRuntimes/ProcessExecutionStrategy.cs:164-167` | Lambda payload interpolated into CLI args with incomplete escaping. `%` not escaped on Windows cmd.exe. Large payloads can break argument. Prefer `--payload file://` pattern. |
+| 1689 | 13 | LOW | `UltimateCompute/Strategies/Distributed/MapReduceStrategy.cs:47` | SHA256.HashData per line for partitioning. Cryptographic hash overkill for non-security partition — unnecessary GC pressure. FNV-1a would suffice. |
+| 1690 | 15 | LOW | `UltimateCompute/Strategies/CoreRuntimes/DockerExecutionStrategy.cs:34` | Comment says "Unix socket (/var/run/docker.sock)" but default URL is TCP `localhost:2375`. No Unix socket handler configured. Misleading documentation. |
+| 1691 | 14 | LOW | `UltimateCompute/Strategies/Distributed/BeamStrategy.cs:43-44` | `runner` from metadata used directly in CLI args without validation. Shell metacharacters break argument parsing. Should validate against known runner set. |
+| 1692 | 14 | LOW | `UltimateCompute/Strategies/Distributed/PrestoTrinoStrategy.cs:71` | `--session {key}={value}` built from metadata without escaping. Keys/values with spaces or `=` produce malformed CLI arguments. |
+| 1693 | 14 | LOW | `UltimateCompute/Strategies/Distributed/FlinkStrategy.cs:51` | `task.Metadata["detached"]` checked with `d is true` (boxed bool). JSON-deserialized values as string `"true"` silently fail pattern match. |
+| 1694 | 12 | LOW | `UltimateCompute/Strategies/Enclave/NitroEnclavesStrategy.cs:78` | "Wait for completion via vsock" but just `Task.Delay(1000)` with no actual vsock polling. No real completion detection. |
+
+**Clean files:** YoukiStrategy (shares #1684 pattern), RayStrategy
+
+---
+
+### Plugin Chunk 035 (15 files: TrustZoneStrategy–SpeculativeExecutionStrategy)
+**Files Reviewed:** 15 | **Findings:** 18 (0 P0, 7 P1, 8 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1695 | 4 | P1 | `UltimateCompute/Strategies/Enclave/TrustZoneStrategy.cs:52` | Path traversal: `taUuid` from `task.Metadata["ta_uuid"]` used in path construction (`/lib/optee_armtz/{taUuid}`) and CLI args without sanitization. `../../etc/cron.d/malicious` escapes directory. |
+| 1696 | 4 | P1 | `UltimateCompute/Strategies/Enclave/TrustZoneStrategy.cs:56-65` | Command/argument injection: `taUuid` and `task.EntryPoint` interpolated directly into `optee_example_ta_invoke` arguments without quoting. Caller can inject extra flags via `ta_uuid`. |
+| 1697 | 4 | P1 | `UltimateCompute/Strategies/Gpu/OpenClStrategy.cs:56` | Code injection: kernel source embedded into generated C code via string interpolation with incomplete escaping (`\r`, null bytes, `*/`, `#include` not handled). Attacker can inject arbitrary C code compiled and executed on host. |
+| 1698 | 4 | P1 | `UltimateCompute/Strategies/Gpu/MetalStrategy.cs:68` | Arbitrary executable: `host_app` from `task.Metadata` passed directly as executable to `RunProcessAsync` without whitelist. Same in VulkanComputeStrategy.cs:66. |
+| 1699 | 4 | P1 | `UltimateCompute/Strategies/IndustryFirst/AdaptiveRuntimeSelectionStrategy.cs:192-195` | Silent security degradation: `nsjail` in candidate list but no case in `GetRuntimeCommand` — falls through to `sh` with no sandbox. `bwrap` uses `--ro-bind / /` mounting entire host filesystem. |
+| 1700 | 2 | P1 | `UltimateCompute/Strategies/IndustryFirst/SpeculativeExecutionStrategy.cs:77-82` | Race condition: `winnerOutput`/`winnerLogs` assigned after `Interlocked.CompareExchange` on `winner` without additional synchronization. Two near-simultaneous successes can overwrite each other's output. |
+| 1701 | 2 | P1 | `UltimateCompute/Strategies/IndustryFirst/AdaptiveRuntimeSelectionStrategy.cs:234-235` | `_selectionHistory.AddOrUpdate` mutates shared `List<SelectionRecord>` in-place. Concurrent calls for same key race on list's internal array → corruption. Same in ComputeCostPredictionStrategy.cs:178-187. |
+| 1702 | 2 | P2 | `UltimateCompute/Strategies/IndustryFirst/HybridComputeStrategy.cs:191,219,277` | `cpuElapsed`/`gpuElapsed` plain `TimeSpan` variables captured into concurrent `Task.Run` lambdas. Not formally atomic — torn reads possible on 32-bit runtime. |
+| 1703 | 1 | P2 | `UltimateCompute/Strategies/Gpu/OpenClStrategy.cs:57-80` | Rule 13 stub: generated C host program only builds kernel and releases it — no `clCreateKernel`, `clSetKernelArg`, or `clEnqueueNDRangeKernel`. Always prints "built successfully" regardless. |
+| 1704 | 7 | P2 | `UltimateCompute/Strategies/Gpu/TensorRtStrategy.cs:87-90` | `inputPath` temp file (`GetTempFileName() + ".bin"`) created but never deleted. No finally block covers cleanup. Leaks .bin file per inference call with input data. |
+| 1705 | 7 | P2 | `UltimateCompute/Strategies/IndustryFirst/CarbonAwareComputeStrategy.cs:175` | `JsonDocument.Parse` result not disposed. Pooled memory grows unbounded until GC finalization. Should use `using var json = ...`. |
+| 1706 | 5 | P2 | `UltimateCompute/Strategies/IndustryFirst/CarbonAwareComputeStrategy.cs:191-193` | `catch { }` swallows all exceptions including `OperationCanceledException`. Shutdown cancellation silently ignored — tasks don't terminate promptly. |
+| 1707 | 12 | P2 | `UltimateCompute/Strategies/IndustryFirst/HybridComputeStrategy.cs:258-269` | GPU output fewer lines than segments → `fullOutput` (entire GPU output) assigned to remaining slots. Merged result contains full GPU output repeated N times for overflow positions. |
+| 1708 | 13 | P2 | `UltimateCompute/Strategies/IndustryFirst/IncrementalComputeStrategy.cs:162-174` | `EvictCache` materializes entire dictionary into sorted list O(n log n) when eviction triggered. For 10K-entry caches near limit, full sort every execution. Consider min-heap. |
+| 1709 | 13 | P2 | `UltimateCompute/Strategies/IndustryFirst/HybridComputeStrategy.cs:365` | `EstimateIntensity` calls `segment.Count(c => ...)` O(n) per line inside loop over all input lines. O(lines × line_length) with LINQ closure allocation per segment. |
+| 1710 | 15 | LOW | `UltimateCompute/Strategies/IndustryFirst/SelfOptimizingPipelineStrategy.cs:24` | Field named `_emaThoughput` — typo ("Thoughput" vs "Throughput"). Affects code searchability. |
+| 1711 | 12 | LOW | `UltimateCompute/Strategies/IndustryFirst/CarbonAwareComputeStrategy.cs:83` | Exponential backoff broken: `deferralTime` computed after loop exits, always `TimeSpan.Zero` inside loop. Wait formula always `30 * 2^0 = 30s` — never increases. |
+| 1712 | 15 | LOW | `UltimateCompute/Strategies/IndustryFirst/AdaptiveRuntimeSelectionStrategy.cs:192` | `docker` variant silently omits `--memory` limit that `podman` applies. Different resource constraints for "equivalent" isolation options without documentation. |
+
+**Clean files:** CudaStrategy, OneApiStrategy, DataGravitySchedulerStrategy
+
+---
+
+### Plugin Chunk 036 (15 files: AppArmorStrategy–WasmComponentStrategy)
+**Files Reviewed:** 15 | **Findings:** 24 (0 P0, 10 P1, 9 P2, 5 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1713 | 4 | P1 | `UltimateCompute/Strategies/Sandbox/AppArmorStrategy.cs:50-53` | User-supplied `AllowedFileSystemPaths` written verbatim into AppArmor profile. Newline or `}` breaks profile syntax and bypasses confinement. Must sanitize to `[a-zA-Z0-9/_.-]`. |
+| 1714 | 4 | P1 | `UltimateCompute/Strategies/Sandbox/AppArmorStrategy.cs:48` | `codePath` embedded directly in profile rule `{codePath} rix,`. Whitespace or special AppArmor tokens in temp path malform the rule. |
+| 1715 | 4 | P1 | `UltimateCompute/Strategies/Sandbox/BubbleWrapStrategy.cs:64-65` | `AllowedFileSystemPaths` placed verbatim in `--bind "{path}" "{path}"`. Double-quote or space in path breaks argument parsing, potentially mapping arbitrary host paths. |
+| 1716 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasiNnStrategy.cs:75-77` | `task.Arguments` appended to wasmedge CLI with no quoting: `args.Append($" {arg}")`. Argument injection via spaces or metacharacters. |
+| 1717 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasiStrategy.cs:72-74` | Same unquoted `task.Arguments` append as WasiNn. |
+| 1718 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasmComponentStrategy.cs:56-59` | Same unquoted arguments, plus `task.EntryPoint` appended as `--invoke {task.EntryPoint}` without quoting. Spaces produce unexpected CLI tokens. |
+| 1719 | 4 | P1 | `UltimateCompute/Strategies/Sandbox/SeLinuxStrategy.cs:42-56` | SELinux context from `task.Metadata["selinux_context"]` passed directly to `chcon`/`runcon` arguments without validation. Must validate against `user:role:type:range` format. |
+| 1720 | 1 | P1 | `UltimateCompute/Strategies/SelfEmulatingComputeStrategy.cs:75-96` | Rule 13 stub: creates JSON envelope but never bundles input data with WASM viewer. `viewerVersion` and `snapshotCapable` are hardcoded placeholders. `await Task.CompletedTask` confirms no real work. |
+| 1721 | 12 | P1 | `UltimateCompute/Strategies/Sandbox/LandlockStrategy.cs` (entire) | Claims Linux Landlock LSM but calls `sandboxer` (kernel sample, not standard binary). No InitializeAsync to verify availability. If absent, code executes without any isolation silently with exit 0. |
+| 1722 | 6 | P1 | `UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs:57-62` | `feeder` Task started with `Task.Run`, awaited after `Task.WhenAll(stageTasks)`. If any stage throws and final channel writer never completed, `ReadAllAsync` deadlocks indefinitely. |
+| 1723 | 10 | P2 | `UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs:88-92` | Stage task `finally` calls `outputChannel.Writer.Complete()` without passing exception. Downstream stages drain empty channel → empty output instead of failure propagation. |
+| 1724 | 12 | P2 | `UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs:97-98` | `await feeder` then `await Task.WhenAll(stageTasks)` sequentially. If feeder fails, stages blocked on channel input are still awaited. Should await both in `Task.WhenAll`. |
+| 1725 | 7 | P2 | `UltimateCompute/Strategies/Sandbox/LandlockStrategy.cs:47-56` | `wrapperPath` deleted only on success path. If `RunProcessAsync` throws, wrapper script leaks. Move delete into outer finally block. |
+| 1726 | 15 | P2 | `UltimateCompute/Strategies/ScatterGather/ShuffleStrategy.cs:53-57` | `sort-merge` branch documented as "range-based partitioning" but implements hash partitioning with `string.GetHashCode()` (non-deterministic across processes). Naming lie. |
+| 1727 | 12 | P2 | `UltimateCompute/Strategies/ScatterGather/PartitionedQueryStrategy.cs:60` | If partition's `RunProcessAsync` throws, `partitionResults` entry never written. `Values.SelectMany` silently omits failed partition's output. |
+| 1728 | 13 | P2 | `UltimateCompute/Strategies/ScatterGather/PartitionedQueryStrategy.cs:47` | Per-record `SHA256.HashData(Encoding.UTF8.GetBytes(key))` in scatter-gather hot loop. New byte array per key → excessive GC pressure for millions of records. |
+| 1729 | 13 | P2 | `UltimateCompute/Strategies/ScatterGather/ShuffleStrategy.cs:62` | Same per-record SHA256 allocation pattern as PartitionedQuery. |
+| 1730 | 14 | P2 | `UltimateCompute/Strategies/Sandbox/SeccompStrategy.cs:47-48` | `task.Metadata["allowed_syscalls"]` cast directly to `string[]`. JsonElement/List<string> types silently fall through to default allowlist with no warning. |
+| 1731 | 13 | P2 | `UltimateCompute/Strategies/SelfEmulatingComputeStrategy.cs:95` | `await Task.CompletedTask` in method that does no async I/O. Entire body is synchronous — masks stub nature. |
+| 1732 | 14 | LOW | `UltimateCompute/Strategies/Sandbox/AppArmorStrategy.cs:37` | Profile name `datawarehouse_compute_{id}` may contain hyphens from task.Id. AppArmor names restricted to `[a-zA-Z0-9_.-]`. Sanitize ID. |
+| 1733 | 14 | LOW | `UltimateCompute/Strategies/Sandbox/NsjailStrategy.cs:43` | `(int)GetEffectiveTimeout(task).TotalSeconds` truncates without minimum guard. `TimeSpan.Zero` → `time_limit: 0` = unlimited execution (opposite of intent). |
+| 1734 | 12 | LOW | `UltimateCompute/Strategies/ScatterGather/PipelinedExecutionStrategy.cs:44-46` | `bufferSize` from metadata checked as `int` but deserialized value is typically `JsonElement`/`long`. Pattern match always fails, using hardcoded default 100. |
+| 1735 | 14 | LOW | `UltimateCompute/Strategies/Wasm/WasiStrategy.cs:65-67` | `--dir {preOpen}::{preOpen}` without quoting paths containing spaces. Breaks wasmtime argument parsing. |
+| 1736 | 12 | LOW | `UltimateCompute/Strategies/Sandbox/LandlockStrategy.cs:41` | `StartsWith("/tmp")` uses culture-sensitive overload. Should use `StringComparison.Ordinal`. |
+
+**Clean files:** ParallelAggregationStrategy
+
+---
+
+### Plugin Chunk 037 (15 files: WasmEdgeStrategy–HaskellWasmLanguageStrategy)
+**Files Reviewed:** 15 | **Findings:** 11 (0 P0, 5 P1, 4 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1737 | 1 | P1 | `UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs:68-110` | Rule 13 stub: "built-in WASM interpreter" only parses section headers. Never interprets a single opcode. Returns `task.InputData` verbatim as output with `Success: true`. Caller receives wrong data silently. |
+| 1738 | 12 | P1 | `UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs:86-99` | LEB128 parsing: unsafe `(int)Math.Min(sectionSize, ...)` cast may wrap on malformed input. Loop stops at `shift >= 35` mid-varint, leaving stream unaligned for subsequent sections. |
+| 1739 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasmEdgeStrategy.cs:50-53` | `nn_backend` from `task.Metadata` interpolated into CLI without validation. Attacker can inject arbitrary wasmedge flags. Must validate against allowlist `["TensorFlow", "PyTorch", "OpenVINO", "GGML"]`. |
+| 1740 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasmerStrategy.cs:49-51` | `backend` from metadata used as `--{backend}` without allowlist check. Attacker can inject extra flags. Must validate against `["cranelift", "singlepass", "llvm"]`. |
+| 1741 | 4 | P1 | `UltimateCompute/Strategies/Wasm/WasmtimeStrategy.cs:52-54` | `AllowedFileSystemPaths` passed to `--dir {path}` without quoting. Same unquoted-path pattern in WasmLanguageStrategyBase.cs:114. Also `task.Arguments` unquoted in WasmEdge:66, Wasmer:61, Wasmtime:60, Wazero:48, LanguageBase:120. |
+| 1742 | 15 | P2 | `UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs:108` | `await Task.CompletedTask` used to silence compiler warning about async method with no await. Masks stub nature of implementation. |
+| 1743 | 7 | P2 | `UltimateCompute/Strategies/Wasm/WasmEdgeStrategy.cs:39` | `Path.GetTempFileName() + ".wasm"` creates orphaned zero-byte .tmp file. Same in WasmerStrategy:39, WasmtimeStrategy:39, WazeroStrategy:39. Four leak sites. |
+| 1744 | 12 | P2 | `UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs:83` | Boundary check `offset + 1 >= code.Length` too strict — skips last section if it begins at exactly `code.Length - 1`. Should be `offset >= code.Length`. |
+| 1745 | 15 | P2 | `UltimateCompute/Strategies/Wasm/WasmInterpreterStrategy.cs` (class) | Strategy named "WASM Interpreter (Built-in)" with description promising "Stack-based WASM execution". Never interprets an opcode. Fundamental naming/contract lie. |
+
+**Clean files:** AssemblyScriptWasmLanguageStrategy, CWasmLanguageStrategy, CppWasmLanguageStrategy, DotNetWasmLanguageStrategy, GoWasmLanguageStrategy, RustWasmLanguageStrategy, ZigWasmLanguageStrategy, DartWasmLanguageStrategy, GrainWasmLanguageStrategy, HaskellWasmLanguageStrategy
+
+---
+
+### Plugin Chunk 038 (15 files: JavaScriptWasmLanguageStrategy–FortranWasmLanguageStrategy)
+**Files Reviewed:** 15 | **Findings:** 2 (0 P0, 0 P1, 0 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1746 | 15 | LOW | `UltimateCompute/Strategies/WasmLanguages/Tier2/TypeScriptWasmLanguageStrategy.cs:48-50` | `PerformanceTier: NearNative` accurate only for AssemblyScript path. Javy/QuickJS path is `Interpreted` performance. Misleading to callers selecting by tier. |
+| 1747 | 15 | LOW | All 15 leaf WasmLanguage strategies | `VerifyLanguageAsync` uses generic nop WASM module — verifies wasmtime itself, not language-specific toolchain (Javy, TeaVM, CPython). Reports `CompilationSuccessful: true` even without toolchains installed. Contract lie in verification method name. |
+
+**Clean files:** All 15 files are pure metadata/sample registrations delegating to WasmLanguageStrategyBase. JavaScriptWasmLanguageStrategy, JavaWasmLanguageStrategy, KotlinWasmLanguageStrategy, LuaWasmLanguageStrategy, MoonBitWasmLanguageStrategy, OCamlWasmLanguageStrategy, PhpWasmLanguageStrategy, PythonWasmLanguageStrategy, RubyWasmLanguageStrategy, SwiftWasmLanguageStrategy, AdaWasmLanguageStrategy, CrystalWasmLanguageStrategy, ElixirWasmLanguageStrategy, FortranWasmLanguageStrategy
+
+---
+
+### Plugin Chunk 039 (15 files: NimWasmLanguageStrategy–AwsSageMakerConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 14 (0 P0, 6 P1, 6 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1748 | 7 | P1 | `UltimateConnector/Strategies/AI/AnthropicConnectionStrategy.cs:10` | `new HttpClient` created per `ConnectCoreAsync` call. No pooling — socket exhaustion under sustained load. Should use IHttpClientFactory or shared instance. |
+| 1749 | 7 | P1 | `UltimateConnector/Strategies/AI/AwsBedrockConnectionStrategy.cs:10` | Same per-call `new HttpClient` as Anthropic. Socket exhaustion risk. |
+| 1750 | 7 | P1 | `UltimateConnector/Strategies/AI/AwsSageMakerConnectionStrategy.cs:10` | Same per-call `new HttpClient`. Socket exhaustion risk. |
+| 1751 | 9 | P1 | `UltimateConnector/Strategies/AI/AnthropicConnectionStrategy.cs:14` | `HttpResponseMessage` not disposed on error path. `EnsureSuccessStatusCode()` throws before disposal. Wrap in `using var response`. |
+| 1752 | 9 | P1 | `UltimateConnector/Strategies/AI/AwsBedrockConnectionStrategy.cs:14` | Same undisposed `HttpResponseMessage` on error path. |
+| 1753 | 9 | P1 | `UltimateConnector/Strategies/AI/AwsSageMakerConnectionStrategy.cs:14-15` | Undisposed `HttpResponseMessage` in both `SendRequestAsync` and `StreamResponseAsync`. Additionally `StreamResponseAsync` missing `EnsureSuccessStatusCode` — silently streams garbage on HTTP 4xx/5xx. |
+| 1754 | 5 | P2 | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageBenchmark.cs:271-273` | Blanket `catch` swallows all exceptions including OOM and ThreadAbort. Strategies silently disappear without logging. |
+| 1755 | 5 | P2 | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageEcosystemStrategy.cs:150-153` | Same blanket `catch` in `GetEcosystemReport`. Strategy instantiation failures dropped silently. |
+| 1756 | 5 | P2 | `UltimateCompute/UltimateComputePlugin.cs:416-419` | `PublishStrategyRegisteredAsync` swallows all exceptions from `MessageBus.PublishAsync` including serialization bugs and null references. Should log at warning level. |
+| 1757 | 15 | P2 | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageStrategyBase.cs:202-206` | `VerifyLanguageAsync` catch block returns `CompilationSuccessful: true` even when wasmtime not found. Misleads callers. Should be `false`. |
+| 1758 | 13 | P2 | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageEcosystemStrategy.cs:231-235` | `GetEcosystemReport()` called twice in `ExecuteAsync` — two full reflection-based assembly scans. Cache and pass result. |
+| 1759 | 14 | P2 | `UltimateConnector/Strategies/AI/AwsBedrockConnectionStrategy.cs:10` | AWS Bedrock requires SigV4 signing. No auth headers set — every request returns 403. Functional stub masquerading as real connection. |
+| 1760 | 12 | LOW | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageStrategyBase.cs:104-108` | `--max-memory` flag may be wrong wasmtime CLI flag. Correct flag varies by version (`--wasm-memory-reservation`). May be silently ignored. |
+| 1761 | 12 | LOW | `UltimateCompute/Strategies/WasmLanguages/WasmLanguageBenchmark.cs:126` | `GC.GetTotalMemory(false)` measures entire process heap, not per-benchmark WASM execution. "Memory (KB)" column meaningless. |
+
+**Clean files:** NimWasmLanguageStrategy, PerlWasmLanguageStrategy, PrologWasmLanguageStrategy, RWasmLanguageStrategy, ScalaWasmLanguageStrategy, VWasmLanguageStrategy, WasmLanguageTypes, WasmLanguageSdkDocumentation
+
+---
+
+### Plugin Chunk 040 (15 files: AzureMlConnectionStrategy–MilvusConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 20 (0 P0, 12 P1, 6 P2, 2 LOW) — *consolidated from 82 raw findings; systemic issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1762 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across all 15 files:** Every AI connector creates `new HttpClient()` per connection. At scale (hundreds of connectors) this exhausts ephemeral ports (socket exhaustion). Should use `IHttpClientFactory` or a shared static client. Affected: AzureMl, AzureOpenAi, Chroma, Cohere, Deepgram, ElevenLabs, GoogleGemini, Groq, Helicone, HuggingFace, Kubeflow, LangSmith, LlamaCpp, LlamaIndex, Milvus. |
+| 1763 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across all 15 files:** `HttpResponseMessage` from `SendAsync`/`PostAsync`/`GetAsync` is never wrapped in `using`. On error paths (`EnsureSuccessStatusCode` throws), the response body stream leaks. Must use `using var response = ...`. |
+| 1764 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~12 files:** `new StringContent(json, Encoding.UTF8, "application/json")` is never disposed. `StringContent` holds a `MemoryStream` internally. Affected: AzureMl, AzureOpenAi, Cohere, Deepgram, ElevenLabs, GoogleGemini, Groq, HuggingFace, Kubeflow, LangSmith, LlamaIndex, Milvus. |
+| 1765 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~10 files:** `JsonDocument.Parse()` result not disposed. `JsonDocument` rents array buffers that are returned only on `Dispose()`. Affected: AzureMl, AzureOpenAi, Chroma, Cohere, ElevenLabs, GoogleGemini, Groq, HuggingFace, LlamaIndex, Milvus. |
+| 1766 | 4 | P1 | `UltimateConnector/Strategies/AI/GoogleGeminiConnectionStrategy.cs:~45` | **API key leaked in URL query parameter.** `$"{_baseUrl}/v1/models/{model}:generateContent?key={_apiKey}"`. API keys in URLs are logged by proxies, CDNs, and browser history. Must use `x-goog-api-key` header instead. |
+| 1767 | 4 | P1 | `UltimateConnector/Strategies/AI/GoogleGeminiConnectionStrategy.cs:~70` | Same API key in URL for streaming endpoint `streamGenerateContent?key={_apiKey}`. |
+| 1768 | 5 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~5 files:** `StreamResponseAsync` catches all exceptions including `OperationCanceledException`, swallowing cancellation requests. Callers cannot cancel streaming. Affected: Cohere, Deepgram, GoogleGemini, Groq, HuggingFace. |
+| 1769 | 6 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~4 files:** `StreamResponseAsync` calls `PostAsync` without forwarding `CancellationToken`. HTTP request cannot be cancelled once started. Affected: Cohere, GoogleGemini, Groq, LlamaIndex. |
+| 1770 | 4 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~9 files:** User-supplied identifiers interpolated directly into URL paths without encoding. Path traversal via `../` or URL injection via `?param=`. Affected: AzureMl (deployment/model), AzureOpenAi (deployment), Chroma (collection), ElevenLabs (voiceId), Kubeflow (pipelineId/runId), LangSmith (runId), LlamaIndex (index), Milvus (collection). |
+| 1771 | 15 | P1 | `UltimateConnector/Strategies/AI/AzureMlConnectionStrategy.cs:TestCoreAsync` | `TestCoreAsync` always returns `true`. Contract promises connectivity check; implementation is a lie. Same in 5 other files. |
+| 1772 | 15 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC `TestCoreAsync` always returns true** in: Cohere, Deepgram, ElevenLabs, Groq, Helicone, LlamaCpp. Health checks are meaningless — callers believe connection is healthy when it may be dead. |
+| 1773 | 15 | P1 | `UltimateConnector/Strategies/AI/HeliconeConnectionStrategy.cs:GetHealthCoreAsync` | `GetHealthCoreAsync` always returns `ConnectionHealthStatus.Healthy`. Same contract lie as `TestCoreAsync`. |
+| 1774 | 14 | P2 | `UltimateConnector/Strategies/AI/AzureMlConnectionStrategy.cs:SendRequestCoreAsync` | No validation that `_deploymentName` and `_modelName` are non-empty. Empty values produce malformed URL `/endpoints//deployments//score`. |
+| 1775 | 14 | P2 | `UltimateConnector/Strategies/AI/ElevenLabsConnectionStrategy.cs:StreamResponseAsync` | `voiceId` parameter not validated before URL interpolation. Empty voiceId produces `/v1/text-to-speech//stream`. |
+| 1776 | 9 | P2 | `UltimateConnector/Strategies/AI/KubeflowConnectionStrategy.cs:GetPipelineRunStatus` | Error response body not read before throwing. Caller gets generic HTTP error with no server-side error message. |
+| 1777 | 9 | P2 | `UltimateConnector/Strategies/AI/LangSmithConnectionStrategy.cs:LogRunAsync` | Fire-and-forget `PostAsync` — no await, no error check. Telemetry silently lost on failure. |
+| 1778 | 14 | P2 | `UltimateConnector/Strategies/AI/MilvusConnectionStrategy.cs:CreateCollectionAsync` | `dimension` parameter not validated. Zero or negative dimension produces invalid Milvus schema. |
+| 1779 | 12 | P2 | `UltimateConnector/Strategies/AI/LlamaCppConnectionStrategy.cs:StreamResponseAsync` | SSE parsing uses `line.StartsWith("data: ")` but doesn't handle `data:` (no space) which is valid per SSE spec. May miss events from some servers. |
+| 1780 | 2 | LOW | `UltimateConnector/Strategies/AI/HeliconeConnectionStrategy.cs:headers` | Custom headers (`Helicone-Session-Id`, `Helicone-User-Id`) accept arbitrary user input without length or character validation. Header injection risk (CRLF). |
+| 1781 | 13 | LOW | `UltimateConnector/Strategies/AI/AzureOpenAiConnectionStrategy.cs:SendRequestCoreAsync` | Response body deserialized fully into string then re-parsed. For large responses (embeddings), double-allocation is wasteful. Stream directly from `HttpResponseMessage.Content`. |
+
+**Clean files:** None — all 15 files have systemic HttpClient/resource issues.
+
+---
+
+### Plugin Chunk 041 (15 files: MistralConnectionStrategy–WeaviateConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 19 (1 P0, 10 P1, 5 P2, 3 LOW) — *consolidated from 27 raw findings; systemic issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1782 | 4 | **P0** | `UltimateConnector/Strategies/AI/PgVectorConnectionStrategy.cs:SendRequestCoreAsync` | **SQL INJECTION.** `cmd.CommandText = prompt` — raw user input executed as SQL. Attacker can `DROP TABLE`, exfiltrate data, or escalate privileges. Must use parameterized queries (`cmd.Parameters.AddWithValue`). |
+| 1783 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across all 15 files:** Same `new HttpClient()` per-connection socket exhaustion as chunk 040. Affected: Mistral, MlFlow, Ollama, OpenAI, Perplexity, PgVector, Pinecone, Qdrant, StabilityAi, Tgi, TogetherAi, Triton, VertexAi, Vllm, Weaviate. |
+| 1784 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across all 15 files:** Same undisposed `HttpResponseMessage` resource leak as chunk 040. |
+| 1785 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~12 files:** Same undisposed `StringContent` as chunk 040. Affected: Mistral, MlFlow, OpenAI, Perplexity, Pinecone, Qdrant, StabilityAi, Tgi, TogetherAi, Triton, VertexAi, Vllm. |
+| 1786 | 7 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~10 files:** Same undisposed `JsonDocument` as chunk 040. Affected: Mistral, MlFlow, OpenAI, Perplexity, Pinecone, Qdrant, StabilityAi, VertexAi, Vllm, Weaviate. |
+| 1787 | 5 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~4 files:** Same silent `OperationCanceledException` swallowing in streaming. Affected: Mistral, OpenAI, Perplexity, Vllm. |
+| 1788 | 4 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC across ~7 files:** Same unsanitized URL path interpolation (model/collection/index IDs). Affected: MlFlow (runId/experimentId), Pinecone (index), Qdrant (collection), StabilityAi (engineId), Triton (model), VertexAi (model/endpoint), Weaviate (class). |
+| 1789 | 15 | P1 | `UltimateConnector/Strategies/AI/*.cs` | **SYSTEMIC `TestCoreAsync` always returns true** in: MlFlow, Ollama, Perplexity, StabilityAi, Vllm. Same contract lie — health check is meaningless. |
+| 1790 | 15 | P1 | `UltimateConnector/Strategies/AI/TritonConnectionStrategy.cs:GetHealthCoreAsync` | `GetHealthCoreAsync` always returns `Healthy`. Triton has a real health endpoint (`/v2/health/ready`) that is never called. |
+| 1791 | 12 | P1 | `UltimateConnector/Strategies/AI/VertexAiConnectionStrategy.cs:SendRequest vs Stream` | `SendRequestCoreAsync` uses Vertex AI v1 predict format (`{"instances":[...]}`) but `StreamResponseAsync` uses Gemini format (`{"contents":[...]}`) on a completely different endpoint. If both are called on the same connection, request/response format mismatch causes deserialization failures. |
+| 1792 | 12 | P1 | `UltimateConnector/Strategies/AI/TritonConnectionStrategy.cs:StreamResponseAsync` | Streaming endpoint `/v2/models/{model}/infer_stream` does not exist in Triton Inference Server API. Triton uses gRPC streaming, not HTTP SSE. This method will always return HTTP 404. |
+| 1793 | 9 | P2 | `UltimateConnector/Strategies/AI/TgiConnectionStrategy.cs:StreamResponseAsync` | User-configured `MaxNewTokens`, `Temperature`, `TopP` parameters ignored in streaming request body. Hardcodes `max_new_tokens: 512`. Streaming and non-streaming produce different results for identical inputs. |
+| 1794 | 9 | P2 | `UltimateConnector/Strategies/AI/PgVectorConnectionStrategy.cs:connection` | `NpgsqlConnection` opened but never closed/disposed on error paths. Connection pool exhaustion under repeated failures. |
+| 1795 | 14 | P2 | `UltimateConnector/Strategies/AI/WeaviateConnectionStrategy.cs:CreateClassAsync` | `className` not validated against Weaviate naming rules (must start with uppercase, alphanumeric only). Invalid names produce cryptic 422 errors. |
+| 1796 | 14 | P2 | `UltimateConnector/Strategies/AI/PineconeConnectionStrategy.cs:UpsertAsync` | No validation on vector dimension. Mismatched dimensions produce 400 errors from Pinecone with no local diagnostic. |
+| 1797 | 5 | P2 | `UltimateConnector/Strategies/AI/MlFlowConnectionStrategy.cs:LogMetricAsync` | Fire-and-forget `PostAsync` — no await. Metrics silently lost. Same as LangSmith #1777. |
+| 1798 | 12 | LOW | `UltimateConnector/Strategies/AI/OllamaConnectionStrategy.cs:StreamResponseAsync` | SSE `data: [DONE]` sentinel only works for OpenAI-compatible mode. Native Ollama streaming uses JSON objects with `"done": true` field. May hang waiting for `[DONE]` that never arrives. |
+| 1799 | 2 | LOW | `UltimateConnector/Strategies/AI/OpenAiConnectionStrategy.cs:_apiKey` | API key stored as plain `string` field. If process memory is dumped (crash dump, heap inspection), key is visible. Consider `SecureString` or encrypted in-memory storage. |
+| 1800 | 13 | LOW | `UltimateConnector/Strategies/AI/QdrantConnectionStrategy.cs:SearchAsync` | Search results fully materialized into `List<T>` then re-serialized. For large result sets (top-1000), this doubles memory. Stream results directly. |
+
+**Clean files:** None — all 15 files have systemic HttpClient/resource issues. WhisperConnectionStrategy and WeightsAndBiasesConnectionStrategy (chunk 042) not yet reviewed.
+
+---
+
+### Plugin Chunk 042 (15 files: WeightsAndBiasesConnectionStrategy–AwsS3ConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 18 (1 P0, 12 P1, 4 P2, 1 LOW) — *consolidated from 82 raw findings; blockchain stubs & systemic issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1801 | 7 | P1 | `UltimateConnector/Strategies/AI/WeightsAndBiases+Whisper, Blockchain/*, CloudPlatform/Aws*` | **SYSTEMIC across all 15 files:** `new HttpClient()` per connection in `ConnectCoreAsync`. Socket exhaustion under concurrent workloads. Every file in this chunk creates a new HttpClient per call. |
+| 1802 | 7 | P1 | `UltimateConnector/Strategies/Blockchain/*.cs` | **SYSTEMIC across 11 blockchain+AI files:** `HttpClient` not disposed on exception path in `ConnectCoreAsync`. If `GetAsync`/`PostAsync`/`new Uri()` throws, the freshly created client leaks. No try/finally guard. |
+| 1803 | 1 | P1 | `UltimateConnector/Strategies/Blockchain/*.cs` | **SYSTEMIC Rule 13 stubs across all 9 blockchain strategies:** `GetBlockAsync` throws `NotSupportedException("Requires X SDK")` in Arweave, Avalanche, CosmosChain, Ethereum, HyperledgerFabric, IPFS, Polygon, Solana, TheGraph. These are core blockchain connector operations — strategies are non-functional for their primary purpose. |
+| 1804 | 1 | P1 | `UltimateConnector/Strategies/Blockchain/*.cs` | **SYSTEMIC Rule 13 stubs:** `SubmitTransactionAsync` throws `NotSupportedException` in all 9 blockchain strategies. Same issue as #1803 for the write path. |
+| 1805 | 15 | P2 | `UltimateConnector/Strategies/Blockchain/*.cs + AI/Whisper` | **SYSTEMIC across 10 files:** `TestCoreAsync` always returns `true` without any real connectivity check. Affected: Arweave, Avalanche, CosmosChain, HyperledgerFabric, IPFS, Polygon, TheGraph, Whisper. `GetHealthCoreAsync` similarly always returns `Healthy`. Health monitoring completely blind for these strategies. |
+| 1806 | 14 | P1 | `UltimateConnector/Strategies/Blockchain/*.cs` | **SYSTEMIC across 7 files:** `config.ConnectionString` passed directly to `new Uri()` with no null guard. `NullReferenceException` on null input. Affected: Avalanche, CosmosChain, HyperledgerFabric, Polygon, TheGraph. Ethereum and IPFS use `Split(':')` — also NRE on null. |
+| 1807 | 12 | **P0** | `UltimateConnector/Strategies/Blockchain/TheGraphConnectionStrategy.cs:20` | JSON literal in `ConnectCoreAsync` contains syntax error — extra `}` and mismatched quotes in `@"{""query"":""{_meta{block{number}}}""}""}"`. Malformed JSON body rejected by The Graph endpoint. `ConnectCoreAsync` effectively always fails. |
+| 1808 | 4 | P1 | `UltimateConnector/Strategies/Blockchain/EthereumConnectionStrategy.cs:25` | Constructs `http://` (plain HTTP) for Ethereum JSON-RPC endpoint. Transaction data and private key material exposed to network interception. Same issue in `IpfsConnectionStrategy.cs:19`. |
+| 1809 | 4 | P1 | `UltimateConnector/Strategies/AI/WeightsAndBiasesConnectionStrategy.cs:14` | `entity`, `project`, `runId` from caller-controlled `options` interpolated directly into URL path (`/files/{entity}/{project}/{runId}/file_stream`) with no URL-encoding. Path injection and NRE risk. |
+| 1810 | 9 | P1 | `UltimateConnector/Strategies/AI/WhisperConnectionStrategy.cs:14` | `Convert.FromBase64String(audioBase64)` in `SendRequestAsync` throws unhandled `FormatException` if caller passes non-base64 data. No validation guard. |
+| 1811 | 1 | P1 | `UltimateConnector/Strategies/CloudPlatform/AwsGlueConnectionStrategy.cs:82` | **SYSTEMIC fake auth across 4 AWS strategies:** `AuthenticateAsync` returns `Guid.NewGuid()` as auth token — no real AWS authentication (SigV4/STS). Affected: AwsGlue, AwsKinesis, AwsLambda, AwsS3. Any caller relying on this token for authenticated requests will fail. |
+| 1812 | 5 | P1 | `UltimateConnector/Strategies/CloudPlatform/Aws*.cs` | **SYSTEMIC across 4 AWS strategies:** Bare `catch` in `TestCoreAsync` swallows all exceptions including `OperationCanceledException` without logging. Failures invisible. Affected: AwsGlue, AwsKinesis, AwsLambda, AwsS3. |
+| 1813 | 15 | P1 | `UltimateConnector/Strategies/CloudPlatform/Aws*.cs` | **SYSTEMIC across 4 AWS strategies:** `TestCoreAsync` returns `true` for any response except `503 ServiceUnavailable`. HTTP 401/403/404/500 all report as "healthy". AwsS3 variant catches `AmazonS3Exception` and returns `true` (auth failures appear healthy). |
+| 1814 | 4 | P1 | `UltimateConnector/Strategies/AI/WeightsAndBiasesConnectionStrategy.cs:14` | `"log"` action serializes raw `object` from caller-controlled `options` directly to JSON POST body — no schema validation. Arbitrary JSON injection possible. |
+| 1815 | 15 | P2 | `UltimateConnector/Strategies/AI/WhisperConnectionStrategy.cs:11,13` | `TestCoreAsync` always returns `true`, `GetHealthCoreAsync` always returns healthy — contract lies masking real connectivity failures. |
+| 1816 | 14 | P2 | `UltimateConnector/Strategies/AI/WhisperConnectionStrategy.cs:14` | No validation that `audioBase64` is non-null before `Convert.FromBase64String`. Null options key produces NRE. |
+| 1817 | 7 | P2 | `UltimateConnector/Strategies/CloudPlatform/AwsS3ConnectionStrategy.cs:31` | `AmazonS3Client` created per connection call. While it manages its own pool, creating new instances per-connect without disposing old handles causes pool growth. |
+| 1818 | 13 | LOW | `UltimateConnector/Strategies/CloudPlatform/Aws*.cs:65` | `await Task.CompletedTask` in `DisconnectCoreAsync` across AwsGlue, AwsKinesis, AwsLambda. Pointless async overhead. |
+
+**Clean files:** None — all 15 files have at least one issue.
+
+---
+
+### Plugin Chunk 043 (15 files: AwsSnsConnectionStrategy–GcpPubSubConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 16 (1 P0, 8 P1, 6 P2, 1 LOW) — *consolidated from 48 raw findings; systemic issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1819 | 15 | **P0** | `UltimateConnector/Strategies/CloudPlatform/GcpPubSubConnectionStrategy.cs:82-97` | `TestCoreAsync` has catch-all `catch { return Task.FromResult(true); }`. Swallows ALL exceptions — including `RpcException` with `StatusCode.Unavailable`. Health check ALWAYS returns true even when service is completely unreachable. Monitoring will never alert on a broken Pub/Sub connection. |
+| 1820 | 15 | P1 | `UltimateConnector/Strategies/CloudPlatform/AwsSnsConnectionStrategy.cs:83` | `catch (AmazonSimpleNotificationServiceException) { return true; }` — reports `IsHealthy: true` when auth/permission errors are thrown. Same pattern in AwsSqs (`AmazonSQSException`) and AzureBlob (`RequestFailedException`). All 3 strategies mask misconfiguration from health dashboards. |
+| 1821 | 7 | P1 | `UltimateConnector/Strategies/CloudPlatform/AzureCosmos,DataLake,Functions,BackblazeB2,CloudflareR2,DigitalOcean,GcpBigtable,GcpDataflow,GcpFirestore` | **SYSTEMIC across 9 files:** `new HttpClient` per connection — socket exhaustion. These 9 raw-HttpClient strategies all create one in `ConnectCoreAsync`. |
+| 1822 | 11 | P1 | `UltimateConnector/Strategies/CloudPlatform/AzureCosmos through GcpFirestore (9 files)` | **SYSTEMIC architectural gap:** 9 raw-HttpClient strategies set NO authentication headers — no Bearer tokens (Azure/GCP) and no HMAC (Backblaze B2). All requests will fail with 401/403 at runtime. The AWS SDK strategies (SNS, SQS) and Azure SDK strategies (Blob, EventHub, ServiceBus) correctly handle auth; the raw-HttpClient group does not. |
+| 1823 | 14 | P1 | `UltimateConnector/Strategies/CloudPlatform/AzureCosmosConnectionStrategy.cs:22` | **SYSTEMIC across 5 files:** Empty config value (e.g. empty `account`) produces malformed URI like `https://.documents.azure.com`. No guard on blank required values. Affected: AzureCosmos, AzureDataLake, AzureFunctions, CloudflareR2 (`accountId`). |
+| 1824 | 1 | P1 | `UltimateConnector/Strategies/CloudPlatform/AzureServiceBusConnectionStrategy.cs:38` | Connection string synthetically constructed with literal `SharedAccessKey=placeholder`. `ServiceBusClient` accepts it but will fail on first send/receive. Returns `"State": "Connected"` — Rule 13 placeholder credential. |
+| 1825 | 15 | P1 | `UltimateConnector/Strategies/CloudPlatform/AzureServiceBusConnectionStrategy.cs:64-111` | `TestCoreAsync` and `GetHealthCoreAsync` both check only `!client.IsClosed` — always `false` after construction regardless of connectivity or auth validity. Health always reports true, even with the placeholder key from #1824. |
+| 1826 | 3 | P1 | `UltimateConnector/Strategies/CloudPlatform/GcpPubSubConnectionStrategy.cs:89` | `wrapper.PublisherClient.ListTopics(projectName)` — synchronous blocking gRPC call inside async context. Thread pool starvation under concurrent health checks. Should use `ListTopicsAsync`. |
+| 1827 | 5 | P2 | `UltimateConnector/Strategies/CloudPlatform/*.cs` | **SYSTEMIC across 12 files:** Bare `catch` blocks in `TestCoreAsync` swallow `OperationCanceledException`, violating cooperative cancellation. Affected: AwsSns, AwsSqs, AzureBlob, AzureCosmos, AzureDataLake, AzureFunctions, BackblazeB2, CloudflareR2, DigitalOcean, GcpBigtable, GcpDataflow, GcpFirestore. |
+| 1828 | 15 | P2 | `UltimateConnector/Strategies/CloudPlatform/AzureFunctions,BackblazeB2,GcpBigtable,GcpDataflow,GcpFirestore` | **SYSTEMIC across 5 files:** `TestCoreAsync` returns `true` for any response except `503 ServiceUnavailable`. HTTP 401/403/404/500 all report as healthy — misleading health dashboards. |
+| 1829 | 14 | P2 | `UltimateConnector/Strategies/CloudPlatform/BackblazeB2ConnectionStrategy.cs:20` | `ConnectCoreAsync` reads no credentials at all (no AccountId, no ApplicationKey, no Authorization header). All authenticated requests will 401. Same credential gap in GcpBigtable, GcpDataflow, GcpFirestore. |
+| 1830 | 9 | P2 | `UltimateConnector/Strategies/CloudPlatform/AzureEventHubConnectionStrategy.cs:74` | `DisconnectCoreAsync` calls `await producer.DisposeAsync()` without try/catch. If dispose throws (AMQP link closed), `MarkDisconnected()` never called — handle left in inconsistent state. Same in AzureServiceBus. |
+| 1831 | 13 | P2 | `UltimateConnector/Strategies/CloudPlatform/GcpPubSubConnectionStrategy.cs:89` | `ListTopics` in `TestCoreAsync` fetches ALL topics in the project (paginated). For projects with thousands of topics this is expensive. A lighter probe (single GetTopic or catch first page) would suffice. |
+| 1832 | 14 | LOW | `UltimateConnector/Strategies/CloudPlatform/AwsSnsConnectionStrategy.cs:36` | `Region` defaults to `"us-east-1"` silently. Misconfigured region hits wrong endpoint with no warning. Same in AwsSqs. |
+
+**Clean files:** None — all 15 files have at least one issue.
+
+---
+
+### Plugin Chunk 044 (15 files: GcpSpannerConnectionStrategy–StarburstConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 22 (8 P0, 10 P1, 4 P2, 0 LOW) — *consolidated from 61 raw findings; systemic CloudPlatform/CloudWarehouse issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1833 | 1 | **P0** | `UltimateConnector/Strategies/CloudPlatform/GcpSpanner,GcpStorage,Minio,OracleCloud,Wasabi` | **SYSTEMIC fake auth across 5 CloudPlatform strategies:** `AuthenticateAsync` returns `Guid.NewGuid()` as token. No real OAuth2/SigV4/OCI signing implemented. GcpStorage comments explicitly say "For now, return a placeholder token". All authenticated API calls will fail with 401/403. |
+| 1834 | 1 | **P0** | `UltimateConnector/Strategies/CloudWarehouse/*.cs` | **SYSTEMIC Rule 13 stubs across ALL 10 CloudWarehouse strategies:** `ExecuteQueryAsync`, `ExecuteNonQueryAsync`, and `GetSchemaAsync` return `Task.Delay` + hardcoded data `{ id=1, value="data" }`. No SQL or API call is ever made. Data returned is fabricated. Affected: AzureSynapse, BigQuery, Databricks, Dremio, Firebolt, GoogleAlloyDb, MotherDuck, Redshift, Snowflake, Starburst. |
+| 1835 | 15 | **P0** | `UltimateConnector/Strategies/CloudWarehouse/*.cs` | **SYSTEMIC dishonest health checks across all 10 CloudWarehouse:** 5 check `_httpClient != null` (always true); 3 check `TcpClient.Connected` (stale flag from last I/O, not live probe); 1 checks `_token != null`; 1 returns any non-503 as healthy. ALL are permanently-true lies. |
+| 1836 | 7 | P1 | `UltimateConnector/Strategies/CloudPlatform+CloudWarehouse/*.cs` | **SYSTEMIC across 12 files:** `new HttpClient()` or `new TcpClient()` per connection call — socket exhaustion. Affected: GcpSpanner, Minio, OracleCloud, Wasabi, BigQuery, Databricks, Dremio, Firebolt, Snowflake, Starburst (HttpClient); AzureSynapse, GoogleAlloyDb, Redshift (TcpClient). |
+| 1837 | 2 | P1 | `UltimateConnector/Strategies/CloudWarehouse/*.cs` | **SYSTEMIC across all 10 CloudWarehouse:** `_httpClient`/`_tcpClient`/`_token` stored as instance fields with no concurrency protection. Concurrent `ConnectCoreAsync` calls race, overwriting the field — prior connection leaks, `DisconnectCoreAsync` closes the wrong client. |
+| 1838 | 5 | P1 | `UltimateConnector/Strategies/CloudPlatform+CloudWarehouse/*.cs` | **SYSTEMIC across 8 files:** Bare `catch { return false; }` in `TestCoreAsync` swallows `OperationCanceledException`. Affected: GcpSpanner, Minio, OracleCloud, Wasabi, Databricks, Dremio, Starburst, GcpStorage. |
+| 1839 | 15 | P1 | `UltimateConnector/Strategies/CloudPlatform/GcpSpanner,OracleCloud` | `TestCoreAsync` returns `true` for any non-503 response. HTTP 401/403/404/500 report as healthy. Same misleading pattern from prior chunks. |
+| 1840 | 4 | P1 | `UltimateConnector/Strategies/CloudWarehouse/BigQuery,Databricks,Firebolt,Snowflake` | **SYSTEMIC CRLF injection:** `config.AuthCredential` placed directly into `Authorization: Bearer` header with no validation or sanitization. A credential containing `\r\n` can inject arbitrary HTTP headers. |
+| 1841 | 14 | P1 | `UltimateConnector/Strategies/CloudWarehouse/AzureSynapse,GoogleAlloyDb,Redshift` | `ParseHostPort` splits connection string on `:` with no validation. Empty string → DNS failure with misleading error. IPv6 addresses (e.g. `[::1]:5432`) completely broken by naive split. |
+| 1842 | 4 | P1 | `UltimateConnector/Strategies/CloudWarehouse/DremioConnectionStrategy.cs:23` | Constructs `http://` (plain HTTP) unconditionally despite advertising `SupportsSsl: true`. Credentials sent in cleartext. Basic auth in Dremio sent Base64-encoded over plain HTTP = effectively cleartext. Same in Starburst. |
+| 1843 | 15 | P2 | `UltimateConnector/Strategies/CloudPlatform/GcpStorageConnectionStrategy.cs:79` | `TestCoreAsync` catches `GoogleApiException` and returns `true` — "auth errors mean we can reach GCP". Misconfigured credentials report as healthy. |
+| 1844 | 15 | P2 | `UltimateConnector/Strategies/CloudPlatform/WasabiConnectionStrategy.cs:21` | `TestCoreAsync` returns `true` on `Forbidden` (403). Auth failures always appear healthy. |
+| 1845 | 4 | P2 | `UltimateConnector/Strategies/CloudWarehouse/MotherDuckConnectionStrategy.cs:24` | Token stored as plain string in `ConnectionInfo` dictionary — visible to any code reading connection metadata, potentially logged. |
+| 1846 | 15 | P2 | `UltimateConnector/Strategies/CloudWarehouse/SnowflakeConnectionStrategy.cs:26` | `ConnectionInfo` hardcodes `["warehouse"] = "COMPUTE_WH"`. Not configurable — wrong warehouse used silently for non-default tenants. |
+
+**Clean files:** None — all 15 files have at least one issue.
+
+---
+
+### Plugin Chunk 045 (15 files: AutoReconnectionHandler–AwsQuickSightConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 27 (3 P0, 14 P1, 10 P2, 0 LOW) — *CrossCutting infrastructure + 2 Dashboard strategies*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1847 | 6 | P1 | `UltimateConnector/Strategies/CrossCutting/AutoReconnectionHandler.cs:98` | Fire-and-forget `_ = MonitorConnectionAsync(...)` — unobserved task. Exceptions after the catch guard silently kill the monitor with no notification. |
+| 1848 | 2 | P1 | `UltimateConnector/Strategies/CrossCutting/AutoReconnectionHandler.cs:86-162` | `_currentHandle` written in `Attach()` (no lock), read in `MonitorConnectionAsync` without sync. `_connectionConfig` read outside lock — concurrent `Attach()` can null between check and use. Thread safety violations throughout. |
+| 1849 | 7 | P1 | `UltimateConnector/Strategies/CrossCutting/AutoReconnectionHandler.cs:241-254` | `DisposeAsync` doesn't await the monitor task. Returns while monitor is mid-reconnect, then disposes `_currentHandle` out from under it — double-dispose race. |
+| 1850 | 12 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionCircuitBreaker.cs:67-76` | `circuit.OpenedAt` is a `DateTimeOffset?` struct read/written across threads without synchronization — torn read on 32-bit targets. Should use `long` ticks via `Interlocked`. |
+| 1851 | 7 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionPoolManager.cs:60-88` | Semaphore acquired but never released if `factory(ct)` throws. Permanently reduces pool capacity on every failed connection creation. No try/finally. |
+| 1852 | 12 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionPoolManager.cs:60-88` | `ActiveCount` incremented only on pool miss, but decremented on every return/dispose. Pool hits that are returned cause `ActiveCount` to go negative — corrupted statistics. |
+| 1853 | 2 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionPoolManager.cs:157-182` | `EvictIdleConnections` drain-and-refill on `ConcurrentQueue` is not atomic. Connections dequeued by concurrent `GetConnectionAsync` during eviction are lost. |
+| 1854 | 12 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionRateLimiter.cs:114-133` | `LastReplenishTimestamp` read/written without `Interlocked`. Concurrent timer callbacks can double token replenishment. |
+| 1855 | 7 | P1 | `UltimateConnector/Strategies/CrossCutting/ConnectionRateLimiter.cs:56-67` | `RateLimitLease.Dispose()` never releases semaphore token. Tokens only recover via timer. If timer stops, tokens permanently lost. |
+| 1856 | 6 | P1 | `UltimateConnector/Strategies/CrossCutting/MessageBusInterceptorBridge.cs:244` | Fire-and-forget `_ = _messageBus.PublishAsync(...)` — async publish failures silently swallowed. Log warning unreachable for async exceptions. |
+| 1857 | 4 | P1 | `UltimateConnector/Strategies/CrossCutting/CredentialResolver.cs:93-104` | Environment variable lookup falls through to raw `normalizedKey`. User-supplied key matching `PATH`, `HOME`, `AWS_SECRET_ACCESS_KEY` exposes arbitrary env vars. Should restrict to `DW_CREDENTIAL_*` namespace only. |
+| 1858 | 14 | P1 | `UltimateConnector/Strategies/CrossCutting/CredentialResolver.cs:63-112` | `ResolvedCredential.IsExpired` computed but never checked in `ResolveCredentialAsync`. Expired credentials silently accepted. |
+| 1859 | 1 | **P0** | `UltimateConnector/Strategies/Dashboard/AwsQuickSightConnectionStrategy.cs:14-15` | Hardcoded `"ACCOUNT_ID"` literal in URL paths for `ProvisionDashboardAsync` and `PushDataAsync`. Placeholder never replaced — AWS rejects with 400/404. |
+| 1860 | 1 | **P0** | `UltimateConnector/Strategies/Dashboard/AwsQuickSightConnectionStrategy.cs:11,13` | `TestCoreAsync` always returns `true`; `GetHealthCoreAsync` always returns `Healthy`. No connectivity check performed. Rule 13 stubs. |
+| 1861 | 4 | **P0** | `UltimateConnector/Strategies/Dashboard/AwsQuickSightConnectionStrategy.cs:10` | No authentication applied to `HttpClient`. Config credentials (`AuthCredential`, `AuthMethod`) completely ignored. All QuickSight requests sent unsigned — AWS requires SigV4. |
+| 1862 | 7 | P1 | `UltimateConnector/Strategies/Dashboard/AwsQuickSight+ApacheSuperset` | `new HttpClient` per connection in both dashboard strategies. Socket exhaustion risk. No try/finally on construction path — leaked on exception. |
+| 1863 | 14 | P1 | `UltimateConnector/Strategies/Dashboard/ApacheSupersetConnectionStrategy.cs:10` | `config.ConnectionString` falls back to `"http://localhost:8088"` silently. Production traffic routed to localhost with no warning. |
+| 1864 | 6 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionAuditLogger.cs:57,221` | Fire-and-forget `_ = FlushAsync()` in timer callback and buffer overflow path. Exceptions silently swallowed — audit entries can be lost. |
+| 1865 | 2 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionAuditLogger.cs:225-232` | `DisposeAsync` race: entries enqueued after `_disposed = true` silently dropped because `FlushAsync` returns early on disposed flag. |
+| 1866 | 12 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionCircuitBreaker.cs:119-135` | Concurrent `RecordFailure` calls can both read same threshold — double `TripCircuit` produces two `OpenedAt` assignments, potentially delaying recovery. |
+| 1867 | 12 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionPoolManager.cs:104` | `ConcurrentQueue.Count` is O(n) and races with semaphore. Valid connections incorrectly discarded during concurrent returns. |
+| 1868 | 12 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionRateLimiter.cs:41-47` | `BurstSize = 0` creates `SemaphoreSlim(0,0)` which throws at construction. `TokensPerSecond = 0` permanently blocks strategy with no recovery. No validation. |
+| 1869 | 5 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionInterceptorPipeline.cs:99-219` | **SYSTEMIC across 5 methods:** `catch (Exception)` swallows `OperationCanceledException` in all interceptor execution methods. Cancellation treated as non-fatal warning; pipeline continues. |
+| 1870 | 6 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionMetricsCollector.cs:52` | Fire-and-forget timer `_ = PublishMetricsAsync()`. Low risk (internal catch), but unexpected exceptions outside inner try/catch silently swallowed. |
+| 1871 | 13 | P2 | `UltimateConnector/Strategies/CrossCutting/ConnectionMetricsCollector.cs:187-188` | `BuildSnapshot` does `LatencySamples.ToArray()` + `Array.Sort` per strategy per timer tick. With 1K samples × 1K strategies = 1M allocations every 15 seconds. |
+| 1872 | 5 | P2 | `UltimateConnector/Strategies/Dashboard/ApacheSupersetConnectionStrategy.cs:11` | `TestCoreAsync` bare `catch { return false; }` swallows `OperationCanceledException`. |
+| 1873 | 15 | P2 | `UltimateConnector/Strategies/Dashboard/AwsQuickSightConnectionStrategy.cs:13` | `GetHealthCoreAsync` unconditionally returns `ConnectionHealth(true, ...)` — contract lie misrepresenting health to all consumers. |
+
+**Clean files:** IConnectionInterceptor.cs (interface only), InterceptorContext.cs (DTOs only), ConnectionTagManager.cs (correct ConcurrentDictionary usage)
+
+---
+
+### Plugin Chunk 046 (15 files: ChronografConnectionStrategy–TableauConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 16 (1 P0, 8 P1, 5 P2, 2 LOW) — *consolidated from 47 raw findings; systemic Dashboard issues grouped*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1874 | 7 | P1 | `UltimateConnector/Strategies/Dashboard/*.cs` | **SYSTEMIC across all 15 files:** Every dashboard connector creates `new HttpClient()` per connection. Socket exhaustion at scale (hundreds of connectors). Affected: Chronograf, Databox, Domo, Geckoboard, Grafana, Klipfolio, Looker, Metabase, MicrosoftFabric, Mode, Plotly, PowerBi, Redash, Sisense, Tableau. |
+| 1875 | 7 | P1 | `UltimateConnector/Strategies/Dashboard/*.cs` | **SYSTEMIC across ~12 files:** `JsonDocument.Parse()` result never disposed in `ProvisionDashboardAsync`. Rented array buffers leak. Affected: Chronograf, Databox, Domo, Geckoboard, Grafana, Klipfolio, Looker, Metabase, Mode, Plotly, Redash, Sisense. |
+| 1876 | 15 | P1 | `UltimateConnector/Strategies/Dashboard/Databox,Geckoboard,Klipfolio,PowerBi` | **SYSTEMIC always-true health:** `TestCoreAsync` returns `true` unconditionally; `GetHealthCoreAsync` returns `Healthy` without any connectivity check. Contract lies — callers believe dashboard is reachable when it may not be. |
+| 1877 | 1 | **P0** | `UltimateConnector/Strategies/Dashboard/PowerBiConnectionStrategy.cs:~45` | Hardcoded `"TABLE_NAME"` placeholder in REST URL for `PushDataAsync`. Never replaced from config — Power BI rejects with 404. Rule 13 stub. |
+| 1878 | 1 | P1 | `UltimateConnector/Strategies/Dashboard/TableauConnectionStrategy.cs:~40` | Hardcoded `"SITE_ID"` placeholder in URL paths. Tableau Server rejects with 404 for non-existent site. |
+| 1879 | 5 | P1 | `UltimateConnector/Strategies/Dashboard/*.cs` | **SYSTEMIC across ~11 files:** Bare `catch { return false; }` or `catch { return Degraded; }` in `TestCoreAsync`/`GetHealthCoreAsync` swallows `OperationCanceledException`. Cancellation treated as unhealthy instead of propagated. |
+| 1880 | 14 | P1 | `UltimateConnector/Strategies/Dashboard/Chronograf,Domo,MicrosoftFabric` | Auth tokens/keys from config used without null/empty validation. Null token → `NullReferenceException` at runtime. Empty token → silent 401 from server. |
+| 1881 | 7 | P2 | `UltimateConnector/Strategies/Dashboard/*.cs` | **SYSTEMIC across ~10 files:** `HttpResponseMessage` from `PostAsync`/`GetAsync` not wrapped in `using`. Response body streams leak on error paths. |
+| 1882 | 7 | P2 | `UltimateConnector/Strategies/Dashboard/*.cs` | **SYSTEMIC across ~8 files:** `new StringContent(json, Encoding.UTF8, "application/json")` never disposed. Internal `MemoryStream` leaks. |
+| 1883 | 4 | P2 | `UltimateConnector/Strategies/Dashboard/Grafana,Metabase,Redash` | API keys placed in URL query parameters or basic auth without TLS enforcement. Keys logged by proxies/CDNs. |
+| 1884 | 14 | P2 | `UltimateConnector/Strategies/Dashboard/Looker,Sisense,Mode` | Dashboard IDs/names interpolated directly into URL paths without `Uri.EscapeDataString`. Path traversal via `../` or URL injection possible. |
+| 1885 | 13 | P2 | `UltimateConnector/Strategies/Dashboard/Plotly,Domo` | `GetHealthCoreAsync` uses `DateTimeOffset.UtcNow` subtraction instead of `Stopwatch` for latency measurement. Clock adjustments can yield negative/inaccurate latency. |
+| 1886 | 15 | LOW | `UltimateConnector/Strategies/Dashboard/MicrosoftFabricConnectionStrategy.cs:~15` | `ConnectionInfo` hardcodes `["workspaceId"] = "default"`. Production workspaces with non-default IDs silently misconfigured. |
+| 1887 | 15 | LOW | `UltimateConnector/Strategies/Dashboard/SisenseConnectionStrategy.cs:~20` | `GetHealthCoreAsync` returns `Healthy` when HTTP status is anything except 503. 401/403/500 all report as healthy. |
+
+**Clean files:** None — all 15 files have at least one systemic issue.
+
+---
+
+### Plugin Chunk 047 (15 files: CitusConnectionStrategy–HdfsConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 22 (2 P0, 14 P1, 6 P2, 0 LOW) — *Database + FileSystem strategies; mock-handle and SSRF patterns*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1888 | 1 | P1 | `UltimateConnector/Strategies/Database/MariaDb,Oracle,TiDb,Vitess` | **SYSTEMIC Rule 13 stubs:** `ExecuteQueryAsync` returns a fake `__status = "OPERATION_NOT_SUPPORTED"` dict row instead of throwing. Callers receive fabricated data indistinguishable from a real query result. |
+| 1889 | 1 | P1 | `UltimateConnector/Strategies/Database/MariaDb,Oracle,TiDb,Vitess` | **SYSTEMIC:** `ExecuteNonQueryAsync` returns `-1` to signal "not supported" instead of throwing. Callers checking `rowsAffected >= 0` silently believe no rows changed. |
+| 1890 | 15 | P1 | `UltimateConnector/Strategies/Database/MariaDb:75,Oracle:74,TiDb:70,Vitess:70` | **SYSTEMIC mock connections:** `ConnectCoreAsync` creates objects explicitly named `mockConnection` (MariaDbTcpConnection, OracleTcpConnection, etc.) stored in `DefaultConnectionHandle` and returned as real `IConnectionHandle`. Contract claims live DB connection; callers get admitted mocks. |
+| 1891 | 4 | P1 | `UltimateConnector/Strategies/FileSystem/CephConnectionStrategy.cs:24-26` | `config.ConnectionString` passed directly as `HttpClient.BaseAddress` without validation. SSRF — attacker-controlled string redirects to internal endpoints. No scheme/host allowlisting. |
+| 1892 | 4 | P1 | `UltimateConnector/Strategies/FileSystem/HdfsConnectionStrategy.cs:24-25` | Connection string naively split on `':'`, first token used as hostname without validation. Attacker input directs WebHDFS to internal network (SSRF). |
+| 1893 | 4 | P1 | `UltimateConnector/Strategies/FileSystem/GlusterFsConnectionStrategy.cs:51-55` | Auto-prefixes `http://` if no scheme present, then used as `HttpClient.BaseAddress` unvalidated. `169.254.169.254` becomes live SSRF target. |
+| 1894 | 7 | **P0** | `UltimateConnector/Strategies/FileSystem/CephConnectionStrategy.cs:24-26` | `ConnectCoreAsync` creates `HttpClient`, calls `GetAsync` — if that throws, no try/finally guards disposal. `HttpClient` leaks on network error. |
+| 1895 | 7 | **P0** | `UltimateConnector/Strategies/FileSystem/HdfsConnectionStrategy.cs:24-27` | Same pattern: `HttpClient` created, `GetAsync` awaited without try block. Leaks on failure path. |
+| 1896 | 7 | P1 | `UltimateConnector/Strategies/FileSystem/GlusterFsConnectionStrategy.cs:57-79` | `HttpClient` created, `GetAsync` + `EnsureSuccessStatusCode` can throw. No try/finally — `httpClient` leaks on error path. |
+| 1897 | 9 | P1 | `UltimateConnector/Strategies/FileSystem/CephConnectionStrategy.cs:25,29` | `ConnectCoreAsync` discards `HttpResponseMessage` without status check — 401/500 silently accepted. `TestCoreAsync` treats all non-503 as healthy (401/403/500 pass). |
+| 1898 | 9 | P1 | `UltimateConnector/Strategies/FileSystem/HdfsConnectionStrategy.cs:26` | `ConnectCoreAsync` ignores `HttpResponseMessage` — no `IsSuccessStatusCode` check. Broken namenode (503/401) silently accepted as connected. |
+| 1899 | 9 | P2 | `UltimateConnector/Strategies/Database/TimescaleDbConnectionStrategy.cs:138-139` | `GetHealthCoreAsync` queries `pg_extension WHERE extname='timescaledb'` — if absent, reports `IsHealthy: true` with version "Unknown". Plain PostgreSQL without TimescaleDB passes as healthy. |
+| 1900 | 9 | P2 | `UltimateConnector/Strategies/Database/CitusConnectionStrategy.cs:128-132` | Same: queries `pg_extension WHERE extname='citus'` — absent extension reports healthy with "Unknown" version. Bare PostgreSQL passes as Citus. |
+| 1901 | 14 | P1 | `UltimateConnector/Strategies/Database/SqliteConnectionStrategy.cs:247` | `PRAGMA table_info('{tableName}')` uses string interpolation. Table names with single-quotes break syntax or risk injection. |
+| 1902 | 14 | P2 | `UltimateConnector/Strategies/Database/MariaDb:59,Oracle:255-269` | Connection string parsers accept empty hostnames without validation. Empty host → `TcpClient.ConnectAsync("")` → obscure exception instead of clear validation error. |
+| 1903 | 13 | P2 | `UltimateConnector/Strategies/Database/MariaDb:88,Oracle:81,TiDb:75,Vitess:75` | `TestCoreAsync` creates new `TcpClient` per health check — full TCP handshake every poll. Wastes ephemeral ports under frequent monitoring. |
+| 1904 | 13 | P2 | `UltimateConnector/Strategies/FileSystem/GlusterFsConnectionStrategy.cs:121-135` | `GetHealthCoreAsync` uses `DateTimeOffset.UtcNow` subtraction instead of `Stopwatch`. NTP/clock adjustments → negative/inaccurate latency. |
+| 1905 | 11 | P2 | `UltimateConnector/Strategies/FileSystem/Ceph:11,Hdfs:11,GlusterFs:15` | Non-sealed leaf strategies (all peers are `sealed`). Allows accidental subclassing bypassing base-class lifecycle hooks. |
+| 1906 | 2 | P1 | `UltimateConnector/Strategies/FileSystem/Ceph:24-32,GlusterFs:102,Hdfs:31` | `HttpClient` Dispose in `DisconnectCoreAsync` races with concurrent `TestCoreAsync`/`GetHealthCoreAsync`. No synchronization guard → `ObjectDisposedException`. |
+
+**Clean files:** PostgreSqlConnectionStrategy, SqlServerConnectionStrategy, MySqlConnectionStrategy, CockroachDbConnectionStrategy, YugabyteDbConnectionStrategy (all use real ADO.NET drivers with parameterized queries and proper disposal)
+
+---
+
+### Plugin Chunk 048 (15 files: LustreConnectionStrategy–AutomatedApiHealingStrategy)
+**Files Reviewed:** 15 | **Findings:** 22 (1 P0, 11 P1, 8 P2, 2 LOW) — *consolidated from 31 raw findings; FileSystem/Healthcare/Innovations strategies*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1907 | 7 | P1 | `UltimateConnector/Strategies/FileSystem/MinioConnectionStrategy.cs:69-126` | `HttpResponseMessage` from `SendAsync` never disposed — both initial and retry responses leak. |
+| 1908 | 7 | P1 | `UltimateConnector/Strategies/FileSystem/MinioFsConnectionStrategy.cs:24-27` | `HttpResponseMessage` from `GetAsync` discarded without disposal. Unconditional leak. |
+| 1909 | 7 | P1 | `UltimateConnector/Strategies/Healthcare/CdaConnectionStrategy.cs:23-26,X12ConnectionStrategy.cs:22-25` | **SYSTEMIC:** `GetAsync("/")` result discarded without disposal in `ConnectCoreAsync`. Unconditional response leak in both files. |
+| 1910 | 7 | P1 | `UltimateConnector/Strategies/Healthcare/FhirR4ConnectionStrategy.cs:64` | `JsonDocument.Parse()` result never disposed after `RootElement.Clone()`. Rented array buffers leak until GC. |
+| 1911 | 4 | P1 | `UltimateConnector/Strategies/FileSystem/MinioConnectionStrategy.cs:66-67` | MinIO auth uses HTTP Basic instead of AWS SigV4 (HMAC-SHA256). Implementation non-functional against real MinIO. |
+| 1912 | 12 | **P0** | `UltimateConnector/Strategies/Innovations/AdaptiveCircuitBreakerStrategy.cs:101-104` | `connectionId = $"cb-{Guid.NewGuid():N}"` then `TryGetValue(connectionId,...)` — fresh GUID never exists in `_states`. Breaker pre-check is dead code. Circuit breaker open-state check never executes; state never persists across reconnects to same endpoint. |
+| 1913 | 5 | P1 | `UltimateConnector/Strategies/Innovations/AdaptiveCircuitBreakerStrategy.cs:239` | `TestCoreAsync` bare `catch` swallows `OperationCanceledException`. Cancellation indistinguishable from circuit rejection. |
+| 1914 | 5 | P1 | `UltimateConnector/Strategies/Innovations/AdaptiveProtocolNegotiationStrategy.cs:93-106` | Protocol probe `catch` swallows `OperationCanceledException`. Cancelled probes return `IsSupported=false` instead of propagating cancellation. |
+| 1915 | 7 | P1 | `UltimateConnector/Strategies/Innovations/AutomatedApiHealingStrategy.cs:132-137` | `StringContent` created and passed to `PostAsync` never disposed. |
+| 1916 | 2 | P1 | `UltimateConnector/Strategies/Innovations/AdaptiveCircuitBreakerStrategy.cs:299-356` | `BreakerState` fields (FailureCount, SuccessStreak, State, OpenedAt, etc.) mutated from concurrent paths without locking. `TotalRequests++` is non-atomic `long` increment. Torn reads/lost updates under load. |
+| 1917 | 14 | P1 | `UltimateConnector/Strategies/FileSystem+Healthcare/Nfs,Smb,Dicom,Hl7v2,Ncpdp` | **SYSTEMIC across 5 TCP strategies:** `ConnectionString.Split(':')` with no null/empty guard. Empty hostname → cryptic DNS error. Port `int.Parse` has no range validation (1-65535). |
+| 1918 | 9 | P1 | `UltimateConnector/Strategies/Innovations/AutomatedApiHealingStrategy.cs:169-205` | No null guard on `sessionId` from `ConnectionInfo`. Missing key → URL contains literal `null` → silent wrong request. Affects TestCoreAsync, DisconnectCoreAsync, GetHealthCoreAsync. |
+| 1919 | 15 | P2 | `UltimateConnector/Strategies/FileSystem+Healthcare/Nfs,Smb,Dicom,Hl7v2,Ncpdp` | **SYSTEMIC across 5 TCP strategies:** `TestCoreAsync` returns `TcpClient.Connected` (stale cached flag, not live probe). `GetHealthCoreAsync` reports `Latency: TimeSpan.Zero` unconditionally (fabricated). Health checks dishonest for dead connections. |
+| 1920 | 4 | P2 | `UltimateConnector/Strategies/FileSystem/MinioConnectionStrategy.cs:76` | Access key stored in plain-text in `ConnectionInfo` dictionary — visible to health check serialization/logging. |
+| 1921 | 1 | P2 | `UltimateConnector/Strategies/Healthcare/Dicom:57,Hl7v2:87,FhirR4:55` | `await Task.CompletedTask; // Make async for consistency` — no-op await to suppress warning. Artificial async. |
+| 1922 | 15 | P2 | `UltimateConnector/Strategies/Innovations/AdaptiveProtocolNegotiationStrategy.cs:225-231` | WebSocket probe uses `OPTIONS` request — cannot determine actual WebSocket Upgrade support. False positives likely. |
+| 1923 | 5 | P2 | `UltimateConnector/Strategies/Innovations/AutomatedApiHealingStrategy.cs:283,299,336` | **SYSTEMIC across 3 methods:** `DetectApiVersionAsync`, `CheckDeprecationAsync`, `CaptureBaselineSchemaAsync` all have bare `catch` swallowing `OperationCanceledException`. |
+| 1924 | 9 | P2 | `UltimateConnector/Strategies/Innovations/AdaptiveProtocolNegotiationStrategy.cs:161-165` | `TestCoreAsync` doesn't catch exceptions — network errors propagate instead of returning `false`. Breaks health check contract. |
+| 1925 | 7 | P2 | `UltimateConnector/Strategies/Innovations/AutomatedApiHealingStrategy.cs:189` | `reportResponse` from `GetAsync` in `DisconnectCoreAsync` neither read nor disposed — purposeless fetch + resource leak. |
+| 1926 | 13 | LOW | `UltimateConnector/Strategies/FileSystem/LustreConnectionStrategy.cs:155` | `GetFileSystemInfos()` on Lustre mount (potentially millions of entries) just to count for status message. Blocks calling thread. |
+| 1927 | 13 | LOW | `UltimateConnector/Strategies/Healthcare/DicomConnectionStrategy.cs:123` | Text tags parsed into new `string` objects up to 1023 bytes each — GC pressure on large DICOM batch parsing. |
+
+**Clean files:** HealthcareDataTypes.cs (pure data records)
+
+---
+
+### Plugin Chunk 049 (15 files: BatteryConsciousHandshakeStrategy–PredictivePoolWarmingStrategy)
+**Files Reviewed:** 15 | **Findings:** 25 (0 P0, 10 P1, 12 P2, 3 LOW) — *consolidated from 49 raw findings; Innovations strategies*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1928 | 7 | P1 | `UltimateConnector/Strategies/Innovations/BatteryConsciousHandshakeStrategy.cs:123-132` | `StringContent` and `HttpResponseMessage` from `PostAsync` never disposed. Leaks in `ConnectCoreAsync`. Same `HttpResponseMessage` leak in `TestCoreAsync:155`. |
+| 1929 | 7 | P1 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:101,117` | `HttpClient` leaks if `AnalyzeBgpPathAsync` throws (no try/finally). `HttpResponseMessage` from `GetAsync` never disposed. |
+| 1930 | 5 | P1 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:221-224,249` | **SYSTEMIC:** Outer `catch (Exception)` silently returns empty `BgpPathAnalysis` — sovereignty policy enforcement bypassed. `ResolveAsnCountryAsync` bare `catch { }` swallows cancellation, returning empty country → false-negative compliance. |
+| 1931 | 6 | P1 | `UltimateConnector/Strategies/Innovations/ChameleonProtocolEmulatorStrategy.cs:93,183` | **Two fire-and-forget tasks:** `_ = RunProtocolEmulatorAsync(...)` and `_ = HandleLegacyClientAsync(...)`. Exceptions silently kill emulator loop and per-client handling with no indication. |
+| 1932 | 6 | P1 | `UltimateConnector/Strategies/Innovations/PassiveEndpointFingerprintingStrategy.cs:129` | `_ = Task.Run(() => PassiveMonitorLoopAsync(...), CancellationToken.None)` — discarded task. Monitor loop dies silently on unobserved exceptions. |
+| 1933 | 6 | P1 | `UltimateConnector/Strategies/Innovations/PidAdaptiveBackpressureStrategy.cs:138` | `_ = Task.Run(() => MonitorAckRateLoopAsync(...), CancellationToken.None)` — same fire-and-forget pattern. PID monitoring dies silently. |
+| 1934 | 6 | P1 | `UltimateConnector/Strategies/Innovations/PredictivePoolWarmingStrategy.cs:130` | `_ = Task.Run(() => PoolScalingLoopAsync(...), CancellationToken.None)` — same. Pool scaling loop dies silently. |
+| 1935 | 2 | P1 | `UltimateConnector/Strategies/Innovations/PassiveEndpointFingerprintingStrategy.cs:437-448` | `FingerprintState` fields (CompositeScore, IsDegraded, TotalProbes, etc.) written by background loop, read from health check path — no synchronization. Torn reads on non-atomic types. |
+| 1936 | 2 | P1 | `UltimateConnector/Strategies/Innovations/PidAdaptiveBackpressureStrategy.cs:380-395` | `PidConnectionState` fields (MeasuredAckRate, CurrentWindowKb, PidOutput, etc.) accessed from background loop and public methods without synchronization. |
+| 1937 | 4 | P1 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:86` | `bgp_looking_glass_url` user-configurable, used directly in HTTP requests without URL validation. SSRF — attacker redirects BGP lookups to internal server, fabricating compliance results. |
+| 1938 | 7 | P2 | `UltimateConnector/Strategies/Innovations/*.cs` | **SYSTEMIC across ~10 files:** `StringContent` created for `PostAsync` never disposed. Affects: BgpAware, ConnectionDigitalTwin, ConnectionTelemetryFabric, DataSovereignty, FederatedMultiSource, IntentBasedServiceDiscovery, NeuralProtocolTranslation, PredictiveMultipathing. |
+| 1939 | 7 | P2 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:136,186,236` | **Multiple HttpResponseMessage leaks:** response objects from `GetAsync` calls in TestCoreAsync, AnalyzeBgpPathAsync, and ResolveAsnCountryAsync (called in loop per ASN) never disposed. |
+| 1940 | 12 | P2 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:244-247` | Country code extraction takes first 2 chars of `holder` field (free-text name like "COMCAST"). Not an ISO-3166 code. Completely incorrect compliance decisions — should use `country` property from RIPE stat API. |
+| 1941 | 5 | P2 | `UltimateConnector/Strategies/Innovations/ChameleonProtocol:98,InverseMux:178,PidBackpressure:260,PredictivePoolWarming:260` | **SYSTEMIC across 4 files:** Bare `catch { }` in probe/monitor loops swallows `OperationCanceledException`. |
+| 1942 | 2 | P2 | `UltimateConnector/Strategies/Innovations/PredictiveFailoverStrategy.cs:312-323` | `FailoverState` fields mutated in `AttemptFailoverAsync` and read concurrently in `GetHealthCoreAsync`. No synchronization. |
+| 1943 | 2 | P2 | `UltimateConnector/Strategies/Innovations/PredictivePoolWarmingStrategy.cs:384-399` | `CurrentPoolSize` set via plain assignment while `ActiveConnections` uses `Interlocked`. Inconsistent concurrency model — torn write possible on 32-bit. |
+| 1944 | 13 | P2 | `UltimateConnector/Strategies/Innovations/BgpAwareGeopoliticalRoutingStrategy.cs:204-217` | `ResolveAsnCountryAsync` called sequentially per ASN. N sequential HTTP requests → O(N) latency. Should parallelize with `Task.WhenAll`. |
+| 1945 | 13 | P2 | `UltimateConnector/Strategies/Innovations/PredictivePoolWarmingStrategy.cs:378-380` | `GetCoveragePercent` iterates all 1440 elements with LINQ `.Count(c => c > 0)` inside lock on every health check. Should maintain counter for O(1). |
+| 1946 | 14 | P2 | `UltimateConnector/Strategies/Innovations/BatteryConsciousHandshakeStrategy.cs:107` | `config.Timeout.TotalSeconds` could be zero/negative → `TimeSpan.FromSeconds()` throws. No validation. |
+| 1947 | 14 | P2 | `UltimateConnector/Strategies/Innovations/InverseMultiplexingStrategy.cs:75` | `parityRatio` from config never validated >= 1. Value of 0 → empty assignments list → only parity chunk created. |
+| 1948 | 4 | P2 | `UltimateConnector/Strategies/Innovations/NeuralProtocolTranslationStrategy.cs:129` | `llm_endpoint` user-configurable, sent as-is to translation server. Second-order SSRF if server makes outbound requests. |
+| 1949 | 7 | P2 | `UltimateConnector/Strategies/Innovations/PredictiveMultipathingStrategy.cs:253-264` | `ProbePathAsync` creates new `HttpClient` per probe call (called per endpoint per connect). Socket exhaustion under load. Response from `SendAsync` not disposed. |
+| 1950 | 12 | LOW | `UltimateConnector/Strategies/Innovations/PidAdaptiveBackpressureStrategy.cs:300` | PID sign inversion: comment says "positive error = slow down (reduce window)" but code adds positive PID output to increase window. Sign contradicts documentation. |
+| 1951 | 12 | LOW | `UltimateConnector/Strategies/Innovations/PredictiveMultipathingStrategy.cs:267` | `IsReachable` set only from first probe. If first fails but subsequent succeed, path incorrectly discarded. |
+| 1952 | 15 | LOW | `UltimateConnector/Strategies/Innovations/PredictivePoolWarmingStrategy.cs:347-359` | `PredictDemand` returns maximum (peak) demand, not total. Comment says "total demand" — misleading naming affecting scaling decisions. |
+
+**Clean files:** None — all 15 have at least one issue. ConnectionDigitalTwinStrategy, ConnectionTelemetryFabricStrategy, DataSovereigntyRouterStrategy, FederatedMultiSourceQueryStrategy, IntentBasedServiceDiscoveryStrategy have only minor StringContent disposal issues.
+
+---
+
+### Plugin Chunk 050 (15 files: QuantumSafeConnectionStrategy–LoRaWanConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 22 (0 P0, 12 P1, 8 P2, 2 LOW) — *consolidated from 30 raw; Innovations (remaining) + IoT strategies*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1953 | 1 | P1 | `UltimateConnector/Strategies/IoT/AmqpIoT,BacNet,CoAp,Knx` | **SYSTEMIC Rule 13 stubs across 4 IoT strategies:** `ReadTelemetryAsync` returns static metadata dictionaries without performing any wire protocol I/O. `SendCommandAsync` returns fabricated "queued" JSON without sending commands. No AMQP/BACnet-IP/CoAP/KNX protocol frames built or transmitted. |
+| 1954 | 4 | P1 | `UltimateConnector/Strategies/Innovations/QuantumSafeConnectionStrategy.cs:97-99` | `RemoteCertificateValidationCallback` only checks `SslPolicyErrors.None` — no cert pinning, no CA chain enforcement, no revocation check. For a quantum-safe FIPS-203 strategy, MITM can still intercept PQC handshake payload. |
+| 1955 | 4 | P1 | `UltimateConnector/Strategies/Innovations/ZeroTrustConnectionMeshStrategy.cs:233-235` | Same: no cert pinning in mTLS validation. Zero Trust strategy advertising NIST 800-207 compliance silently accepts any valid chain — contradicts "never trust, always verify". |
+| 1956 | 4 | P1 | `UltimateConnector/Strategies/Innovations/UniversalCdcEngineStrategy.cs:122-123` | Full database `connection_string` (may contain passwords) serialized verbatim into JSON payload sent to CDC coordinator endpoint. Credential leak to third-party. |
+| 1957 | 4 | P1 | `UltimateConnector/Strategies/Innovations/ZeroTrustConnectionMeshStrategy.cs:256-257` | `device_id` = `MachineName + "-" + UserName` (PII) sent in plain-text JSON to remote policy endpoint. No signing/attestation — trivially spoofable. |
+| 1958 | 2 | P1 | `UltimateConnector/Strategies/Innovations/SelfHealingConnectionPoolStrategy.cs:231-256` | `PoolMetrics` fields mutated from timer callback (background) and `TestCoreAsync` (caller) without synchronization. EMA calculations and circuit-breaker state corrupted under concurrency. |
+| 1959 | 2 | P1 | `UltimateConnector/Strategies/IoT/LoRaWanConnectionStrategy.cs:175-210` | `LoRaDevice` record mutated (`FrameCounterUp++`, LastRssi, LastSnr, DataRate, LastSeen) without synchronization. Concurrent uplinks race — lost frame counter increments allow replay attacks. |
+| 1960 | 2 | P1 | `UltimateConnector/Strategies/IoT/LoRaWanConnectionStrategy.cs:240-258` | `ProcessAdr` TOCTOU: reads `SnrHistory.Count` outside lock, then acquires lock for sum. Concurrent updates between locks produce inconsistent ADR calculations. |
+| 1961 | 7 | P1 | `UltimateConnector/Strategies/IoT/AwsIoTCore,AzureIoTHub,GoogleIoT` | **SYSTEMIC across 3 files:** `new HttpClient` per connection without `IHttpClientFactory`. Socket exhaustion from TIME_WAIT accumulation. |
+| 1962 | 12 | P1 | `UltimateConnector/Strategies/IoT/AwsIoTCore:64,AzureIoTHub:37,GoogleIoT:34` | **SYSTEMIC:** `TestCoreAsync` returns `true` for any non-503 status (401/403/404 report as healthy). |
+| 1963 | 12 | P1 | `UltimateConnector/Strategies/IoT/AwsIoTCore:130,AzureIoTHub:93,GoogleIoT:91` | **SYSTEMIC:** `SendCommandAsync` uses GET instead of POST on AWS Jobs/Azure Direct Methods/Google sendCommand endpoints. Wrong HTTP verb → 405 or silent wrong behavior. Returns fabricated "queued" regardless of outcome. |
+| 1964 | 5 | P2 | `UltimateConnector/Strategies/Innovations/ZeroTrustConnectionMeshStrategy.cs:286-289` | Timer callback in `StartContinuousReauth` catches all exceptions silently. Failed re-auth → token silently expires while connection reports healthy. |
+| 1965 | 5 | P2 | `UltimateConnector/Strategies/Innovations/SelfHealingConnectionPoolStrategy.cs:278-284` | Timer callback catches all exceptions with bare `catch { }`. Exception swallowed without logging — impossible to distinguish network errors from bugs. |
+| 1966 | 4 | P2 | `UltimateConnector/Strategies/Innovations/UniversalCdcEngineStrategy.cs:30-41` | `DetectDatabaseType` uses brittle substring matching on connection string. `"host="` matches PostgreSQL even in `"targethost=sqlserver"`. Wrong CDC method silently configured. |
+| 1967 | 14 | P2 | `UltimateConnector/Strategies/IoT/AmqpIoT:42,BacNet:42,CoAp:103,Knx:27,LoRaWan:35` | **SYSTEMIC across 5 IoT files:** `ConnectionString.Split(':')` with no null check. Null → `NullReferenceException`. `int.Parse(parts[1])` has no TryParse/range validation. |
+| 1968 | 12 | P2 | `UltimateConnector/Strategies/IoT/CoApConnectionStrategy.cs:96-98` | `GetNextMessageId()` non-thread-safe `ushort` increment. Concurrent calls produce duplicate CoAP message IDs, breaking deduplication. |
+| 1969 | 15 | P2 | `UltimateConnector/Strategies/IoT/BacNet:46,CoAp:136,Knx:28` | **SYSTEMIC:** `UdpClient.Connect()` always succeeds regardless of device existence. Strategies report successful connection for any syntactically valid address. |
+| 1970 | 10 | P2 | `UltimateConnector/Strategies/IoT/LoRaWanConnectionStrategy.cs:100-137` | `ProcessOtaaJoin` doesn't verify MIC (Message Integrity Code). Any arbitrary device can join and obtain session keys without AppKey validation. Fundamental LoRaWAN security breach. |
+| 1971 | 10 | P2 | `UltimateConnector/Strategies/IoT/LoRaWanConnectionStrategy.cs:175-195` | `ProcessUplink` doesn't check incoming frame counter > stored counter. Missing monotonicity check allows replay attacks. |
+| 1972 | 15 | P2 | `UltimateConnector/Strategies/Innovations/SelfHealingConnectionPoolStrategy.cs:253-256` | `TotalHealedConnections` incremented on degradation detection, not actual healing. Metric name lies — misleads operators. |
+| 1973 | 15 | LOW | `UltimateConnector/Strategies/Innovations/SemanticTrafficCompressionStrategy.cs:34-45` | `PayloadProfiles` static `Dictionary` is mutable. Should be `IReadOnlyDictionary` or `FrozenDictionary`. |
+| 1974 | 4 | LOW | `UltimateConnector/Strategies/Innovations/ZeroTrustConnectionMeshStrategy.cs:141-151` | `session_token` stored in `ConnectionInfo` dictionary — exposed via APIs/logging. Should be held in private field. |
+
+**Clean files:** SchemaEvolutionTrackerStrategy.cs, TimeTravelQueryStrategy.cs, SemanticTrafficCompressionStrategy.cs (mostly clean, minor issues only)
+
+---
+
+### Plugin Chunk 051 (15 files: ModbusConnectionStrategy–SmtpConnectionStrategy)
+**Files Reviewed:** 15 | **Findings:** 22 (2 P0, 13 P1, 7 P2, 0 LOW) — *consolidated from 32 raw; IoT (remaining) + Legacy strategies*
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1975 | 1 | P1 | `UltimateConnector/Strategies/IoT/Modbus,MqttIoT,OpcUa,Zigbee` | **SYSTEMIC Rule 13 stubs across 4 IoT strategies:** `ReadTelemetryAsync` returns static metadata without reading Modbus registers / subscribing MQTT topics / performing OPC UA session / sending Zigbee cluster commands. `SendCommandAsync` returns fabricated "queued" JSON without wire activity. Zero protocol framing implemented. |
+| 1976 | 12 | **P0** | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:21-26` | Mutable instance fields (`_host`, `_port`, `_username`, `_password`, `_useSsl`, `_useFtps`) set in `ConnectCoreAsync`. Strategy instances are shared — concurrent connections overwrite fields. All subsequent operations (Download, Upload, List, Delete) use wrong host/credentials. Data-loss/mis-routing race. Same defect in `LdapConnectionStrategy.cs:19-25`. |
+| 1977 | 12 | **P0** | `UltimateConnector/Strategies/Legacy/LdapConnectionStrategy.cs:19-25` | Same mutable instance-field race as #1976. Fields `_host`, `_port`, `_baseDn`, `_bindDn`, `_bindPassword`, `_useSsl` overwritten by concurrent `ConnectCoreAsync`. Search/Add/Modify/Delete silently operate with wrong credentials. |
+| 1978 | 2 | P1 | `UltimateConnector/Strategies/Legacy/SmtpConnectionStrategy.cs:20-25` | Same mutable instance-field pattern. `_host`, `_port`, `_username`, `_password`, `_useSsl` written without synchronization, read from Test/Health/SendEmail concurrently. |
+| 1979 | 1 | P1 | `UltimateConnector/Strategies/Legacy/LdapConnectionStrategy.cs:120-215` | **SYSTEMIC Rule 13 stubs:** `SearchAsync` returns empty list with `Success=true`. `AddEntryAsync`, `ModifyEntryAsync`, `DeleteEntryAsync` all return `Success=true` unconditionally. No LDAP operations performed. Code explicitly comments "In a real implementation, this would use System.DirectoryServices.Protocols". |
+| 1980 | 4 | P1 | `UltimateConnector/Strategies/Legacy/LdapConnectionStrategy.cs:204-215` | **Authentication bypass:** `BindAsync` returns `Success = !string.IsNullOrEmpty(dn)` — any non-empty DN with ANY password accepted. No LDAP Bind PDU sent. If downstream trusts this result for auth, complete bypass. |
+| 1981 | 12 | P1 | `UltimateConnector/Strategies/Legacy/CobolCopybookConnectionStrategy.cs:71` | `GetHashCode() % 1000` used as COBOL record byte offset. `string.GetHashCode()` is randomized per-process in .NET Core — offset changes every restart. Reads point to different data each run. |
+| 1982 | 4 | P1 | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:127-148` | Path traversal: `remotePath` parameter interpolated directly into FTP URL without sanitization. `/../secret` or absolute paths pass through. |
+| 1983 | 4 | P1 | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:160-183` | Arbitrary file write: `localPath` parameter used in `File.Create()` without validation. `../../etc/passwd` overwrites arbitrary files. |
+| 1984 | 4 | P1 | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:195-222` | Arbitrary file read: `localPath` parameter used to read files for upload without sanitization. Attacker-controlled path reads arbitrary local files. |
+| 1985 | 4 | P1 | `UltimateConnector/Strategies/Legacy/EdiConnectionStrategy.cs:44` | `DateTime.Now` (local time) used for ISA/GS interchange control timestamps instead of `DateTime.UtcNow`. DST shifts produce incorrect control numbers, breaking trading-partner validation. |
+| 1986 | 7 | P1 | `UltimateConnector/Strategies/Legacy/EdiConnectionStrategy.cs:22-26` | `new HttpClient` per connection + `GetResponseAsync()` response never disposed before handle creation. Socket exhaustion + response leak. |
+| 1987 | 14 | P1 | `UltimateConnector/Strategies/Legacy+IoT/As400,Cics,Db2Mainframe,Ims,Zigbee,Modbus,MqttIoT,OpcUa` | **SYSTEMIC across 8 files:** `ConnectionString.Split(':')` with no null/empty guard → `NullReferenceException`. `int.Parse(parts[1])` with no TryParse/range validation → cryptic `FormatException`. |
+| 1988 | 14 | P1 | `UltimateConnector/Strategies/Legacy/AzureIoTHubConnectionStrategy.cs:27-28` | No null-guard on `config.ConnectionString` before `.Contains()` call → `NullReferenceException`. |
+| 1989 | 5 | P2 | `UltimateConnector/Strategies/Legacy/FtpSftp:70,240;Ldap:68;Smtp:64;Odbc:57;OleDb:60` | **SYSTEMIC across 6 files:** Bare `catch { return false; }` in `TestCoreAsync` swallows `OperationCanceledException`. Cancellation treated as unhealthy instead of propagated. |
+| 1990 | 5 | P2 | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:240-241` | `DeleteFileAsync` bare `catch { return false; }` swallows cancellation. |
+| 1991 | 7 | P2 | `UltimateConnector/Strategies/Legacy/FtpSftpConnectionStrategy.cs:204` | `request.GetRequestStream()` is synchronous blocking call. If `GetResponseAsync` throws after stream write, FTP connection not torn down cleanly. |
+| 1992 | 14 | P2 | `UltimateConnector/Strategies/Legacy/SmtpConnectionStrategy.cs:81` | `_port` defaults to 0 if `ConnectionString` has no port in split — `TcpClient.ConnectAsync(host, 0)` throws unhelpful error instead of clear validation message. |
+| 1993 | 14 | P2 | `UltimateConnector/Strategies/Legacy/EdiConnectionStrategy.cs:44` | Hardcoded sender/receiver identifiers "SENDER"/"RECEIVER" in ISA segment. Not configurable from connection config — will fail trading partner EDI validation. |
+| 1994 | 14 | P2 | `UltimateConnector/Strategies/Legacy/CobolCopybookConnectionStrategy.cs:61` | No validation that COBOL copybook field names/types are syntactically valid. Empty or special-character field names produce malformed READ commands. |
+
+**Clean files:** OdbcConnectionStrategy (only P2 cancellation swallow), OleDbConnectionStrategy (same), CicsConnectionStrategy, Db2MainframeConnectionStrategy, ImsConnectionStrategy (only shared port-parse gap)
+
+---
+
+### Plugin Chunk 052 (15 files: Legacy/Tn3270–Messaging/RabbitMq)
+
+**Files Reviewed:** 15 | **Findings:** 39 (3 P0, 21 P1, 13 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 1995 | 14 | P0 | `UltimateConnector/Strategies/Legacy/Tn3270ConnectionStrategy.cs:26` | `config.ConnectionString.Split(':')` with no null/empty guard — empty string produces `parts[0]=""`, `ConnectAsync("")` throws `SocketException`. **SYSTEMIC: same in Tn5250:26, VSAM:24.** |
+| 1996 | 12 | P0 | `UltimateConnector/Strategies/Messaging/ActiveMqConnectionStrategy.cs:168-174` | `ExtractMessageBody` uses magic `bodyStart = Math.Min(20, payload.Length-1)` — always returns garbage bytes at offset 20 regardless of OpenWire frame structure. Messages delivered with corrupted content. **Same in ApachePulsar:151.** |
+| 1997 | 12 | P0 | `UltimateConnector/Strategies/Messaging/ApacheRocketMqConnectionStrategy.cs:113-115` | `ExtractRocketMqMessage` bounds check inverted: `headerLength + 4 < response.Length` should be `<=`. Empty-body messages silently dropped. |
+| 1998 | 2 | P1 | `UltimateConnector/Strategies/Messaging/MqttConnectionStrategy.cs:21,64` | `_packetId` (ushort) incremented via `++` with no thread sync. Concurrent `SubscribeAsync` calls race, producing duplicate MQTT packet IDs → broker disconnect. |
+| 1999 | 4 | P1 | `UltimateConnector/Strategies/Messaging/ConfluentCloudConnectionStrategy.cs:23-44` | SASL handshake initiated but credentials never sent. Connection proceeds with incomplete SASL exchange — either fails or falls through unauthenticated. |
+| 2000 | 4 | P1 | `UltimateConnector/Strategies/Messaging/AzureEventGridConnectionStrategy.cs:28-30` | SAS key from `config.AuthCredential` used with no null/empty validation. Null key produces unauthenticated requests; `TestCoreAsync` reports healthy (only checks non-503). |
+| 2001 | 4 | P1 | `UltimateConnector/Strategies/Messaging/AwsEventBridgeConnectionStrategy.cs:23` | No AWS authentication — `HttpClient` created without SigV4 signing or any credentials. All requests rejected with 403, but `TestCoreAsync` treats 403 as healthy. |
+| 2002 | 9 | P1 | `UltimateConnector/Strategies/Messaging/AwsEventBridge:24,AzureEventGrid:33,GooglePubSub:31` | **SYSTEMIC:** `response.StatusCode != ServiceUnavailable` as health check — 401/403/404/500 all reported as "healthy". |
+| 2003 | 7 | P1 | `UltimateConnector/Strategies/Messaging/AwsEventBridge:23,AzureEventGrid:27,GooglePubSub:26` | **SYSTEMIC:** `HttpClient` created in `ConnectCoreAsync` — if connect succeeds but later step throws, `HttpClient` leaked. No dispose on connection loss. |
+| 2004 | 7 | P1 | `UltimateConnector/Strategies/Legacy+Messaging/Tn3270:27,Tn5250:27,VSAM:25,ActiveMq:28,AmazonMsk:28,ApachePulsar:31,ApacheRocketMq:23,ConfluentCloud:28,Mqtt:28` | **SYSTEMIC across 9 files:** `TcpClient` created but if `ConnectAsync` throws, `TcpClient` not disposed. No `using` or try/finally. |
+| 2005 | 12 | P1 | `UltimateConnector/Strategies/Messaging/AmazonMskConnectionStrategy.cs:90` | `SubscribeAsync` fetch offset hardcoded to `0L` on every iteration — consumer never advances, infinite duplicate delivery. **Same in ConfluentCloud:105.** |
+| 2006 | 12 | P1 | `UltimateConnector/Strategies/Messaging/ApachePulsarConnectionStrategy.cs:51-53` | `PublishAsync` sends PRODUCER command on every call — re-registers producer each time, exhausting server producer IDs. |
+| 2007 | 1 | P1 | `UltimateConnector/Strategies/Messaging/ActiveMqConnectionStrategy.cs:100-108` | `BuildOpenWireWireFormatInfo` writes placeholder string — comment says "Simplified wire format". Rule 13 stub; will fail OpenWire negotiation. |
+| 2008 | 1 | P1 | `UltimateConnector/Strategies/Messaging/ActiveMqConnectionStrategy.cs:168-175` | `ExtractMessageBody` explicitly commented "Simplified extraction - real impl would parse full OpenWire format". Rule 13 placeholder. |
+| 2009 | 1 | P1 | `UltimateConnector/Strategies/Messaging/ApachePulsarConnectionStrategy.cs:151` | `ExtractPulsarMessagePayload` uses `Math.Min(20, frame.Length-1)` as hardcoded offset — no protocol parsing. Rule 13 stub returning wrong data. |
+| 2010 | 12 | P1 | `UltimateConnector/Strategies/Messaging/ApachePulsarConnectionStrategy.cs:107-121` | `BuildPulsarCommand` size calculation wrong: claims 4 bytes for `commandType` but writes 1 byte. Frame header incorrect → broker rejects. |
+| 2011 | 10 | P1 | `UltimateConnector/Strategies/Messaging/AmazonMskConnectionStrategy.cs:119-136` | `HostToNetworkOrder` returns big-endian int, but `BinaryWriter.Write(int)` writes little-endian — conversion immediately undone. Kafka message set malformed. **Same in ConfluentCloud:148.** |
+| 2012 | 10 | P1 | `UltimateConnector/Strategies/Messaging/AmazonMskConnectionStrategy.cs:47-48` | Request header fields (`short`, `int`) written in little-endian via `BinaryWriter` but Kafka protocol is big-endian. All requests malformed. **Same in ConfluentCloud:61-66.** |
+| 2013 | 4 | P1 | `UltimateConnector/Strategies/Messaging/GooglePubSubConnectionStrategy.cs:85-87` | `Convert.FromBase64String` with no try/catch in subscribe loop. Malformed base64 from server throws `FormatException`, permanently terminates subscription. |
+| 2014 | 9 | P1 | `UltimateConnector/Strategies/Messaging/GooglePubSubConnectionStrategy.cs:77` | `JsonDocument.Parse` can throw `JsonException` — not caught in subscribe loop. Single bad response kills entire subscription. |
+| 2015 | 9 | P1 | `UltimateConnector/Strategies/Messaging/RabbitMqConnectionStrategy.cs:208-211` | `BasicAckAsync` called before `WriteAsync` to channel. If channel write throws, message already acked → silent data loss. |
+| 2016 | 7 | P1 | `UltimateConnector/Strategies/Messaging/KafkaConnectionStrategy.cs:85-95` | `adminClient.GetMetadata()` is sync blocking inside async `TestCoreAsync`. Same in `GetHealthCoreAsync:116-120`. |
+| 2017 | 3 | P1 | `UltimateConnector/Strategies/Messaging/KafkaConnectionStrategy.cs:101` | `Producer.Flush(5s)` is sync-over-async in `DisconnectCoreAsync` — blocks thread pool 5 seconds. |
+| 2018 | 3 | P1 | `UltimateConnector/Strategies/Messaging/KafkaConnectionStrategy.cs:208` | `consumer.Consume(100ms)` is sync blocking inside `async IAsyncEnumerable` — blocks thread pool on every poll. |
+| 2019 | 9 | P1 | `UltimateConnector/Strategies/Messaging/MqttConnectionStrategy.cs:161` | `ReadMqttRemainingLength` no guard on multiplier overflow. Malformed 5+ byte length → int overflow → negative array size → crash. |
+| 2020 | 14 | P2 | `UltimateConnector/Strategies/Legacy+Messaging/Tn3270:26,Tn5250:26,VSAM:24,ActiveMq:26,AmazonMsk:26,ApachePulsar:29,ApacheRocketMq:23,ConfluentCloud:26,Mqtt:26` | **SYSTEMIC across 9 files:** `int.Parse(parts[1])` with no TryParse → cryptic `FormatException` for non-numeric ports. |
+| 2021 | 13 | P2 | `UltimateConnector/Strategies/Messaging/AmazonMsk:108,ConfluentCloud:123,ApacheRocketMq:76` | **SYSTEMIC:** `Task.Delay(100ms)` busy-poll caps throughput at 10 batches/sec. No backoff or fetch-wait. |
+| 2022 | 12 | P2 | `UltimateConnector/Strategies/Messaging/ApacheRocketMqConnectionStrategy.cs:84,99` | JSON string interpolation without escaping — topic names containing `"` or `\` produce malformed JSON. |
+| 2023 | 14 | P2 | `UltimateConnector/Strategies/Messaging/AwsEventBridgeConnectionStrategy.cs:37` | `Encoding.UTF8.GetString(message)` embeds raw bytes as `detail` field. Binary data → replacement chars; JSON data → double-escaped string. |
+| 2024 | 15 | P2 | `UltimateConnector/Strategies/Messaging/AwsEventBridge:59-77,AzureEventGrid:64-77` | **SYSTEMIC:** `SubscribeAsync` does `yield break` after 5s delay — returns nothing without throwing `NotSupportedException`. Contract lie. |
+| 2025 | 10 | P2 | `UltimateConnector/Strategies/Messaging/MqttConnectionStrategy.cs:92-93` | QoS > 0 PUBLISH packets have 2-byte packet ID in header; reader assumes QoS 0 layout → first 2 payload bytes silently discarded for QoS 1/2. |
+| 2026 | 13 | P2 | `UltimateConnector/Strategies/Messaging/GooglePubSubConnectionStrategy.cs:70-92` | New `StringContent` object allocated every 100ms poll iteration for identical request body `{"maxMessages":10}`. |
+| 2027 | 2 | P2 | `UltimateConnector/Strategies/Messaging/ApachePulsarConnectionStrategy.cs:21-24` | Instance-level counter fields shared across connections. Acceptable if handles per-instance but undocumented. |
+| 2028 | 9 | P2 | `UltimateConnector/Strategies/Messaging/MqttConnectionStrategy.cs:37-39` | CONNACK return code never examined — auth failure silently treated as success. |
+| 2029 | 9 | P2 | `UltimateConnector/Strategies/Messaging/MqttConnectionStrategy.cs:68-69` | SUBACK return code never checked — subscription rejection (`0x80`) silently ignored. |
+| 2030 | 14 | P2 | `UltimateConnector/Strategies/Messaging/ConfluentCloudConnectionStrategy.cs:23-44` | SASL handshake response never read — broker rejection produces cryptic protocol errors later. |
+| 2031 | 13 | P2 | `UltimateConnector/Strategies/Messaging/KafkaConnectionStrategy.cs:85-95` | New `AdminClient` created/destroyed per `TestCoreAsync`/`GetHealthCoreAsync` call — TCP connection overhead on every health check. |
+| 2032 | - | LOW | `UltimateConnector/Strategies/Messaging/ActiveMq:37,AmazonMsk:32,ApachePulsar:40,ApacheRocketMq:24,ConfluentCloud:46,Mqtt:41,Nats:63,RabbitMq:84` | **SYSTEMIC across 8 files:** `async` methods with no `await` — unnecessary state machine overhead. |
+| 2033 | - | LOW | `UltimateConnector/Strategies/Messaging/RabbitMqConnectionStrategy.cs:205` | `Channel.CreateUnbounded<byte[]>()` — unbounded memory growth if consumer slower than producer. |
+
+**Clean files:** NatsConnectionStrategy (only LOW async-without-await), VsamConnectionStrategy (only shared connect-leak + port-parse)
+
+---
+
+### Plugin Chunk 053 (15 files: Messaging/RedPanda–Observability/AppDynamics)
+
+**Files Reviewed:** 15 | **Findings:** 30 (2 P0, 15 P1, 12 P2, 1 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2034 | 1 | P1 | `UltimateConnector/Strategies/NoSql/ScyllaDbConnectionStrategy.cs:82-97` | `ExecuteQueryAsync` returns `OPERATION_NOT_SUPPORTED` sentinel dict; `ExecuteNonQueryAsync` silently returns -1. Rule 13 stub claiming Cassandra compatibility while doing nothing. |
+| 2035 | 2 | P1 | `UltimateConnector/Strategies/NoSql/ArangoDbConnectionStrategy.cs:16` | `_httpClient` instance field with no sync — concurrent `ConnectCoreAsync` + `TestCoreAsync` tear between null and new client. **SYSTEMIC: same in Couchbase:16, InfluxDb:16, OpenSearch:16.** |
+| 2036 | 2 | P1 | `UltimateConnector/Strategies/NoSql/Neo4jConnectionStrategy.cs:18-19` | Both `_httpClient` and `_tcpClient` unguarded instance fields — concurrent read/write race during reconnect. |
+| 2037 | 2 | P1 | `UltimateConnector/Strategies/NoSql/ScyllaDbConnectionStrategy.cs:16` | `_tcpClient` field unguarded. `TestCoreAsync` reads handle connection while `DisconnectCoreAsync` nulls `_tcpClient` on another thread. |
+| 2038 | 12 | P0 | `UltimateConnector/Strategies/Messaging/RedPandaConnectionStrategy.cs:37,69` | `Environment.TickCount` (int, wraps ~25 days) used for Kafka correlation IDs. Simultaneous requests in same tick share ID → response routing failures. |
+| 2039 | 12 | P0 | `UltimateConnector/Strategies/Messaging/RedPandaConnectionStrategy.cs:38-50` | Multi-byte integers written in host (little-endian) byte order except where `HostToNetworkOrder` explicit. Kafka protocol is big-endian — broker will reject/misparse all produce requests. |
+| 2040 | 12 | P1 | `UltimateConnector/Strategies/Messaging/ZeroMqConnectionStrategy.cs:48-50` | ZMTP subscription filter sent without ZMTP greeting/handshake. Raw byte write silently discarded or causes protocol error on any compliant ZeroMQ peer. |
+| 2041 | 12 | P1 | `UltimateConnector/Strategies/Messaging/ZeroMqConnectionStrategy.cs:76-85` | `WriteZmqFrame` always emits 9-byte header (1-byte flags + 8-byte size). ZMTP 3.x short frames use 1-byte flags + 1-byte length. Breaks interop with standard ZMTP peers. |
+| 2042 | 15 | P1 | `UltimateConnector/Strategies/NoSql/ScyllaDbConnectionStrategy.cs:23-34` | `Capabilities` claims `SupportsPooling`, `SupportsStreaming`, `SupportsBulkOperations`, `SupportsSchemaDiscovery` — all false. Strategy is TCP ping wrapper that refuses all queries. Misleads strategy selection. |
+| 2043 | 15 | P1 | `UltimateConnector/Strategies/Observability/AppDynamicsConnectionStrategy.cs:15-16` | `PushLogsAsync`/`PushTracesAsync` throw `NotSupportedException` at runtime. If base type advertises these in Capabilities, callers can't anticipate failure. |
+| 2044 | 14 | P1 | `UltimateConnector/Strategies/Messaging/RedPandaConnectionStrategy.cs:22` | No null/empty check on `config.ConnectionString` before splitting. Null → `NullReferenceException`; empty → `ConnectAsync("", 9092)`. **Same in ZeroMq:22.** |
+| 2045 | 9 | P1 | `UltimateConnector/Strategies/NoSql/CosmosDbConnectionStrategy.cs:162` | `GetConfiguration<string?>(null!, "Database", "default")` — passes `null!` as `ConnectionConfig`. If `GetConfiguration` dereferences `config`, throws `NullReferenceException` for every query without explicit `database` param. |
+| 2046 | 9 | P1 | `UltimateConnector/Strategies/NoSql/CassandraConnectionStrategy.cs:218` | CQL injection: `WHERE keyspace_name = '{keyspace}'` — crafted keyspace name with single quote breaks query. Should use parameterized query. |
+| 2047 | 7 | P1 | `UltimateConnector/Strategies/Observability/AppDynamicsConnectionStrategy.cs:10` | `HttpClient` created per `ConnectCoreAsync` call, old instance not disposed → socket exhaustion. **SYSTEMIC: same in ArangoDB, Couchbase, InfluxDb, OpenSearch, Neo4j.** |
+| 2048 | 4 | P1 | `UltimateConnector/Strategies/NoSql/ArangoDbConnectionStrategy.cs:43` | Always uses `http://` even when ConnectionString contains `https://`. `ParseHostPort` strips scheme, `ConnectCoreAsync` hardcodes `http://`. TLS never established — credentials in cleartext. **SYSTEMIC: same in Couchbase:43, InfluxDb:43, OpenSearch:43.** |
+| 2049 | 7 | P2 | `UltimateConnector/Strategies/NoSql/CosmosDbConnectionStrategy.cs:209` | `JsonDocument.Parse(command)` not disposed before `await UpsertItemAsync` — if upsert throws, `JsonDocument` leaked. |
+| 2050 | 13 | P2 | `UltimateConnector/Strategies/NoSql/DynamoDbConnectionStrategy.cs:225` | `ListTablesAsync` without pagination — returns max 100 tables. Accounts with >100 tables produce silently incomplete schema. |
+| 2051 | 13 | P2 | `UltimateConnector/Strategies/NoSql/RedisConnectionStrategy.cs:78` | `db.Ping()` called synchronously inside async `TestCoreAsync` — holds calling thread for full RTT. Should use `PingAsync`. |
+| 2052 | 13 | P2 | `UltimateConnector/Strategies/NoSql/RedisConnectionStrategy.cs:106` | Same sync `db.Ping()` in `GetHealthCoreAsync` — should use `PingAsync`. |
+| 2053 | 10 | P2 | `UltimateConnector/Strategies/NoSql/InfluxDbConnectionStrategy.cs:138-151` | Flux CSV parser does naive `line.Split(',')` without RFC 4180 quoted-field handling. Quoted values with commas produce wrong column alignment → silent data corruption. |
+| 2054 | 10 | P2 | `UltimateConnector/Strategies/Messaging/RedPandaConnectionStrategy.cs:81` | Fetch offset hardcoded to `0L` on every subscribe iteration — replays entire topic from beginning every time. No offset tracking. |
+| 2055 | 13 | P2 | `UltimateConnector/Strategies/NoSql/CassandraConnectionStrategy.cs:69` | `Task.Run(() => cluster.Connect(), ct)` wraps sync blocking call. Ties up ThreadPool thread for duration of connect. Minor P2 — known driver limitation. |
+| 2056 | 13 | P2 | `UltimateConnector/Strategies/Messaging/GooglePubSubConnectionStrategy.cs:70-92` | New `StringContent` allocated every 100ms poll for identical request body. Trivially avoidable allocation. (Note: overlap with chunk 052 finding 2026 — different chunk, same file scanned in both) |
+| 2057 | 13 | P2 | `UltimateConnector/Strategies/NoSql/DynamoDbConnectionStrategy.cs:225` | Same pagination gap as #2050 — `LastEvaluatedTableName` not iterated. |
+| 2058 | 9 | P2 | `UltimateConnector/Strategies/NoSql/CosmosDbConnectionStrategy.cs:162` | Duplicate of #2045 path — `null!` config cascading through multiple query methods. |
+| 2059 | 13 | P2 | `UltimateConnector/Strategies/Messaging/RedPandaConnectionStrategy.cs:81` | Duplicate of #2054. |
+| 2060 | 14 | P2 | `UltimateConnector/Strategies/Messaging/ZeroMqConnectionStrategy.cs:22` | Same missing null/empty check as #2044. |
+| 2061 | 13 | P2 | `UltimateConnector/Strategies/NoSql/KafkaConnectionStrategy.cs:85-95` | Duplicate of chunk 052 finding #2031. |
+| 2062 | 13 | P2 | `UltimateConnector/Strategies/NoSql/CassandraConnectionStrategy.cs:69` | Duplicate of #2055. |
+| 2063 | 14 | LOW | `UltimateConnector/Strategies/NoSql/Neo4jConnectionStrategy.cs:47` | Bolt port hardcoded to 7687 regardless of config. Non-standard port not configurable. |
+
+**Clean files:** MongoDbConnectionStrategy (solid official driver usage; minor: schema samples only first document), ElasticsearchConnectionStrategy (well-structured; minor: stopwatch not stopped in error branch), DynamoDbConnectionStrategy (good SDK usage; only pagination gap), RedisConnectionStrategy (solid StackExchange.Redis; only sync Ping calls)
+
+---
+
+### Plugin Chunk 054 (15 files: Observability/AwsCloudWatch–Observability/Mimir)
+
+**Files Reviewed:** 15 | **Findings:** 22 (0 P0, 7 P1, 9 P2, 6 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2064 | 7 | P1 | `UltimateConnector/Strategies/Observability/AwsCloudWatchConnectionStrategy.cs:10` | **SYSTEMIC across all 15 files:** `new HttpClient()` per `ConnectCoreAsync` — socket exhaustion under load. No `IHttpClientFactory`. |
+| 2065 | 4 | P1 | `UltimateConnector/Strategies/Observability/AwsCloudWatchConnectionStrategy.cs:10` | No AWS SigV4 signing on CloudWatch requests. Every request gets HTTP 403. Non-functional against real AWS endpoint. |
+| 2066 | 12 | P1 | `UltimateConnector/Strategies/Observability/GcpCloudMonitoringConnectionStrategy.cs:14-16` | Hardcoded literal `PROJECT_ID` in request URLs — placeholder never substituted. Every call hits nonexistent URL. Rule 13 placeholder. |
+| 2067 | 12 | P1 | `UltimateConnector/Strategies/Observability/LogzioConnectionStrategy.cs:14-16` | Port-only strings (`:8053`, `:8071`) used as relative URI paths. `HttpClient.PostAsync` throws `UriFormatException` or resolves incorrectly. |
+| 2068 | 14 | P1 | `UltimateConnector/Strategies/Observability/FluentdConnectionStrategy.cs:29-31` | `int.Parse(parts[1])` with no validation — `FormatException` on bad input with no diagnostic context. |
+| 2069 | 12 | P1 | `UltimateConnector/Strategies/Observability/ElasticsearchLoggingConnectionStrategy.cs:61` | Hardcoded index name `"logs"` — all docs sent to same index regardless of source/environment. Not configurable. |
+| 2070 | 4 | P1 | `UltimateConnector/Strategies/Observability/InstanaConnectionStrategy.cs:10` | Auth header set via `DefaultRequestHeaders.Add("Authorization", ...)` instead of typed `AuthenticationHeaderValue`. CRLF injection risk. **Same in Logzio.** |
+| 2071 | 1 | P2 | `UltimateConnector/Strategies/Observability/AwsCloudWatch:11,GcpCloudMonitoring:11,Logzio:11` | **SYSTEMIC:** `TestCoreAsync` returns `Task.FromResult(true)` unconditionally — no network probe. Rule 13 stub. `GetHealthCoreAsync` same. |
+| 2072 | 13 | P2 | `UltimateConnector/Strategies/Observability/ElasticsearchLoggingConnectionStrategy.cs:58-63` | `StringBuilder` bulk payload built without pre-sizing. Entire batch in memory before upload. |
+| 2073 | 13 | P2 | `UltimateConnector/Strategies/Observability/*` | **SYSTEMIC across all 15 files:** No batch-size guard before serialization. Arbitrarily large payloads will breach API limits (413). |
+| 2074 | 14 | P2 | `UltimateConnector/Strategies/Observability/Datadog:33,Honeycomb:10,GcpCloudMonitoring:10` | **SYSTEMIC:** API key accepted without null/empty check. Empty key produces silent 403 failures. |
+| 2075 | 4 | P2 | `UltimateConnector/Strategies/Observability/MimirConnectionStrategy.cs:60-65` | No TLS enforcement — `baseUrl` can be `http://` even when credentials supplied. Basic Auth in cleartext. |
+| 2076 | 9 | P2 | `UltimateConnector/Strategies/Observability/FluentdConnectionStrategy.cs:60-70` | TCP stream obtained without reconnect logic. Dropped connection causes `InvalidOperationException` with no recovery. |
+| 2077 | 15 | P2 | `UltimateConnector/Strategies/Observability/AwsCloudWatchConnectionStrategy.cs:14-15` | CloudWatch metrics and logs both POST to `"/"` — not valid AWS write paths. Will get 400/403. |
+| 2078 | 15 | P2 | `UltimateConnector/Strategies/Observability/AzureMonitorConnectionStrategy.cs:14-15` | Fixed DCR path without rule ID. Real API requires `{dcrImmutableId}/{streamName}`. Will get 404. |
+| 2079 | 15 | P2 | `UltimateConnector/Strategies/Observability/DatadogConnectionStrategy.cs:74` | Datadog Logs API path wrong — posts to `/v1/input` (agent legacy) not `/api/v2/logs`. Will get 404. |
+| 2080 | 5 | LOW | `UltimateConnector/Strategies/Observability/Cortex:52,GrafanaLoki:55,Mimir:78` | **SYSTEMIC:** Bare `catch` with no logging in `TestCoreAsync`. Transient vs definitive failures indistinguishable. |
+| 2081 | - | LOW | `UltimateConnector/Strategies/Observability/AwsCloudWatch,AzureMonitor,Dynatrace,GcpCloudMonitoring,Honeycomb,Instana,Logzio` | **SYSTEMIC across 7 files:** `async ConnectCoreAsync` with no `await` — unnecessary state machine. |
+| 2082 | 15 | LOW | `UltimateConnector/Strategies/Observability/HoneycombConnectionStrategy.cs:15-16` | Logs posted to literal path `/1/events/dataset` — `"dataset"` is placeholder, not actual dataset name. |
+| 2083 | 15 | LOW | `UltimateConnector/Strategies/Observability/DatadogConnectionStrategy.cs:78-85` | `PushTracesAsync` posts to deprecated `/v0.3/traces`. Risk of silent data loss when Datadog drops support. |
+| 2084 | 14 | LOW | `UltimateConnector/Strategies/Observability/*` | **SYSTEMIC across all 15 files:** No null/empty validation on metrics/logs/traces parameters before serialization. |
+| 2085 | 12 | LOW | `UltimateConnector/Strategies/Observability/FluentdConnectionStrategy.cs:29` | Null-coalescing fallback array is dead code — never fully applied due to split logic. |
+
+**Clean files:** None fully clean. JaegerConnectionStrategy closest (only systemic HttpClient + batch-size issues).
+
+---
+
+### Plugin Chunk 055 (15 files: Observability/Nagios–Protocol/Ftp)
+
+**Files Reviewed:** 15 | **Findings:** 28 (1 P0, 12 P1, 11 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2086 | 1 | P1 | `UltimateConnector/Strategies/Observability/NewRelicConnectionStrategy.cs:11` | Stub health check — `TestCoreAsync` always returns `true` without contacting API. Broken connection never detected. |
+| 2087 | 12 | P1 | `UltimateConnector/Strategies/Observability/SigNozConnectionStrategy.cs:13` | Health check starts/stops Stopwatch before any HTTP call — always reports ~0ms latency. Effectively a stub. |
+| 2088 | 12 | P1 | `UltimateConnector/Strategies/Observability/SigNozConnectionStrategy.cs:11` | `TestCoreAsync` interprets any HTTP response (including 405/404) as success — broken at protocol level yet reports healthy. |
+| 2089 | 14 | P1 | `UltimateConnector/Strategies/Observability/Nagios:10,Zabbix:10,Protocol/Dns:45,Protocol/Ftp:45` | **SYSTEMIC:** `config.ConnectionString` null/empty split — empty string produces `host=""`, null throws `NullReferenceException`. |
+| 2090 | 14 | P1 | `UltimateConnector/Strategies/Observability/Nagios:10,Zabbix:10,Protocol/Dns:47,Protocol/Ftp:47` | **SYSTEMIC:** `int.Parse(parts[1])` — no TryParse, no range check. Malformed port throws unhandled `FormatException`. |
+| 2091 | 7 | P1 | `UltimateConnector/Strategies/Observability/Nagios:10,Zabbix:10` | **SYSTEMIC:** `TcpClient` leaked on connection failure — no try/finally or using guard around `ConnectAsync`. |
+| 2092 | 7 | P1 | `UltimateConnector/Strategies/Observability/Netdata:10` | **SYSTEMIC across 11 HTTP strategies:** `HttpClient` leaked if `DefaultConnectionHandle` constructor throws after allocation. |
+| 2093 | 7 | P1 | `UltimateConnector/Strategies/Observability/OpenSearchLogging:58-66` | **SYSTEMIC across all HTTP strategies:** `StringContent` not disposed after `PostAsync` in all push methods. |
+| 2094 | 12 | P1 | `UltimateConnector/Strategies/Observability/NagiosConnectionStrategy.cs:14` | `metric["host"]`, `metric["service"]` etc. accessed via direct indexer — missing keys throw `KeyNotFoundException`. No field validation. |
+| 2095 | 12 | P1 | `UltimateConnector/Strategies/Observability/ZabbixConnectionStrategy.cs:14` | `BitConverter.GetBytes((long)dataBytes.Length)` uses platform endianness. Zabbix protocol requires little-endian. Corrupt on big-endian platforms. |
+| 2096 | 15 | P1 | `UltimateConnector/Strategies/Observability/PrometheusConnectionStrategy.cs:135` | Wrong wire format — Prometheus remote write requires Protobuf+Snappy, not JSON. HTTP 400 or silent data loss. **Same in Thanos:102, VictoriaMetrics:133.** |
+| 2097 | 15 | P1 | `UltimateConnector/Strategies/Observability/NetdataConnectionStrategy.cs:14` | Netdata `/api/v1/data` is read-only API — no POST ingestion endpoint exists. `PushMetricsAsync` is a contract lie. |
+| 2098 | 12 | P0 | `UltimateConnector/Strategies/Protocol/DnsConnectionStrategy.cs:52` | UDP `Connect()` only sets default endpoint — no actual DNS query sent. `Task.Delay(10ms)` is fake verification. `TestCoreAsync`/`GetHealthCoreAsync` rely on `client.Client?.Connected` which is always true for UDP. |
+| 2099 | 4 | P1 | `UltimateConnector/Strategies/Observability/SplunkHecConnectionStrategy.cs:33-36` | Splunk HEC token injected into `Authorization` header without sanitization. CRLF injection risk from whitespace/newline chars. |
+| 2100 | 12 | P1 | `UltimateConnector/Strategies/Protocol/FtpConnectionStrategy.cs:52-53` | Dead-code guard: `if (!client.Connected)` is unreachable — `ConnectAsync` throws on failure, never returns false. |
+| 2101 | - | P2 | `UltimateConnector/Strategies/Protocol/FtpConnectionStrategy.cs:15,DnsConnectionStrategy.cs:15` | Not `sealed` — inconsistent with all other strategy classes in codebase. |
+| 2102 | 13 | P2 | `UltimateConnector/Strategies/Observability/SplunkHecConnectionStrategy.cs:72` | `logs.Select(...)` serialized as lazy LINQ query — non-deterministic if collection changes during serialization. |
+| 2103 | 1 | P2 | `UltimateConnector/Strategies/Observability/NewRelicConnectionStrategy.cs:13` | `GetHealthCoreAsync` always returns healthy without HTTP call. Combined with stub `TestCoreAsync` (#2086), broken connection undetectable. |
+| 2104 | 15 | P2 | `UltimateConnector/Strategies/Observability/OtlpCollector:56,SigNoz:14` | OTLP JSON payload structure incorrect — `resourceMetrics` requires `ResourceMetrics` objects with `resource`/`scopeMetrics`. Arbitrary JSON fails OTLP schema validation. |
+| 2105 | 15 | P2 | `UltimateConnector/Strategies/Observability/OpenSearchLoggingConnectionStrategy.cs:61` | Hardcoded index name `"logs"` — not configurable. Limits multi-tenant and lifecycle management. |
+| 2106 | 9 | P2 | `UltimateConnector/Strategies/Observability/ZabbixConnectionStrategy.cs:14` | Zabbix sender response not read — success always assumed. Server rejection (auth fail, schema error) goes undetected. |
+| 2107 | 15 | P2 | `UltimateConnector/Strategies/Observability/NagiosConnectionStrategy.cs:14` | NSCA protocol missing timestamp field — may cause server rejection depending on NSCA version. |
+| 2108 | 1 | P2 | `UltimateConnector/Strategies/Protocol/DnsConnectionStrategy.cs:82-92` | `GetHealthCoreAsync` always reports zero latency — no DNS query issued. Health checks entirely fictional. |
+| 2109 | 1 | P2 | `UltimateConnector/Strategies/Protocol/FtpConnectionStrategy.cs:83-93` | `GetHealthCoreAsync` reports zero latency — inspects only cached `Connected` property. Cannot detect half-open TCP. |
+| 2110 | 15 | P2 | `UltimateConnector/Strategies/Observability/TempoConnectionStrategy.cs:59` | Tempo OTLP trace payload uses `{ batches: [...] }` instead of `{ resourceSpans: [...] }`. Will get 400 from Tempo. |
+| 2111 | - | LOW | `UltimateConnector/Strategies/Observability/NagiosConnectionStrategy.cs:10` | `ConnectionStrategyCapabilities` returns empty default — useless for routing decisions. |
+| 2112 | - | LOW | `UltimateConnector/Strategies/Observability/*` | **SYSTEMIC:** All HTTP strategies use `new HttpClient` directly instead of `IHttpClientFactory`. (Overlaps with chunk 054 #2064) |
+| 2113 | - | LOW | `UltimateConnector/Strategies/Protocol/Dns,Ftp` | File-scoped namespace not used — inconsistent with Observability strategies. |
+
+**Clean files:** ZipkinConnectionStrategy (only systemic HttpClient/StringContent issues)
+
+---
+
+### Plugin Chunk 056 (15 files: Protocol/GraphQl–SaaS/Airtable)
+**Files Reviewed:** 15 | **Findings:** 24 (2 P0, 14 P1, 6 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2114 | 1 | P0 | `UltimateConnector/Strategies/SaaS/AirtableConnectionStrategy.cs:24` | `AuthenticateAsync` returns `Guid.NewGuid().ToString("N")` — random GUID, no credential exchange. Rule 13 stub. No API key read from config; all API calls will be unauthenticated. |
+| 2115 | 4 | P0 | `UltimateConnector/Strategies/SaaS/AirtableConnectionStrategy.cs:20-21` | `ConnectCoreAsync` never applies `Authorization: Bearer <PAT>` header. `TestCoreAsync` calls `/v0/meta/bases` without auth — returns `true` on 401 (only false on 503), misrepresenting health. |
+| 2116 | 7 | P1 | **SYSTEMIC** `ConnectCoreAsync` — `GraphQlConnectionStrategy.cs:86`, `JsonRpcConnectionStrategy.cs:50`, `ODataConnectionStrategy.cs:49`, `SoapConnectionStrategy.cs:50`, `RestGenericConnectionStrategy.cs:49`, `SseConnectionStrategy.cs:51`, `GrpcConnectionStrategy.cs:64` | `new HttpClient` constructed then `EnsureSuccessStatusCode()` called — if it throws, HttpClient is never disposed. Resource leak on every failed connection attempt. |
+| 2117 | 5 | P1 | **SYSTEMIC** `TestCoreAsync` — `AirtableConnectionStrategy.cs:21`, `GrpcConnectionStrategy.cs:118` + all HTTP-based strategies in chunk | Bare `catch { return false; }` swallows `OperationCanceledException`. Cancelled health checks report "unhealthy" instead of propagating cancellation. |
+| 2118 | 14 | P1 | **SYSTEMIC** `ConnectCoreAsync` — `LdapConnectionStrategy.cs:45`, `SftpConnectionStrategy.cs:44`, `SmtpConnectionStrategy.cs:44`, `SshConnectionStrategy.cs:44`, `SnmpConnectionStrategy.cs:44`, `SyslogConnectionStrategy.cs:44` | No null-check on `config.ConnectionString` before `Split(':')`. Null value throws `NullReferenceException` instead of meaningful `ArgumentException`. |
+| 2119 | 14 | P1 | **SYSTEMIC** `ConnectCoreAsync` — `LdapConnectionStrategy.cs:48`, `SftpConnectionStrategy.cs:47`, `SmtpConnectionStrategy.cs:47`, `SshConnectionStrategy.cs:47`, `SnmpConnectionStrategy.cs:47`, `SyslogConnectionStrategy.cs:47` | `int.Parse(parts[1])` with no `TryParse` guard. Non-numeric port or IPv6 address throws unhandled `FormatException`. |
+| 2120 | 7 | P1 | `UltimateConnector/Strategies/Protocol/SseConnectionStrategy.cs:17,51-70` | Static `_sharedTestClient` with no `BaseAddress` or timeout. Streaming `HttpClient` (Timeout=Infinite) leaks on `EnsureSuccessStatusCode` or content-type check failure. |
+| 2121 | 15 | P1 | `UltimateConnector/Strategies/Protocol/SnmpConnectionStrategy.cs:43-62` | UDP `Connect()` is a no-op (sets default endpoint only). `await Task.Delay(10, ct)` fakes verification. No SNMP GetRequest PDU sent. Always succeeds regardless of agent reachability. |
+| 2122 | 15 | P1 | `UltimateConnector/Strategies/Protocol/SyslogConnectionStrategy.cs:43-62` | Same as #2121 — UDP `Connect` is not a handshake. `Task.Delay(10ms)` is cosmetic. No actual syslog message sent for verification. |
+| 2123 | 1 | P1 | `UltimateConnector/Strategies/Protocol/SftpConnectionStrategy.cs` | Raw `TcpClient` to port 22 stored as SFTP handle. No SSH banner exchange, key negotiation, or auth. `DisplayName = "SFTP"` is a contract lie — handle is a raw socket, not an SFTP session. |
+| 2124 | 1 | P1 | `UltimateConnector/Strategies/Protocol/SshConnectionStrategy.cs` | Same as #2123 — raw TCP to port 22 is not SSH. No cipher negotiation, no host key validation, no authentication. |
+| 2125 | 12 | P1 | **SYSTEMIC** `TestCoreAsync` — `SnmpConnectionStrategy.cs:66`, `SyslogConnectionStrategy.cs:66` | `client.Client?.Connected ?? false` for UDP always returns `true` after `Connect()`. Health checks are meaningless. |
+| 2126 | 12 | P1 | **SYSTEMIC** `TestCoreAsync` — `LdapConnectionStrategy.cs:69`, `SftpConnectionStrategy.cs:67`, `SmtpConnectionStrategy.cs:67`, `SshConnectionStrategy.cs:67` | `TcpClient.Connected` reflects last I/O, not current state. Half-open connections report healthy. No liveness probe (LDAP WhoAmI, SMTP NOOP, etc.). |
+| 2127 | 2 | P1 | `UltimateConnector/Strategies/Protocol/GraphQlConnectionStrategy.cs:32-42,77-79,133-160` | `_maxQueryDepth`, `_maxQueryComplexity`, `_enableIntrospection` written in `ConnectCoreAsync`, read in `ValidateQuery` — no synchronization. Concurrent reconnect produces torn reads. |
+| 2128 | 1 | P1 | `UltimateConnector/Strategies/Protocol/SoapConnectionStrategy.cs:52-63` | Hardcoded `http://tempuri.org/` namespace and `GetStatus` operation — Visual Studio WCF placeholder. No real SOAP service uses this. Connection test always fails against production services. |
+| 2129 | 14 | P1 | `UltimateConnector/Strategies/SaaS/AirtableConnectionStrategy.cs:20` | No credential (API key / PAT) read from config. Airtable requires `Authorization: Bearer <token>` on every request. All calls through this handle get HTTP 401. Missing validation that required credential exists. |
+| 2130 | 14 | P2 | `UltimateConnector/Strategies/Protocol/GrpcConnectionStrategy.cs:83-93` | Fallback retry sends POST to `"/"` without gRPC framing headers. Second `SendAsync` failure propagates without disposing `client`. |
+| 2131 | 9 | P2 | `UltimateConnector/Strategies/SaaS/AirtableConnectionStrategy.cs:22` | `DisconnectCoreAsync`: `async` method with only synchronous work + `await Task.CompletedTask` — unnecessary state machine overhead. |
+| 2132 | 14 | P2 | **SYSTEMIC** `ConnectCoreAsync` — all TCP/UDP strategies (Ldap, Sftp, Smtp, Ssh, Snmp, Syslog) | `Split(':')` fails for IPv6 addresses like `[::1]:389`. Should use `Uri.TryCreate` or `IPEndPoint.TryParse`. |
+| 2133 | 15 | P2 | `UltimateConnector/Strategies/Protocol/JsonRpcConnectionStrategy.cs:52-55` | `"ping"` is not a standard JSON-RPC method. Server returns `-32601 Method not found` but HTTP 200 — `EnsureSuccessStatusCode` passes, giving false impression of RPC capability. |
+| 2134 | 15 | P2 | **SYSTEMIC** `SmtpConnectionStrategy.cs`, `LdapConnectionStrategy.cs` | SMTP: raw TCP to port 587, no EHLO/STARTTLS/AUTH. LDAP: raw TCP to port 389, no bind. `DisplayName` promises protocol semantics not delivered. |
+| 2135 | 12 | P2 | `UltimateConnector/Strategies/Protocol/GraphQlConnectionStrategy.cs:127-161` | `ValidateQuery` called before `ConnectCoreAsync` silently uses field defaults (depth=10, complexity=1000) instead of throwing `InvalidOperationException`. |
+| 2136 | 15 | LOW | `UltimateConnector/Strategies/Protocol/SseConnectionStrategy.cs:74-79` | Health check uses `_sharedTestClient` (100s timeout) instead of per-connection streaming client (infinite timeout) — inconsistent timeout policies. |
+| 2137 | 14 | LOW | `UltimateConnector/Strategies/Protocol/WebSocketConnectionStrategy.cs` | `ClientWebSocket` connected but no ping/pong or close handshake validation — acceptable for connection strategy but limits health check accuracy. |
+
+**Clean files:** None — all 15 files have findings.
+
+---
+
+### Plugin Chunk 057 (15 files: SaaS/Asana–SaaS/Sap)
+**Files Reviewed:** 15 | **Findings:** 29 (3 P0, 14 P1, 9 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2138 | 4 | P0 | **SYSTEMIC** `AuthenticateAsync` — All 11 simple strategies (Asana:24, DocuSign:24, FreshDesk:24, HubSpot:24, Intercom:24, MicrosoftDynamics:24, Monday:24, NetSuite:24, Notion:24, OracleFusion:24, Pipedrive:24) | Returns `(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(X))`. No credential exchange with remote service. Rule 13 stub masquerading as real auth. |
+| 2139 | 4 | P0 | **SYSTEMIC** `RefreshTokenAsync` — All 11 simple strategies + `GitHubConnectionStrategy.cs:88`, `JiraConnectionStrategy.cs:93`, `SapConnectionStrategy.cs:97` | Delegates unconditionally to `AuthenticateAsync` (which is itself a GUID factory for stub strategies). Token refresh must use existing refresh credential, not fabricate new one. |
+| 2140 | 4 | P0 | `UltimateConnector/Strategies/SaaS/SalesforceConnectionStrategy.cs:120-125` | Silent catch in `AuthenticateAsync` swallows OAuth error, falls back to `Guid.NewGuid()` as "access token". Callers hold random-string token, all API calls fail 401 silently. |
+| 2141 | 4 | P1 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:40-51` | Password stored as plain `string`, Base64-encoded into Authorization header. Never zeroed after use — survives in GC dumps. Empty-string fallback on `"Password"` config key sends unauthenticated Basic header silently. |
+| 2142 | 4 | P1 | `UltimateConnector/Strategies/SaaS/JiraConnectionStrategy.cs:49` | Same as #2141: email + API token Base64-encoded without zeroing credential bytes. Fields survive for strategy instance lifetime. |
+| 2143 | 7 | P1 | **SYSTEMIC** `ConnectCoreAsync` — All 15 files | `new HttpClient { ... }` per-connection without `IHttpClientFactory`. Socket exhaustion (TIME_WAIT) under heavy reconnection. HttpClient leaks if constructor throws before handle assignment. |
+| 2144 | 7 | P1 | **SYSTEMIC** `DisconnectCoreAsync` — All 15 files | `handle.GetConnection<HttpClient>()?.Dispose()` only cleanup. If handle metadata contains other disposables, they leak. |
+| 2145 | 12 | P1 | **SYSTEMIC** `TestCoreAsync` — 13 files (all except Salesforce, Monday) | Health test passes for any status except `503 ServiceUnavailable`. 401/403/404/429/500 all report healthy. Should use `IsSuccessStatusCode`. |
+| 2146 | 12 | P1 | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:244-248` | `CheckRateLimitAsync` skips wait when `delay.TotalSeconds >= 60`. Sustained load with >60s reset window → all subsequent calls hit 429. Arbitrary undocumented ceiling. |
+| 2147 | 2 | P1 | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:20-22,231-238` | `_rateLimitRemaining` and `_rateLimitReset` written from async continuations, read from `CheckRateLimitAsync`/`GetRateLimitStatus` — no synchronization. Concurrent calls produce torn reads. |
+| 2148 | 2 | P1 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:24,112` | `_csrfToken` plain string field with TOCTOU on `IsNullOrEmpty` guard. Concurrent writes call `FetchCsrfTokenAsync` twice, race on partially-written token. |
+| 2149 | 2 | P1 | **SYSTEMIC** `ConnectCoreAsync` fields — `JiraConnectionStrategy.cs:21-23`, `SalesforceConnectionStrategy.cs:23-26`, `SapConnectionStrategy.cs:22-24` | `_instance`, `_email`, `_apiToken`, `_instanceUrl`, `_clientId`, `_host` etc. plain fields written in `ConnectCoreAsync`, read across all API methods. Concurrent reconnect produces torn state. |
+| 2150 | 5 | P1 | **SYSTEMIC** `TestCoreAsync` — All 15 files | `catch { return false; }` swallows `OperationCanceledException`, `ObjectDisposedException`, `OutOfMemoryException`. Cancelled test reports "unhealthy" instead of propagating. |
+| 2151 | 5 | P1 | `UltimateConnector/Strategies/SaaS/SalesforceConnectionStrategy.cs:103-123` | Inner `try/catch` in `AuthenticateAsync` swallows all OAuth exceptions without logging. Auth failure invisible in production. |
+| 2152 | 1 | P1 | **SYSTEMIC** `AuthenticateAsync` — `GitHubConnectionStrategy.cs:83`, `JiraConnectionStrategy.cs:88`, `SapConnectionStrategy.cs:92` | GitHub/Jira/SAP return GUID or raw PAT as "token" without calling token endpoint. Jira/SAP use Basic auth — callers treating return as bearer token get 401. |
+| 2153 | 14 | P1 | **SYSTEMIC** — `DocuSignConnectionStrategy.cs:20`, `FreshDeckConnectionStrategy.cs:20`, `MicrosoftDynamicsConnectionStrategy.cs:20`, `NetSuiteConnectionStrategy.cs:20`, `OracleFusionConnectionStrategy.cs:20` | Empty-string fallback for required config keys (`AccountId`, `Domain`, `Organization`, `Pod`). Produces malformed URLs like `https://.docusign.net`. |
+| 2154 | 14 | P1 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:37`, `JiraConnectionStrategy.cs:36` | SAP: `_host = ""` → `new Uri("https://")` throws `UriFormatException`. Jira: `_instance = "example"` → connects to `https://example.atlassian.net` (real third-party domain). |
+| 2155 | 15 | P2 | `UltimateConnector/Strategies/SaaS/FreshDeskConnectionStrategy.cs:20` | Default domain `"example"` → `https://example.freshdesk.com` — real Freshdesk tenant. Misconfigured connector silently targets third party. |
+| 2156 | 12 | P2 | `UltimateConnector/Strategies/SaaS/SalesforceConnectionStrategy.cs:301-302` | `GetProperty("id").GetString()!` null-forgiving after `GetString()`. Non-standard error body → `NullReferenceException` at runtime. |
+| 2157 | 12 | P2 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:208` | `CallFunctionImportAsync` URL: `{functionName}&$format=json` uses `&` instead of `?` when no parameters — malformed URL. |
+| 2158 | 13 | P2 | **SYSTEMIC** `GetHealthCoreAsync` — All 15 files | Full HTTP round-trip per health check with no cached status. High-frequency polling creates unnecessary load. |
+| 2159 | 12 | P2 | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:100-102` | `perPage` not clamped to GitHub max 100; `page` not validated positive. `perPage=0` → 422. |
+| 2160 | 4 | P2 | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:186-219` | `CreateWebhookAsync` `secret` param has no min-length/entropy validation. Empty webhook secret accepted. |
+| 2161 | 13 | P2 | `UltimateConnector/Strategies/SaaS/SalesforceConnectionStrategy.cs:135-187` | `ExecuteSoqlAsync` URL-encodes full SOQL into GET query string. Long queries exceed proxy URL limits. Should use POST for large queries. |
+| 2162 | 14 | P2 | `UltimateConnector/Strategies/SaaS/JiraConnectionStrategy.cs:99-138` | `jql` serialized directly — empty/whitespace produces unhelpful Jira error. Missing `ArgumentException` guard. |
+| 2163 | 14 | P2 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:120-169` | `$select={select}` not URL-encoded (contrast: `$filter` correctly uses `Uri.EscapeDataString`). Special chars produce malformed OData query. |
+| 2164 | - | LOW | **SYSTEMIC** `DisconnectCoreAsync` — All 15 files | `await Task.CompletedTask` in async method with only synchronous work — unnecessary state machine. |
+| 2165 | - | LOW | **SYSTEMIC** All 11 simple strategies | Single-line multi-statement method bodies severely harm readability. |
+| 2166 | - | LOW | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:257` | `Full_Name`, `Html_Url`, `Default_Branch` — snake_case in C# record. Should use PascalCase with `[JsonPropertyName]` attributes. |
+
+**Clean files:** None — all 15 files have findings.
+
+---
+
+### Plugin Chunk 058 (15 files: SaaS/SendGrid–SpecializedDb/CrateDb)
+**Files Reviewed:** 15 | **Findings:** 22 (0 P0, 13 P1, 5 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2167 | 7 | P1 | **SYSTEMIC** `ConnectCoreAsync` — All 15 files (SendGrid, ServiceNow, Shopify, Slack, Stripe, SuccessFactors, Twilio, Workday, Zendesk, Zuora, ApacheDruid, ApacheIgnite, ApachePinot, ClickHouse, CrateDb) | `new HttpClient(...)` per-connection with no `IHttpClientFactory`. Socket exhaustion under load. Identical to prior chunk systemics. |
+| 2168 | 2 | P1 | **SYSTEMIC** — `SendGridConnectionStrategy.cs:20`, `SlackConnectionStrategy.cs:20-21`, `StripeConnectionStrategy.cs:22-23`, `TwilioConnectionStrategy.cs:20-21`, `ServiceNowConnectionStrategy.cs:22-24` | Mutable instance fields (`_apiKey`, `_botToken`, `_signingSecret`, etc.) written in `ConnectCoreAsync`, read from API methods — no synchronization. Concurrent connect/use races on these fields. |
+| 2169 | 2 | P1 | **SYSTEMIC** — `ApacheDruidConnectionStrategy.cs:16`, `ApacheIgniteConnectionStrategy.cs:13`, `ApachePinotConnectionStrategy.cs:13`, `ClickHouseConnectionStrategy.cs:17`, `CrateDbConnectionStrategy.cs:14` | `_httpClient` instance field set in Connect, nulled in Disconnect, read in Execute — no synchronization. Reconnect racing in-flight query → null-reference or use-after-dispose. TOCTOU on null guard. |
+| 2170 | 5 | P1 | **SYSTEMIC** `ExecuteQueryAsync`/`ExecuteNonQueryAsync` — `ApacheDruidConnectionStrategy.cs:97-100,114-117,141-143`, `ApacheIgniteConnectionStrategy.cs:54,65,87`, `ApachePinotConnectionStrategy.cs:89,102,125`, `ClickHouseConnectionStrategy.cs:108,112,125,155`, `CrateDbConnectionStrategy.cs:62,77,106` | Silent catch blocks swallow all exceptions in query execution. Return empty results or 0 — no logging. Production debugging impossible. |
+| 2171 | 5 | P1 | **SYSTEMIC** `TestCoreAsync` — All 10 SaaS files | `catch { return false; }` swallows all exceptions including `OperationCanceledException`. Same pattern as prior chunks. |
+| 2172 | 9 | P1 | `UltimateConnector/Strategies/SaaS/ServiceNowConnectionStrategy.cs:37` | Default instance `"dev12345"` — misconfigured caller silently connects to third-party `dev12345.service-now.com`. Data leak risk. Should validate non-empty and throw. |
+| 2173 | 9 | P1 | `UltimateConnector/Strategies/SaaS/ZendeskConnectionStrategy.cs:20` | Default subdomain `"example"` → silently targets `example.zendesk.com`. Same risk as #2172. |
+| 2174 | 1 | P1 | **SYSTEMIC** `ConnectCoreAsync` — `ShopifyConnectionStrategy.cs:20`, `WorkdayConnectionStrategy.cs:20`, `ZuoraConnectionStrategy.cs:20`, `ZendeskConnectionStrategy.cs:20`, `SuccessFactorsConnectionStrategy.cs:20` | No authentication headers set. APIs require OAuth/Bearer/Basic auth. Handle is constructed unauthenticated — all API calls get 401. |
+| 2175 | 1 | P1 | **SYSTEMIC** `AuthenticateAsync` — `ServiceNowConnectionStrategy.cs:92`, `ShopifyConnectionStrategy.cs:24`, `SuccessFactorsConnectionStrategy.cs:24`, `WorkdayConnectionStrategy.cs:24`, `ZendeskConnectionStrategy.cs:24`, `ZuoraConnectionStrategy.cs:24` | Returns `Guid.NewGuid().ToString("N")` — random string, not a real auth token. Rule 13 stub. |
+| 2176 | 4 | P1 | **SYSTEMIC** — `ApacheDruidConnectionStrategy.cs:43`, `ApacheIgniteConnectionStrategy.cs:23`, `ApachePinotConnectionStrategy.cs:32`, `CrateDbConnectionStrategy.cs:24`, `ClickHouseConnectionStrategy.cs:44` | `Capabilities` declares `SupportsSsl: true` but connection always uses `http://`. No HTTPS code path. ClickHouse strips `https://` then reconstructs as `http://` — silent downgrade. |
+| 2177 | 12 | P1 | `UltimateConnector/Strategies/SaaS/SlackConnectionStrategy.cs:103,127-128` | `doc.RootElement.GetProperty("ok")` without checking HTTP status. 5xx returns HTML → unhandled `JsonException`. Missing `EnsureSuccessStatusCode()`. |
+| 2178 | 14 | P1 | `UltimateConnector/Strategies/SpecializedDb/ApacheIgniteConnectionStrategy.cs:37` | SQL query via GET URL with `qryfldexe` — missing required `cacheName` parameter. All `ExecuteQueryAsync` calls silently return empty (error swallowed by catch). |
+| 2179 | 12 | P1 | `UltimateConnector/Strategies/SpecializedDb/ClickHouseConnectionStrategy.cs:96` | Always appends `" FORMAT JSONEachRow"` — conflicts with user-provided FORMAT clause. Large queries exceed URL length limits as GET parameters. |
+| 2180 | 12 | P2 | **SYSTEMIC** `GetHealthCoreAsync` — `ApacheDruidConnectionStrategy.cs:79` (8ms), `ApacheIgniteConnectionStrategy.cs:30` (8ms), `ApachePinotConnectionStrategy.cs:55` (7ms), `ClickHouseConnectionStrategy.cs:87` (5ms), `CrateDbConnectionStrategy.cs:31` (6ms) | Hardcoded latency values instead of `Stopwatch` measurement. Health data useless for alerting. |
+| 2181 | 15 | P2 | `UltimateConnector/Strategies/SpecializedDb/ApacheDruidConnectionStrategy.cs:103-118` | `ExecuteNonQueryAsync` sends to `/druid/v2/sql` returning `1` on success. Druid SQL doesn't support DML — method accepts INSERT/UPDATE/DELETE and fabricates row count. |
+| 2182 | 14 | P2 | `UltimateConnector/Strategies/SaaS/ServiceNowConnectionStrategy.cs:113` | `sysparm_fields` values joined with commas but not individually URL-encoded. Special chars produce malformed query string. |
+| 2183 | 14 | P2 | `UltimateConnector/Strategies/SaaS/SendGridConnectionStrategy.cs:205` | `ListTemplatesAsync` hardcodes `page_size=50` with no pagination. >50 templates silently truncated. |
+| 2184 | 14 | P2 | `UltimateConnector/Strategies/SaaS/SlackConnectionStrategy.cs:127` | `ListChannelsAsync` — no cursor-based paging for >1000 channels (Slack default limit). |
+| 2185 | - | LOW | `UltimateConnector/Strategies/SaaS/StripeConnectionStrategy.cs` | Webhook verification correctly implemented with `CryptographicOperations.FixedTimeEquals` + HMAC-SHA256 — only systemic findings apply. |
+| 2186 | - | LOW | `UltimateConnector/Strategies/SaaS/TwilioConnectionStrategy.cs` | Individual API methods well-structured — only systemic findings apply. |
+| 2187 | - | LOW | `UltimateConnector/Strategies/SpecializedDb/CrateDbConnectionStrategy.cs:24` | `http://` only despite CrateDB native TLS support. Same as #2176. |
+| 2188 | - | LOW | `UltimateConnector/Strategies/SpecializedDb/ApachePinotConnectionStrategy.cs` | Query API path `/query/sql` correct — only systemic findings apply. |
+
+**Clean files:** StripeConnectionStrategy, TwilioConnectionStrategy (only systemic issues)
+
+---
+
+### Plugin Chunk 059 (15 files: SpecializedDb/DuckDb–UltimateConsensus/ConsistentHash)
+**Files Reviewed:** 15 | **Findings:** 23 (1 P0, 12 P1, 7 P2, 3 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2189 | 12 | P0 | `UltimateConsensus/ConsistentHash.cs:95-101` | **Data-loss routing bug**: `RemoveNode` removes from `_activeNodes` but doesn't reduce `_bucketCount`. `Route` uses `_bucketCount` directly without consulting `_activeNodes` — removed nodes still receive traffic. Keys hashing to dead node's bucket routed to dead Raft group until restart. |
+| 2190 | 1 | P1 | **SYSTEMIC** — `HazelcastConnectionStrategy.cs:31-33`, `MemgraphConnectionStrategy.cs:62-80`, `NuoDbConnectionStrategy.cs:30-32`, `QuestDbConnectionStrategy.cs:58-77`, `RethinkDbConnectionStrategy.cs:30-32`, `SingleStoreConnectionStrategy.cs:30-32`, `SurrealDbConnectionStrategy.cs:60-78`, `TigerGraphConnectionStrategy.cs:60-78`, `VoltDbConnectionStrategy.cs:31-33` | Rule 13 stubs: `ExecuteQueryAsync`/`ExecuteNonQueryAsync`/`GetSchemaAsync` return hardcoded fake data (e.g. `{ ["key"]="key1" }`, hardcoded `1` rows, static schemas) behind `Task.Delay`. Nine strategies produce invented results indistinguishable from real data. |
+| 2191 | 2 | P1 | **SYSTEMIC** — `EventStoreDbConnectionStrategy.cs:13`, `FaunaDbConnectionStrategy.cs:13`, `HazelcastConnectionStrategy.cs:13`, `QuestDbConnectionStrategy.cs:13`, `SurrealDbConnectionStrategy.cs:13`, `TigerGraphConnectionStrategy.cs:13`, `VoltDbConnectionStrategy.cs:13` | `_httpClient` unsynchronized instance field. Concurrent `ConnectCoreAsync` races to assign — old client leaks, torn state. |
+| 2192 | 2 | P1 | **SYSTEMIC** — `FoundationDbConnectionStrategy.cs:13`, `MemgraphConnectionStrategy.cs:13`, `NuoDbConnectionStrategy.cs:13`, `RethinkDbConnectionStrategy.cs:13`, `SingleStoreConnectionStrategy.cs:13` | Same race as #2191 but for `_tcpClient`. Previous `TcpClient` undisposed on concurrent reconnect. |
+| 2193 | 5 | P1 | **SYSTEMIC** — `EventStoreDbConnectionStrategy.cs:62,81,103`, `FaunaDbConnectionStrategy.cs:66,78,103`, `QuestDbConnectionStrategy.cs:42`, `SurrealDbConnectionStrategy.cs:44`, `TigerGraphConnectionStrategy.cs:44`, `VoltDbConnectionStrategy.cs:28` | Silent catches swallow all exceptions. Caller gets empty result or `false` with no way to distinguish "no data" from "connection failed". |
+| 2194 | 7 | P1 | **SYSTEMIC** — EventStoreDb, FaunaDb, Hazelcast, QuestDb, SurrealDb, TigerGraph, VoltDb | `new HttpClient { ... }` per instance without `IHttpClientFactory`. Socket exhaustion under reconnect load. |
+| 2195 | 4 | P1 | `UltimateConnector/Strategies/SpecializedDb/EventStoreDbConnectionStrategy.cs:76` | JSON injection: `eventData` from `command.Split('|')[2]` embedded via string interpolation into JSON body. Malformed JSON or embedded quotes break payload structure. Use `JsonSerializer.Serialize`. |
+| 2196 | 2 | P1 | `UltimateConnector/Strategies/SpecializedDb/DuckDbConnectionStrategy.cs:12,30,38,43` | `_filePath` unsynchronized field — `DisconnectCoreAsync` sets `null`, concurrent `TestCoreAsync` reads stale/null value. Torn reads on reconnect. |
+| 2197 | 1 | P1 | `UltimateConnector/Strategies/SpecializedDb/DuckDbConnectionStrategy.cs:53-73` | `ExecuteQueryAsync`/`ExecuteNonQueryAsync`/`GetSchemaAsync` return empty results silently. `Capabilities` claims `SupportsBulkOperations: true`, `SupportsSchemaDiscovery: true` — lies. |
+| 2198 | 1 | P1 | `UltimateConnector/Strategies/SpecializedDb/FoundationDbConnectionStrategy.cs:30-46` | Same as #2197 — `ExecuteQueryAsync`/`ExecuteNonQueryAsync` silently return empty/0. `Capabilities` claims `SupportsPooling: true`, `SupportsBulkOperations: true`. |
+| 2199 | 12 | P1 | **SYSTEMIC** `TestCoreAsync` — `FoundationDbConnectionStrategy.cs:27`, `MemgraphConnectionStrategy.cs:37`, `NuoDbConnectionStrategy.cs:27`, `RethinkDbConnectionStrategy.cs:27`, `SingleStoreConnectionStrategy.cs:27` | `Task.Delay(N)` + `TcpClient.Connected` — Connected reflects last I/O, not live state. Dead connections report healthy indefinitely. |
+| 2200 | 5 | P1 | `UltimateConnector/UltimateConnectorPlugin.cs:457-460` | Silent catch in `PublishStrategyRegisteredAsync` — strategy registration failures silently dropped. No way to detect missing bus broadcast at startup. |
+| 2201 | 2 | P1 | `UltimateConnector/UltimateConnectorPlugin.cs:47,154` | `_initialized` plain `bool` without synchronization. Concurrent `OnStartCoreAsync` races — both execute full discovery, no memory barrier on write. |
+| 2202 | 4 | P2 | `UltimateConnector/Strategies/SpecializedDb/FaunaDbConnectionStrategy.cs:22-26` | SSRF: auth credential sent to endpoint from user-supplied `config.ConnectionString`. Attacker-controlled URL receives bearer token. Validate endpoint domain. |
+| 2203 | 9 | P2 | **SYSTEMIC** `ParseHostPort` — `FoundationDbConnectionStrategy.cs:47`, `RethinkDbConnectionStrategy.cs:33`, `NuoDbConnectionStrategy.cs:33`, `SingleStoreConnectionStrategy.cs:33` | Split on `:` with no null/empty guard. Null/empty ConnectionString → empty hostname → unhelpful `SocketException`. |
+| 2204 | 13 | P2 | `UltimateConnector/UltimateConnectorPlugin.cs:91-141` | `DeclaredCapabilities` property rebuilds `List<RegisteredCapability>` from all 283 strategies on every access. O(n) LINQ on every handshake call. Cache after init. |
+| 2205 | 13 | P2 | `UltimateConnector/UltimateConnectorPlugin.cs:209-263` | `GetStaticKnowledge()` runs 3 separate `Count(predicate)` + `GroupBy` over all strategies = O(4n) per call. Pre-compute during init. |
+| 2206 | 15 | P2 | `UltimateConnector/Strategies/SpecializedDb/HazelcastConnectionStrategy.cs:18` | `Capabilities` declares `SupportsTransactions: false` — Hazelcast supports XA transactions. Contract lie may cause callers to avoid available transactions. |
+| 2207 | 15 | P2 | `UltimateConnector/Strategies/SpecializedDb/DuckDbConnectionStrategy.cs:19-24` | `Capabilities` declares `SupportsAuthentication: false` — DuckDB supports auth in server mode. Strategy mixes embedded/server modes without surfacing distinction. |
+| 2208 | 12 | P2 | `UltimateConsensus/ConsistentHash.cs:54-60` | `Route(string)` acquires `_lock` for read-only `GetBucket` call. Every routing call blocks all other routing threads. Use `volatile int` for `_bucketCount` so reads are lock-free. |
+| 2209 | 9 | LOW | `UltimateConnector/Strategies/SpecializedDb/EventStoreDbConnectionStrategy.cs:105` | `ParseHostPort` strips `http://` but not `https://`. TLS connection string includes scheme in hostname. |
+| 2210 | 9 | LOW | `UltimateConnector/Strategies/SpecializedDb/DuckDbConnectionStrategy.cs:30` | No null/empty validation on `ConnectionString` for non-`:memory:` paths. Empty string passes `TestCoreAsync` (not null). |
+| 2211 | 14 | LOW | `UltimateConsensus/ConsistentHash.cs:42-46` | `GetBucket` returns `0` for `numBuckets <= 0` silently. Public static method should throw `ArgumentOutOfRangeException`. |
+
+**Clean files:** None — all 15 files have findings.
+
+---
+
+### Plugin Chunk 060 (15 files: UltimateConsensus/IRaftStrategy–UltimateDataCatalog/LivingCatalogStrategies)
+
+**Files Reviewed:** 15 | **Findings:** 16 (0 P0, 8 P1, 4 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2212 | 1 | P1 | `UltimateConsensus/UltimateConsensusPlugin.cs:113-124` | Rule 13: Constructor `TODO (v6.0)` states `InMemoryClusterMembership` and `InMemoryP2PNetwork` are "DEV-ONLY / SINGLE-NODE". Multi-node deployment silently runs in-memory consensus with no real transport — proposals to peers throw `InvalidOperationException`. Advertises multi-node Raft but only works single-node. |
+| 2213 | 5 | P1 | **SYSTEMIC** — `UltimateConsensus/Scaling/SegmentedRaftLog.cs:553-556,612-616` | Two silent catches: (1) `LoadSegmentsAsync` discards all deserialization/IO exceptions with `// Skip corrupted segment` — no diagnostic output. (2) `LoadPersistentStateAsync` resets `currentTerm` to 0 on any parse error — stale node re-votes in a term already promised. |
+| 2214 | 5 | P1 | `UltimateConsensus/Scaling/SegmentedRaftLog.cs:431-433` | Silent `catch { /* best-effort cleanup */ }` in `RewriteSegmentsAsync` swallows file-delete failures. Old segments remain on disk, causing duplicate log entries on next load. No logging, no retry. |
+| 2215 | 5 | P1 | `UltimateConsensus/UltimateConsensusPlugin.cs:561-566` | Silent catch in `NotifyCommitHandlers` — handler exceptions completely invisible. Need at minimum error counter or structured log. |
+| 2216 | 2 | P1 | `UltimateConsensus/IRaftStrategy.cs:86-89,110` | `PaxosStrategy._isStableLeader` read outside `_lock` without `volatile`/`Volatile.Read` — stale-read race. `_nextProposalNumber` is `long` incremented without `Interlocked` — non-atomic on 32-bit platforms. |
+| 2217 | 10 | P1 | `UltimateConsensus/IRaftStrategy.cs:325-329` | Compaction re-indexes entries in-memory (`_entries[i].Index = i + 1`) but does NOT persist to disk until `RewriteSegmentsAsync`. Crash between mutation and rewrite leaves on-disk indices inconsistent with in-memory. |
+| 2218 | 12 | P1 | `UltimateConsensus/IRaftStrategy.cs:451-455` | PBFT commit HMAC check is tautology: `VerifyHmac(commitHmac, ComputeHmac(...))` where `commitHmac` was computed with identical inputs one line above. Always true — bypasses Byzantine commit quorum validation. |
+| 2219 | 12 | P1 | `UltimateConsensus/IRaftStrategy.cs:524-549` | `TriggerViewChange` ends with comments `// New primary creates NEW-VIEW...` and `// Re-propose uncommitted entries...` — neither implemented. View change silently drops uncommitted entries, violating PBFT safety. |
+| 2220 | 13 | P2 | `UltimateDataCatalog/Scaling/CatalogScalingManager.cs:204-222` | `ListAssets` iterates all 256 shards, concatenates into single list, then `.Skip().Take()`. Materializes up to 25M entries per paginated call. Pagination should be shard-level. |
+| 2221 | 2 | P2 | `UltimateConsensus/Scaling/SegmentedRaftLog.cs:128-134` | `Count`, `GetAsync`, `GetRangeAsync`, `GetFromAsync` access `_entries` List without `_logLock`. Concurrent `AppendAsync`/`TruncateFromAsync` races — torn state or `ArgumentOutOfRangeException`. |
+| 2222 | 13 | P2 | `UltimateDataCatalog/Strategies/LivingCatalog/LivingCatalogStrategies.cs:593-609` | O(N×M²) relationship discovery: nested loop over all source×target columns × all assets. 1000 assets × 100 columns = 10 billion pairs per call. No index, no early exit. |
+| 2223 | 14 | P2 | `UltimateConsensus/IRaftStrategy.cs:683-686` | `PbftGroupState` constructor ignores `totalNodes` param, hardcodes `HighWatermark = 200`. Proposals beyond seq 200 rejected before first checkpoint. Should compute `CheckpointInterval * 2`. |
+| 2224 | 5 | LOW | `UltimateConsensus/Scaling/SegmentedRaftLog.cs:502-508` | Silent catch in `RefreshHotSegments` suppresses mmap errors. Persistent failure causes silent fallback to slower file reads with no visibility. |
+| 2225 | 5 | LOW | `UltimateConsensus/UltimateConsensusPlugin.cs:496-497` | Silent catch for corrupted `commitIndices` resets to zero — nodes may re-propose already-committed entries, causing duplicate state machine application. |
+| 2226 | 12 | LOW | `UltimateDataCatalog/Strategies/LivingCatalog/LivingCatalogStrategies.cs:629-634` | Dead code: `_id` suffix-match branch unreachable — requires both columns equal but exact-match branch at line 622 already returned. |
+| 2227 | 15 | LOW | `UltimateConsensus/UltimateConsensusPlugin.cs:240-243` | `GetClusterStateAsync` sets `Term = maxCommitIndex`. Raft term ≠ commit index — callers expecting election term get wrong data. |
+
+**Clean files:** DataCatalogStrategy.cs, ConsensusScalingManager.cs, AccessControlStrategies.cs, AssetDiscoveryStrategies.cs, CatalogApiStrategies.cs, CatalogUIStrategies.cs, DataRelationshipsStrategies.cs, DocumentationStrategies.cs, DarkDataDiscoveryStrategies.cs, RetroactiveScoringStrategies.cs
+
+---
+
+### Plugin Chunk 061 (15 files: UltimateDataCatalog/MarketplaceStrategies–UltimateDataFormat/GeoTiffStrategy)
+
+**Files Reviewed:** 15 | **Findings:** 15 (0 P0, 6 P1, 7 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2228 | 1 | P1 | **SYSTEMIC** — `UltimateDataFormat/Strategies/AI/OnnxStrategy.cs:91-109`, `UltimateDataFormat/Strategies/Geo/GeoTiffStrategy.cs:80-112` | Rule 13 stubs: `ParseAsync` and `SerializeAsync` return `DataFormatResult.Fail(...)` citing absent library dependency. Format detection succeeds but all data operations always fail. |
+| 2229 | 1 | P1 | `UltimateDataFormat/Strategies/Binary/ProtobufStrategy.cs:7,74-111` | Rule 13: Class comment says "Stub implementation". `ParseAsync`/`SerializeAsync` return `Fail` citing need for `Google.Protobuf`. `ValidateCoreAsync` returns `Valid` unconditionally when schema provided — no bytes validated. |
+| 2230 | 1 | P1 | `UltimateDataFormat/Strategies/Geo/GeoTiffStrategy.cs:114-150` | Stub schema extraction: `ExtractSchemaCoreAsync` returns hardcoded placeholder `FormatSchema` with `RawSchema = "Schema extraction requires TIFF library..."` and three fake fields (`crs`, `bounds`, `raster`). Not derived from file data. |
+| 2231 | 5 | P1 | **SYSTEMIC** — `UltimateDataCatalog/UltimateDataCatalogPlugin.cs:525,537,549` | Three `catch { /* corrupted state — start fresh */ }` blocks swallow deserialization errors for assets, relationships, and glossary. Silent data loss on startup with zero diagnostics. |
+| 2232 | 9 | P1 | `UltimateDataFormat/Strategies/AI/SafeTensorsStrategy.cs:118-119,154` | `headerLength` read as `long`, cast to `(int)headerLength` for allocation without overflow check. Malicious file with header >2GB causes unchecked integer overflow. Same at line 154 `(int)tensorSize`. |
+| 2233 | 7 | P1 | **SYSTEMIC** — `UltimateDataFormat/Strategies/AI/OnnxStrategy.cs:117`, `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:81`, `UltimateDataFormat/Strategies/Columnar/ArrowStrategy.cs:110,194` | Unbounded allocation from untrusted stream length: `new byte[stream.Length]` with no upper bound. 2GB+ stream causes immediate OOM. |
+| 2234 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:723` | Unsafe `long`→`int` cast: `new MemoryStream(fileBytes, (int)sOffset, sLength)` silently truncates stripe offset. Files >2GB get wrong slices or `ArgumentOutOfRangeException`. |
+| 2235 | 2 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:97` | `_flights` is plain `Dictionary<string, FlightRegistration>` accessed concurrently from `DoPut` (write) and `GetFlightInfo`/`DoGet`/`ListFlights` (reads). Race condition → data corruption or `InvalidOperationException`. Use `ConcurrentDictionary`. |
+| 2236 | 13 | P2 | `UltimateDataFormat/Strategies/AI/SafeTensorsStrategy.cs:152-154` | O(n) random-access seeks per tensor in `ParseAsync`. Non-seekable streams (network) throw at runtime with no guard. `Capabilities.Streaming = false` mitigates but no explicit check. |
+| 2237 | 12 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:409` | `SerializeAsync` calls `output.Write(payload, 0, payload.Length)` synchronously in an async method. Blocks thread pool on large Arrow payloads. Should use `WriteAsync`. |
+| 2238 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:760` | `allColumns.Add(null!)` fills list with null references via null-forgiving operator. If zero stripes, nulls propagate to `ColumnarBatch`. Error-prone initialization pattern. |
+| 2239 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/ParquetStrategy.cs:99` | `await foreach` over `ReadFromStream(input)` without `.WithCancellation(ct)`. Cancellation only checked between batches via `ct.ThrowIfCancellationRequested()`. Large files delay or ignore cancellation. |
+| 2240 | 1 | P2 | `UltimateDataFormat/Strategies/Binary/ProtobufStrategy.cs:99-111` | `ValidateCoreAsync` returns `Valid` when schema provided without reading any bytes. Non-protobuf file with any schema object reported as valid — contract lie. |
+| 2241 | 15 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:477` | `PostscriptSize = 13` hardcoded constant. Any layout change without updating this constant silently breaks the entire format. Should be computed. |
+| 2242 | 10 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:435` | Variable `offset` reused as both row offset and byte position. Name collision with `stripeOffset` pattern could cause maintenance bugs. |
+
+**Clean files:** MarketplaceStrategies.cs, SchemaRegistryStrategies.cs, SearchDiscoveryStrategies.cs, MessagePackStrategy.cs, ColumnarFormatVerification.cs, ArrowStrategy.cs, GeoJsonStrategy.cs
+
+---
+
+### Plugin Chunk 062 (15 files: UltimateDataFormat/CgnsStrategy–UltimateDataGovernance/SyncConsciousnessWiring)
+
+**Files Reviewed:** 15 | **Findings:** 15 (0 P0, 4 P1, 7 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2243 | 3 | P1 | `UltimateDataGovernance/DataGovernanceStrategyBase.cs:91` | Sync-over-async deadlock risk: `GetHealth()` calls `.GetAwaiter().GetResult()` on `GetCachedHealthAsync(...)`. With ambient `SynchronizationContext` (ASP.NET, WinForms) this deadlocks. |
+| 2244 | 5 | P1 | `UltimateDataFormat/UltimateDataFormatPlugin.cs:141-145` | Silent bare `catch` in `DiscoverAndRegisterStrategies()` swallows all strategy instantiation failures. Misconfigured strategies silently omitted from registry with no diagnostics. |
+| 2245 | 5 | P1 | `UltimateDataFormat/UltimateDataFormatPlugin.cs:224-229` | Silent bare `catch` in `DetectFormat()` per strategy swallows all exceptions including `OutOfMemoryException`. Detection falls through to `null` with no logging. |
+| 2246 | 1 | P1 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:76-86`, `VtkStrategy.cs:68-81` | Rule 13 stubs: `ParseAsync` always returns `DataFormatResult.Fail(...)` citing absent native library. Code comments explicitly say "Stub". Strategies registered as production-capable but no parse path works. |
+| 2247 | 12 | P2 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/VtkStrategy.cs:93,240` | `stream.Length` accessed without seekability check. `NetworkStream`, `GZipStream` throw `NotSupportedException`. CGNS counterpart uses fixed buffer. |
+| 2248 | 13 | P2 | `UltimateDataFormat/Strategies/Text/CsvStrategy.cs:163` | Per-character `c.ToString() == delimiter` allocates on heap every char in every CSV line. Millions of rows = massive GC pressure. Compare as `char` instead. |
+| 2249 | 12 | P2 | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:71,95,99,122` | `Task.Run` wraps synchronous `XDocument.Load`/`Save` — `CancellationToken` not honored. Large XML loads ignore cancellation. Use `XDocument.LoadAsync`. |
+| 2250 | 14 | P2 | `UltimateDataFormat/Strategies/Text/TomlStrategy.cs:57-61` | Over-permissive detection: returns `true` for any content with `[`, `=`, or `#`. INI files, properties files, shell scripts all match. |
+| 2251 | 14 | P2 | `UltimateDataFormat/Strategies/Text/YamlStrategy.cs:59-63` | Over-permissive detection: returns `true` for any content with `: ` (colon-space). HTTP headers, log lines, Python dicts all match. |
+| 2252 | 5 | P2 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:160-164`, `VtkStrategy.cs:229-233` | `ExtractSchemaCoreAsync` has `catch (Exception) { return null; }` — silent swallow including `OutOfMemoryException`. No logging. |
+| 2253 | 7 | P2 | `UltimateDataGovernance/DataGovernanceStrategyBase.cs:69-80` | `async Task` + `await Task.CompletedTask` in no-op `InitializeAsyncCore`/`ShutdownAsyncCore` creates unnecessary state machine allocations. Systemic across governance hierarchy. |
+| 2254 | 2 | LOW | `UltimateDataGovernance/Moonshots/CrossMoonshot/CrossMoonshotWiringRegistrar.cs:28` | `_registeredWirings` is plain `List<WiringEntry>` mutated by `RegisterAllAsync`/`UnregisterAllAsync` without synchronization. Concurrent calls corrupt list. |
+| 2255 | 15 | LOW | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:40` | `Extensions` includes `.xsd` but parse logic treats all XML identically. XSD has schema-specific semantics requiring different handling. |
+| 2256 | 15 | LOW | `UltimateDataFormat/Strategies/Text/JsonStrategy.cs:98` | `(bool)context.Options["indent"]` — direct cast without type guard. String `"true"` throws `InvalidCastException` that propagates unhandled. |
+| 2257 | 1 | LOW | `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:99-103` | `ExtractSchemaCoreAsync` returns hardcoded template schema without reading stream. Comment acknowledges "simplified stub". Rule 13 fake data. |
+
+**Clean files:** ChaosImmunityWiring.cs, ComplianceSovereigntyWiring.cs, FabricPlacementWiring.cs, PlacementCarbonWiring.cs, SyncConsciousnessWiring.cs
+
+---
+
+### Plugin Chunk 063 (15 files: UltimateDataGovernance/TagConsciousnessWiring–UltimateDataGovernance/MoonshotOrchestrator)
+
+**Files Reviewed:** 15 | **Findings:** 5 (0 P0, 1 P1, 2 P2, 2 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2258 | 2 | P1 | `UltimateDataGovernance/Moonshots/HealthProbes/MoonshotHealthAggregator.cs:23,75,124,149,166` | `_lastCheckTimes` is plain `Dictionary<MoonshotId, DateTimeOffset>` mutated inside `Task.WhenAll` parallel probe execution and read/written without synchronization. Concurrent `CheckAllAsync` calls produce data race. Use `ConcurrentDictionary`. |
+| 2259 | 12 | P2 | `UltimateDataGovernance/Moonshots/HealthProbes/MoonshotHealthAggregator.cs:191` | Empty `_probes` list returns empty results with no warning. Operator deploying with zero registered probes sees `0/0 moonshots ready` with no indication health monitoring is non-functional. |
+| 2260 | 12 | P2 | `UltimateDataGovernance/Moonshots/CrossMoonshot/TagConsciousnessWiring.cs:85-88` | Double `TryGetValue` on same key `"score"` — second call redundant. `sv` from first call already holds value. Use single lookup with `is double d ? d : is int i ? (double)i : 0.0`. |
+| 2261 | 10 | LOW | `UltimateDataGovernance/Moonshots/CrossMoonshot/TimeLockComplianceWiring.cs:27` | Comment says "minimum: 3 years (configurable)" but value is hardcoded `static readonly` with no override mechanism. GDPR retention periods vary by data category. |
+| 2262 | 15 | LOW | `UltimateDataGovernance/Moonshots/HealthProbes/MoonshotHealthAggregator.cs:108` | `RunPeriodicHealthChecksAsync` performs immediate full check before entering loop. Name implies periodic-only. Undocumented eager check causes double-checking at startup. |
+
+**Clean files:** DefaultPipelineDefinition.cs, CarbonHealthProbe.cs, ChaosHealthProbe.cs, ComplianceHealthProbe.cs, ConsciousnessHealthProbe.cs, FabricHealthProbe.cs, PlacementHealthProbe.cs, SemanticSyncHealthProbe.cs, SovereigntyHealthProbe.cs, TagsHealthProbe.cs, TimeLockHealthProbe.cs, MoonshotOrchestrator.cs
+
+---
+
+### Plugin Chunk 064 (15 files: UltimateDataGovernance/MoonshotPipelineStages–UltimateDataGovernance/ValueScoringStrategies)
+
+**Files Reviewed:** 15 | **Findings:** 17 (1 P0, 4 P1, 8 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2263 | 11 | P0 | `UltimateDataGovernance/Strategies/IntelligentGovernance/IntelligentGovernanceStrategies.cs:376-380` | **Compliance-gap detection completely broken**: `RegisterFramework` creates `FrameworkRequirements` with freshly allocated empty `BoundedDictionary`, discards the `requirements` parameter entirely. Seeded GDPR/HIPAA/PCI-DSS requirements never inserted. `DetectGaps` always finds zero requirements → always reports full compliance. Entire feature is a no-op. |
+| 2264 | 5 | P1 | `UltimateDataGovernance/Scaling/GovernanceScalingManager.cs:385-388` | Silent catch in `RefreshInBackgroundAsync` swallows all backing-store read exceptions. Failed refreshes leave stale cache data with no diagnostic signal. |
+| 2265 | 6 | P1 | **SYSTEMIC** — `UltimateDataGovernance/Scaling/GovernanceScalingManager.cs:185,238,290` | Fire-and-forget `_ = RefreshInBackgroundAsync(...)` in `GetPolicyAsync`, `GetOwnershipAsync`, `GetClassificationAsync`. Unhandled exceptions silently swallowed. No dedup guard — concurrent stale reads launch unbounded parallel refreshes for same key. |
+| 2266 | 10 | P1 | `UltimateDataGovernance/Moonshots/MoonshotRegistryImpl.cs:53-71` | TOCTOU race in `UpdateStatus`: reads existing, checks oldStatus, calls TryUpdate. Concurrent callers both reading same record → second writer's update silently lost, StatusChanged event fires only for first. |
+| 2267 | 12 | P1 | `UltimateDataGovernance/Strategies/IntelligentGovernance/ValueScoringStrategies.cs:510-522` | Logic bug in `ComplianceValueStrategy.Score`: `score` recomputed 3 times, final `score = frameworkCount * 10.0` discards 80-point audit base. Dead reassignment before closing `Math.Max`. |
+| 2268 | 13 | P2 | `UltimateDataGovernance/Scaling/GovernanceScalingManager.cs:185-292` | No dedup guard on stale-while-revalidate refreshes. N concurrent stale-key reads → N independent backing-store reads for same key. Use in-flight refresh registry. |
+| 2269 | 2 | P2 | `UltimateDataGovernance/Strategies/GovernanceEnhancedStrategies.cs:42-45` | `AddOrUpdate` factory may be called multiple times under contention — sample could be double-inserted into calibration list. Latent defect in hot paths. |
+| 2270 | 14 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoArchiveStrategies.cs:141-152` | Missing `created_at` metadata → age check skipped entirely. Newly-created objects with no timestamp bypass minimum-age protection. |
+| 2271 | 14 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoArchiveStrategies.cs:285-303` | `daysSinceAccess` defaults to 0 when `last_accessed` absent — never-accessed data gets decay factor 1.0 (no decay). Should decay more aggressively, not less. |
+| 2272 | 15 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoArchiveStrategies.cs:521-522` | `TierDepthOrder` contains `"glacier"` but no strategy ever produces this tier name. Dead entry suggests unfinished implementation. |
+| 2273 | 12 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoPurgeStrategies.cs:683-685` | Urgency comparison relies on undocumented enum ordinal ordering (`Immediate=0 < High=1 < ...`). Future enum reorder silently inverts selection. |
+| 2274 | 13 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/ConsciousnessScoringEngine.cs:244-247` | `IncrementCounter(name, amount)` uses serial for-loop of single increments. O(n) for large batches. Use `Interlocked.Add`. |
+| 2275 | 14 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/LiabilityScoringStrategies.cs:68-69` | CVV pattern `\b\d{3,4}\b` matches any 3-4 digit number (zip codes, years, ports). Massive false-positive rate inflates PCI liability scores. |
+| 2276 | 1 | LOW | **SYSTEMIC** — AuditReportingStrategies.cs, DataClassificationStrategies.cs, DataOwnershipStrategies.cs, DataStewardshipStrategies.cs | Metadata-only shells with zero behavioral logic. Acceptable only if `DataGovernanceStrategyBase` has complete non-placeholder default. |
+| 2277 | 9 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoPurgeStrategies.cs:699-710` | No-purge decision hardcodes `Reason: PurgeReason.ToxicData` even though neither strategy triggered. Misleading reason field. |
+| 2278 | 9 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoArchiveStrategies.cs:467-471` | `_transitionLog` AddOrUpdate mutates inner List without lock. Concurrent AddOrUpdate callers corrupt list. `GetTransitionHistory` reads without lock. |
+| 2279 | 12 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/IntelligentGovernanceStrategies.cs:604-610` | `AddRuleInternal` mutates `List<ClassificationRule>` in `_rules` AddOrUpdate factory without lock. Concurrent post-construction `AddRule` calls race. `Classify` iterates without lock. |
+
+**Clean files:** MoonshotPipelineStages.cs, IngestPipelineConsciousnessStrategy.cs
+
+---
+
+### Plugin Chunk 065 (15 files: UltimateDataGovernance/LineageTracking–UltimateDataIntegration/SchemaEvolutionStrategies)
+
+**Files Reviewed:** 15 | **Findings:** 27 (0 P0, 9 P1, 14 P2, 4 LOW)
+
+| # | Cat | Sev | File:Line | Description |
+|---|-----|-----|-----------|-------------|
+| 2280 | 5 | P1 | `UltimateDataGovernance/UltimateDataGovernancePlugin.cs:576-577` | **SYSTEMIC** — Three silent `catch { /* corrupted state */ }` blocks in `OnStartCoreAsync` swallow all exceptions (OOM, JsonException). No logging, no metrics. |
+| 2281 | 6 | P1 | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:449-471` | Timer callback fires `_ = RequestPatternDetection()` — returned Task discarded. Exceptions inside Task.Run silently swallowed. Unobserved task faults. |
+| 2282 | 1 | P1 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:119-133` | Rule 13 stub: `ExtractAsync` returns 1,000 synthetic records (`data = "record_{i}"`). Source ConnectionString/Query/Options completely ignored. |
+| 2283 | 1 | P1 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:206-213` | Rule 13 stub: `LoadAsync` is `return Task.CompletedTask`. All records silently discarded, EtlTarget never used. Load phase is no-op. |
+| 2284 | 1 | P1 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:105-128` | Rule 13 stubs: `LoadRawDataAsync` returns hardcoded `RecordsLoaded=100000`, `ExecuteTransformationAsync` returns hardcoded `RowsAffected=95000`. Comments say "Simulate". |
+| 2285 | 1 | P1 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:371-386` | Rule 13 stub: `ExtractFromWarehouseAsync` generates 1,000 fake records with `customer_id="CUST_{i}"`, `score=85.5`. Query/ConnectionString never used. |
+| 2286 | 2 | P1 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:263-266` | `FireTriggerAsync` mutates inner `List<ChangeRecord>` in BoundedDictionary without synchronization. Concurrent calls corrupt list. |
+| 2287 | 2 | P1 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:591,616,628` | `EventSourcingCdcStrategy.AppendEventAsync` mutates `stream.Version++` and `events.Add()` without synchronization. Concurrent appends produce duplicate versions or corrupted lists. |
+| 2288 | 15 | P1 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyManagementStrategies.cs:99-109` | **Fail-open default**: `EvaluatePolicy` returns `IsAllowed=true` when policy not found. Invalid/typo'd policy ID silently permits access. Must fail-closed. |
+| 2289 | 13 | P2 | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:91-93` | `records.ToList().IndexOf(record)` inside per-error catch — O(n) scan per error → O(n²) for large error sets. Use loop index. |
+| 2290 | 13 | P2 | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:336-386` | `CalculateSimilarity` does dual LINQ glossary scans per field pair inside O(src×tgt) nested loop. O(n²×m) with no caching. |
+| 2291 | 1 | P2 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:651` | Rule 13: `IncrementalEtlPipelineStrategy.ExecuteRunAsync` hardcodes `recordsProcessed=500`. Incremental extraction never performed. Watermark advanced regardless. |
+| 2292 | 1 | P2 | **SYSTEMIC** — `UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs:411-432` | Rule 13: `UnifiedBatchStreamingStrategy` mode methods return hardcoded fake counts (100K/50K/75K). DataSource never used. |
+| 2293 | 1 | P2 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:491-504` | Rule 13: `MedallionArchitectureStrategy` tier methods return hardcoded counts (100K/95K/50K). Pipeline/Source never used. |
+| 2294 | 1 | P2 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:265-275` | Rule 13: `DbtStyleTransformationStrategy.ExecuteModelAsync` returns hardcoded `RowsAffected=10000`. SqlQuery never executed. |
+| 2295 | 1 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:564-572` | Rule 13: `SchemaMigrationStrategy.ExecuteStepAsync` always returns `Success=true, DurationMs=100`. No actual DDL execution. |
+| 2296 | 10 | P2 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs:149-153` | `GetVersionHistory` returns `history.AsReadOnly()` without lock while `RecordVersion` mutates list under lock. TOCTOU — reader observes partial writes. |
+| 2297 | 2 | P2 | `UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs:82-83,120-121` | `LambdaArchitectureStrategy` mutates `batchView.TotalRecords` and `speedView.TotalEvents` on sealed record mutable props without synchronization. |
+| 2298 | 12 | P2 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:259-263` | `TopologicalSort` sorts by `Dependencies.Count` not actual topological order. Equal-count models not ordered correctly → incorrect DAG execution. |
+| 2299 | 10 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:714-715` | `GenerateSchemaId` uses `definition.GetHashCode()` — not stable across .NET process restarts (string hash randomization). Breaks persistent schema refs. |
+| 2300 | 14 | P2 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:132-158` | `SimulateChangeAsync` is public production API named "Simulate" but enqueues into live queue. Misleading name. Rename to `InjectChangeEventAsync`. |
+| 2301 | 9 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:688-692` | `int.Parse(k.Split(":v")[1])` with no try-catch. Subject name containing `:v` throws `IndexOutOfRangeException`. Caller-controlled, not validated. |
+| 2302 | 15 | P2 | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:238-240` | `RejectProposalAsync` stores `rejectedBy` in `ApprovedBy` property. Semantically wrong — implies approval on rejection record. |
+| 2303 | 2 | LOW | `UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs:493-516` | `HybridIntegrationStrategy` mutates `pipeline.CurrentMode`/`LastModeSwitch` on sealed record without sync. Concurrent calls race. |
+| 2304 | 14 | LOW | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyManagementStrategies.cs:141-145` | `_violations` ContainsKey then index-assign is non-atomic. Concurrent threads may overwrite. Use GetOrAdd/AddOrUpdate. |
+| 2305 | 14 | LOW | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:304-310` | `Convert.ToDouble(payload["changePercentage"])` — fragile if value is string. Use `double.TryParse`. |
+| 2306 | 15 | LOW | `UltimateDataIntegration/Strategies/Monitoring/IntegrationMonitoringStrategies.cs` | No findings — listed as clean but agent numbered as 2326. Actually clean. |
+
+**Clean files:** LineageTrackingStrategies.cs, RegulatoryComplianceStrategies.cs, RetentionManagementStrategies.cs, DataValidationEngine.cs, IntegrationMonitoringStrategies.cs
+
+---
+
+
+### Chunk 066 — UltimateDataGovernance (PolicyMgmt, Regulatory, Retention, Plugin) + UltimateDataIntegration (Composition, BatchStreaming, CDC, ELT, ETL, Mapping, Monitoring, SchemaEvolution, Transformation)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2307 | 2 | P1 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs:139-152` | `RecordVersion` uses `lock(list)` on a `List<T>` returned from `AddOrUpdate`. Readers via `GetVersionHistory` access `history.AsReadOnly()` without sync. Concurrent reads/writes not fully protected. |
+| 2308 | 2 | P1 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyManagementStrategies.cs:141-145` | `PolicyEnforcementStrategy.EvaluatePolicy` TOCTOU race: `ContainsKey` then index-assign on `_violations` -- two concurrent evaluations for same resourceId can create two lists, one lost. |
+| 2309 | 2 | P1 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:590-628` | `EventSourcingCdcStrategy.AppendEventAsync` reads `stream.Version`, increments, appends to `_events[streamId]` list without lock. Concurrent calls produce duplicate versions and lost events. |
+| 2310 | 2 | P1 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:253-269` | `TriggerBasedCdcStrategy.FireTriggerAsync` calls `changeTable.Add(record)` on plain `List<ChangeRecord>` stored in BoundedDictionary with no lock. |
+| 2311 | 1 | P1 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:119-132` | `ClassicEtlPipelineStrategy.ExtractAsync` generates 1000 fake records (`record_{i}`) instead of reading from `EtlSource`. Connection string ignored. |
+| 2312 | 1 | P1 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:206-212` | `ClassicEtlPipelineStrategy.LoadAsync` is a complete stub -- "Simulate loading", returns `Task.CompletedTask` without writing to `EtlTarget`. |
+| 2313 | 1 | P1 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:105-128` | `CloudNativeEltStrategy.LoadRawDataAsync` and `ExecuteTransformationAsync` hardcode fake counts (100000/95000) with "Simulate" comments. No actual ELT. |
+| 2314 | 1 | P1 | `UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs:410-432` | `UnifiedBatchStreamingStrategy` ProcessBatch/Streaming/MicroBatch all return hardcoded tuples (100000/50000/75000 records) without real processing. |
+| 2315 | 1 | P1 | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:371-395` | `ReverseEltStrategy.ExtractFromWarehouseAsync` generates fake 1000-record loop with dummy keys. `SyncToTargetAsync` discards records, returns hardcoded success. |
+| 2316 | 5 | P2 | `UltimateDataGovernance/UltimateDataGovernancePlugin.cs:575-577` | Three `catch { /* corrupted state */ }` blocks in `OnStartCoreAsync` discard deserialization exceptions without logging. Silent state loss on restart. |
+| 2317 | 6 | P2 | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:449-472` | `RequestPatternDetection()` returns Task from `Task.Run` but caller is TimerCallback that ignores it. Unhandled exceptions silently swallowed. |
+| 2318 | 7 | P2 | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:496-508` | `Dispose()` not thread-safe: `_disposed` set at end not beginning. Concurrent Start/Stop can use already-disposed resources. |
+| 2319 | 13 | P2 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs:92-93` | `ListPolicies` chains Skip/Take on full OrderByDescending enumeration. Redundant `AsEnumerable()` call. |
+| 2320 | 13 | P2 | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:91-93` | `ApplyMappingAsync` calls `records.ToList().IndexOf(record)` inside error catch -- O(n) per error with full list allocation. |
+| 2321 | 13 | P2 | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:337-355` | `SemanticMappingStrategy.CalculateSimilarity` iterates `_businessGlossary.Values` twice per comparison; `SuggestMappingsAsync` calls it per (source,target) pair -- O(n^3). |
+| 2322 | 13 | P2 | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:358-376` | `LevenshteinDistance` allocates 2D `int[a.Length+1, b.Length+1]` per call. Span-based single-row DP would avoid heap allocations. |
+| 2323 | 10 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:57-65` | `ForwardCompatibleSchemaStrategy.RegisterSchemaAsync` ContainsKey+Add without lock. Concurrent registrations produce duplicate version numbers. |
+| 2324 | 10 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:199-207` | Same race in `BackwardCompatibleSchemaStrategy` and `FullCompatibleSchemaStrategy` RegisterSchemaAsync (lines 319-323). |
+| 2325 | 12 | P2 | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:161-163` | `ApplyTransformation` for Filter/Aggregate/Deduplicate all return record unchanged with "Would apply" comments. Silent no-ops producing incorrect results. |
+| 2326 | 12 | P2 | `UltimateDataIntegration/Strategies/Transformation/DataTransformationStrategies.cs:369-371` | `DataCleansingStrategy.ApplyCleansingRule` for Standardize sets `modified=true` but never changes value. False modification count. |
+| 2327 | 12 | P2 | `UltimateDataIntegration/Strategies/Transformation/DataTransformationStrategies.cs:651-658` | `DataNormalizationStrategy.ApplyNormalizationRule` for UnitConversion/AddressStandard same pattern: `modified=true` with unchanged value. |
+| 2328 | 14 | P2 | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:713-715` | `GenerateSchemaId` uses `string.GetHashCode()` -- non-deterministic across process restarts. Must not be used as stable identifier. |
+| 2329 | 14 | P2 | `UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs:37-57` | `CreatePolicy` no validation of name/description/category. Empty strings accepted silently. |
+| 2330 | 14 | P2 | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:370-391` | `TimestampBasedCdcStrategy.PollChangesAsync` calls `DateTime.Parse(ts.ToString()!)` on user-controlled values without try-catch. FormatException aborts entire poll. |
+| 2331 | 1 | LOW | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:649-651` | `IncrementalEtlPipelineStrategy.ExecuteRunAsync` hardcodes `recordsProcessed = 500`. Always reports 500 regardless of workload. |
+| 2332 | 1 | LOW | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:564-572` | `SchemaMigrationStrategy.ExecuteStepAsync` always returns `Success=true, DurationMs=100` for every step. Migration engine non-functional. |
+| 2333 | 1 | LOW | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:173-175` | `ApplyFieldTransformation` for Lookup is a no-op returning value unchanged. |
+| 2334 | 1 | LOW | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:194-197` | `EvaluateExpression` always no-op returning input unchanged. Expression transforms non-functional. |
+| 2335 | 1 | LOW | `UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs:606-616` | `SemanticLayerStrategy.QueryAsync` hardcodes `RowCount=100, ExecutionTimeMs=50` with "Simulate query" comment. |
+| 2336 | 15 | LOW | `UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs:262-276` | `TopologicalSort` uses `OrderBy(m => m.Dependencies.Count)` -- not a real topological sort. Incorrect order for diamond dependencies. |
+| 2337 | 15 | LOW | `UltimateDataGovernance/UltimateDataGovernancePlugin.cs:513` | `HandleStatsAsync` hardcodes `policyViolations = 0L` regardless of actual violations. |
+| 2338 | 15 | LOW | `UltimateDataGovernance/UltimateDataGovernancePlugin.cs:219` | `GetMetadata` also hardcodes `PolicyViolations = 0L`. Both stats always report zero. |
+| 2339 | 12 | LOW | `UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs:287-293` | `HandleDataIngestedAsync` is intentional no-op stub. Data-ingested subscription is dead code. |
+| 2340 | 14 | LOW | `UltimateDataIntegration/Strategies/CDC/CdcStrategies.cs:131-158` | `SimulateChangeAsync` is public on production strategy. Injects fake events into live CDC. Should be DEBUG-only. |
+| 2341 | 13 | LOW | `UltimateDataIntegration/Strategies/Monitoring/IntegrationMonitoringStrategies.cs:85-86` | `RecordHealthCheckAsync` appends to `ActiveAlerts` without eviction policy. Unbounded list growth. |
+| 2342 | 10 | LOW | `UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs:689-724` | `GetNextVersionForSubject` iterates all keys in `_schemas` per registration. O(total schemas) per call. |
+| 2343 | 12 | LOW | `UltimateDataIntegration/Strategies/BatchStreaming/BatchStreamingStrategies.cs:164-166` | `LambdaArchitectureStrategy` UpdateBatch/SpeedAggregations only increment Version, discard all content. Serving layer merge empty. |
+| 2344 | 9 | LOW | `UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs:541-542` | `SetValueByPath` unchecked cast `(Dictionary<string,object>)next`. InvalidCastException if path component is non-dict type. |
+
+**Clean files:** RegulatoryComplianceStrategies.cs, RetentionManagementStrategies.cs, DataValidationEngine.cs
+
+---
+
+### Chunk 067 — UltimateDataIntegration (Plugin) + UltimateDataIntegrity (Hash, Plugin) + UltimateDataLake (all) + UltimateDataLineage (Provenance, Base, Scaling)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2345 | 5 | P1 | `UltimateDataIntegration/UltimateDataIntegrationPlugin.cs:144-148` | Bare `catch { }` in `DiscoverAndRegisterStrategies` swallows all exceptions from strategy instantiation. Broken strategy types silently skipped with no diagnostic. |
+| 2346 | 5 | P1 | `UltimateDataLake/UltimateDataLakePlugin.cs:481,497,513,527,536,545` | Six bare `catch { }` blocks in OnStart/OnStopCoreAsync. Stop-path catches (527/536/545) silently discard persistence failures -- catalog/lineage state lost with no log. |
+| 2347 | 10 | P1 | `UltimateDataLineage/LineageStrategyBase.cs:252-253` | `GetOrAdd` on `_provenance` followed by external `lock(list)` -- TOCTOU race. BoundedDictionary eviction may replace reference. Concurrent Track and read operations on stale list silently drop provenance records. |
+| 2348 | 13 | P2 | `UltimateDataLineage/LineageStrategyBase.cs:272,305` | `GetUpstreamAsync`/`GetDownstreamAsync` BFS inner loop scans `_edges.Values.Where(...)` on every dequeue -- O(n) per visited node, O(n*v) overall. Needs reverse-index. |
+| 2349 | 13 | P2 | `UltimateDataLineage/LineageStrategyBase.cs:326-343` | `AnalyzeImpactAsync` same O(n*v) pattern plus `.Contains` on `List<T>` in loop -- O(d) check. Use HashSet. |
+| 2350 | 13 | P2 | `UltimateDataLineage/Scaling/LineageScalingManager.cs:303` | `TraceLineage` collects all BFS nodes then `Skip(offset).Take(limit)`. Full graph in memory before pagination. |
+| 2351 | 12 | P2 | `UltimateDataLineage/Scaling/LineageScalingManager.cs:407-413` | `FilterEdgesByDirection` ignores direction parameter entirely. Returns all edges regardless of Upstream/Downstream. Caller gets incorrect results silently. |
+| 2352 | 14 | P2 | `UltimateDataIntegration/UltimateDataIntegrationPlugin.cs:326` | `RecordOperation(string operationName)` increments `_totalWrites` but `operationName` parameter never used. Contract lie. |
+| 2353 | 15 | P2 | `UltimateDataLineage/Scaling/LineageScalingManager.cs:371-387` | `AutoExpandPartition` sets capacity in dict but never creates new BoundedCache with that capacity. Name promises expansion but none occurs. Metrics report inflated capacity. |
+| 2354 | 13 | LOW | `UltimateDataIntegrity/Hashing/HashProviders.cs:609,617` | HMAC-SHA3 providers buffer entire stream into MemoryStream before hashing. Should use streaming BlockUpdate like standard SHA-3. |
+| 2355 | 14 | LOW | `UltimateDataLineage/Scaling/LineageScalingManager.cs:191-202` | `PutNodeAsync` increments `_totalNodeCount` unconditionally. Overwrites double-count actual distinct nodes. |
+| 2356 | 14 | LOW | `UltimateDataLineage/Composition/ProvenanceCertificateService.cs:305` | `HandleCertificateRequestAsync` accesses `message.Payload["objectId"]` with indexer -- throws KeyNotFoundException if absent. Should use TryGetValue. |
+| 2357 | 4 | LOW | `UltimateDataLineage/Composition/ProvenanceCertificateService.cs:337-351` | `ComputeCertificateHash` uses SHA256 while rest of system uses SHA-3/Keccak. Bypasses established integrity plugin. Inconsistency. |
+| 2358 | 12 | LOW | `UltimateDataLake/UltimateDataLakePlugin.cs:402,443` | Missing space before `==` operator in category filters. Formatter not applied. |
+
+**Clean files:** UltimateDataIntegrityPlugin.cs, DataLakeArchitectureStrategies.cs, DataCatalogStrategies.cs, DataLakeGovernanceStrategies.cs, LakeWarehouseIntegrationStrategies.cs, DataLineageStrategies.cs, SchemaOnReadStrategies.cs, DataLakeSecurityStrategies.cs, DataLakeZoneStrategies.cs
+
+---
+
+### Chunk 068 -- UltimateDataLineage (Strategies, Plugin) + UltimateDataManagement (Base, FanOut, AiEnhanced/AiDataOrchestrator, AiEnhancedBase)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2359 | 5 | P1 | `UltimateDataLineage/UltimateDataLineagePlugin.cs:550` | `catch { /* corrupted state */ }` on node deserialization swallows all exceptions. Non-corruption errors (OOM, network) silently drop all persisted nodes. |
+| 2360 | 5 | P1 | `UltimateDataLineage/UltimateDataLineagePlugin.cs:563` | Identical silent catch on edge deserialization. All persisted edges silently discarded on any exception. |
+| 2361 | 1 | P1 | `UltimateDataLineage/UltimateDataLineagePlugin.cs:498-503` | `HandleProvenanceAsync` retrieves strategy but does nothing. Comment: "Provenance would be retrieved here". Returns `success=true` with no data. |
+| 2362 | 5 | P1 | `UltimateDataManagement/DataManagementStrategyBase.cs:478-480` | `AutoDiscover` inner/outer catch swallow all reflection/type-load failures silently. Partial strategy loads go undetected. |
+| 2363 | 5 | P1 | `UltimateDataManagement/Strategies/AiEnhanced/AiEnhancedStrategyBase.cs:453-455` | `catch { /* Graceful degradation */ }` in `SubscribeToIntelligenceTopics` swallows all exceptions. Broken subscription means AI never updated as available. |
+| 2364 | 5 | P2 | `UltimateDataManagement/FanOut/DataWarehouseWriteFanOutOrchestrator.cs:501-504` | `catch { /* Processing unavailable */ }` in `RequestContentProcessingAsync` swallows exceptions without logging. |
+| 2365 | 5 | P2 | `UltimateDataManagement/FanOut/TamperProofFanOutStrategy.cs:484-486` | `catch { /* Rollback failures are logged */ }` -- comment says "logged" but no logging occurs. Tamper-proof rollback failures silently lost. |
+| 2366 | 5 | P2 | `UltimateDataManagement/FanOut/WriteDestinations.cs:378-381` | `catch` in `VectorStoreDestination.GenerateEmbeddingsAsync` silently returns null. Embedding failures indistinguishable from "unavailable". |
+| 2367 | 5 | P2 | `UltimateDataManagement/Strategies/AiEnhanced/AiEnhancedStrategyBase.cs:518-521` | `catch { return null; }` in `SendAiRequestAsync` swallows all exceptions. AI request failures undiagnosable. |
+| 2368 | 2 | P2 | `UltimateDataLineage/Strategies/LineageStrategies.cs:83-95` | `InMemoryGraphStrategy.GetUpstreamAsync` iterates `_upstreamLinks` without snapshotting. Concurrent `TrackAsync` can cause `InvalidOperationException`. |
+| 2369 | 2 | P2 | `UltimateDataLineage/Strategies/ActiveLineageStrategies.cs:179-197` | `GetDownstreamAsync`/`AnalyzeImpactAsync` build reverseIndex by iterating `_provenance` without lock. Concurrent TrackAsync mutates during iteration. |
+| 2370 | 10 | P2 | `UltimateDataManagement/FanOut/TamperProofFanOutStrategy.cs:509` | `PreviousHash` hardcoded to "genesis" on every write. Blockchain is not a chain -- tamper-detection of reordering impossible. |
+| 2371 | 12 | P2 | `UltimateDataLineage/Strategies/LineageEnhancedStrategies.cs:172-176` | `BuildPath` always returns `new[] { from, to }` regardless of actual traversal. PropagationPath meaningless for multi-hop paths. |
+| 2372 | 12 | LOW | `UltimateDataLineage/Strategies/LineageStrategies.cs:104` | `UpstreamCount = nodes.Count - 1` can be negative when nodes empty. Should use `Math.Max(0, ...)`. |
+| 2373 | 12 | LOW | `UltimateDataLineage/Strategies/LineageStrategies.cs:147` | Same negative count issue for `DownstreamCount`. |
+| 2374 | 1 | LOW | `UltimateDataLineage/Strategies/AdvancedLineageStrategies.cs:67` | `CryptoProvenanceStrategy.TrackAsync` comment: "In production, would compute hashes and build chain". BeforeHash and chain linkage absent. |
+| 2375 | 14 | LOW | `UltimateDataManagement/FanOut/DataWarehouseWriteFanOutOrchestrator.cs:229-253` | `StartAsync` validates destinations after `base.StartAsync(ct)`. Validation failure leaves partially-started state. |
+| 2376 | 12 | LOW | `UltimateDataManagement/FanOut/StandardFanOutStrategy.cs:396` | TTL `(int)NonRequiredTimeout.TotalSeconds * 30` can overflow to negative with large timeouts. Needs checked/clamp. |
+| 2377 | 15 | LOW | `UltimateDataManagement/FanOut/TamperProofDestinations.cs:317` | `BlockchainAnchorDestination` and `WormStorageDestination` both return `WriteDestinationType.DocumentStore`. Results dict key collision -- WORM overwrites blockchain result. |
+| 2378 | 13 | LOW | `UltimateDataLineage/Strategies/LineageEnhancedStrategies.cs:114` | `CalculateBlastRadius` calls `graph.Nodes.FirstOrDefault(n => n.Id == currentId)` in BFS loop -- O(n^2). Needs pre-built dict. |
+| 2379 | 13 | LOW | `UltimateDataLineage/Strategies/LineageEnhancedStrategies.cs:131-133` | `graph.Edges.Where(e => e.SourceId == currentId)` O(E) per BFS node -- O(V*E) total. Needs adjacency map. |
+
+**Clean files:** ConsciousnessLineageStrategies.cs, IFanOutStrategy.cs, AiDataOrchestratorStrategy.cs
+
+---
+
+### Chunk 069 -- UltimateDataManagement AiEnhanced (Carbon, Compliance, Cost, Gravity, Intent, Predictive, SelfOrganizing, SemanticDedup) + Branching + Caching (Base, Distributed, GeoDistributed, Hybrid, InMemory)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2380 | 5 | P1 | `UltimateDataManagement/Strategies/AiEnhanced/IntentBasedDataManagementStrategy.cs:465` | `catch` in `ParseGoalWithAiAsync` swallows all AI completion exceptions silently. No logging. |
+| 2381 | 5 | P1 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:493` | `PerformHealthChecks` timer callback bare `catch` silently sets `IsHealthy=false` without logging exception. |
+| 2382 | 2 | P1 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:150-151` | Timers started in constructor before `InitializeCoreAsync`. Callbacks access uninitialized state -- race condition. |
+| 2383 | 2 | P1 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:295-296` | `GetCoreAsync` mutates `entry.LastAccess` without lock while `EnsureCapacity` reads it concurrently for LRU. Unsynchronized write/read. |
+| 2384 | 12 | P1 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:448` | `FindCommonAncestor` LINQ result discarded (not assigned to variable). Dead code signals broken ancestor walk logic. |
+| 2385 | 15 | P1 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:313` | `branch.BlockIds.Contains(blockId)` on `List<string>` in hot read path -- O(n). Should be HashSet. |
+| 2386 | 2 | P1 | `UltimateDataManagement/Strategies/Caching/InMemoryCacheStrategy.cs:159-161` | `SetCoreAsync` TryAdd then else-branch `_cache[key] = entry` not atomic. Concurrent remove between causes stale data reinsertion and size leak. |
+| 2387 | 1 | P2 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:298-301` | "In a real implementation, try remote regions" -- remote fetch absent despite `SupportsDistributed = true`. |
+| 2388 | 1 | P2 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:333-335` | "In a real implementation, replicate writes" -- replication body empty despite `ReplicateWrites` flag. |
+| 2389 | 1 | P2 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:487-491` | "Simulate health check" -- unconditionally sets `IsHealthy=true`. Health checks are no-ops. |
+| 2390 | 1 | P2 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:503-505` | "Send invalidation to other regions" -- cross-region invalidation never sent, only local. |
+| 2391 | 1 | P2 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:405-409` | Modified-blocks detection loop has empty if body. Modified blocks always empty list -- diff incomplete. |
+| 2392 | 1 | P2 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:665-675` | `DetectConflict` always returns null. "Simplified conflict detection -- conflicts are rare". Merge never detects actual conflicts. |
+| 2393 | 10 | P2 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:628-633` | `ThreeWayMergeCoreAsync` assumes same block ID means same content without hash comparison. Two different writes with shared ID silently merged. |
+| 2394 | 7 | P2 | `UltimateDataManagement/Strategies/Caching/GeoDistributedCacheStrategy.cs:150-151` | Timers created in constructor, disposed in `DisposeCoreAsync`. If never disposed, timers leak and hold references. |
+| 2395 | 7 | P2 | `UltimateDataManagement/Strategies/Caching/InMemoryCacheStrategy.cs:86` | `_cleanupTimer` same leak risk -- background timer keeps firing if strategy never disposed. |
+| 2396 | 13 | P2 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:313` | `BlockIds.Contains` on List in read path O(n). Same location as #2385 but separate perf concern. |
+| 2397 | 13 | P2 | `UltimateDataManagement/Strategies/Branching/GitForDataBranchingStrategy.cs:443-459` | `FindCommonAncestor` uses `Values.FirstOrDefault` in loop -- O(n * depth). O(n^2) for deep trees. |
+| 2398 | 13 | P2 | `UltimateDataManagement/Strategies/AiEnhanced/SemanticDeduplicationStrategy.cs:380-397` | `FindAllDuplicateGroupsAsync` O(n^2) -- iterates all signatures for each. Needs ANN index for production. |
+| 2399 | 14 | P2 | `UltimateDataManagement/Strategies/Caching/DistributedCacheStrategy.cs:127-128` | `CacheConnection` constructor calls `_client.Connect(host, port)` synchronously with no timeout. Can hang indefinitely. |
+| 2400 | 4 | P2 | `UltimateDataManagement/Strategies/Caching/DistributedCacheStrategy.cs:350-352` | Redis SET command built by string interpolation. Key containing CRLF enables RESP injection. |
+| 2401 | 4 | P2 | `UltimateDataManagement/Strategies/Caching/DistributedCacheStrategy.cs:358-359` | Memcached set command same injection risk. Key with spaces/CRLF injects arbitrary commands. |
+| 2402 | 4 | P2 | `UltimateDataManagement/Strategies/AiEnhanced/ComplianceAwareLifecycleStrategy.cs:551` | SSN regex also matches phone numbers. False-positive PII detections apply overly restrictive policies. |
+| 2403 | 10 | LOW | `UltimateDataManagement/Strategies/AiEnhanced/CarbonAwareDataManagementStrategy.cs:521` | Energy-to-size back-calculation uses write factor regardless of operation type. Systematically incorrect for non-write ops. |
+| 2404 | 15 | LOW | `UltimateDataManagement/Strategies/Caching/DistributedCacheStrategy.cs:289-292` | `GetCurrentSize()`/`GetEntryCount()` return 0 with "Size tracked by backend" comment. Contract implies real values. |
+| 2405 | 12 | LOW | `UltimateDataManagement/Strategies/AiEnhanced/IntentBasedDataManagementStrategy.cs:464` | `targetValue`/`targetUnit` always null in AI path -- extraction code never written. AI-parsed goal identical to fallback. |
+| 2406 | 12 | LOW | `UltimateDataManagement/Strategies/AiEnhanced/SemanticDeduplicationStrategy.cs:497-505` | `FindFallbackDuplicates` tokenizes text but returns empty list. Fallback dedup inoperative when AI unavailable. |
+
+**Clean files:** CostAwareDataPlacementStrategy.cs, GravityAwarePlacementIntegration.cs, PredictiveDataLifecycleStrategy.cs, SelfOrganizingDataStrategy.cs, CachingStrategyBase.cs, HybridCacheStrategy.cs
+
+---
+
+### Chunk 070 -- UltimateDataManagement Caching (Predictive, ReadThrough, WriteBehind, WriteThru) + Deduplication (all 11 strategies)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2407 | 3 | P1 | `UltimateDataManagement/Strategies/Caching/WriteBehindCacheStrategy.cs:159` | `Task.Run(...).GetAwaiter().GetResult()` inside Timer callback -- sync-over-async threadpool deadlock risk under high load. |
+| 2408 | 6 | P1 | `UltimateDataManagement/Strategies/Caching/WriteBehindCacheStrategy.cs:380-384` | `FlushPendingWrites` timer callback is completely empty. Items in `_pendingWrites` after channel overflow never flushed. |
+| 2409 | 12 | P1 | `UltimateDataManagement/Strategies/Deduplication/DeltaCompressionDeduplicationStrategy.cs:313-375` | `ComputeDelta` O(n*m) nested loop. 1MB files = 10^12 comparisons. Catastrophic for any meaningful file size. |
+| 2410 | 1 | P1 | `UltimateDataManagement/Strategies/Deduplication/SemanticDeduplicationStrategy.cs:101-105` | `SetEmbeddingProvider` public API is empty no-op. Comment: "Can't reassign readonly field". Callers get no effect silently. |
+| 2411 | 2 | P2 | `UltimateDataManagement/Strategies/Caching/PredictiveCacheStrategy.cs:374-396` | `_lastAccessedKey` accessed without sync from concurrent GetCoreAsync calls. Torn write on 32-bit. |
+| 2412 | 2 | P2 | `UltimateDataManagement/Strategies/Caching/PredictiveCacheStrategy.cs:62,385-396` | `_sequentialPatterns` List mutated under `_patternLock` but `GetAccessPredictions` reads without lock. Concurrent RemoveRange during iteration throws. |
+| 2413 | 5 | P2 | `UltimateDataManagement/Strategies/Caching/PredictiveCacheStrategy.cs:464-465` | Inner `catch { /* Prefetch non-fatal */ }` swallows OperationCanceledException. Cancellation doesn't propagate. |
+| 2414 | 5 | P2 | `UltimateDataManagement/Strategies/Caching/ReadThroughCacheStrategy.cs:416-419` | `BackgroundRefreshAsync` silently swallows all exceptions including cancellation. |
+| 2415 | 12 | P2 | `UltimateDataManagement/Strategies/Deduplication/PostProcessDeduplicationStrategy.cs:159` | Same sync-over-async `Task.Run().GetResult()` pattern in timer. Deadlock risk under pool pressure. |
+| 2416 | 13 | P2 | `UltimateDataManagement/Strategies/Deduplication/DeltaCompressionDeduplicationStrategy.cs:328-374` | `ComputeDelta` O(n*m) worst case. Linear scan per byte of newData. Unacceptable for production file sizes. |
+| 2417 | 14 | P2 | `UltimateDataManagement/Strategies/Deduplication/GlobalDeduplicationStrategy.cs:183,190` | `GetGlobalStats()` iterates `_globalIndex.Values` without lock while concurrent dedup modifies entries. Torn reads on ReferenceCount. |
+| 2418 | 12 | P2 | `UltimateDataManagement/Strategies/Deduplication/DeltaCompressionDeduplicationStrategy.cs:429-457` | `ApplyDelta` never validates `resultPos + length <= result.Length`. Corrupted delta causes IndexOutOfRangeException or data truncation. |
+| 2419 | 9 | LOW | `UltimateDataManagement/Strategies/Caching/WriteBehindCacheStrategy.cs:300-307` | `FlushAsync` per-item exceptions short-circuit entire flush. Should collect as AggregateException. |
+| 2420 | 15 | LOW | `UltimateDataManagement/Strategies/Deduplication/SemanticDeduplicationStrategy.cs:147-189` | Returns `IsDuplicate=true` with `StoredSize=totalSize`. Contract `Duplicate` factory sets StoredSize=0. Incorrect space savings calculation. |
+| 2421 | 13 | LOW | `UltimateDataManagement/Strategies/Deduplication/ContentAwareChunkingStrategy.cs:222-233` | `FindDuplicateObject` O(n*m) linear scan across all stored objects. Needs reverse chunk-hash index. |
+| 2422 | 2 | LOW | `UltimateDataManagement/Strategies/Deduplication/GlobalDeduplicationStrategy.cs:183` | `AccessingNodes` HashSet mutated under lock but read without lock in GetGlobalStats. Partial set visible. |
+| 2423 | 13 | LOW | `UltimateDataManagement/Strategies/Deduplication/SemanticDeduplicationStrategy.cs:308-325` | `FindMostSimilar` O(n) linear scan over all embeddings. Needs ANN index for production scale. |
+
+**Clean files:** WriteThruCacheStrategy.cs, DeduplicationStrategyBase.cs, FileLevelDeduplicationStrategy.cs, FixedBlockDeduplicationStrategy.cs, InlineDeduplicationStrategy.cs
+
+---
+
+### Chunk 071 -- UltimateDataManagement EventSourcing + Fabric + Indexing (Composite, FullText, Graph, Base, Metadata, Semantic, SpatialAnchor, Spatial, TemporalConsistency, Temporal) + Lifecycle (Archival, Classification, Expiration)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2424 | 5 | P1 | `UltimateDataManagement/Strategies/EventSourcing/EventSourcingStrategies.cs:500,514` | Subscriber notification catches swallow all exceptions with `/* Log error */` comment. No logging, no dead-letter, no detection. |
+| 2425 | 6 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataArchivalStrategy.cs:573` | `_ = Task.Run(() => ProcessRetrievalAsync(...), CancellationToken.None)` fire-and-forget. Exceptions swallowed, no cancellation propagation. |
+| 2426 | 2 | P1 | `UltimateDataManagement/Strategies/EventSourcing/EventSourcingStrategies.cs:299-344` | `AppendToStreamAsync` version check reads `_streamVersions` before acquiring lock. TOCTOU: two appenders both pass check, second overwrites with stale version. |
+| 2427 | 2 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataExpirationStrategy.cs:329,757-759` | `_eventHandlers` List written by `SubscribeToEvents` and iterated by processor concurrently with no sync. InvalidOperationException. |
+| 2428 | 10 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataArchivalStrategy.cs:807-812` | `GetOrCreateEncryptionKeyAsync` returns fabricated key ID never stored in key management. Encrypted archives permanently unrecoverable. |
+| 2429 | 9 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataExpirationStrategy.cs:845-849` | Background processor outer catch swallows all exceptions with `// Log and continue`. Silent no-op if every cycle fails. |
+| 2430 | 13 | P2 | `UltimateDataManagement/Strategies/Indexing/IndexingStrategyBase.cs:375-385` | `CreateSnippet` O(n*m) sliding window over entire document. Use IndexOf for first term match instead. |
+| 2431 | 1 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataArchivalStrategy.cs:700-701` | `ProcessRetrievalAsync` simulates retrieval with Task.Delay. No actual decompression/decryption. Returns fabricated "restored" state. |
+| 2432 | 1 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataClassificationStrategy.cs:757-771` | `GetContentForAnalysis` reads from metadata keys only. Comment: "In production, fetch from storage". Falls through to metadata-only classification. |
+| 2433 | 1 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataClassificationStrategy.cs:774-797` | `GetMlClassificationAsync` always returns `(null, 0)`. `_mlAvailable` hardcoded false. ML path is dead code. |
+| 2434 | 2 | P2 | `UltimateDataManagement/Strategies/Indexing/TemporalConsistencyStrategy.cs:455-459` | Timer started in constructor before InitializeAsync. Callback fires on uninitialized state. |
+| 2435 | 2 | P2 | `UltimateDataManagement/Strategies/Indexing/TemporalIndexStrategy.cs:257-261` | Timer in constructor fires `ApplyRetentionPolicy` which modifies `_documents` without holding `_indexLock` for full scan. Race with concurrent index ops. |
+| 2436 | 2 | P2 | `UltimateDataManagement/Strategies/Indexing/SemanticIndexStrategy.cs:273-311` | `GenerateEmbeddingAsync` outer `catch {}` swallows bus exceptions. `termDocs` HashSet mutated without inner lock -- race in RemoveCoreAsync. |
+| 2437 | 9 | P2 | `UltimateDataManagement/Strategies/Indexing/CompositeIndexStrategy.cs:189-198` | `CompareValues` catches all exceptions from CompareTo, falls back to string comparison. NullRef/Overflow silently ignored -- incorrect sort order. |
+| 2438 | 13 | P2 | `UltimateDataManagement/Strategies/Indexing/TemporalIndexStrategy.cs:711-740` | `GetAggregations` full table scan on every call ignoring `_downsampledCache`. O(n) per query. |
+| 2439 | 13 | P2 | `UltimateDataManagement/Strategies/EventSourcing/EventSourcingStrategies.cs:963-964` | `ReplayToPointInTimeAsync` three LINQ enumerations on lazy IEnumerable. Should materialize once. |
+| 2440 | 14 | P2 | `UltimateDataManagement/Strategies/Indexing/SpatialAnchorStrategy.cs:68-111` | `CreateAnchorAsync` no validation of GPS coordinates (lat +-90, lon +-180). Invalid coords stored silently. |
+| 2441 | 12 | P2 | `UltimateDataManagement/Strategies/Indexing/TemporalConsistencyStrategy.cs:532-534` | `CreateSnapshotAsync` visible-transactions query on `_activeTransactions` where `!t.IsActive` -- committed transactions already removed, set always empty. |
+| 2442 | 9 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataExpirationStrategy.cs:994-1003` | Inner catch returns `ActionTaken = Expired` regardless of actual attempted action. Callers can't distinguish success from failure. |
+| 2443 | 15 | LOW | `UltimateDataManagement/Strategies/EventSourcing/EventSourcingStrategies.cs:689-699` | `CatchupAsync` iterates volatile in-memory buffer. Name implies durable catchup from persisted position. |
+| 2444 | 1 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataArchivalStrategy.cs:733-735` | Callback notification is empty comment. `CallbackUrl` public API field silently does nothing. |
+| 2445 | 15 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataArchivalStrategy.cs:791-804` | `CalculateCompressedSize` uses hardcoded ratios. `ArchivedSize` implies real post-compression count but is estimate. |
+| 2446 | 14 | LOW | `UltimateDataManagement/Strategies/EventSourcing/EventSourcingStrategies.cs:285-295` | `AppendToStreamAsync` no null-guard or empty-list short-circuit on events parameter. |
+| 2447 | 14 | LOW | `UltimateDataManagement/Strategies/Indexing/FullTextIndexStrategy.cs:68-71` | Empty stop-word set silently disables all filtering. No documentation or validation. |
+| 2448 | 15 | LOW | `UltimateDataManagement/Strategies/Indexing/TemporalIndexStrategy.cs:824-826` | `TruncateToBucket` for Week uses Sunday-anchored weeks. Inconsistent with ISO Monday-start. |
+| 2449 | 13 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataClassificationStrategy.cs:652-658` | `DetectPii` runs all 10 regex patterns on every call. No pre-screen for short or non-PII content. |
+| 2450 | 7 | LOW | `UltimateDataManagement/Strategies/Indexing/TemporalConsistencyStrategy.cs:436-460` | Timer in constructor with disposal in DisposeCoreAsync. If abandoned, timer fires indefinitely. |
+
+**Clean files:** FabricStrategies.cs, SpatialIndexStrategy.cs
+
+---
+
+### Chunk 072 -- UltimateDataManagement Lifecycle (Migration, Purging, PolicyEngine, Base) + Retention (all 9) + Sharding (Auto, Composite)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2451 | 1 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:934-943` | `TransferDataAsync` stub -- "Simulate data transfer" returns Task.CompletedTask. No actual I/O. Data never moves. |
+| 2452 | 1 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:917-931` | `ConvertFormatAsync` stub -- hardcoded size multipliers, no actual Parquet/Avro/ORC conversion. |
+| 2453 | 1 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataPurgingStrategy.cs:877-882` | `SimulateOverwriteAsync` named stub with empty body. DoD/Gutmann/NIST overwrite methods silently do nothing. Security deletion guarantee is false. |
+| 2454 | 1 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataPurgingStrategy.cs:871-875` | `DestroyEncryptionKeyAsync` stub -- "Would call key management T94". Crypto-shred purges non-functional. |
+| 2455 | 6 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:417` | `_ = Task.Run(() => ExecuteMigrationAsync(...))` fire-and-forget. Migration exceptions swallowed entirely. |
+| 2456 | 6 | P1 | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:475` | Same fire-and-forget in `ResumeMigrationAsync`. Resume failures unobservable. |
+| 2457 | 6 | P1 | `UltimateDataManagement/Strategies/Sharding/AutoShardingStrategy.cs:442` | `_ = Task.Run(() => MonitorAndAdjustAsync(CancellationToken.None))` unbounded fire-and-forget with silent inner catch. |
+| 2458 | 5 | P2 | `UltimateDataManagement/Strategies/Lifecycle/LifecyclePolicyEngineStrategy.cs:521-523` | `catch { /* Log and continue */ }` no actual logging. Failing policy execution silently swallowed. |
+| 2459 | 5 | P2 | `UltimateDataManagement/Strategies/Sharding/AutoShardingStrategy.cs:505-508` | `catch { /* Log but don't throw */ }` no actual logging. Split/merge failures invisible. |
+| 2460 | 12 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:788-800` | `GetObjectsToMigrate` checkpoint resumption broken. Closure over `checkpointFound` -- resume always produces empty list. |
+| 2461 | 2 | P2 | `UltimateDataManagement/Strategies/Retention/InactivityBasedRetentionStrategy.cs:112-115,122-128` | Non-atomic timestamp updates after Interlocked.Increment on counts. Torn reads on concurrent RecordRead/Write. |
+| 2462 | 2 | P2 | `UltimateDataManagement/Strategies/Retention/LegalHoldStrategy.cs:120-124` | `hold.HeldObjects.Add(objectId)` outside lock block. Plain List shared across concurrent callers -- corruption. Same for Custodians. |
+| 2463 | 2 | P2 | `UltimateDataManagement/Strategies/Sharding/AutoShardingStrategy.cs:141,209` | `_nextShardIndex` incremented with `++` from concurrent paths without Interlocked. Non-volatile fields. |
+| 2464 | 12 | P2 | `UltimateDataManagement/Strategies/Lifecycle/LifecyclePolicyEngineStrategy.cs:772-793` | `CalculateNextExecution` cron parser broken. `"*"` minute reuses now.Minute, schedules 24h ahead instead of 1 min for `"* * * * *"`. |
+| 2465 | 14 | P2 | `UltimateDataManagement/Strategies/Retention/PolicyBasedRetentionStrategy.cs:228-229` | User-supplied PathPattern compiled into Regex with no timeout. `"*"` to `".*"` substitution enables ReDoS. |
+| 2466 | 10 | P2 | `UltimateDataManagement/Strategies/Lifecycle/DataPurgingStrategy.cs:517-518` | `BytesPurged` re-queries already-removed objects from TrackedObjects. Cascaded purge size always 0. Systematically under-counted. |
+| 2467 | 12 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:670-671` | Unbounded `migrationTasks` accumulation before WhenAll. Large object sets exhaust memory. |
+| 2468 | 13 | LOW | `UltimateDataManagement/Strategies/Retention/SizeBasedRetentionStrategy.cs:300-328` | `ShouldEvict` calls `TrackedObjects.Values.Where(...).ToList()` per object -- O(N^2) per retention pass. |
+| 2469 | 13 | LOW | `UltimateDataManagement/Strategies/Lifecycle/LifecyclePolicyEngineStrategy.cs:501-509` | Scheduler `_schedules.Values.Where(...).ToList()` blocks task thread. Lost Task reference on init exception. |
+| 2470 | 15 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataMigrationStrategy.cs:943-947` | `VerifyMigrationAsync` always returns true. "Would verify checksum" comment. Verification failures undetectable. |
+| 2471 | 15 | LOW | `UltimateDataManagement/Strategies/Lifecycle/DataPurgingStrategy.cs:703-709` | `VerifyComplianceAsync` no await, returns Task.FromResult. Misleading async signature. |
+| 2472 | 14 | LOW | `UltimateDataManagement/Strategies/Sharding/AutoShardingStrategy.cs:528` | Operation ID `Substring(0,20)` truncates GUID. Non-unique IDs break history dedup. |
+| 2473 | 2 | LOW | `UltimateDataManagement/Strategies/Retention/SmartRetentionStrategy.cs:116-119` | `BusinessValueSignals` List accessed concurrently without lock from RecordAccess and RecordBusinessValueSignal. |
+
+**Clean files:** None -- all 15 files have at least one finding.
+
+---
+
+### Chunk 073 -- UltimateDataManagement Sharding (ConsistentHash, Directory, Geo, Hash, Range, Base, Tenant, Time, Virtual) + Tiering (AccessFrequency, Age, BlockLevel, CostOptimized, Hybrid, Manual)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2474 | 6 | P1 | `UltimateDataManagement/Strategies/Sharding/DirectoryShardingStrategy.cs:85-90` | Timer callback `async _ => await PersistDirectoryAsync()` fire-and-forget. Exceptions silently swallowed. |
+| 2475 | 5 | P1 | `UltimateDataManagement/Strategies/Sharding/TenantShardingStrategy.cs:779` | `catch { /* Continue with other tenants */ }` in BalanceSharedShardsAsync. Failed migrations leave cluster silently unbalanced. |
+| 2476 | 5 | P1 | `UltimateDataManagement/Strategies/Tiering/HybridTieringStrategy.cs:292` | `catch { /* Strategy evaluation failed - skip */ }` swallows all including OOM. OperationCanceledException not rethrown. |
+| 2477 | 2 | P1 | `UltimateDataManagement/Strategies/Sharding/DirectoryShardingStrategy.cs:61,145-181` | `_isDirty` plain bool written from timer thread and others without sync. Should be volatile. |
+| 2478 | 2 | P1 | `UltimateDataManagement/Strategies/Sharding/TimeShardingStrategy.cs:391-399` | `lock(_partitionLock)` where `_partitionLock` is ReaderWriterLockSlim. Locks object itself as monitor, bypasses RWLS semantics. Deadlock risk. |
+| 2479 | 12 | P1 | `UltimateDataManagement/Strategies/Sharding/ConsistentHashShardingStrategy.cs:192-213` | Lock-ordering inversion: `ShardLock` then `_ringLock.EnterWriteLock()`. Reverse order in another path causes deadlock. |
+| 2480 | 13 | P2 | `UltimateDataManagement/Strategies/Sharding/DirectoryShardingStrategy.cs:540-565` | `LookupInDirectory` O(n) linear scan for wildcard/prefix matching on every cache miss. |
+| 2481 | 13 | P2 | `UltimateDataManagement/Strategies/Sharding/HashShardingStrategy.cs:314-324` | `ClearCacheForShard` O(n) scan of cache per shard add/remove. Needs reverse index. |
+| 2482 | 13 | P2 | `UltimateDataManagement/Strategies/Sharding/TimeShardingStrategy.cs:563` | `ExtractTimestamp` compiles new Regex on every call. Should cache compiled regex. |
+| 2483 | 12 | P2 | `UltimateDataManagement/Strategies/Sharding/TimeShardingStrategy.cs:392-399` | `UpdatePartitionMetrics` wrong lock type (see #2478). TimePartition accessed concurrently without consistent locking. |
+| 2484 | 12 | P2 | `UltimateDataManagement/Strategies/Sharding/RangeShardingStrategy.cs:125-148` | Default range start `""` universally matches all keys `>= ""`. Keys before "G" double-route to shard-0001. |
+| 2485 | 1 | P2 | `UltimateDataManagement/Strategies/Sharding/TenantShardingStrategy.cs:457-461` | `MigrateTenantAsync` simulates with Task.Delay loop. "In real implementation, actual data transfer." Placeholder. |
+| 2486 | 1 | P2 | `UltimateDataManagement/Strategies/Sharding/ShardingStrategyBase.cs:532-537` | `MigrateDataFromShardAsync` virtual no-op stub. RemoveShardAsync with migrateData=true silently destroys data. |
+| 2487 | 14 | P2 | `UltimateDataManagement/Strategies/Sharding/RangeShardingStrategy.cs:280-326` | `AddRangeAsync` no validation start <= end. Inverted range creates dead entry that never matches. |
+| 2488 | 14 | P2 | `UltimateDataManagement/Strategies/Tiering/BlockLevelTieringStrategy.cs` | `InitializeBlockMap` silently returns when totalSize < min. Later calls get empty/null results with no indication. |
+| 2489 | 15 | LOW | `UltimateDataManagement/Strategies/Tiering/ManualTieringStrategy.cs:316` | `EvaluateCoreAsync` calls Demote when promoting from Archive to Hot. Wrong helper name for promotion. |
+| 2490 | 15 | LOW | `UltimateDataManagement/Strategies/Sharding/ConsistentHashShardingStrategy.cs:541` | `_cacheMaxSize` (100000) inconsistent with BoundedDictionary capacity (1000). No effect on actual memory. |
+| 2491 | 15 | LOW | `UltimateDataManagement/Strategies/Sharding/GeoShardingStrategy.cs:516-518` | Unknown country codes default to NorthAmerica. GDPR risk -- EU data routed to non-compliant region silently. |
+| 2492 | 10 | LOW | `UltimateDataManagement/Strategies/Tiering/AccessFrequencyTieringStrategy.cs:345-373` | `AgeOutAccesses` linear decay doesn't preserve window semantics. 30-day old record incorrectly retains ~970 of 1000 accesses. |
+| 2493 | 13 | LOW | `UltimateDataManagement/Strategies/Tiering/HybridTieringStrategy.cs:265-295` | `EvaluateAllAsync` sequential await in foreach. Independent strategies could run in parallel. |
+| 2494 | 14 | LOW | `UltimateDataManagement/Strategies/Sharding/VirtualShardingStrategy.cs:117-124` | Constructor validates > 0 but field used in modulo. Reflection bypass could cause divide-by-zero. |
+| 2495 | 7 | LOW | `UltimateDataManagement/Strategies/Sharding/TimeShardingStrategy.cs:118-122` | Timer in constructor, disposal relies on base class. If init fails before registration, timer leaks. |
+
+**Clean files:** AgeTieringStrategy.cs, CostOptimizedTieringStrategy.cs
+
+---
+
+### Chunk 074 -- UltimateDataManagement Tiering (Performance, PolicyBased, Predictive, Size, Base) + Versioning (BiTemporal, Branching, CopyOnWrite, Delta, Linear, Semantic, Tagging, TimePoint, Base) + Plugin
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2496 | 5 | P2 | `UltimateDataManagement/Strategies/Versioning/SemanticVersioningStrategy.cs:89-100` | `TryParse` bare `catch {}` swallows all exceptions including OOM rather than specific FormatException. |
+| 2497 | 1 | P1 | `UltimateDataManagement/UltimateDataManagementPlugin.cs:554-556` | `HandleStatsAsync` hardcodes `0L` for `totalBytesManaged` and `totalFailures`. Stub metrics. |
+| 2498 | 10 | P1 | `UltimateDataManagement/Strategies/Versioning/BiTemporalVersioningStrategy.cs:293-296` | SLA-violation count reset to 0 before building log message. Reason string always reports "0 violations". |
+| 2499 | 12 | P1 | `UltimateDataManagement/Strategies/Tiering/PredictiveTieringStrategy.cs:294-318` | `UpdatePatterns` sets `weekdayTotals[dayOfWeek] = 1` (not `++`), same for `hourlyTotals`. Denominator always 1, all pattern averages wrong. |
+| 2500 | 13 | P2 | `UltimateDataManagement/Strategies/Versioning/SemanticVersioningStrategy.cs:770-794` | `AnalyzeDataStructure` calls `Encoding.UTF8.GetString(data)` + two Regex.Matches on arbitrary binary data with no size guard. |
+| 2501 | 13 | P2 | `UltimateDataManagement/Strategies/Versioning/SemanticVersioningStrategy.cs:816` | `DetectChangeType` calls `oldData.SequenceEqual(newData)` O(n) on arbitrarily large payloads with no size guard. |
+| 2502 | 13 | P2 | `UltimateDataManagement/Strategies/Tiering/PolicyBasedTieringStrategy.cs:316,383` | `Regex.IsMatch` called per rule evaluation without compiling or caching. O(rules × objects) regex compilations. |
+| 2503 | 14 | P2 | `UltimateDataManagement/Strategies/Tiering/TieringStrategyBase.cs:422` | `MoveToTierAsync` catch returns `TierMoveResult.Failed` with hardcoded `StorageTier.Hot` as source regardless of actual tier. |
+| 2504 | 10 | P2 | `UltimateDataManagement/Strategies/Versioning/BiTemporalVersioningStrategy.cs:684-695` | `CreateVersionCoreAsync` parses `fact.FactId.Split('-').Last()` with `long.Parse` without try/catch. FormatException on malformed IDs. |
+| 2505 | 10 | P2 | `UltimateDataManagement/Strategies/Versioning/BiTemporalVersioningStrategy.cs:736,743` | `ListVersionsCoreAsync` same fragile `long.Parse(f.FactId.Split('-').Last())` in LINQ Select. |
+| 2506 | 5 | P2 | `UltimateDataManagement/UltimateDataManagementPlugin.cs:776` | `catch { /* corrupted state */ }` in OnStartCoreAsync swallows all exceptions including OperationCanceledException without logging. |
+| 2507 | 12 | P2 | `UltimateDataManagement/Strategies/Tiering/PerformanceTieringStrategy.cs:293-302` | SlaViolations reset to 0 before reading in message. Always says "0 violations exceeded threshold". |
+| 2508 | 15 | LOW | `UltimateDataManagement/UltimateDataManagementPlugin.cs:127` | Metadata key `"DeduplicationStrategies"` populated by `GetStrategiesByCategory(Lifecycle)`. Key name misleading. |
+| 2509 | 15 | LOW | `UltimateDataManagement/Strategies/Tiering/PredictiveTieringStrategy.cs:241` | `InitializeHistoryFromDataObject` uses Random.Shared to scatter synthetic access events. Non-deterministic predictions. |
+
+**Clean files:** None -- all 15 files have at least one finding.
+
+---
+
+### Chunk 075 -- UltimateDataMesh (Scaling, CrossDomain, DataProduct, DomainDiscovery, DomainOwnership, FederatedGovernance, MeshObservability, MeshSecurity, SelfServe, Plugin) + UltimateDataPrivacy (Base, Anonymization, DifferentialPrivacyEnhanced, DifferentialPrivacy, Masking)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2510 | 5 | P1 | `UltimateDataMesh/Scaling/DataMeshScalingManager.cs:354-358` | Bare `catch { return; }` in federation subscription handler swallows all exceptions from Convert.FromBase64String without logging. |
+| 2511 | 6 | P1 | `UltimateDataMesh/Scaling/DataMeshScalingManager.cs:324-375` | Async lambda passed to `_messageBus.Subscribe` is async-void equivalent. Unhandled exceptions unobserved, can tear down process. |
+| 2512 | 2 | P1 | `UltimateDataMesh/Scaling/DataMeshScalingManager.cs:344-371` | Non-atomic check-then-act on `_entityTimestamps` and `cache.Put`. Concurrent threads interleave between timestamp read and cache write. |
+| 2513 | 5 | P1 | `UltimateDataMesh/UltimateDataMeshPlugin.cs:540,553,566,579,592` | Five `catch { /* corrupted state */ }` blocks in OnStartCoreAsync swallow all deserialization exceptions without logging. |
+| 2514 | 5 | P1 | `UltimateDataPrivacy/DataPrivacyStrategyBase.cs:113` | Bare `catch { }` in `AutoDiscover` swallows all strategy instantiation exceptions. Registration failures invisible. |
+| 2515 | 3 | P2 | `UltimateDataPrivacy/DataPrivacyStrategyBase.cs:78-81` | `IsHealthy()` calls `.GetAwaiter().GetResult()` on async method. Sync-over-async deadlock risk under thread-pool saturation. |
+| 2516 | 2 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:89-92` | `_queryHistory.AddOrUpdate` initial-value lambda outside lock. Two concurrent first-calls for same key can drop a query. |
+| 2517 | 10 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:51-115` | `ConsumePrivacy` performs budget check and update as two separate non-atomic operations. Concurrent callers can overshoot privacy budget. |
+| 2518 | 13 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:416-439` | `PiiDetectionStrategy.Scan` compiles new Regex per call in nested loop over all PII patterns. Should pre-compile. |
+| 2519 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:29-45` | `InitializeBudget` no validation that `totalEpsilon > 0` or `totalDelta >= 0`. Zero/negative epsilon produces nonsensical results. |
+| 2520 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:213-239` | `SubmitContribution` no finite check on `value`. NaN/Infinity corrupts aggregate result. |
+| 2521 | 15 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:384-406` | `PiiDetectionStrategy` has `Category = DifferentialPrivacy` but PII detection is classification, not DP. Misleading category. |
+
+**Clean files:** CrossDomainSharingStrategies.cs, DataProductStrategies.cs, DomainDiscoveryStrategies.cs, DomainOwnershipStrategies.cs, FederatedGovernanceStrategies.cs, MeshObservabilityStrategies.cs, MeshSecurityStrategies.cs, SelfServeStrategies.cs, AnonymizationStrategies.cs, DifferentialPrivacyStrategies.cs, MaskingStrategies.cs
+
+---
+
+### Chunk 076 -- UltimateDataPrivacy (PrivacyCompliance, PrivacyMetrics, PrivacyPreservingAnalytics, Pseudonymization, Tokenization, Plugin) + UltimateDataProtection (Catalog, Configuration, StrategyBase, Registry, Topics, IProvider, Retention, Scaling, Scheduler)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2522 | 5 | P1 | `UltimateDataPrivacy/UltimateDataPrivacyPlugin.cs:498,507` | Two `catch { /* corrupted state */ }` blocks when deserializing consent records and privacy policies. All exceptions swallowed without logging. |
+| 2523 | 5 | P1 | `UltimateDataProtection/DataProtectionStrategyBase.cs:479,514` | `RequestBackupRecommendationAsync` and `RequestAnomalyDetectionAsync` both have bare `catch { return null; }`. Message bus exceptions silently discarded. |
+| 2524 | 5 | P1 | `UltimateDataProtection/Retention/RetentionPolicyEngine.cs:171` | Bare `catch` in `EnforceAsync` swallows all deletion failures silently. Only increments counter, never logs. |
+| 2525 | 5 | P1 | `UltimateDataProtection/Scaling/BackupScalingManager.cs:545` | `RetentionEnforcementCallback` bare `catch (Exception)` with "Best-effort" comment. Silent swallow. |
+| 2526 | 6 | P2 | `UltimateDataProtection/DataProtectionStrategyBase.cs:618-634` | `PublishProgress`/`PublishRestoreProgress` call `PublishAsync().ConfigureAwait(false)` without await. Unobserved Task, exceptions silently dropped. |
+| 2527 | 2 | P2 | `UltimateDataProtection/Scaling/BackupScalingManager.cs:59-63,232-243,427-441` | `_emaThroughput`, `_emaQueueDepth`, `_emaIoUtilization`, `_currentConcurrentJobs` plain fields read/written from timer callback and caller threads without sync. Non-atomic doubles. |
+| 2528 | 10 | P2 | `UltimateDataProtection/Retention/RetentionPolicyEngine.cs:135-141` | `backups.Count()` re-executes deferred LINQ query after `ApplyPolicy` already enumerated it. TOCTOU inconsistency in `EvaluatedBackups`. |
+| 2529 | 13 | P2 | `UltimateDataProtection/DataProtectionStrategyRegistry.cs:320-330` | `GetAggregatedStatistics` calls `s.GetStatistics()` twice per strategy in LINQ chain. O(2N) lock acquisitions. |
+| 2530 | 1 | P2 | `UltimateDataProtection/DataProtectionStrategyBase.cs:476-477` | `RequestBackupRecommendationAsync` publishes then returns `null` with "Actual implementation would await response" comment. Functional stub. |
+| 2531 | 12 | P2 | `UltimateDataProtection/Scheduler/BackupScheduler.cs:288-307` | `ParseCronNext` only handles hour and minute fields. dayOfMonth, month, dayOfWeek silently ignored. Incorrect schedules for non-trivial cron expressions. |
+| 2532 | 15 | P2 | `UltimateDataProtection/Scheduler/BackupScheduler.cs:288` | `ParseCronNext` named as cron parser but ignores 3 of 5 fields. Contract lie. |
+| 2533 | 9 | LOW | `UltimateDataProtection/DataProtectionStrategyBase.cs:319-322` | `ValidateRestoreTargetAsync` calls `Path.GetDirectoryName` without try-catch. ArgumentException on invalid path characters. |
+| 2534 | 14 | LOW | `UltimateDataProtection/Catalog/BackupCatalog.cs:186-200` | `GetStatistics` calls `entries.Min`/`Max` without empty-list guard. InvalidOperationException on empty sequence. |
+| 2535 | 14 | LOW | `UltimateDataProtection/Scaling/BackupScalingManager.cs:267-285` | `RegisterJobAsync` no null/empty validation on `sourcePath`. Incomplete metadata silently persisted. |
+
+**Clean files:** PrivacyComplianceStrategies.cs, PrivacyMetricsStrategies.cs, PrivacyPreservingAnalyticsStrategies.cs, PseudonymizationStrategies.cs, TokenizationStrategies.cs, DataProtectionConfiguration.cs, DataProtectionTopics.cs, IDataProtectionProvider.cs
+
+---
+
+### Chunk 077 -- UltimateDataProtection Advanced (AirGapped, BlockLevel, BreakGlass, CrashRecovery, SyntheticFull) + Archive + CDP + Cloud + DR + Database + Full + Incremental + Innovations (AiPredictive, AiRestoreOrchestrator, AutoHealing)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2536 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/AirGappedBackupStrategy.cs:483-510` | `CatalogSourceDataAsync` returns hardcoded 25K files/10GB. `CreateBackupDataAsync` returns 1MB placeholder with `Task.Delay(100)` "Simulate work". |
+| 2537 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/AirGappedBackupStrategy.cs:564-572,607-668` | `PrepareTransportPackageAsync` no-op. `VerifyPackageIntegrityAsync`/`SignatureAsync`/`ManifestAsync` all return true. `RestoreFilesFromDataAsync` hardcoded. `CreateAuditLogEntryAsync` no-op. |
+| 2538 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/BlockLevelBackupStrategy.cs:483-563` | `ScanSourceFilesAsync` returns 10K fake files. `StoreBlockAsync` returns hardcoded compressed size (block.Size*0.6), stores capped 1KB buffer. `Task.Delay(100)` simulation in restore. |
+| 2539 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/BreakGlassRecoveryStrategy.cs:565-596` | `SplitSecretKey` encodes full secret in every share (not Shamir's). `ReconstructSecretKey` decodes first share. k-of-n guarantee absent. `CatalogSourceDataAsync`/`CreateBackupDataAsync` hardcoded. |
+| 2540 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/BreakGlassRecoveryStrategy.cs:662-665` | `ValidateEmergencyTokenAsync` always returns true. No token validation. |
+| 2541 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/CrashRecoveryStrategy.cs:511-523` | `ScanSourceFilesAsync` returns hardcoded 15K fake files. |
+| 2542 | 3 | P1 | `UltimateDataProtection/Strategies/Advanced/CrashRecoveryStrategy.cs:529` | `.Wait(ct)` on `WriteLogEntryAsync` inside `BeginTransactionAsync`. Sync-over-async blocking. |
+| 2543 | 1 | P1 | `UltimateDataProtection/Strategies/Advanced/SyntheticFullBackupStrategy.cs:492-493` | `WriteSyntheticFullAsync` returns `storedBytes * 1000`. Fabricated 1000x amplified storage size. |
+| 2544 | 5 | P1 | `UltimateDataProtection/Strategies/Innovations/AiPredictiveBackupStrategy.cs:527-532,663-667,697-703` | Three bare `catch { }` blocks in `RequestBackupPredictionAsync`, `PreStageFutureBackupsAsync`, `ReportBackupResultsToAiAsync`. All AI errors silently swallowed. |
+| 2545 | 1 | P2 | `UltimateDataProtection/Strategies/Archive/ArchiveStrategies.cs:14-57` | All 5 archive strategies (Tape, ColdStorage, WORM, Compliance, Tiered) return hardcoded fake BackupResults. Full stubs. |
+| 2546 | 1 | P2 | `UltimateDataProtection/Strategies/CDP/ContinuousProtectionStrategies.cs:27-70` | All 4 CDP strategies (Journal, Replication, Snapshot, Hybrid) return hardcoded fake results. Full stubs. |
+| 2547 | 1 | P2 | `UltimateDataProtection/Strategies/Cloud/CloudBackupStrategies.cs:15-121` | All 4 cloud strategies (S3, AzureBlob, GCS, MultiCloud) return hardcoded fake results. No cloud SDK calls. Full stubs. |
+| 2548 | 1 | P2 | `UltimateDataProtection/Strategies/DR/DisasterRecoveryStrategies.cs:15-150` | All 5 DR strategies return hardcoded fake results. Full stubs. |
+| 2549 | 1 | P2 | `UltimateDataProtection/Strategies/Database/DatabaseBackupStrategies.cs:15-181` | All 6 database strategies (SqlServer, Postgres, MySql, OracleRMAN, MongoDB, Cassandra) return hardcoded fake results. Full stubs. |
+| 2550 | 1 | P2 | `UltimateDataProtection/Strategies/Incremental/IncrementalBackupStrategies.cs:27-347` | All 5 incremental strategies return hardcoded fake results. Full stubs. |
+| 2551 | 1 | P2 | `UltimateDataProtection/Strategies/Full/FullBackupStrategies.cs` | Multiple full backup strategies return hardcoded fake results. Full stubs. |
+| 2552 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/AiRestoreOrchestratorStrategy.cs:522-617` | `LoadOrRegenerateRestorePlanAsync` returns hardcoded plan. `RestorePhaseComponentsAsync` returns hardcoded 50MB/100 files with Task.Delay simulation. |
+| 2553 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/AutoHealingBackupStrategy.cs:916-1031` | `RecoverWithEccAsync`/`ReplicaAsync`/`ParityAsync` all return true unconditionally. `RestoreFilesAsync` returns hardcoded 500. `CreateBackupDataAsync` returns 10MB placeholder. |
+| 2554 | 2 | P2 | `UltimateDataProtection/Strategies/Advanced/BlockLevelBackupStrategy.cs:505-530` | `ChunkFileAsync` creates new `SHA256.Create()` per block in loop. Should create once per call. |
+| 2555 | 4 | P2 | `UltimateDataProtection/Strategies/Advanced/AirGappedBackupStrategy.cs:512-516` | `DeriveEncryptionKey` uses raw SHA-256 with no salt or iteration count. Weak key derivation. |
+| 2556 | 4 | P2 | `UltimateDataProtection/Strategies/Advanced/BreakGlassRecoveryStrategy.cs:559-562` | `ComputeKeyId` SHA-256 of master key logged in audit entries. Leaks detectable hash of secret. |
+| 2557 | 10 | P2 | `UltimateDataProtection/Strategies/Advanced/BlockLevelBackupStrategy.cs:476-478` | `DeleteBackupCoreAsync` removes block index but leaves all referenced blocks in `_blockStore`. Orphaned blocks accumulate. |
+| 2558 | 2 | P2 | `UltimateDataProtection/Strategies/Full/FullBackupStrategies.cs:302-303,489-491` | `ParallelFullBackupStrategy`, `BlockLevelFullBackupStrategy`, `SnapMirrorFullBackupStrategy` use `static` shared dictionaries. Cross-instance state contamination. |
+| 2559 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/AiRestoreOrchestratorStrategy.cs:319-336,571-596` | Two bare `catch { }` blocks in `AnalyzeDependencyGraphAsync` and `RequestAiOptimizationAsync`. Silent swallow. |
+| 2560 | 12 | P2 | `UltimateDataProtection/Strategies/Innovations/AiRestoreOrchestratorStrategy.cs:633-648` | `WaitForPhaseHealthAsync` always evaluates `allHealthy && true` and returns after first iteration. Health checks never performed. |
+| 2561 | 15 | LOW | `UltimateDataProtection/Strategies/Advanced/AirGappedBackupStrategy.cs:542-548` | `CreatePackageSignatureAsync` computes SHA-256 hash and calls it "signature". No private key involved. Naming lie. |
+| 2562 | 15 | LOW | `UltimateDataProtection/Strategies/Advanced/BreakGlassRecoveryStrategy.cs:656-659` | `StoreKeySharesAsync` is a no-op. Name implies distributing shares to secure storage. |
+| 2563 | 15 | LOW | `UltimateDataProtection/Strategies/Advanced/CrashRecoveryStrategy.cs:603-607` | `RestoreFromCheckpointAsync` is a no-op. Name implies restoring from checkpoint. |
+| 2564 | 14 | LOW | `UltimateDataProtection/Strategies/Advanced/BreakGlassRecoveryStrategy.cs:239-241` | Token sliced with `token[..8]` before length validation. ArgumentOutOfRangeException if token < 8 chars. |
+
+**Clean files:** None -- all 15 files have at least one finding.
+
+---
+
+### Chunk 078 -- UltimateDataProtection Innovations (BackupConfidenceScore, BiometricSealed, BlockchainAnchored, CrossCloud, CrossVersionRestore, DnaBackup, FaradayCageAware, Gamified, Geographic, InstantMount, NaturalLanguage, NuclearBunker, OffGrid, PartialObjectRestore, PredictiveRestore)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2565 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/BackupConfidenceScoreStrategy.cs:721-779` | `GatherFeaturesAsync` returns fabricated data via Random.Shared. `PredictSuccessProbabilityAsync` hardcoded heuristic from 0.85 with "use actual trained model" comment. |
+| 2566 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/BackupConfidenceScoreStrategy.cs:994-1022` | `CreateBackupDataAsync` returns 10MB zeros. `ProcessBackupAsync` no-op. `StoreBackupAsync` fake URI. `VerifyBackupAsync` always true. `RetrieveBackupAsync` 10MB zeros. `RestoreFilesAsync` returns 500. |
+| 2567 | 6 | P1 | `UltimateDataProtection/Strategies/Innovations/BackupConfidenceScoreStrategy.cs:402` | `UpdateModelAsync().ConfigureAwait(false)` called without await in sync `ReportOutcome`. Fire-and-forget with unobserved exception. |
+| 2568 | 6 | P1 | `UltimateDataProtection/Strategies/Innovations/PredictiveRestoreStrategy.cs:503-512` | `_ = Task.Run(async () => { ... })` in `PreStageBackupAsync`. Fire-and-forget hydration loop, exceptions silently lost. |
+| 2569 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/BlockchainAnchoredBackupStrategy.cs:592-669` | `AnchorToBlockchainAsync` sets hardcoded block numbers and fake contract addresses "0x1234...abcd". All five `AnchorTo*Async` use Task.Delay simulation. |
+| 2570 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/BlockchainAnchoredBackupStrategy.cs:797-919` | `VerifyMerkleRootAsync`, `VerifyImmutabilityProofAsync`, `VerifyDataIntegrityAsync` all return true unconditionally. `CatalogSourceDataAsync` returns 18K synthetic files. |
+| 2571 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/CrossCloudBackupStrategy.cs:719-916` | `UploadToProviderAsync` Task.Delay simulation. `CheckProviderHealthAsync`/`VerifyProviderDataAsync` always true. `FinalizeProviderUploadAsync`/`DeleteStagedDataAsync` no-ops. `CatalogSourceDataAsync` hardcoded 30K/20GB. |
+| 2572 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/CrossVersionRestoreStrategy.cs:112-116` | Backup loop uses Task.Delay(50) and hardcodes 120MB per source. No actual data backed up. |
+| 2573 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/BiometricSealedBackupStrategy.cs:896-898` | When hardware unavailable, `GenerateSimulatedTemplate` called instead of failing. Biometric falls back to simulated data silently. |
+| 2574 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/GamifiedBackupStrategy.cs` | `CreateBackupDataAsync`, `ProcessBackupAsync`, `StoreBackupAsync` all stubs — zero-filled data, no real persistence. |
+| 2575 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/PartialObjectRestoreStrategy.cs:486-822` | `ScanDatabaseObjectsAsync`/`ScanEmailObjectsAsync` return hardcoded mock lists. `ExtractObjectAsync` uses Task.Delay(50). `VerifyRestoredObjectsAsync` always true. |
+| 2576 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/PredictiveRestoreStrategy.cs:100-108` | Backup body per source hardcodes +100MB, +30MB, +500 files. No data read from any source. |
+| 2577 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/NuclearBunkerBackupStrategy.cs:687-688` | `backup.FileCount = request.Sources.Count * 100` with "Simulated" comment. |
+| 2578 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/OffGridBackupStrategy.cs:460` | `backup.FileCount = request.Sources.Count * 25` with "Simulated" comment. |
+| 2579 | 2 | P2 | `UltimateDataProtection/Strategies/Innovations/BackupConfidenceScoreStrategy.cs:298` | `_scoreTrends` plain List accessed concurrently from `ReportOutcome` and `CalculateConfidenceScoreAsync` with no lock. |
+| 2580 | 2 | P2 | `UltimateDataProtection/Strategies/Innovations/PredictiveRestoreStrategy.cs:294-512` | Double-checked locking without volatile on `_predictionTimer`. `preStagedBackup` fields written from Task.Run lambda, read without sync. |
+| 2581 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/CrossCloudBackupStrategy.cs:691-695` | `RollbackTransactionAsync` catch swallows all rollback exceptions. "Best effort rollback" with no logging. |
+| 2582 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/PredictiveRestoreStrategy.cs:326-362` | `RunPredictionCycleAsync` and `GeneratePredictionsAsync` both swallow exceptions with empty catch blocks. |
+| 2583 | 13 | P2 | `UltimateDataProtection/Strategies/Innovations/PartialObjectRestoreStrategy.cs:466` | `sources.ToList().IndexOf(source)` inside foreach loop. O(n²) per-iteration linear search. |
+| 2584 | 15 | LOW | `UltimateDataProtection/Strategies/Innovations/BackupConfidenceScoreStrategy.cs:507` | `VerifyBackupAsync` always returns true. Method name guarantees verification it cannot keep. |
+| 2585 | 15 | LOW | `UltimateDataProtection/Strategies/Innovations/BlockchainAnchoredBackupStrategy.cs:729-736` | `VerifyAnchorAsync` only checks `anchor.Confirmed == true`, no blockchain query. |
+| 2586 | 14 | LOW | `UltimateDataProtection/Strategies/Innovations/BlockchainAnchoredBackupStrategy.cs:604` | Hardcoded placeholder contract address "0x1234...abcd" in production code path. |
+| 2587 | 12 | LOW | `UltimateDataProtection/Strategies/Innovations/PredictiveRestoreStrategy.cs:525-526` | `EvictStalePreStagedBackupsAsync` uses default DateTimeOffset (MinValue) for ReadyAt, causing immediate eviction of non-hydrated entries. |
+| 2588 | 9 | LOW | `UltimateDataProtection/Strategies/Innovations/FaradayCageAwareStrategy.cs:473-475` | Key error surfaces mid-restore after data fetched rather than in guard clause. |
+| 2589 | 9 | LOW | `UltimateDataProtection/Strategies/Innovations/NaturalLanguageBackupStrategy.cs` | `RestoreCoreAsync` no OperationCanceledException rethrow guard. Cancellation swallowed as generic failure. |
+
+**Clean files:** DnaBackupStrategy.cs
+
+---
+
+### Chunk 079 -- UltimateDataProtection Innovations (QuantumKD, QuantumSafe, Satellite, SemanticBackup, SemanticRestore, Sneakernet, Social, TimeCapsule, UsbDeadDrop, ZeroConfig, ZeroKnowledge) + Intelligence + Kubernetes + Snapshot + Versioning/Infinite
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2590 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/QuantumSafeBackupStrategy.cs:641-815` | `GenerateKyberEncapsulationAsync`/`DecapsulateKyberKeyAsync` stubs — random bytes, no Kyber. `CreateQuantumSafeSignatureAsync` uses HMACSHA512 not Dilithium. `VerifyQuantumSafeSignatureAsync` always true. `CatalogSourceDataAsync` hardcoded 15K/8GB. |
+| 2591 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/SemanticBackupStrategy.cs:780-839` | `CatalogSourceDataAsync`/`BackupFilesAsync`/`RestoreByPriorityAsync` stubs — hardcoded 20K/15GB. `VerifyBackupIntegrityAsync` always true. |
+| 2592 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:814-895` | All core ops stubs — `CreateCompressedBackupAsync`, `EncryptForSatelliteTransmissionAsync`, `VerifySatelliteStorageAsync`, `DownloadViaSatelliteAsync`, `DecryptAndDecompressAsync`, `RestoreFilesFromDataAsync` return fixed arrays/counts. |
+| 2593 | 1 | P1 | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:691-945` | `CreateTimeLockPuzzleAsync` XOR stub. `SolveTimeLockPuzzleAsync`/`VerifyTimeWitnessAsync` no-ops. `CatalogSourceDataAsync` hardcoded 8K/4GB. `DestroyBackup` only sets status flag. |
+| 2594 | 4 | P1 | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:722-729` | `EncryptKeyWithPuzzle` uses XOR as "encryption". Trivially reversible. No real confidentiality. |
+| 2595 | 1 | P1 | `UltimateDataProtection/Strategies/Intelligence/IntelligentBackupStrategies.cs:16-104` | All 4 intelligent strategies (Predictive, AnomalyAware, OptimizedRetention, SmartRecovery) return hardcoded fake results. Full stubs. |
+| 2596 | 1 | P1 | `UltimateDataProtection/Strategies/Kubernetes/KubernetesBackupStrategies.cs:15-151` | All 5 Kubernetes strategies (Velero, Etcd, PVC, Helm, CRD) return hardcoded fake results. Full stubs. |
+| 2597 | 1 | P1 | `UltimateDataProtection/Strategies/Snapshot/SnapshotStrategies.cs:14-175` | All 6 snapshot strategies (COW, ROW, VSS, LVM, ZFS, CloudSnapshot) return hardcoded fake results. Full stubs. |
+| 2598 | 1 | P1 | `UltimateDataProtection/Strategies/Versioning/InfiniteVersioningStrategy.cs:724-736` | `CompressBlock`/`DecompressBlock` return data unchanged. Compression is a no-op. Size metrics incorrect. |
+| 2599 | 15 | P1 | `UltimateDataProtection/Strategies/Innovations/ZeroKnowledgeBackupStrategy.cs:694-713` | `EncryptMetadataHomomorphicAsync` named as homomorphic encryption but uses plain AES-CBC. Contract actively lies about security property. |
+| 2600 | 15 | P1 | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:691-719` | `CreateTimeLockPuzzleAsync` documented as time-lock puzzle but is trivially reversible XOR. Security contract false. |
+| 2601 | 10 | P1 | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:788-797` | `DestroyBackup` only sets in-memory status flag. No data securely wiped. Self-destruct fictional. Critical compliance gap. |
+| 2602 | 2 | P1 | `UltimateDataProtection/Strategies/Innovations/UsbDeadDropStrategy.cs:30-31` | `_tamperEvents` plain List with separate lock object. Concurrent writes from tamper detection and reads from accessors race. |
+| 2603 | 2 | P1 | `UltimateDataProtection/Strategies/Versioning/InfiniteVersioningStrategy.cs:674-686` | `AddVersionToIndex` holds `_globalLock`, but List/GetVersion/Delete/Lock/LegalHold all read/mutate list without lock. |
+| 2604 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:133-783` | `CreateBackupCoreAsync` hardcodes 80MB/400 files per source. `ExtractSemanticMetadataAsync` hardcodes 100MB/500. |
+| 2605 | 1 | P2 | `UltimateDataProtection/Strategies/Innovations/ZeroKnowledgeBackupStrategy.cs:770-860` | `CatalogSourceDataAsync` hardcoded 12K/6GB. `EncryptHomomorphic` uses AES-CBC not homomorphic. `RetrieveEncryptedDataAsync` returns static 1MB. |
+| 2606 | 4 | P2 | `UltimateDataProtection/Strategies/Innovations/QuantumSafeBackupStrategy.cs:693-712` | `DeriveHybridKeyAsync` concatenation + SHA-256 not HKDF. "In production, use HKDF" comment. Weak key derivation. |
+| 2607 | 2 | P2 | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:249` | `_connectionStatus` written from concurrent calls without lock or volatile. |
+| 2608 | 2 | P2 | `UltimateDataProtection/Strategies/Innovations/ZeroConfigBackupStrategy.cs:311` | `_activeDefaults` nullable field written without sync. Concurrent `RunQuickBackupAsync` races against `AutoConfigureAsync`. |
+| 2609 | 2 | P2 | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:764-786` | `CheckAndDestroyExpiredBackups` timer callback iterates `_backups` and mutates status without lock. |
+| 2610 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/SemanticBackupStrategy.cs:562-767` | `GenerateSemanticEmbeddingsAsync` and `GenerateSemanticIndexAsync` both swallow exceptions with bare `catch { }`. |
+| 2611 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:449-813` | `RequestAiInterpretationAsync` and `EnrichMetadataWithAiAsync` swallow exceptions with bare catch. |
+| 2612 | 5 | P2 | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:305-308` | `CheckSatelliteAvailabilityAsync` swallows per-provider probe exceptions. Individual failures never logged. |
+| 2613 | 7 | P2 | `UltimateDataProtection/Strategies/Innovations/QuantumSafeBackupStrategy.cs:836-838` | Two `SHA256.Create()` calls in `CreateQuantumSafeManifest` without using statements. Resource leak. |
+| 2614 | 9 | P2 | `UltimateDataProtection/Strategies/Innovations/ZeroConfigBackupStrategy.cs:494-700` | `CreateBackupCoreAsync` and `RestoreCoreAsync` don't catch `OperationCanceledException` separately. Cancellation swallowed as generic failure. |
+| 2615 | 10 | P2 | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:391-392` | `FileCount = request.Sources.Count * 50` "Simulated" comment. Fabricated file count. |
+| 2616 | 10 | P2 | `UltimateDataProtection/Strategies/Innovations/ZeroConfigBackupStrategy.cs:558-559` | `FileCount = effectiveRequest.Sources.Count * 100` hardcoded. No real file enumeration. |
+| 2617 | 12 | P2 | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:39-48` | `TemporalPatterns` year lambda returns MinValue which is always skipped. Dead code in O(n) hot path. |
+| 2618 | 13 | P2 | `UltimateDataProtection/Strategies/Versioning/InfiniteVersioningStrategy.cs:362-365` | `CompareVersionsAsync` two O(n²) LINQ chains with nested `.Any()`. Should use HashSet. |
+| 2619 | 14 | P2 | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:370-372` | `SelectOptimalProviderAsync` returns default enum on empty config. `_providerConfigs[selectedProvider]` throws confusing KeyNotFoundException. |
+| 2620 | 14 | P2 | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:264-265` | `RestoreCoreAsync` silently fabricates 100MB result when backup not in catalog. Returns Success=true. |
+| 2621 | 15 | LOW | `UltimateDataProtection/Strategies/Innovations/SatelliteBackupStrategy.cs:807-811` | `SelectOptimalProviderAsync` always picks first provider. Ignores signal/bandwidth/latency. Name promises optimal. |
+| 2622 | 15 | LOW | `UltimateDataProtection/Strategies/Innovations/ZeroKnowledgeBackupStrategy.cs:799-801` | `CheckEncryptedDataExistsAsync` checks metadata dict not actual storage. Contract lie. |
+| 2623 | 12 | LOW | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:819-823` | `GetLastDayOfWeek` always returns `from.AddDays(-7)` regardless of day-of-week requested. |
+| 2624 | 12 | LOW | `UltimateDataProtection/Strategies/Innovations/TimeCapsuleBackupStrategy.cs:340-345` | `VerifyTimeWitnessAsync` false result enters empty block. Warning never surfaced. |
+| 2625 | 13 | LOW | `UltimateDataProtection/Strategies/Innovations/SemanticRestoreStrategy.cs:375-382` | `IsSemanticQuery` creates new Regex per pattern per call. Should pre-compile. |
+| 2626 | 5 | LOW | `UltimateDataProtection/Strategies/Innovations/QuantumSafeBackupStrategy.cs:863-866` | `PublishQuantumSafeBackupCompletedAsync` swallows bus publish exceptions. Best effort, no log. |
+| 2627 | 14 | LOW | `UltimateDataProtection/Strategies/Versioning/InfiniteVersioningStrategy.cs:79-107` | `CreateVersionAsync` creates version with `ContentHash = string.Empty` for metadata-only. No empty check before integrity use. |
+
+**Clean files:** None -- all 15 files have at least one finding.
+
+---
+
+### Chunk 080 -- UltimateDataProtection Subsystems (Backup, Intelligence, Restore, Versioning) + Plugin + Validation + Versioning Policies (Continuous, Event, Intelligent, Manual, Scheduled) + UltimateDataQuality (Base, Cleansing)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2628 | 1 | P1 | `UltimateDataProtection/Validation/BackupValidator.cs:197-226` | `VerifyChecksumsAsync`, `PerformTestRestoreAsync`, `VerifyChainIntegrityAsync` all stubs with "Simulated" comments, always return IsValid=true. No real verification. |
+| 2629 | 1 | P1 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:262-269` | `RestoreVersionAsync` stub — "In a real implementation would restore content". No actual restoration. Succeeds silently. |
+| 2630 | 2 | P1 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:81-114` | Non-atomic read-modify-write on `_contentHashes` and `_versionContent`. Concurrent calls can both see isDuplicate=false, both store content, corrupt dedup state. |
+| 2631 | 5 | P1 | `UltimateDataProtection/Subsystems/IntelligenceSubsystem.cs:56-59,326-329` | Two bare `catch` blocks in `RecommendStrategyAsync` and `GetAIStrategyRecommendationAsync` swallow all exceptions including OperationCanceledException. AI failures invisible. |
+| 2632 | 1 | P2 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:459-468` | `GetAvailablePoliciesAsync` returns only active policy. "In real implementation would return all registered" comment. Contract implies full catalog. |
+| 2633 | 1 | P2 | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:628-638` | `RecommendRecoveryPointAsync` returns hardcoded confidence=0.95, echoes back input backupId. No real analysis. |
+| 2634 | 2 | P2 | `UltimateDataProtection/Versioning/Policies/ScheduledVersioningPolicy.cs:32,72-73` | `_lastScheduledVersion` plain field read/written concurrently. Check-then-write not atomic. |
+| 2635 | 5 | P2 | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:657-671` | `DiscoverAndRegisterStrategies` bare `catch` silently skips broken strategies with no logging. |
+| 2636 | 5 | P2 | `UltimateDataQuality/DataQualityStrategyBase.cs:706-715` | `AutoDiscover` two nested bare `catch` blocks — inner skips uninstantiable types, outer skips unscanned assemblies. Neither logs. |
+| 2637 | 5 | P2 | `UltimateDataQuality/Strategies/Cleansing/CleansingStrategies.cs:410-413` | `ApplyRegexReplace` catches all exceptions from Regex.Replace and silently returns original. Bad regex patterns invisibly fail. |
+| 2638 | 3 | P2 | `UltimateDataQuality/DataQualityStrategyBase.cs:612-614` | `IsHealthy()` calls `.GetAwaiter().GetResult()` on async method. Sync-over-async deadlock risk. |
+| 2639 | 9 | P2 | `UltimateDataProtection/Subsystems/RestoreSubsystem.cs:148-155` | `GetProgressAsync` hardcodes PercentComplete=50. Callers always see 50% with "In Progress" phase. |
+| 2640 | 10 | P2 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:41-43` | Version number via `itemVersions.Count + 1`. After concurrent deletes/creates, numbers collide. Should use atomic counter. |
+| 2641 | 13 | P2 | `UltimateDataQuality/Strategies/Cleansing/CleansingStrategies.cs:718-733` | `FindClosestMatch` O(n) over validValues with Levenshtein per entry. O(m×n) string lengths. Quadratic in hot path. |
+| 2642 | 12 | LOW | `UltimateDataProtection/Subsystems/IntelligenceSubsystem.cs:244` | Growth-rate calculation is average backup size ÷ days, not actual storage growth rate. `PredictedDailyGrowthBytes` systematically wrong. |
+| 2643 | 12 | LOW | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:233-243` | `GetVersionContentAsync` dedup lookup iterates all versions with nested SelectMany+Any. O(n). Should use reverse index. |
+| 2644 | 14 | LOW | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:553-565` | `scenario` from msg.Payload embedded directly into reasoning string without length/content validation. |
+| 2645 | 15 | LOW | `UltimateDataProtection/Validation/BackupValidator.cs:27-88` | `ValidateAsync` with VerifyChecksums=true default calls stubs that always return valid. Contract lies about validation scope. |
+
+**Clean files:** IVersioningPolicy.cs, IVersioningSubsystem.cs, ContinuousVersioningPolicy.cs, EventVersioningPolicy.cs, IntelligentVersioningPolicy.cs, ManualVersioningPolicy.cs, BackupSubsystem.cs
+
+---
+
+### Chunk 081 -- UltimateDataQuality (DuplicateDetection, Monitoring, PredictiveQuality, Profiling, Reporting, Scoring, Standardization, Validation, Plugin) + UltimateDataTransit (Audit, CompressionInTransit, EncryptionInTransit, CostAwareRouter, QoSThrottling, TransitScalingMigration)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2646 | 4 | P0 | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:241-248` | AES-256-GCM fallback stores raw encryption key in transit metadata (`"encryption-key": Convert.ToBase64String(key)`). Key travels alongside ciphertext defeating encryption entirely. Comment admits "in production, use key management service". |
+| 2647 | 6 | P1 | `UltimateDataTransit/Audit/TransitAuditService.cs:73,168-214` | `PublishAuditEntryAsync` fire-and-forget `_ = Task.Run(...)` with bare `catch {}`. Audit failures silently dropped with zero observability. |
+| 2648 | 5 | P1 | `UltimateDataTransit/Audit/TransitAuditService.cs:210-213` | Catch block inside fire-and-forget Task.Run is completely empty. No logging at all. |
+| 2649 | 4 | P1 | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:196-199` | Bare catch falls back from encryption plugin to local AES-GCM silently. Degraded encryption not logged. |
+| 2650 | 5 | P1 | `UltimateDataTransit/Layers/CompressionInTransitLayer.cs:174-178` | Same pattern: bare catch for message-bus compression call. Silent fallback hides service degradation. |
+| 2651 | 5 | P1 | `UltimateDataQuality/UltimateDataQualityPlugin.cs:667` | `OnStartCoreAsync` bare `catch { /* corrupted state */ }` on JSON deserialization. Exception never recorded. |
+| 2652 | 5 | P1 | `UltimateDataQuality/Strategies/Validation/ValidationStrategies.cs:523` | `catch { /* Invalid regex */ }` swallows all exceptions from Regex.IsMatch. Bad regex patterns invisibly non-functional. |
+| 2653 | 1 | P1 | `UltimateDataQuality/UltimateDataQualityPlugin.cs:252-254,471-473` | `GetMetadata()` and `HandleStatsAsync` return hardcoded `0L` for TotalIssuesFound, TotalCorrections, TotalDuplicates. Fake metric data. |
+| 2654 | 2 | P1 | `UltimateDataQuality/Strategies/Monitoring/MonitoringStrategies.cs:376-388` | `RecordMetric` calls `GetOrAdd` then `lock(history)`. Concurrent calls may get different list objects if GetOrAdd factory runs twice. |
+| 2655 | 3 | P1 | `UltimateDataTransit/QoS/QoSThrottlingManager.cs:490,501` | `ThrottledStream.Read`/`Write` use `Task.Run(() => ConsumeAsync()).GetResult()`. Sync-over-async blocks thread pool thread. |
+| 2656 | 13 | P2 | `UltimateDataQuality/Strategies/DuplicateDetection/DuplicateDetectionStrategies.cs:255,506-527` | `SelectMaster` uses `List.Contains` O(n) in loop. `CalculateGroupSimilarity` O(n²) unbounded. |
+| 2657 | 13 | P2 | `UltimateDataQuality/Strategies/PredictiveQuality/PredictiveQualityStrategies.cs:929-935` | `AnalyzeRootCause` O(n×m) nested foreach with Any() LINQ. |
+| 2658 | 2 | P2 | `UltimateDataTransit/QoS/QoSThrottlingManager.cs:296-340` | `TokenBucket.TryConsumeAsync` double-release semaphore guard is fragile. SemaphoreFullException caught silently. |
+| 2659 | 10 | P2 | `UltimateDataQuality/Strategies/Reporting/ReportingStrategies.cs:497-523` | `GenerateCsvReport` does not escape field names or dimension names for CSV. Malformed output on commas/newlines. |
+| 2660 | 12 | P2 | `UltimateDataQuality/Strategies/Scoring/ScoringStrategies.cs:443-446` | All aggregated top issues assigned `Dimension = Validity` regardless of actual dimension. Downstream filtering corrupted. |
+| 2661 | 14 | P2 | `UltimateDataQuality/Strategies/Monitoring/MonitoringStrategies.cs:614-616` | `CheckThresholds` warning formula inverted: `warningLevel = minValue / warningThreshold`. For 0.9 threshold, fires when metric < 111 (above minimum). Always fires. |
+| 2662 | 1 | P2 | `UltimateDataQuality/Strategies/Validation/ValidationStrategies.cs` | All 12 message handlers (validate, profile, cleanse, detect-duplicates, etc.) only look up strategy and return metadata. No actual data processing. Pervasive stub. |
+| 2663 | 15 | LOW | `UltimateDataQuality/Strategies/Monitoring/MonitoringStrategies.cs:464-513` | `CalculateTrend` hardcoded 5% threshold not configurable. Applies same to all metric ranges. |
+| 2664 | 15 | LOW | `UltimateDataQuality/Strategies/Standardization/StandardizationStrategies.cs:51` | Property `StandardizedValue_` trailing underscore clashes with enclosing class name. Naming violation. |
+| 2665 | 14 | LOW | `UltimateDataQuality/Strategies/Profiling/ProfilingStrategies.cs:575-604` | `ProfileNumeric` uses `sorted[n/4]` for Q1/Q3. No interpolation. Incorrect quartiles for small datasets. |
+| 2666 | 7 | LOW | `UltimateDataTransit/Layers/CompressionInTransitLayer.cs:93-107` | `compressedStream` not disposed if `TransferAsync` throws. Missing using/try-finally. |
+| 2667 | 7 | LOW | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:219` | Plaintext byte array not zeroed after encryption. Sensitive data remains in GC-reachable memory until collected. |
+
+**Clean files:** CostAwareRouter.cs, TransitScalingMigration.cs
+
+---
+
+### Chunk 082 — UltimateDataTransit (Advanced strategies) + UltimateDatabaseProtocol (Base)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2668 | 4 | P0 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:374` | Default username is literal `"anonymous"` when no credentials supplied. SSH connections silently attempt to authenticate as anonymous with empty password. Same issue in `SftpTransitStrategy.cs:265`. |
+| 2669 | 4 | P0 | `UltimateDataTransit/Strategies/AirGapTransferStrategy.cs:117` | `VerifyPackageSignature` catches all exceptions silently, returns `false`. HMAC comparison uses `==` (not constant-time), vulnerable to timing side-channel. |
+| 2670 | 14 | P1 | `UltimateDataTransit/Strategies/StoreAndForwardStrategy.cs:392` | `IngestPackageAsync` uses `entry.RelativePath` from deserialized manifest JSON to construct file path without path traversal validation. Crafted `../../../etc/passwd` escapes `dataDir`. |
+| 2671 | 5 | P1 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:822-830` | `RegisterAsSeederAsync` bare `catch { }` swallows all exceptions without logging. |
+| 2672 | 5 | P1 | `UltimateDataTransit/UltimateDataTransitPlugin.cs:761` | `PublishTransferEventAsync` bare `catch { }` silently swallows message-bus publish failures. Audit data gaps invisible. |
+| 2673 | 5 | P1 | `UltimateDatabaseProtocol/DatabaseProtocolStrategyBase.cs:1221-1230` | Two nested bare `catch { }` blocks in `DiscoverStrategies` swallow all instantiation and assembly-scanning errors. Broken strategies silently skipped. |
+| 2674 | 2 | P1 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:755-773` | Failed segment in `TransferSegmentsOnPathAsync` never re-queued or marked failed. Entire transfer fails after all parallel work wasted. |
+| 2675 | 2 | P1 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:711` | Fire-and-forget `_ = Task.Run(...)` in retry path. Unobserved exception if write loop throws. |
+| 2676 | 6 | P1 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:611` | `Task.Run` body: null-ref from `SelectPeer` before inner `try` would propagate without releasing semaphore slot. |
+| 2677 | 10 | P1 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:792` | `state.Request?.DataStream` null-conditional masks root cause — resume path may not have original stream, not validated before parallel transfer begins. |
+| 2678 | 4 | P1 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:126-131` | Catch block swallows all errors (file not found vs connection refused) during delta download, silently triggers full upload. |
+| 2679 | 12 | P2 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:172-173` | `TransferAsync` computes `dataToTransfer` via delta but uploads `sourceData` (full source) instead. Delta detection completely useless — logic bug. |
+| 2680 | 13 | P2 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:735` | `state.Segments.Count(s => s.Completed)` O(n) LINQ scan on every segment completion in hot concurrent loop. O(n²) aggregate. |
+| 2681 | 13 | P2 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:556-557` | Rarity sort uses nested LINQ `Count(p => p.PieceBitmap[i])` per piece. O(N×M) for N pieces × M peers. |
+| 2682 | 13 | P2 | `UltimateDataTransit/Strategies/DeltaDifferentialStrategy.cs:382` | `ComputeDeltaInstructions` recomputes `Adler32` over full block per byte position instead of using implemented `RollHash` O(1) update. O(n) degrades to O(n×blockSize). |
+| 2683 | 7 | P2 | `UltimateDataTransit/Strategies/GrpcStreamingTransitStrategy.cs:140-142` | Pull-mode `HttpResponseMessage` never disposed. Same in `Http3TransitStrategy.cs:136-138`. |
+| 2684 | 2 | P2 | `UltimateDatabaseProtocol/DatabaseProtocolStrategyBase.cs:997` | `ResetStatistics` writes `_lastUpdateTime` without lock/volatile. Technically undefined in C# memory model. |
+| 2685 | 12 | LOW | `UltimateDataTransit/UltimateDataTransitPlugin.cs:789-793` | `TransferAsync(string key, ...)` returns hardcoded `"delegated-to-strategy"` without delegating. Rule 13 placeholder. |
+| 2686 | 14 | LOW | `UltimateDataTransit/Strategies/ChunkedResumableStrategy.cs:637-646` | `DetermineChunkSize` no upper bound. `int.MaxValue` (2GB) chunk size accepted, causing massive allocation. |
+| 2687 | 2 | LOW | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:627-628` | `ActiveDownloads` counter updated by record replacement in BoundedDictionary — not atomic CAS. `ConcurrentDownloadLimitPerPeer` not reliably enforced. |
+
+**Clean files:** TransitMessageTopics.cs
+
+---
+
+### Chunk 083 — UltimateDatabaseProtocol (ConnectionPool, Compression, CloudDW, Driver, Embedded, Graph, Messaging, NewSQL, NoSQL, Relational strategies)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2688 | 1 | P1 | `UltimateDatabaseProtocol/ProtocolCompression.cs:675-757` | Rule 13 stubs: LZ4→Deflate, Zstd→Brotli, Snappy→Deflate, LZO→Deflate. Wire protocol advertises one codec but sends another. Data sent to real servers will fail to decompress. |
+| 2689 | 1 | P1 | `UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs:1021-1035,1236-1251` | Rule 13 stubs: RocksDb and BerkeleyDb declare `SupportsTransactions = true` but Begin/Commit/Rollback are all no-ops returning fake GUIDs or Task.CompletedTask. |
+| 2690 | 1 | P1 | `UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs:994-1002` | Rule 13 stub: `RocksDbProtocolStrategy.Compact()` returns `"compaction_triggered"` with no actual work. |
+| 2691 | 3 | P1 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:631-633` | Sync-over-async: `Dispose()` calls `DisposeAsync().AsTask().Wait()`. Deadlock risk in ASP.NET Core contexts. |
+| 2692 | 6 | P1 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:388-392` | Fire-and-forget: `_ = WarmUpAsync()` in constructor. Unobserved exceptions if warm-up fails. |
+| 2693 | 7 | P1 | `UltimateDatabaseProtocol/Strategies/Driver/DriverProtocolStrategies.cs` (JdbcBridge) | `_httpClient = new HttpClient { ... }` in `PerformHandshakeAsync` without IHttpClientFactory. Leaked if AuthenticateAsync throws. |
+| 2694 | 9 | P1 | `UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs` (LevelDb/RocksDb/BerkeleyDb) | File operations (`ReadAllText`, `WriteAllText`, `Delete`, `GetFiles`) have no try/catch. IOException propagates unhandled instead of structured `QueryResult { Success = false }`. |
+| 2695 | 1 | P2 | `UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs` | All three "embedded key-value" strategies are plain filesystem file-per-key stores. No actual LevelDB/RocksDB/BerkeleyDB driver, LSM trees, bloom filters, or WAL. |
+| 2696 | 1 | P2 | `UltimateDatabaseProtocol/Strategies/Graph/AdditionalGraphStrategies.cs:600-615` | TigerGraph `BeginTransactionCoreAsync` returns GUID, Commit/Rollback are Task.CompletedTask despite `SupportsTransactions = true`. |
+| 2697 | 1 | P2 | `UltimateDatabaseProtocol/ProtocolCompression.cs:828-833` | `WrapWithCompression()` returns unwrapped stream. Comment: "would need proper integration". |
+| 2698 | 2 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:96-121` | `PooledConnection<T>` fields `IsInUse`, `LastUsedAt`, `UseCount` mutated without sync. Maintenance loop races with `MarkInUse` in AcquireAsync. |
+| 2699 | 2 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:543-583` | `PerformMaintenanceAsync` reads snapshot via `ToArray()` then `TryDequeue` — under concurrency can dequeue wrong connection, causing double-use. |
+| 2700 | 2 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:638-645` | `DisposeAsync` guard `if (_disposed) return` not atomic. Concurrent calls double-dispose semaphores. |
+| 2701 | 2 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/RedisRespProtocolStrategy.cs:39-41` | `_inTransaction` and `_transactionQueue` accessed without locks in concurrent pipelining scenario. |
+| 2702 | 5 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:311-316,419-423` | Two bare `catch { }` blocks: maintenance loop and warm-up. Errors invisible. |
+| 2703 | 5 | P2 | `UltimateDatabaseProtocol/ProtocolCompression.cs:280-291` | Bare `catch` swallows compression failures, returns uncompressed data as `WasCompressed = false`. |
+| 2704 | 5 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/MongoDbWireProtocolStrategy.cs:296-303` | `ParseQueryAsCommand` silently falls through to collection.operation parser on JsonException. |
+| 2705 | 5 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/MemcachedProtocolStrategy.cs:249-272` | Multi-get `catch { break; }` returns partial result set without notifying caller. |
+| 2706 | 7 | P2 | `UltimateDatabaseProtocol/Strategies/Graph/AdditionalGraphStrategies.cs:67,288,490` | `new HttpClient { ... }` in ArangoDB/JanusGraph/TigerGraph AuthenticateAsync. Not disposed if subsequent call throws. |
+| 2707 | 10 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:503-541` | `TryReleaseAsync`: if `DisposeConnectionAsync` throws on expired connection, semaphore Release in finally inflates available slots beyond MaxPoolSize. |
+| 2708 | 10 | P2 | `UltimateDatabaseProtocol/Strategies/Graph/Neo4jBoltProtocolStrategy.cs:82-88` | `_inTransaction` set false after failed rollback. Server may still have active transaction. |
+| 2709 | 12 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/MySqlProtocolStrategy.cs:497-498` | ERR packet in result set `break`s without returning failure. Falls through to success path with partial rows. |
+| 2710 | 12 | P2 | `UltimateDatabaseProtocol/Strategies/Graph/Neo4jBoltProtocolStrategy.cs:499-501` | Non-struct message marker reads garbage into metadata. |
+| 2711 | 12 | P2 | `UltimateDatabaseProtocol/ProtocolCompression.cs:358-363` | `CompressToStreamAsync` reads `input.Length` after copy — throws `NotSupportedException` for non-seekable streams. |
+| 2712 | 9 | P2 | `UltimateDatabaseProtocol/Strategies/Driver/DriverProtocolStrategies.cs:508-525` | JdbcBridge Commit/Rollback don't call `EnsureSuccessStatusCode()`. HTTP error silently treated as success. |
+| 2713 | 9 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/CassandraCqlProtocolStrategy.cs:316-318` | `ResultPrepared` case returns success without caching prepared statement ID. Subsequent execute lost. |
+| 2714 | 14 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/CassandraCqlProtocolStrategy.cs:146-151` | Sends `CQL_VERSION = "3.4.5"` unconditionally regardless of server's SUPPORTED response. |
+| 2715 | 14 | P2 | `UltimateDatabaseProtocol/Strategies/NoSQL/MemcachedProtocolStrategy.cs:500` | `uint.Parse(parts[2])` without TryParse. FormatException on non-numeric expiry. |
+| 2716 | 15 | P2 | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:216-228` | `ReleaseAsync` silently destroys connection if pool not found, but contract implies return-to-pool. |
+| 2717 | 13 | P2 | `UltimateDatabaseProtocol/Strategies/Embedded/EmbeddedDatabaseStrategies.cs:680,971,1209` | `Directory.GetFiles` materializes entire array then `OrderBy().Take()`. Use `EnumerateFiles`. |
+| 2718 | 12 | LOW | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:279-281` | Pool key: null username and empty username produce same key `"::"`. Unauthenticated can share authenticated pool. |
+| 2719 | 10 | LOW | `UltimateDatabaseProtocol/Strategies/NoSQL/CassandraCqlProtocolStrategy.cs:86-89` | `_protocolVersion` read without sync from multiple async continuations. |
+| 2720 | 13 | LOW | `UltimateDatabaseProtocol/Strategies/NoSQL/MongoDbWireProtocolStrategy.cs:641-648` | `ReadCString` byte-by-byte into `List<byte>` then `ToArray()`. Two allocations per string. |
+| 2721 | 14 | LOW | `UltimateDatabaseProtocol/ConnectionPoolManager.cs:176-185` | `GetOrCreatePool` no null check on `parameters`. NullReferenceException on `parameters.Host`. |
+| 2722 | 15 | LOW | `UltimateDatabaseProtocol/ProtocolCompression.cs:475-487` | `GetBestAlgorithm` is hardcoded content-type lookup, not intelligent analysis. Name misleading. |
+| 2723 | 15 | LOW | `UltimateDatabaseProtocol/Strategies/NoSQL/MongoDbWireProtocolStrategy.cs:232-236` | `Normalize()` returns password unchanged. SASLprep not implemented despite SCRAM requirement. |
+
+---
+
+### Chunk 084 — UltimateDatabaseProtocol (Relational, Search, Specialized, TimeSeries, Virtualization, Plugin) + UltimateDatabaseStorage (Base)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2724 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:315-329` | `ComputePasswordVerifier()` is stub: SHA1+SHA256 double-hash instead of O5LOGON. Will never auth against real Oracle. Comment: "Simplified Oracle password verification." |
+| 2725 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:966-976` | `ParseQueryData()` stub: all result data dumped into single `"data"` key as raw EBCDIC string. Real query results corrupted. |
+| 2726 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:1003-1033` | `ParseColumnValue()` only handles INT/BIGINT/NVARCHAR/VARCHAR. FLOAT, DECIMAL, DATETIME, BIT, MONEY, XML etc. silently return `null`. |
+| 2727 | 1 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs:489-512` | `ExecuteDdlAsync`/`ExecuteDmlAsync` return success with hardcoded row counts ("INSERT 0 1", "UPDATE 1") without performing any storage operation. |
+| 2728 | 4 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:119-121` | Host/port/service interpolated into TNS string without sanitization. `)(` chars in host enable injection. |
+| 2729 | 4 | P1 | `UltimateDatabaseProtocol/Strategies/Search/AdditionalSearchStrategies.cs:70-76` | SSL bypass `(message, cert, chain, errors) => true` guarded by `_verifySsl` flag with no safe setter — dead code that could be accidentally activated. Same in Elasticsearch/OpenSearch. |
+| 2730 | 2 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/MySqlProtocolStrategy.cs:120,476` | `_sequenceId` field mutated without sync. Concurrent calls produce duplicate sequence numbers. |
+| 2731 | 2 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:33-34` | `_sequenceNumber`, `_sdu`, `_tdu`, `_sessionKey` — mutable fields without sync. Concurrent calls corrupt protocol state. |
+| 2732 | 2 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:117,1076` | `_packetId++` without lock, `_envChanges` plain Dictionary updated during concurrent parsing. |
+| 2733 | 5 | P1 | `UltimateDatabaseProtocol/UltimateDatabaseProtocolPlugin.cs:487-489` | `PublishStrategyRegisteredAsync` bare `catch { }` swallows all exceptions. |
+| 2734 | 5 | P1 | `UltimateDatabaseStorage/DatabaseStorageStrategyBase.cs:597-634` | `RetrieveBatchAsync`/`DeleteBatchAsync` bare `catch { // Skip failed }` silently discard per-item errors. |
+| 2735 | 12 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:163-176` | `ParseAcceptPacket()` offset not advanced past `_tdu` field. SDU negotiation silently fails for non-standard layouts. |
+| 2736 | 12 | P1 | `UltimateDatabaseProtocol/Strategies/Specialized/SpecializedProtocolStrategies.cs` (Db2Drda) | `ParseQueryData()` returns all data in single `"data"` key as raw EBCDIC string. Results unusable. |
+| 2737 | 7 | P1 | `UltimateDatabaseProtocol/Strategies/Search/ElasticsearchProtocolStrategy.cs:122-130` | `JsonDocument.Parse(content)` never disposed. Pooled buffer leak per auth call. Same in OpenSearch. |
+| 2738 | 4 | P2 | `UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs:370,378` | `SharedHttpClient` static field: `DefaultRequestHeaders.Add("Authorization", ...)` leaks auth headers between instances. |
+| 2739 | 5 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:541-551` | Bare `catch { return false; }` in `PingCoreAsync`. Same in Db2DrdaProtocolStrategy. |
+| 2740 | 7 | P2 | `UltimateDatabaseProtocol/Strategies/Search/AdditionalSearchStrategies.cs:67` | `SolrProtocolStrategy` creates new HttpClient without disposing old. Handler leaked on reconnect. |
+| 2741 | 7 | P2 | `UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs:377-451` | `_httpClient = SharedHttpClient` then `CleanupConnectionAsync` calls `_httpClient?.Dispose()` — disposes static shared client. |
+| 2742 | 12 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs:421-433` | `CommitTransactionAsync` on failed transaction silently transitions to idle state, returns success. Neither commits nor rolls back. |
+| 2743 | 12 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:274` | `NotifySslUpgradeAsync` is async no-op. Encryption requirement from pre-login never acted upon. |
+| 2744 | 12 | P2 | `UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs:379` | `stream.Position` accessed after `using` block disposes stream. `ObjectDisposedException`. |
+| 2745 | 14 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:196-200` | `new byte[length - 8]` — if `length < 8` from malformed packet, negative array size. No bounds check. |
+| 2746 | 14 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/MySqlProtocolStrategy.cs:296-298` | Auth response length cast to byte — silently truncates if > 255. |
+| 2747 | 14 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:498-503` | Unknown TDS token reads 2-byte length; tokens with 4-byte or fixed headers corrupt all subsequent parsing. |
+| 2748 | 10 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs:32-33` | Transaction state fields plain instance fields, no sync. Torn reads under concurrent async continuations. |
+| 2749 | 10 | P2 | `UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs:181` | Query cache has no invalidation mechanism for `RegisterTable` updates. Stale data served for 5-minute TTL. |
+| 2750 | 13 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlCatalogProvider.cs:339-360` | N+1: `GetTableColumnsInternalAsync` called sequentially per table in `foreach`. |
+| 2751 | 13 | P2 | `UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs:626-635` | Cache key = full SQL + all params concatenated. Unbounded string keys. Should hash. |
+| 2752 | 13 | P2 | `UltimateDatabaseProtocol/Strategies/Virtualization/SqlOverObjectProtocolStrategy.cs:420-456` | `ReadToEndAsync` materializes entire JSON file in memory before parsing. |
+| 2753 | 15 | P2 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs:421-433` | `CommitTransactionAsync` name lies — silently discards failed transaction. |
+| 2754 | 15 | P2 | `UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs:294-295` | TimescaleDb `PerformHandshakeAsync` performs full connect+auth lifecycle. `AuthenticateAsync` is no-op. Breaks base class contract. |
+| 2755 | 15 | LOW | `UltimateDatabaseStorage/DatabaseStorageStrategyBase.cs:780` | `Dispose()` uses `new` hiding base. Breaks IDisposable when held as base type. |
+| 2756 | 11 | LOW | `UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs:273` | TimescaleDb directly instantiates `PostgreSqlProtocolStrategy` by full class name. Intra-plugin coupling. |
+| 2757 | 13 | LOW | `UltimateDatabaseProtocol/UltimateDatabaseProtocolPlugin.cs:112-143` | `DeclaredCapabilities` computed getter enumerates all strategies per call. No caching. |
+| 2758 | 9 | LOW | `UltimateDatabaseProtocol/Strategies/TimeSeries/TimeSeriesProtocolStrategies.cs:174-179` | `PingCoreAsync` sends HTTP GET without try/catch. Exception propagates instead of returning false. |
+
+**Clean files:** PostgreSqlProtocolStrategy.cs, PostgreSqlTypeMapping.cs, PostgreSqlWireVerification.cs
+
+---
+
+### Chunk 085 — UltimateDatabaseStorage (Scaling, Analytics, CloudNative, Optimization, Embedded, Graph)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2759 | 4 | P0 | `UltimateDatabaseStorage/Strategies/Analytics/PrestoStorageStrategy.cs:109-216` | SQL injection: `key`, `dataBase64`, `etag`, `contentType` interpolated into SQL without escaping. Only `metadataJson` gets `Replace("'","''")`. All CRUD methods vulnerable. |
+| 2760 | 1 | P0 | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:79-124` | `EnsureSchemaCoreAsync` builds complete ingestion spec then discards with `Task.CompletedTask`. Datasource never provisioned. |
+| 2761 | 1 | P0 | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:242-251` | `DeleteCoreAsync` stub: returns size but performs no deletion. Caller told delete succeeded when data remains. |
+| 2762 | 1 | P0 | `UltimateDatabaseStorage/Strategies/CloudNative/SpannerStorageStrategy.cs:99-113` | `EnsureSchemaCoreAsync` builds DDL then discards with `Task.CompletedTask`. Table never created. |
+| 2763 | 1 | P1 | `UltimateDatabaseStorage/Strategies/Embedded/H2StorageStrategy.cs:83-97` | `CreateH2Connection` returns `NpgsqlConnection` claiming H2 PostgreSQL wire protocol. DDL uses H2 CLOB syntax incompatible with Npgsql. |
+| 2764 | 4 | P1 | `UltimateDatabaseStorage/Strategies/Graph/ArangoDbStorageStrategy.cs:232-251` | AQL injection: `_collection` interpolated directly into `FOR doc IN {_collection}`. User-configurable value. |
+| 2765 | 4 | P1 | `UltimateDatabaseStorage/Strategies/Analytics/PrestoStorageStrategy.cs:262-263` | `DefaultRequestHeaders.Add` called per query — duplicate headers accumulate. After N queries, N catalog/schema headers sent. |
+| 2766 | 2 | P1 | `UltimateDatabaseStorage/Scaling/DatabaseStorageScalingManager.cs:385-390` | `CancellationTokenSource` disposed at foreach iteration end before async task completes. `ObjectDisposedException` in flight. |
+| 2767 | 2 | P1 | `UltimateDatabaseStorage/Scaling/DatabaseStorageScalingManager.cs:77,461-479` | `_disposed` plain bool, `_maxBufferBytes`/`_chunkSize`/etc. plain ints written and read across threads without sync. |
+| 2768 | 2 | P1 | `UltimateDatabaseStorage/Strategies/Graph/DistributedGraphProcessing.cs:27-28,106` | `_currentSuperstep` and `_isActive` plain fields read concurrently without volatile/Interlocked. |
+| 2769 | 2 | P1 | `UltimateDatabaseStorage/Strategies/DatabaseStorageOptimization.cs:46-54` | `IndexUsageStats.TotalScans++` and `TotalTimeMs += queryTimeMs` non-atomic on shared object. |
+| 2770 | 2 | P1 | `UltimateDatabaseStorage/Strategies/DatabaseStorageOptimization.cs:422-437` | `GetAsync` read-then-put TOCTOU: concurrent misses both invoke expensive fallback and double-fill cache. |
+| 2771 | 7 | P1 | `UltimateDatabaseStorage/Strategies/Embedded/LiteDbStorageStrategy.cs:370-374` | `MemoryStream` in `RetrieveLargeFileAsync` never disposed if `DownloadAsync` throws. |
+| 2772 | 10 | P1 | `UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs:75-101` | `EnsureSchemaCoreAsync` opens connection, then `ConnectCoreAsync` opens again. Double-open may fail/corrupt state. |
+| 2773 | 14 | P2 | `UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs:84-98` | `_database`/`_tableName` interpolated into DDL SQL from user config. No identifier validation. |
+| 2774 | 14 | P2 | `UltimateDatabaseStorage/Strategies/CloudNative/SpannerStorageStrategy.cs:99-234` | `_tableName` interpolated into DDL/DML without validation. |
+| 2775 | 14 | P2 | `UltimateDatabaseStorage/Strategies/Embedded/DuckDbStorageStrategy.cs:313` | `filePath` interpolated into `COPY ... TO '{filePath}'`. Path traversal + single-quote injection. |
+| 2776 | 10 | P2 | `UltimateDatabaseStorage/Strategies/Embedded/DerbyStorageStrategy.cs:143-196` | Non-atomic upsert (UPDATE then INSERT). Concurrent INSERT between causes PK violation. |
+| 2777 | 10 | P2 | `UltimateDatabaseStorage/Strategies/Graph/ArangoDbStorageStrategy.cs:461-468` | `CommitAsync`/`RollbackAsync` don't call `EnsureSuccessStatusCode`. Failed commit goes undetected. |
+| 2778 | 10 | P2 | `UltimateDatabaseStorage/Strategies/Embedded/LiteDbStorageStrategy.cs:293-294` | ETag uses `HashCode.Combine` (non-deterministic across restarts). Not collision-resistant. |
+| 2779 | 13 | P2 | `UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs:670-685` | Modularity calculation O(V²) iterating all vertex pairs. |
+| 2780 | 13 | P2 | `UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs:638-665` | `CalculateModularityGain` O(V) per call inside innermost Louvain loop. Total O(V² × iterations). |
+| 2781 | 13 | P2 | `UltimateDatabaseStorage/Strategies/DatabaseStorageOptimization.cs:482-487` | LRU eviction `OrderBy().FirstOrDefault()` per eviction = O(M × N log N). |
+| 2782 | 13 | P2 | `UltimateDatabaseStorage/Strategies/Graph/DistributedGraphProcessing.cs:173-176` | `GroupBy(v => v.Partition).ToList()` every superstep materializes O(V) objects. |
+| 2783 | 12 | P2 | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:316-319` | `Created`/`Modified` always `DateTime.UtcNow` instead of parsed from `__time`. Timestamps meaningless. |
+| 2784 | 15 | P2 | `UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs:309-327` | `CheckHealthCoreAsync` bare catch returns false. Infrastructure vs health failures indistinguishable. Pattern repeated across 6 strategies. |
+| 2785 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Graph/ArangoDbStorageStrategy.cs:164-175` | PUT fail silently falls through to POST regardless of error type. Should check 404 only. |
+| 2786 | 15 | LOW | `UltimateDatabaseStorage/Scaling/DatabaseStorageScalingManager.cs:343` | `ExecuteStreamingQueryAsync` increments `_paginatedQueries` counter. Misleading metric. |
+| 2787 | 12 | LOW | `UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs:817-819` | LabelPropagation returns `Modularity = 0` without computing it. Misleading. |
+| 2788 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:56-63` | `_httpClient` no `BaseAddress` set. Misconfigured trailing slash produces double-slash URLs. |
+| 2789 | 14 | LOW | `UltimateDatabaseStorage/Strategies/CloudNative/CosmosDbStorageStrategy.cs:65` | `Enum.Parse<ConsistencyLevel>` without `ignoreCase: true` or try/catch. Case mismatch throws. |
+
+---
+
+### Chunk 086 — UltimateDatabaseStorage (Graph/Partitioning, Graph/Visualization, JanusGraph, Neo4j, KeyValue, NewSQL)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2790 | 4 | P0 | `UltimateDatabaseStorage/Strategies/NewSQL/CockroachDbStorageStrategy.cs:84-97` | `_tableName` interpolated directly into DDL/DML SQL with no validation. SQL injection via config. Same in all 6 CRUD methods. |
+| 2791 | 4 | P0 | `UltimateDatabaseStorage/Strategies/NewSQL/TiDbStorageStrategy.cs:80-93` | Identical SQL injection via `_tableName` interpolation in all queries. |
+| 2792 | 4 | P0 | `UltimateDatabaseStorage/Strategies/NewSQL/VitessStorageStrategy.cs:84,96-109` | Triple exposure: `_tableName` + `_keyspace` both interpolated unvalidated. `USE {_keyspace}` at line 84. |
+| 2793 | 4 | P0 | `UltimateDatabaseStorage/Strategies/NewSQL/YugabyteDbStorageStrategy.cs:84-101` | Same `_tableName` interpolation incl. `idx_{_tableName}_created` index name. |
+| 2794 | 5 | P1 | `UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs:113-121` | Bare `catch { }` in `EnsureSchemaCoreAsync`. Auth/network errors silently swallowed. |
+| 2795 | 5 | P1 | `UltimateDatabaseStorage/Strategies/Graph/Neo4jStorageStrategy.cs:98-124` | Two bare `catch { }` blocks in schema creation. Any error type silently ignored. |
+| 2796 | 5 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue` (Consul:188, Etcd:206, Memcached:204, Redis:241) | `ListCoreAsync` bare `catch { continue; }` in 4 KV strategies. Silent data omission from listings. |
+| 2797 | 5 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/EtcdStorageStrategy.cs:151-158` | `DeleteCoreAsync` bare `catch { }` on metadata retrieval. Size returned as 0. |
+| 2798 | 5 | P1 | `UltimateDatabaseStorage/Strategies/NewSQL/VitessStorageStrategy.cs:87-92` | Bare `catch { }` on `USE {_keyspace}`. Permissions/config errors silently swallowed. |
+| 2799 | 2 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/LevelDbStorageStrategy.cs:109-129` | TOCTOU: metadata read outside `lock`, write inside lock. Concurrent writer corrupts `CreatedAt`. |
+| 2800 | 2 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/RocksDbStorageStrategy.cs:127-144` | Same TOCTOU: metadata read outside lock, `WriteBatch` has no lock at all. |
+| 2801 | 10 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/MemcachedStorageStrategy.cs:259-281` | Index read-modify-write without CAS. Concurrent stores produce lost updates. |
+| 2802 | 10 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs:159-163` | `DeleteCoreAsync` doesn't check transaction result. Failed delete reported as success. |
+| 2803 | 12 | P1 | `UltimateDatabaseStorage/Strategies/KeyValue/EtcdStorageStrategy.cs:266-272` | `GetRangeEnd` byte increment wraps 0xFF→0x00 without carry. Empty results for keys ending 0xFF. |
+| 2804 | 12 | P1 | `UltimateDatabaseStorage/Strategies/Graph/Neo4jStorageStrategy.cs:302-306` | `SingleAsync()` throws on zero results. Null check is dead code. Misleading exception type. |
+| 2805 | 4 | P2 | `UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs:104-141` | `_vertexLabel` interpolated into Gremlin queries. Data values use bindings but label doesn't. |
+| 2806 | 10 | P2 | `UltimateDatabaseStorage/Strategies/NewSQL/CockroachDbStorageStrategy.cs:112-125` | UPSERT always overwrites `created_at`. Original creation time lost on update. Same in YugabyteDb. |
+| 2807 | 2 | P2 | `UltimateDatabaseStorage/Strategies/Graph/GraphPartitioningStrategies.cs:595-661` | `CommunityPartitioningStrategy`: `_communityAssignments[vertexId] = newCommunity` races between Interlocked.Increment and assignment. |
+| 2808 | 2 | P2 | `UltimateDatabaseStorage/Strategies/Graph/GraphPartitioningStrategies.cs` (VertexCut) | `HashSet<int>` mutated inside `AddOrUpdate` delegate. Not thread-safe for concurrent edge partitioning. |
+| 2809 | 12 | P2 | `UltimateDatabaseStorage/Strategies/Graph/GraphPartitioningStrategies.cs:318` | `Math.Abs(GetHashCode()) % PartitionCount` — `int.MinValue` produces negative partition index. |
+| 2810 | 13 | P2 | `UltimateDatabaseStorage/Strategies/KeyValue/RedisStorageStrategy.cs:224` | `SortedSetRangeByScoreAsync` loads ALL keys. Unbounded allocation. No pagination. |
+| 2811 | 13 | P2 | `UltimateDatabaseStorage/Strategies/KeyValue/MemcachedStorageStrategy.cs:192,259-281` | Entire key index deserialized/serialized on every store/delete. O(n) per mutation. |
+| 2812 | 12 | P2 | `UltimateDatabaseStorage/Strategies/KeyValue/LevelDbStorageStrategy.cs:213-220` | `ListCoreAsync` early-exit logic redundant and potentially wrong. Falls through when should break. |
+| 2813 | 15 | P2 | `UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs:83-88` | `ConnectCoreAsync` submits test query but discards result. Connectivity not actually verified. |
+| 2814 | 15 | P2 | `UltimateDatabaseStorage/Strategies/NewSQL/YugabyteDbStorageStrategy.cs:62-67` | Version check for "YugabyteDB" has empty `if` body (comment only). Silently connects to non-YugabyteDB. |
+| 2815 | 15 | LOW | `UltimateDatabaseStorage/Strategies/KeyValue/FoundationDbStorageStrategy.cs:59` | `Fdb.Start()` called every init. Must be once-per-process. |
+| 2816 | 15 | LOW | `UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs:342` | `Task.Run(() => _lock.Release())` wraps sync call unnecessarily. |
+| 2817 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Graph/GraphVisualizationExport.cs:499-510` | `ParseHexColor` throws on malformed 6-char hex. No TryParse fallback. |
+
+---
+
+### Chunk 087 — UltimateDatabaseStorage (NoSQL, Relational, Search, Spatial)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2818 | 1 | P0 | `UltimateDatabaseStorage/Strategies/NoSQL/CouchDbStorageStrategy.cs:11` | Entire file wrapped in `#if FALSE`. Strategy is dead code — zero runtime capability. |
+| 2819 | 4 | P0 | `UltimateDatabaseStorage/Strategies/NoSQL/RavenDbStorageStrategy.cs:71-75` | TLS certificate loaded then discarded. Mutual TLS silently non-functional. Comment: "Certificate is read-only in newer versions." |
+| 2820 | 4 | P0 | `UltimateDatabaseStorage/Strategies/Relational/SqlServerStorageStrategy.cs:84-101` | `_tableName`/`_schemaName` interpolated into DDL without validation. SQL injection. Same in MySql:88, Oracle:96, Sqlite:107, PostGis:87. |
+| 2821 | 4 | P0 | `UltimateDatabaseStorage/Strategies/Relational/SqliteStorageStrategy.cs:107-122` | `_tableName` from config interpolated into all DDL/DML. No identifier validation. |
+| 2822 | 10 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:177-229` | Chunked store: chunks written before metadata. Process death = orphaned chunks consuming capacity forever. No rollback. |
+| 2823 | 10 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:282-298` | Chunked retrieval: missing chunks silently skipped. Caller receives truncated/corrupted data. |
+| 2824 | 10 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:303-334` | Delete doesn't paginate Query. >1MB/1000 chunks leaves orphans. |
+| 2825 | 13 | P1 | `UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs:199-211` | `ListCoreAsync` hardcodes `.Size(10000)`. Silently truncates at 10K docs. No scroll/search-after. Same in OpenSearch:197. |
+| 2826 | 13 | P1 | `UltimateDatabaseStorage/Strategies/Search/MeilisearchStorageStrategy.cs:174` | `ListCoreAsync` hardcodes `Limit = 1000`. No pagination. Silently truncates. |
+| 2827 | 13 | P1 | `UltimateDatabaseStorage/Strategies/Search/TypesenseStorageStrategy.cs:191` | `per_page=250` hardcoded. No pagination. Silently truncates beyond 250 docs. |
+| 2828 | 5 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/CouchDbStorageStrategy.cs:127-134,206-215` | `StoreCoreAsync` bare catch treats all errors as "not found". `ExistsCoreAsync` catches all → returns false. |
+| 2829 | 5 | P1 | `UltimateDatabaseStorage/Strategies/Search/MeilisearchStorageStrategy.cs:79-88` | `EnsureSchemaCoreAsync` bare catch to detect index existence. Network/auth errors silently swallowed. |
+| 2830 | 12 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs:309-312` | `BeginTransactionCoreAsync` hardcoded partition key `"default"`. Transactions on other partitions silently wrong. |
+| 2831 | 12 | P1 | `UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs:152-162` | `StoreCoreAsync` always sets both Created/Modified to now. Original creation time lost on update. |
+| 2832 | 4 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/MongoDbStorageStrategy.cs:349-372` | `ExecuteQueryCoreAsync` passes raw user string to `BsonDocument.Parse` then `AggregateAsync`. NoSQL injection via `$out`/`$merge`/`$lookup`. |
+| 2833 | 14 | P2 | `UltimateDatabaseStorage/Strategies/Relational/MySqlStorageStrategy.cs:88-106` | Table/database names backtick-quoted but no identifier validation. Backtick doubling not handled. |
+| 2834 | 14 | P2 | `UltimateDatabaseStorage/Strategies/Relational/OracleStorageStrategy.cs:84` | `_schemaName`/`_tableName` interpolated without validation. Oracle double-quote quoting exploitable. |
+| 2835 | 3 | P2 | `UltimateDatabaseStorage/Strategies/Relational/OracleStorageStrategy.cs:325-330` | `BeginTransactionCoreAsync` calls `conn.BeginTransaction()` synchronously. Not async variant. |
+| 2836 | 3 | P2 | `UltimateDatabaseStorage/Strategies/Relational/SqlServerStorageStrategy.cs:381-391` | `CommitAsync`/`RollbackAsync` call sync `Commit()`/`Rollback()`. Ignore CancellationToken. Same pattern in Oracle:348-352 and Sqlite:472-474. |
+| 2837 | 12 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:278` | `TotalSize` field name mismatch — metadata stores `"Size"` but retrieval reads `"TotalSize"`. Pre-allocation capacity always 0. |
+| 2838 | 12 | P2 | `UltimateDatabaseStorage/Strategies/Search/MeilisearchStorageStrategy.cs:180-193` | `ListCoreAsync` uses full-text search (typo-tolerant) instead of prefix filter. Unreliable results. |
+| 2839 | 12 | P2 | `UltimateDatabaseStorage/Strategies/Search/TypesenseStorageStrategy.cs:189` | `q=key:{prefix}*` is keyword search not structural filter. Unreliable for special characters. |
+| 2840 | 13 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:353-413` | `ListCoreAsync` performs full-table `Scan` instead of `Query`. Reads every partition. |
+| 2841 | 15 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs:380-383` | `RollbackAsync` is no-op returning Task.CompletedTask. After CommitAsync, second Rollback silently succeeds. |
+| 2842 | 7 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/RavenDbStorageStrategy.cs:212-232` | `IAsyncEnumerator` from `StreamAsync` not in `await using`. Server-side cursor leak on early dispose. |
+| 2843 | 13 | LOW | `UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs:139-142` | `.Refresh(Refresh.True)` on every write. 10x indexing throughput reduction. Should be configurable. Same in OpenSearch. |
+| 2844 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Spatial/PostGisStorageStrategy.cs:87-98` | `_tableName` interpolated into DDL without `ValidateIdentifier`. Inconsistent with PostgreSql strategy. |
+
+**Clean files:** PostgreSqlStorageStrategy.cs (best-in-class with ValidateIdentifier)
+
+---
+
+### Chunk 088 — UltimateDatabaseStorage (Streaming, TimeSeries, WideColumn, Plugin) + UltimateDeployment (Base, AppPlatform, CICD)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2845 | 1 | P0 | `UltimateDeployment/Strategies/CICD/CiCdStrategies.cs:95-645` | ALL seven CI/CD strategies (GitHubActions, GitLabCi, Jenkins, AzureDevOps, CircleCi, ArgoCd, FluxCd, Spinnaker) are complete stubs — every private method returns hardcoded success (`Task.FromResult(12345L)`, `Task.FromResult(123)`, etc.). No real HTTP calls, no authentication, no CI/CD integration. |
+| 2846 | 1 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/VictoriaMetricsStorageStrategy.cs:85-157` | `StoreCoreAsync` posts JSON to `/api/v1/import` (wrong endpoint for blobs); `RetrieveCoreAsync` tries to read binary from Prometheus metric label which cannot work. Every retrieve throws `FileNotFoundException`. |
+| 2847 | 4 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/QuestDbStorageStrategy.cs:98-272` | SQL injection: `_tableName` from user config interpolated into all SQL/DDL. `ListCoreAsync` also builds regex prefix filter with no sanitisation. |
+| 2848 | 4 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/TimescaleDbStorageStrategy.cs:91-360` | SQL injection: `_tableName` and `_chunkInterval` interpolated into DDL, `create_hypertable`, `ALTER TABLE`, `add_compression_policy` — all from user config with no validation. |
+| 2849 | 4 | P1 | `UltimateDatabaseStorage/Strategies/TimeSeries/InfluxDbStorageStrategy.cs:147-273` | Flux query injection: `EscapeFluxString` only escapes `\` and `"` — crafted keys with `)` or newlines can inject arbitrary Flux. Delete predicate similarly vulnerable. |
+| 2850 | 5 | P1 | `UltimateDatabaseStorage/Strategies/Streaming/KafkaStorageStrategy.cs:133-140` | Bare `catch { }` in `EnsureSchemaCoreAsync` swallows all Kafka topic creation errors including auth/network/replication failures. |
+| 2851 | 5 | P1 | `UltimateDatabaseStorage/Strategies/Streaming/PulsarStorageStrategy.cs:93-101` | Bare `catch { }` in namespace creation swallows all HTTP errors including auth failures. |
+| 2852 | 5 | P1 | `UltimateDatabaseStorage/Strategies/TimeSeries/TimescaleDbStorageStrategy.cs:112-119` | Bare `catch { }` in hypertable creation — swallows all PostgreSQL errors, not just "already a hypertable". |
+| 2853 | 5 | P1 | `UltimateDatabaseStorage/UltimateDatabaseStoragePlugin.cs:463-469` | Bare `catch { }` in `DisposeAsyncCore` — disposal errors invisible in production. |
+| 2854 | 5 | P1 | `UltimateDatabaseStorage: Kafka:385, Pulsar:313, InfluxDb:312, QuestDb:308, TimescaleDb:307, Bigtable:300, Cassandra:277, ScyllaDb:269` | 8 strategies have bare `catch` in `CheckHealthCoreAsync` — returns `false` with no diagnostic info about root cause. |
+| 2855 | 1 | P1 | `UltimateDatabaseStorage/Strategies/TimeSeries/QuestDbStorageStrategy.cs:188-194` | `DeleteCoreAsync` is a no-op — returns size as if deleted but QuestDB has no DELETE. Callers believe delete succeeded. |
+| 2856 | 2 | P1 | `UltimateDeployment/Strategies/AppPlatform/AppRuntimeStrategy.cs:148-188` | TOCTOU race in `SubmitAiRequestAsync`: `_concurrentCounts` check and `AddOrUpdate` not atomic — two threads can both pass the guard. |
+| 2857 | 1 | P1 | `UltimateDatabaseStorage/UltimateDatabaseStoragePlugin.cs:314-387` | `HandleRetrieveAsync` and `HandleQueryAsync` retrieve data then discard it — comment says "Response would be sent via message context" but nothing is sent. |
+| 2858 | 12 | P1 | `UltimateDeployment/Strategies/CICD/CiCdStrategies.cs:68-599` | Copy-paste counter names: ArgoCd records `"circle_ci.deploy"`, FluxCd records `"argo_cd.deploy"`, Spinnaker records `"flux_cd.deploy"`, rollback methods use `.deploy` suffix. All metrics wrong. |
+| 2859 | 12 | P1 | `UltimateDatabaseStorage/UltimateDatabaseStoragePlugin.cs:281-312` | `HandleStoreAsync` silently returns on missing/invalid parameters — caller receives no error response. |
+| 2860 | 2 | P2 | `UltimateDeployment/DeploymentStrategyBase.cs:280-316` | `_cachedHealthy` and `_healthCacheExpiry` non-volatile fields read/written from multiple threads without sync. |
+| 2861 | 7 | P2 | `UltimateDeployment/DeploymentStrategyBase.cs:278,285` | `_httpClient = new HttpClient()` in constructor but base class has no IDisposable — socket leak per strategy instance. |
+| 2862 | 7 | P2 | `UltimateDatabaseStorage: VictoriaMetrics:55, Pulsar:61, QuestDb:65, HBase:58` | 4 strategies create `HttpClient` per-instance without `IHttpClientFactory` — ephemeral port exhaustion under load. |
+| 2863 | 13 | P2 | `UltimateDatabaseStorage/Strategies/Streaming/KafkaStorageStrategy.cs:195-324` | `RetrieveCoreAsync`/`ListCoreAsync` scan all messages from Offset.Beginning on partition 0 only — O(n) per call, other partitions invisible. |
+| 2864 | 13 | P2 | `UltimateDatabaseStorage: Cassandra:200-209, ScyllaDb:202-203` | `ListCoreAsync` fetches all rows for prefix filter — Cassandra uses `ALLOW FILTERING`, ScyllaDb has no filter at all. |
+| 2865 | 14 | P2 | `UltimateDatabaseStorage/Strategies/WideColumn/CassandraStorageStrategy.cs:107-109` | Keyspace created with `SimpleStrategy` — not production-safe for multi-DC clusters. ScyllaDb correctly uses `NetworkTopologyStrategy`. |
+| 2866 | 9 | P2 | `UltimateDatabaseStorage/Strategies/WideColumn/HBaseStorageStrategy.cs:265,325` | `DateTime.Parse` without `CultureInfo.InvariantCulture` — throws on non-invariant locale hosts. |
+| 2867 | 1 | P2 | `UltimateDatabaseStorage/UltimateDatabaseStoragePlugin.cs:332-421` | `HandleRetrieveAsync` and `HandleHealthCheckAsync` compute results that are never sent — wasted work, callers get nothing. |
+| 2868 | 10 | P2 | `UltimateDatabaseStorage/Strategies/TimeSeries/TimescaleDbStorageStrategy.cs:140-152` | `StoreCoreAsync` plain INSERT with UNIQUE constraint — rapid same-key stores at same millisecond throw constraint violation. Needs ON CONFLICT. |
+| 2869 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Streaming/PulsarStorageStrategy.cs:51` | `SupportsSql => true` but no SQL execution path exists in strategy. |
+| 2870 | 15 | LOW | `UltimateDeployment/Strategies/AppPlatform/AppHostingStrategy.cs:126-137` | `HealthCheckCoreAsync` hardcodes `IsHealthy=true, ResponseTimeMs=1` — fabricated health data. |
+| 2871 | 15 | LOW | `UltimateDeployment/Strategies/AppPlatform/AppRuntimeStrategy.cs:118` | `GetStateCoreAsync` returns hardcoded `Version="1.0.0", Health=Healthy` for any deploymentId. |
+| 2872 | 15 | LOW | `UltimateDatabaseStorage/Strategies/WideColumn/BigtableStorageStrategy.cs:35` | `DatabaseCategory => NoSQL` — should be WideColumn (SDK gap). |
+
+**Clean files:** None
+
+---
+
+### Chunk 089 — UltimateDeployment (Config, Container, DeploymentPatterns, Env, FeatureFlags, HotReload, Rollback, Secrets, Serverless, VMBareMetal, Plugin) + UltimateDocGen
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2873 | 1 | P0 | `UltimateDeployment/Strategies: Config/Secrets/Serverless/Infrastructure/HotReload/Rollback (ALL files)` | Every private implementation method across ALL remaining deployment strategies is a stub: Config returns `Task.Delay`, Vault returns `"hvs.token123"`, Terraform returns hardcoded plan, Lambda returns `"$LATEST"`, etc. Zero real API calls in entire plugin. |
+| 2874 | 6 | P0 | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:60` | Fire-and-forget: `_ = MonitorDeploymentAsync(...)` — unobserved exceptions in automatic rollback permanently lost. Uses deploy-call CancellationToken that expires when deploy returns. |
+| 2875 | 5 | P0 | `UltimateDeployment/UltimateDeploymentPlugin.cs:688-691` | Bare `catch { }` in `DiscoverAndRegisterStrategies` — strategy instantiation failures silently swallowed, invisible capability loss. |
+| 2876 | 5 | P1 | `UltimateDeployment/UltimateDeploymentPlugin.cs:183-186,221-224` | Bare `catch { }` in `GetDeploymentStateAsync` and `HealthCheckAsync` — all strategy exceptions (bugs, connectivity) silently consumed. |
+| 2877 | 5 | P1 | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:111-114` | Bare `catch { }` in `MonitorDeploymentAsync` loop — all exceptions during rollback evaluation masked. |
+| 2878 | 1 | P1 | `UltimateDeployment: Config:91-532, FeatureFlags:68-362, Secrets:121-640, Serverless:105-363, Infrastructure:115-398, HotReload:75-457, Rollback:189-298` | ALL `IncrementCounter` calls use wrong strategy name — copy-paste residue: ConsulConfig.Rollback→`"consul_config.deploy"`, ConsulConfig.HealthCheck→`"etcd_config.deploy"`, EtcdConfig.Rollback→`"spring_cloud_config.deploy"`, etc. ~40 wrong counter names across 9 strategy files. Observability completely broken. |
+| 2879 | 2 | P1 | `UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs:9, CanaryStrategy.cs:9` | `_environmentPairs` and `_canaryStates` are plain `Dictionary` on singleton strategies — concurrent deployments race on reads/writes. |
+| 2880 | 2 | P1 | `UltimateDeployment: KubernetesStrategies:12-13, RollingUpdateStrategy:532-533,743-744` | `_lastHealthCheck` and `_lastHealthCheckResult` non-volatile, read/written without sync. ABTesting/ShadowDeployment share same cache slot across all deploymentIds. |
+| 2881 | 2 | P1 | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:~289` | `DeploymentMonitor.TotalRequests += results.Count` from background task and HealthCheck concurrently — lost-update race. `AverageLatencyMs` torn double write. |
+| 2882 | 7 | P1 | `UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs:229` | `new HttpClient()` per health-check invocation — socket exhaustion in TIME_WAIT. |
+| 2883 | 1 | P1 | `UltimateDeployment/UltimateDeploymentPlugin.cs:163-191 + ALL strategies` | Every `GetStateCoreAsync` returns `Version="unknown", Health=Unknown` — plugin state recovery path always fails, RollbackAsync throws "Deployment not found". |
+| 2884 | 4 | P1 | `UltimateDeployment/Strategies/SecretManagement/SecretsStrategies.cs:165,774` | Hardcoded credential stubs: `"hvs.token123"` (Vault), `"token123"` (Conjur), `"app123"/"env123"` (AwsAppConfig) — fake tokens in metadata trigger false security alerts. |
+| 2885 | 10 | P1 | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:59-215` | Background monitoring task calls `TriggerAutomaticRollbackAsync` concurrently with manual `RollbackCoreAsync` — double-rollback race, lost snapshot entries. |
+| 2886 | 12 | P1 | `UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs:216` | `break; // Simulated completion` — deployment declared complete with no verification on first loop iteration. |
+| 2887 | 12 | P1 | `UltimateDeployment/Strategies/DeploymentPatterns/CanaryStrategy.cs:346-348` | `CollectCanaryMetricsAsync` reads back from same `message.Payload` it sent — always gets fallback values (0.005/20.0), never real metrics. |
+| 2888 | 14 | P1 | `UltimateDeployment/Strategies/ConfigManagement/ConfigurationStrategies.cs:439` | `int.Parse(targetVersion)` without validation — `FormatException` on semantic versions or SHAs. Same in `SecretsStrategies.cs:102`. |
+| 2889 | 9 | P1 | `UltimateDeployment/Strategies/VMBareMetal/InfrastructureStrategies.cs:92-99` | Ansible rollback ignores `RunPlaybookAsync` result — failed rollback returns `Healthy` with no error indication. |
+| 2890 | 9 | P1 | `UltimateDeployment/Strategies/HotReload/HotReloadStrategies.cs:286` | `LoadPluginAsync` return value discarded in rollback — continues to `ActivatePlugin` with potentially broken assembly. |
+| 2891 | 4 | P1 | `UltimateDeployment/Strategies/HotReload/HotReloadStrategies.cs:86` | Path traversal risk: `previousAssemblyPath` from Metadata passed unvalidated to `LoadAssemblyAsync` — assembly injection vector when real loading wired in. |
+| 2892 | 2 | P2 | `UltimateDeployment/UltimateDeploymentPlugin.cs:741` | `_usageStats.AddOrUpdate` increment delegate may not be atomic under BoundedDictionary — lost counts under concurrency. |
+| 2893 | 13 | P2 | `UltimateDeployment/Strategies/DeploymentPatterns/RollingUpdateStrategy.cs:191-198` | Health checks iterate all instances sequentially with `await` per instance — O(n) serial delay. Should use `Task.WhenAll`. |
+| 2894 | 13 | P2 | `UltimateDeployment/UltimateDeploymentPlugin.cs:173-226` | `GetDeploymentStateAsync` and `HealthCheckAsync` scan all 65+ strategies serially on every cache miss — O(n) round-trips that all return Unknown/fail. |
+| 2895 | 12 | P2 | `UltimateDeployment/Strategies/DeploymentPatterns/BlueGreenStrategy.cs:122` | Rollback reads `"environment"` key from Metadata but Deploy writes `"blueEnvironment"/"greenEnvironment"/"activeEnvironment"` — always resolves to `"default"`. |
+| 2896 | 12 | P2 | `UltimateDeployment/Strategies/DeploymentPatterns/CanaryStrategy.cs:78-81` | Fixed traffic steps `[canaryPercent, 25, 50, 75, 100]` — if canaryPercent=50, steps go backwards from 50→25→50→75→100. |
+| 2897 | 12 | P2 | `UltimateDeployment/Strategies/VMBareMetal/InfrastructureStrategies.cs:697` | Progress calculation uses integer division: `60 * index / length` truncates to 0 for early hosts. |
+| 2898 | 12 | P2 | `UltimateDeployment/Strategies/ContainerOrchestration/KubernetesCsiDriver.cs:237` | `ListVolumes` pagination: `NextToken = _volumes.Count` instead of `skip + maxEntries` — second page skips too far. |
+| 2899 | 2 | P2 | `UltimateDeployment/Strategies/ContainerOrchestration/KubernetesCsiDriver.cs:120-122` | TOCTOU: capacity check `_usedCapacityBytes + capacityBytes > _totalCapacityBytes` then `Interlocked.Add` not atomic. |
+| 2900 | 2 | P2 | `UltimateDeployment/Strategies/ContainerOrchestration/KubernetesCsiDriver.cs:168-171` | TOCTOU: `nodes.Count` check outside `lock`, then `nodes.Add` inside lock — concurrent publish can bypass SingleNodeWriter guard. |
+| 2901 | 9 | P2 | `UltimateDeployment/UltimateDeploymentPlugin.cs:226-248` | `HealthCheckAsync` returns empty array on all-strategy failure (indistinguishable from "no instances"). `RollbackAsync` always throws "Cannot determine strategy" because no strategy writes `["strategy"]` key. |
+| 2902 | 4 | P2 | `UltimateDocGen/UltimateDocGenPlugin.cs:409,508-534` | XSS: `request.OperationId` and `apiBaseUrl` interpolated into HTML without encoding. Interactive "try it out" page sends arbitrary fetch() requests with no CSRF/CORS/auth. |
+| 2903 | 12 | P2 | `UltimateDeployment/Strategies/DeploymentPatterns/RollingUpdateStrategy.cs:638-884` | ABTesting/ShadowDeployment share singleton health-check cache across all deploymentIds — returns stale results from wrong deployment. |
+| 2904 | 14 | P2 | `UltimateDeployment/Strategies/EnvironmentProvisioning/EnvironmentStrategies.cs` | `workingDir` from config passed to terraform commands without path validation — traversal risk when real execution wired in. |
+| 2905 | 15 | LOW | `UltimateDeployment/Strategies/SecretManagement/SecretsStrategies.cs:19-686` | All 7 secret management strategies typed as `DeploymentType.FeatureFlag` — wrong classification corrupts strategy discovery. |
+| 2906 | 1 | LOW | `UltimateDeployment: ALL strategies` | Every `GetStateCoreAsync` returns identical stub `Version="unknown", Health=Unknown`. Plugin recovery never works. |
+| 2907 | 13 | LOW | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:16` | `BoundedDictionary<string, List<DeploymentSnapshot>>` — outer dict bounded to 1000 keys but inner lists unbounded, memory leak per deployment. |
+| 2908 | 1 | LOW | `UltimateDocGen/UltimateDocGenPlugin.cs (all strategies)` | All DocGen strategies ignore `request.Source` and produce fixed boilerplate — scaffold output regardless of input. |
+| 2909 | 14 | LOW | `UltimateDocGen/UltimateDocGenPlugin.cs:727-728` | `OperationId` and `SourceType` accepted without length/format validation — extremely long strings embedded in HTML. |
+
+**Clean files:** EnvironmentStrategies.cs (clean arch), KubernetesStrategies.cs (good overall structure)
+
+---
+
+### Chunk 090 — UltimateEdgeComputing (FederatedLearning, Specialized, Plugin) + UltimateEncryption (CryptoAgility, Features, Registration)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2910 | 1 | P1 | `UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs:71-72` | `await Task.Delay(5, ct)` with `// Simulate training delay` inside inner batch loop — artificial latency stub in production training. |
+| 2911 | 1 | P1 | `UltimateEdgeComputing/Strategies/FederatedLearning/ModelDistributor.cs:40-41` | `await Task.Delay(10, ct)` with `// Simulate network distribution delay` — stores weights in local dict only, no real network distribution. |
+| 2912 | 1 | P1 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:700-714` | `EncryptAsync` prepends 16 zero bytes (not encryption). `ManageCertificateAsync` returns literal `"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"` placeholder. |
+| 2913 | 1 | P1 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:630,664` | `RunInferenceAsync` returns hardcoded `Prediction=0.85, Confidence=0.92`. `TrainLocallyAsync` returns `new byte[1024]` zero-filled gradients. |
+| 2914 | 5 | P1 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:199-209` | Bare `catch { }` in `DiscoverAndRegisterBaseStrategies` — strategy instantiation failures silently vanish. |
+| 2915 | 5 | P1 | `UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs:204-218` | Two bare `catch { }` blocks in `CollectGradientUpdatesAsync` — per-node training errors and `Task.WhenAll` failures silently swallowed. |
+| 2916 | 2 | P1 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:33,148,155,216` | `_initialized` plain bool read/written from multiple methods without sync — torn state possible. |
+| 2917 | 12 | P1 | `UltimateEdgeComputing/Strategies/FederatedLearning/GradientAggregator.cs:78,117` | `Dictionary.GetHashCode()` used as model version — identity hash, not content-based. Collisions across rounds, non-deterministic. |
+| 2918 | 1 | P2 | `UltimateEdgeComputing/Strategies/SpecializedStrategies.cs:145-1080` | Every domain method (`ProcessSensorData`, `DistributeComputation`, `OffloadComputation`, `PredictiveMaintenance`, `ProcessTransaction`, `OptimizeTraffic`) is `Task.Delay(N)` + hardcoded result. |
+| 2919 | 1 | P2 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:345-783` | All impl sections (`EdgeDataSynchronizer`, `EdgeCloudCommunicator`, `EdgeAnalyticsEngine`, `EdgeSecurityManager`, `EdgeResourceManager`) are `Task.Delay` + hardcoded values: `BytesSynced=1024`, `CPU=45%`, etc. |
+| 2920 | 15 | P2 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:343-352` | `DiscoverNodesAsync` always returns one synthetic node with random UUID — ignores `options.NetworkRange`. |
+| 2921 | 2 | P2 | `UltimateEdgeComputing/Strategies/FederatedLearning/DifferentialPrivacyIntegration.cs:12` | `new Random()` not thread-safe — concurrent `AddNoise` calls corrupt internal state, breaking differential privacy guarantees. |
+| 2922 | 2 | P2 | `UltimateEdgeComputing/Strategies/FederatedLearning/ConvergenceDetector.cs:14-15` | `_lossHistory` (List) and `_stableRounds` (int) mutated without sync in `RecordLoss`. |
+| 2923 | 13 | P2 | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:879-885` | `GetTopologyAsync` builds full mesh O(n²) connections — 50M objects for 10K nodes. |
+| 2924 | 13 | P2 | `UltimateEdgeComputing/Strategies/FederatedLearning/LocalTrainingCoordinator.cs:107-130` | Finite-difference gradients: O(W×B×2) forward passes per batch — intractable for real models. |
+| 2925 | 9 | P2 | `UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs:107-108` | `updates.Length / nodeIds.Length` — division by zero if no nodes registered. |
+| 2926 | 5 | P2 | `UltimateEncryption/CryptoAgility/MigrationWorker.cs:427-457` | Two bare catches: `PublishProgressAsync` and `PublishRollbackSignalAsync` swallow all exceptions. Rollback signal failure means engine never learns migration failed. |
+| 2927 | 9 | P2 | `UltimateEncryption/CryptoAgility/CryptoAgilityEngine.cs:116` | `new DoubleEncryptionService(MessageBus!)` — null-forgiving operator without actual null guard. |
+| 2928 | 6 | P2 | `UltimateEncryption/CryptoAgility/MigrationWorker.cs:262-266` | `MigrateObjectAsync` exceptions caught with `catch (Exception)` — only increments `_failureCount`, no logging of why. |
+| 2929 | 4 | P2 | `UltimateEncryption/Features/TransitEncryption.cs:612-621` | AES-NI detection uses `AesGcm` construction success (always true even with software AES) instead of `System.Runtime.Intrinsics.X86.Aes.IsSupported`. |
+| 2930 | 7 | LOW | `UltimateEdgeComputing/UltimateEdgeComputingPlugin.cs:246,252` | Timer allocated in `EdgeNodeManagerImpl` but never disposed — continues firing after shutdown. |
+| 2931 | 14 | LOW | `UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs:45-48` | `RegisterNode` accepts null/empty nodeId with no validation. |
+| 2932 | 15 | LOW | `UltimateEdgeComputing/Strategies/SpecializedStrategies.cs:159-163,987-998` | `TranslateProtocolAsync` returns input unchanged. `OptimizeTrafficAsync` returns hardcoded signal timings ignoring input. |
+| 2933 | 15 | LOW | `UltimateEncryption/CryptoAgility/CryptoAgilityEngine.cs:311-316` | `DoubleEncryptAsync` creates transient untracked `DoubleEncryptionService` when called outside migration — lifecycle ungoverned. |
+
+**Clean files:** FederatedLearningModels.cs, DoubleEncryptionService.cs, CipherPresets.cs
+
+---
+
+### Chunk 091 — UltimateEncryption (Scaling, AEAD, AES, Asymmetric, BlockCiphers, ChaCha, Disk, Educational, FPE, Homomorphic, Hybrid, X25519Kyber768)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2934 | 1/12 | P0 | `UltimateEncryption/Strategies/Aead/AeadStrategies.cs:294-469,584-748` | AEGIS-128L and AEGIS-256 are cryptographically incorrect custom implementations — uses full AES encryption instead of AES round function, wrong keystream derivation, wrong finalization tag. Broken cipher masquerading as standardized. |
+| 2935 | 15 | P0 | `UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs:500-556` | KuznyechikStrategy uses `Gost28147Engine` (Magma, 64-bit block) instead of Kuznyechik (128-bit block) — completely wrong cipher. Incompatible with any real GOST R 34.12-2015 implementation. |
+| 2936 | 2 | P0 | `UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs:33-38,395-399` | Paillier and ElGamal store mutable key state (`_n`, `_lambda`, `_mu`, `_x`) in instance fields — concurrent callers overwrite each other's keys silently. Wrong key used for encrypt/decrypt. |
+| 2937 | 5 | P0 | `UltimateEncryption/Strategies/Asymmetric/RsaStrategies.cs:272-311,571-620` | RSA `ParsePublicKey`/`ParsePrivateKey` bare `catch { }` on BouncyCastle path — silently falls through to .NET RSA fallback which may parse with different key interpretation. |
+| 2938 | 4 | P0 | `UltimateEncryption/Strategies/Hybrid/HybridStrategies.cs:500-507` | HKDF salt is all-zero `new byte[48]` in `CombineSecrets` across 3 hybrid strategies — comment implies random salt but uses zeros, weakening key derivation. |
+| 2939 | 2 | P1 | `UltimateEncryption/Scaling/EncryptionScalingManager.cs:396-418` | `ReconfigureLimitsAsync` non-atomic semaphore swap — concurrent `ExecuteMigrationAsync` can `WaitAsync` on old semaphore then `Release` on new, or get permanently blocked when old is disposed. |
+| 2940 | 12 | P1 | `UltimateEncryption/Strategies/Aes/AesCtrXtsStrategies.cs:343-450` | XTS ciphertext stealing has redundant `MultiplyAlphaByTwo` immediately overwritten. Decryption path incomplete — doesn't re-decrypt penultimate block with alpha_n+1 per IEEE P1619. |
+| 2941 | 12/4 | P1 | `UltimateEncryption/Strategies/ChaCha/ChaChaStrategies.cs:315-333` | `ChaCha20Strategy` decrypt: encrypts zeros to extract keystream then XORs manually. Generates unused Poly1305 tag, uses separate HMAC-SHA256 — dual-auth scheme, one unused. |
+| 2942 | 15/12 | P1 | `UltimateEncryption/Strategies/Asymmetric/RsaStrategies.cs:463-464` | `RsaPkcs1Strategy.CheckHealthAsync` tests with `OaepSHA256` padding instead of `Pkcs1` — health check verifies wrong operation. |
+| 2943 | 4 | P1 | `UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs:34-38,395-399` | Private key material (`_lambda`, `_mu`, `_x`) stored as `BigInteger?` on heap — cannot be zeroed, persists until GC, survives memory dumps. |
+| 2944 | 12/13 | P1 | `UltimateEncryption/Strategies/Disk/DiskEncryptionStrategies.cs:168,250` | `TransformFinalBlock` inside loop for ECB — flushes/resets ICryptoTransform per 16-byte block. Should use `TransformBlock`. |
+| 2945 | 12 | P1 | `UltimateEncryption/Strategies/Disk/DiskEncryptionStrategies.cs:503-506` | `ComputeNhHash`: 16-byte output from 64-bit accumulator — `accumulator >> 32` writes high 32 bits extended to 64, last 4 bytes always zero. Weakened authentication. |
+| 2946 | 9 | P1 | `UltimateEncryption/Strategies/Fpe/FpeStrategies.cs:509-511` | `Ff3Strategy.ComputeFf3RoundKey` buffer overflow when `numHalfBytes.Length > 11` — reachable with legal 56-digit FF3-1 input (28 digits = 12 bytes > 11 available). |
+| 2947 | 9 | P1 | `UltimateEncryption/Strategies/Fpe/FpeStrategies.cs:311-319` | FF1 missing NIST minimum length check (`radix^minlen >= 1000000`). FF1 insecure for very short strings. |
+| 2948 | 2 | P2 | `UltimateEncryption/Scaling/EncryptionScalingManager.cs:197-213,401-402` | `_currentCapabilities` volatile but compound read-modify-write non-atomic. `_currentLimits` written without volatile/Interlocked. |
+| 2949 | 13 | P2 | `UltimateEncryption/Strategies/Aead/AeadStrategies.cs:34,203,492` | Unused `_secureRandom` allocated per instance in Ascon/Aegis128L/Aegis256 — dead object allocation. |
+| 2950 | 4 | P2 | `UltimateEncryption/Strategies/Aes/AesCbcStrategy.cs:69` | `SHA256.HashData(key)` as HMAC key violates key separation — should use HKDF with domain-separated info label. Same in AesCtrStrategy. |
+| 2951 | 9 | P2 | `UltimateEncryption/Strategies/Aes/AesCtrXtsStrategies.cs:329-355` | XTS ciphertext stealing when `blockCount==0` causes `IndexOutOfRangeException` at `ciphertext[-16]`. |
+| 2952 | 1 | P2 | `UltimateEncryption/Strategies/Disk/DiskEncryptionStrategies.cs:513-537` | Adiantum uses HKDF-SHA256 instead of HChaCha20 for subkey derivation — comment admits "approximation". Correct `HChaCha20` exists in same codebase. |
+| 2953 | 12 | P2 | `UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs:387-393` | SEED PKCS7 padding always over-pads by one block even when block-aligned — works but wastes 16 bytes. |
+| 2954 | 13 | P2 | `UltimateEncryption/Strategies/Aead/AeadStrategies.cs:411-438,694-719` | `AegisUpdate` creates Aes + 8 ICryptoTransform objects per call (~512 allocations per KB). Severe hot-path GC pressure. |
+| 2955 | 12 | P2 | `UltimateEncryption/Strategies/Hybrid/X25519Kyber768Strategy.cs:152-160` | Hybrid KEM encapsulates against ephemeral key pair and discards private key — recipient cannot decapsulate. Fundamental protocol bug in all 4 hybrid strategies. |
+| 2956 | 15 | P2 | `UltimateEncryption/Scaling/EncryptionScalingManager.cs:299-300` | SHA extension detection uses `X86Base.IsSupported` (always true on x86) — misleading `ShaExtensionsSupported` flag. |
+| 2957 | 4 | LOW | `UltimateEncryption/Scaling/EncryptionScalingManager.cs:189` | `KeyDerivationCache` exposed as `public` — any component can read/poison cached key material. Should be `internal`. |
+| 2958 | 12 | LOW | `UltimateEncryption/Strategies/Fpe/FpeStrategies.cs:121,151,415,451` | Unused variable `v = n - u` in all FF1/FF3 encrypt/decrypt methods — dead code. |
+| 2959 | 4 | LOW | `UltimateEncryption/Strategies/Aes/AesCbcStrategy.cs:140-154` | `encKey` not zeroed if `TransformFinalBlock` throws — no try/finally wrapping the decrypt path. |
+| 2960 | 13 | LOW | `UltimateEncryption/Strategies/Educational/EducationalCipherStrategies.cs:77-310` | Caesar/XOR/Vigenere use `Task.Run` for trivial byte loops — thread pool overhead vastly exceeds compute time. |
+
+**Clean files:** None (all files have at least one finding)
+
+---
+
+### Chunk 093 — UltimateEncryption (Transit remaining, Plugin) + UltimateFilesystem (DeviceManagement 10 files)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2961 | 1 | P0 | `UltimateEncryption/Strategies/Transit/SerpentGcmTransitStrategy.cs:59-66` | Comments say "Production code would use BouncyCastle" and "simplified" but the code actually does use BouncyCastle correctly. Misleading Rule 13 comments contradict the real implementation — auditors cannot trust the cipher without reading full source. |
+| 2962 | 4 | P0 | `UltimateEncryption/Strategies/Transit/TlsBridgeTransitStrategy.cs:173-181` | `VerifyTlsActive()` silently returns when `TlsStream` is null — comment says "In production, this should check." Encrypt returns plaintext unmodified, caller believes data is protected. Security vulnerability: silent plaintext passthrough. |
+| 2963 | 4 | P0 | `UltimateEncryption/Strategies/Transit/XChaCha20TransitStrategy.cs:197-206` | HChaCha20 subkey derivation replaced with HKDF-SHA256 — produces a different cipher incompatible with any real XChaCha20 implementation. Comment says "simplified for demonstration." Broken crypto + Rule 13 + naming lie. |
+| 2964 | 13 | P1 | `UltimateEncryption/Strategies/Transit/CompoundTransitStrategy.cs:122,204,235` | All three async methods do synchronous crypto then `await Task.FromResult(...)` — pointless async state machine + Task allocation per call. |
+| 2965 | 15 | P2 | `UltimateEncryption/Strategies/Transit/CompoundTransitStrategy.cs:25-26` | `NonceSize=24` comment says "12 bytes per cipher" and `TagSize=32` says "16 bytes per cipher" — values are combined totals, comments are wrong. Misleads crypto wire format auditing. |
+| 2966 | 13 | P1 | `UltimateEncryption/Strategies/Transit/SerpentGcmTransitStrategy.cs:89,139,235` | Same `await Task.FromResult(...)` wrapping synchronous BouncyCastle crypto. Unnecessary allocations in high-frequency encryption path. |
+| 2967 | 15 | P2 | `UltimateEncryption/Strategies/Transit/TlsBridgeTransitStrategy.cs:65-70,131-136,226-231` | `CipherAlgorithm`, `HashAlgorithm`, `KeyExchangeAlgorithm` metadata all set to `cipherSuite.ToString()` — same full suite string for three distinct fields. Misleads downstream consumers. |
+| 2968 | 6 | P1 | `UltimateEncryption/UltimateEncryptionPlugin.cs:569,602,603` | Three `_ = SaveStateAsync(...)` fire-and-forget calls for FIPS mode and default strategy persistence. Silent swallow of persistence failures in security-sensitive plugin. |
+| 2969 | 4 | P1 | `UltimateEncryption/UltimateEncryptionPlugin.cs:475,683` | Generated encryption keys written to `message.Payload["generatedKey"]` and `message.Payload["keys"]` — key material traverses message bus where it can be logged/serialized/read by other plugins. |
+| 2970 | 2 | P2 | `UltimateEncryption/UltimateEncryptionPlugin.cs:61,564,593,708` | `_defaultStrategyId` declared `volatile` but used in read-evaluate-write sequences without atomicity. TOCTOU race in `HandleSetFipsAsync` concurrent calls. |
+| 2971 | 1 | P1 | `UltimateFilesystem/DeviceManagement/BaremetalBootstrap.cs:162-167` | Journal recovery (Step 4) is entire stub — `recoveredIntents` always empty, no journal entries read/replayed. Comment says "deferred." Crash recovery non-functional. |
+| 2972 | 1 | P1 | `UltimateFilesystem/DeviceManagement/BaremetalBootstrap.cs:280-299` | Journal area initialization loop only logs a debug message — no I/O issued. Catch block catches exception that can never be thrown. No-op masquerading as initialization. |
+| 2973 | 10 | P2 | `UltimateFilesystem/DeviceManagement/BaremetalBootstrap.cs:139-140` | `ScanForPoolsAsync` called with `Array.Empty<IPhysicalBlockDevice>()` — always returns zero pools. Bootstrap can never restore pools; all devices classified as unpooled. |
+| 2974 | 10 | P2 | `UltimateFilesystem/DeviceManagement/DeviceJournal.cs:442-468` | `UpdateEntryPhaseAsync` silently succeeds if entry not found (evicted by circular buffer). Caller believes commit/rollback happened but no operation occurred. Dangling Intent on next recovery. |
+| 2975 | 2 | LOW | `UltimateFilesystem/DeviceManagement/DeviceJournal.cs:252-256` | `_nextSequenceNumber` TOCTOU: `Interlocked.Read` then `Interlocked.Exchange` — concurrent thread may increment between, and Exchange regresses to stale `maxSeq`. Should use CompareExchange loop. |
+| 2976 | 5 | P1 | `UltimateFilesystem/DeviceManagement/DevicePoolManager.cs:407-411` | `ScanForPoolsAsync` bare `catch (Exception) { }` swallows all device read errors during critical bootstrap — no logging. Transient errors, permissions, corruption invisible to operator. |
+| 2977 | 1 | P1 | `UltimateFilesystem/DeviceManagement/DevicePoolManager.cs:322-340` | `DeletePoolAsync` comment says "Clear metadata from all member devices (write zeros to block 0)" but implementation is `await Task.CompletedTask`. Device metadata never cleared — deleted pools reappear on bootstrap. |
+| 2978 | 1 | P1 | `UltimateFilesystem/DeviceManagement/DevicePoolManager.cs:584-594` | `UpdateExistingMemberMetadataAsync` is complete stub (`await Task.CompletedTask`). Called from Add/Remove/UpdateLocality — existing members' block 0 metadata never updated. Stale descriptors break bootstrap. |
+| 2979 | 5 | LOW | `UltimateFilesystem/DeviceManagement/DeviceTopologyMapper.cs:381-386` | `DiscoverLinuxCpuCores` bare `catch { return Array.Empty<int>(); }` — no logging. NUMA scheduling decisions affected by silent sysfs failures. |
+| 2980 | 13 | P2 | `UltimateFilesystem/DeviceManagement/DeviceTopologyMapper.cs:63-68` | NVMe namespace grouping LINQ chain is O(n^2) nested inside two outer foreach loops. Should precompute once before outer loops. |
+| 2981 | 6 | P2 | `UltimateFilesystem/DeviceManagement/HotSwapManager.cs:158-159,390` | Three fire-and-forget async handlers. Internal try/catch mitigates but future code changes could produce unobserved TaskUnobservedException. |
+| 2982 | 2 | P2 | `UltimateFilesystem/DeviceManagement/HotSwapManager.cs:339,408` | `_activeRebuilds` check-then-act: `Values.Count(...)` then conditional write not atomic. Two simultaneous device failures can double-trigger rebuild. |
+| 2983 | 5 | P2 | `UltimateFilesystem/DeviceManagement/NumaAwareIoScheduler.cs:163-183,208-219` | `GetCurrentThreadNumaNode` and `GetLinuxNumaNodeForProcessor` bare `catch { return null; }` in hot-path scheduling code. No diagnostics for NUMA detection failures. |
+| 2984 | 4 | LOW | `UltimateFilesystem/DeviceManagement/NumaAwareIoScheduler.cs:270-275` | Windows thread affinity fallback matches `ThreadState.Running` which could be any thread, not the caller. May set affinity on wrong thread. |
+| 2985 | 5 | P2 | `UltimateFilesystem/DeviceManagement/PhysicalDeviceManager.cs:217-219,304-305,322-323` | Multiple bare `catch { }` blocks suppress all callback exceptions (OnStatusChange, OnDeviceDiscovered, OnDeviceRemoved, OnFailurePrediction). Silent suppression prevents debugging. |
+| 2986 | 5 | P2 | `UltimateFilesystem/DeviceManagement/SmartMonitor.cs:213-215,247-249,273-275,560-595` | Six+ bare `catch { }` blocks in sysfs/hwmon reading utilities. Health metrics silently fall back to "healthy" defaults, potentially masking failing devices. |
+| 2987 | 9 | P2 | `UltimateFilesystem/DeviceManagement/SmartMonitor.cs:299-312` | `ReadWindowsSmartAsync` wraps WMI calls in `Task.Run` without timeout. Hung WMI query blocks thread pool thread indefinitely; polling loop accumulates blocked threads. |
+| 2988 | 13 | LOW | `UltimateFilesystem/DeviceManagement/FailurePredictionEngine.cs:266-270` | `HigherRisk` allocates new array and does `Array.IndexOf` per call (3-4x per prediction). Should use static Dictionary for O(1) lookup. |
+| 2989 | 12 | LOW | `UltimateFilesystem/DeviceManagement/SmartMonitor.cs:165` | `isHealthy` threshold of 100 uncorrectable errors is a magic number. Any nonzero count is typically critical in storage monitoring. Should be configurable, default 0 or 1. |
+
+**Clean files:** PoolMetadataCodec.cs
+
+---
+
+### Chunk 092 — UltimateEncryption (KDF, Legacy, Padding, PostQuantum, StreamCiphers, Transit/Aes128Gcm+AesCbc+AesGcm+ChaCha20)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 2990 | 10 | P0 | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:522-543` | `RemoveChaffFromCiphertext` cannot recover original ciphertext for RandomBurst/HeaderHeavy/TailHeavy modes. RandomBurst comment says "simplified approach" and copies front of buffer (includes chaff). HeaderHeavy/TailHeavy uses stride that doesn't mirror write-time interleaving. Data encrypted with 3/4 modes is unrecoverable. |
+| 2991 | 4 | P0 | `UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs:88-91` | All legacy strategies (Blowfish/IDEA/CAST5/CAST6/RC5) do `Buffer.BlockCopy(key, 0, encKey, 0, KeySizeBits/8)` without checking `key.Length >= KeySizeBits/8`. Blowfish needs 56 bytes — shorter key causes `ArgumentException` crash. No validation guard. |
+| 2992 | 15 | P0 | `UltimateEncryption/Strategies/PostQuantum/CrystalsKyberStrategies.cs:176,300,425` + `MlKemStrategies.cs:44-63` | Kyber/ML-KEM strategies claim FIPS 203 compliance but use NTRU (`NtruHps2048509/677/4096821`) — completely different lattice construction. Keys not interoperable with any FIPS 203 implementation. False compliance labelling. |
+| 2993 | 12 | P0 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:109,257,389` | Argon2id/i/d silently discard user-provided salt when `key.Length < 16` — generates random salt instead. Caller relying on short salt for deterministic derivation gets different key each time. Same issue in Scrypt (line 528, 32 bytes) and PBKDF2 (line 962). |
+| 2994 | 5 | P1 | `UltimateEncryption/Strategies/PostQuantum/CrystalsDilithiumStrategies.cs:67-70` + `SphincsPlusStrategies.cs:68-71` | Bare `catch { return false; }` in signature verification swallows all exceptions including `OutOfMemoryException`. Root cause of BouncyCastle errors lost. |
+| 2995 | 10 | P1 | `UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs:136-213` + `AesGcmTransitStrategy.cs:136-214` + `ChaCha20TransitStrategy.cs:136-213` | Streaming encryption: chunks individually authenticated but no cross-chunk ordering/completeness verification. Attacker can reorder, truncate, or replay chunks across sessions. No end-of-stream sentinel. |
+| 2996 | 12 | P1 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:955-976,1064-1084` | PBKDF2 Sha256/Sha512 `EncryptCoreAsync` runs 600K/210K iterations synchronously on calling thread (no `Task.Run`). 300-600ms thread-pool stall unlike Argon2 which wraps in Task.Run. |
+| 2997 | 4 | P1 | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:193-209` | Header fields (magic, original length, chaff%, distribution) written in plaintext and unauthenticated. Leaks exact original ciphertext length defeating traffic-analysis resistance. Attacker can flip header bytes to corrupt decryption. |
+| 2998 | 7 | P1 | `UltimateEncryption/Strategies/PostQuantum/AdditionalPqcSignatureStrategies.cs:83,209` | `AsymmetricCipherKeyPair(null, privateKeyParams)` passes null public key. BouncyCastle accepts it but any access to `keyPair.Public` throws NRE. |
+| 2999 | 2 | P1 | `UltimateEncryption/Strategies/PostQuantum/*` (all PQC strategies) | Instance-level `SecureRandom _secureRandom` is not thread-safe. Concurrent `EncryptCoreAsync` calls via `Task.Run` can corrupt PRNG state, producing repeated nonces/key material. |
+| 3000 | 14 | P1 | `UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs:155` + `AesGcmTransitStrategy.cs:156` + `ChaCha20TransitStrategy.cs:155` | `KeyStore!` null-forgiving operator suppresses null guard. Uninitialized KeyStore produces undiagnosable NRE at runtime. |
+| 3001 | 13 | P2 | `UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs:80,132` + `AesGcmTransitStrategy.cs` + `AesCbcTransitStrategy.cs` + `ChaCha20TransitStrategy.cs` | All transit `EncryptDataAsync`/`DecryptDataAsync` use `await Task.FromResult(...)` for synchronous crypto — unnecessary state machine + Task allocation per call. |
+| 3002 | 13 | P2 | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:382-408` | `RandomBurst` interleave: `while (remaining > 0)` loop can spin indefinitely when burst placement fails to reduce `remaining` on nearly-full positions array. |
+| 3003 | 10 | P2 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:174,314,447` | Argon2 `DecryptCoreAsync` returns raw password bytes on verification success. Caller expecting derived key gets the secret input instead. |
+| 3004 | 9 | P2 | `UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs` (IDEA/CAST5/CAST6/RC5) | Missing `GenerateKey()` override. Base class returns wrong-length key for these ciphers — will crash or be rejected at use time. |
+| 3005 | 15 | P2 | `UltimateEncryption/Strategies/StreamCiphers/OtpStrategy.cs` | No `GenerateKey()` override. OTP requires key = plaintext length, but base class returns fixed-size key. Length mismatch on first use. |
+| 3006 | 9 | P2 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:955-976,733-758` | PBKDF2/HKDF strategies accept empty/null plaintext (password/IKM). Empty password produces deterministic attacker-predictable output. |
+| 3007 | 15 | LOW | `UltimateEncryption/Strategies/PostQuantum/SphincsPlusStrategies.cs:316` | `Parameters["HashFunction"] = "SHAKE-192"` — SHAKE-192 does not exist. SPHINCS+-192f uses SHAKE-256 truncated to 192-bit security. |
+| 3008 | 15 | LOW | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:595-596` | `BcryptKdfStrategy.KeySizeBits = 184` but bcrypt produces 24 bytes (192 bits). Comment says "23 bytes" — wrong. |
+| 3009 | 13 | LOW | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:380-381` | `RandomBurst` allocates O(n) `bool[]` positions array — for 1 GB input with 25% chaff, that's 1.25 GB bool array on heap. Use BitArray. |
+| 3010 | 9 | LOW | `UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs` + `AesGcmTransitStrategy.cs` + `ChaCha20TransitStrategy.cs` | `DecryptStreamForTransitAsync` not implemented — streams encrypted via chunk-based path cannot be decrypted. |
+
+**Clean files:** None
+
+---
+
+### Chunk 094 — UltimateFilesystem (StrategyBase, Scaling, Strategies: Detection/Discovery/Health/Pool/Drivers/AdvancedFeatures/Operations/Format/Network/Specialized/Superblock/Fuse/WinFsp)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3011 | 1 | P0 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:407-410,438-441` | `EncryptBlockAsync`/`DecryptBlockAsync` fall through to XOR-with-IV when bus unavailable. XOR provides zero confidentiality. Comment says "In production with bus, UltimateEncryption would perform actual AES-XTS." Data written is not encrypted. |
+| 3012 | 1 | P0 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:449-459` | `CreatePerFileEncryption` returns raw 256-bit key in `FileKeyWrapped`. Comment: "In production: wrapped by master key." Raw key material exposed to callers/serialization/logging. |
+| 3013 | 12 | P0 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:585-588` | Raft leader election uses `Random.Shared.NextDouble() > 0.3` for votes. Two simultaneous candidates both see majority with different random draws. Guarantees nothing about split-brain prevention. |
+| 3014 | 6 | P0 | `UltimateFilesystem/Scaling/FilesystemScalingManager.cs:385-386` | `DispatchLoopAsync` fires `_ = ExecuteIoOperationAsync(op, ct)` with no concurrency cap. Unbounded parallel tasks spawn from channel, starving ThreadPool. Unhandled exceptions silently lost. |
+| 3015 | 3 | P0 | `UltimateFilesystem/Strategies/DevicePoolStrategy.cs:114` | `GetMetadataAsync` calls `.GetAwaiter().GetResult()` on async method — sync-over-async deadlock risk. Additionally `poolCount` is computed but never used in returned metadata — dead code that blocks a thread. |
+| 3016 | 2 | P1 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:55,98` | `CasBlock.ReferenceCount` modified via `++`/`--` without synchronization in ContentAddressableStorageLayer described as thread-safe for multi-writer. Non-atomic read-modify-write. |
+| 3017 | 2 | P1 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:613-619,627-634` | `DistributedHaFilesystemManager` node mutations (IsHealthy, UsedBytes, LastHeartbeat) outside any lock. `_electionLock` only protects election, not node state. |
+| 3018 | 2 | P1 | `UltimateFilesystem/Strategies/SpecializedStrategies.cs:98-148` | `BlockCacheStrategy._cache` is plain `Dictionary` used without locking. Concurrent reads during write cause `InvalidOperationException` or corruption. |
+| 3019 | 2 | P1 | `UltimateFilesystem/Strategies/SpecializedStrategies.cs:160-218` | `QuotaEnforcementStrategy._quotas` plain `Dictionary` read/written without synchronization from concurrent calls. |
+| 3020 | 5 | P1 | `UltimateFilesystem/FilesystemStrategyBase.cs:242,245` + `FilesystemScalingManager.cs:399` + `FilesystemAdvancedFeatures.cs:222-225,396-399,430-434` | Multiple bare `catch { }` blocks: AutoDiscover skips errors, dispatch loop swallows all non-cancellation errors, bus communication failures all silently suppressed. |
+| 3021 | 12 | P1 | `UltimateFilesystem/Strategies/DriverStrategies.cs:113-152` | `IoUringDriverStrategy` claims `SupportsKernelBypass = true` but uses plain `FileStream`. Comment confirms "fallback to async file I/O." Naming/capability lie. |
+| 3022 | 13 | P1 | `UltimateFilesystem/Scaling/FilesystemScalingManager.cs:465-470` | io_uring detection via `"Linux version 5."` string match returns true for 5.0 (no io_uring, added 5.1) and false for 7+. |
+| 3023 | 9 | P1 | `UltimateFilesystem/Scaling/FilesystemScalingManager.cs:569-583` | `Dispose` cancels CTS but never awaits `_dispatchTask`. In-flight operations reference disposed objects. |
+| 3024 | 14 | P1 | `UltimateFilesystem/Strategies/DetectionStrategies.cs` + `DriverStrategies.cs` + `FormatStrategies.cs` + `NetworkFilesystemStrategies.cs` + `SpecializedStrategies.cs` + all block-I/O strategies | No path traversal validation on user-supplied `path` in any strategy. Attacker can read/write arbitrary filesystem locations via `../../etc/shadow` or UNC paths. |
+| 3025 | 15 | P1 | `UltimateFilesystem/Strategies/FormatStrategies.cs:508-510` | `Hammer2Strategy` detects on `OSPlatform.FreeBSD` but HAMMER2 is DragonFly BSD only. Returns fake metadata for any path on FreeBSD. |
+| 3026 | 4 | P2 | `UltimateFilesystem/Strategies/SuperblockDetectionStrategies.cs:126-134` | `ResolveDevicePath` returns raw Windows device path (`\\.\C:`) opened with `FileShare.ReadWrite`. In elevated context with user-supplied path, could expose raw device data. |
+| 3027 | 1 | P2 | `UltimateFilesystem/Strategies/DriverStrategies.cs:139,229` | `IoUringDriverStrategy`/`WindowsNativeDriverStrategy` use `ReadExactlyAsync` which throws on partial reads — inconsistent with other strategies that resize buffer. |
+| 3028 | 13 | P2 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:21-22` | CAS `_blockStore` bounded to 1000 entries with no auto-GC. Under sustained writes, blocks silently dropped or evicted while still referenced. |
+| 3029 | 12 | P2 | `UltimateFilesystem/Scaling/FilesystemScalingManager.cs:489-502,509-525` | `IsCallerThrottled` check-then-`IncrementCallerQuota` TOCTOU race. Concurrent threads all pass check at `MaxOps-1`, then all increment — quota exceeded by thread count. |
+| 3030 | 12 | P2 | `UltimateFilesystem/Strategies/FilesystemAdvancedFeatures.cs:653-665` | `Rebalance` uses `underloaded.FirstOrDefault()` repeatedly without removing — one node gets all movements, likely becoming overloaded itself. |
+| 3031 | 15 | P2 | `UltimateFilesystem/Strategies/FilesystemOperations.cs:562-564` | Comment says "ext4 inline data: files <= 60 bytes stored directly in inode" but implementation writes to regular storage. Sets ExtendedAttribute flag that misleads ext4 readers. |
+| 3032 | 13 | P2 | `UltimateFilesystem/Strategies/FormatStrategies.cs` + `NetworkFilesystemStrategies.cs` + `SuperblockDetectionStrategies.cs` (~15 call sites) | `File.ReadAllLines("/proc/mounts")` allocates full string array in hot `DetectAsync` paths. Should use `File.ReadLines` (lazy) or cache with short TTL. |
+| 3033 | 10 | P2 | `UltimateFilesystem/Strategies/FilesystemOperations.cs:547` | `WriteSuperblockAsync` uses `FileMode.OpenOrCreate` without truncating. Old superblock bytes beyond written range persist, may confuse `e2fsck`. |
+| 3034 | 12 | P2 | `UltimateFilesystem/Strategies/FormatStrategies.cs:511-521` | `Hammer2Strategy.DetectAsync` unconditionally returns metadata on FreeBSD without checking path existence. Hardcoded zero TotalBytes/AvailableBytes. |
+| 3035 | 14 | P2 | `UltimateFilesystem/Scaling/FilesystemScalingManager.cs:153-158` | Constructor starts timer with `TimeSpan.Zero` dueTime — callback fires before constructor returns. `_disposed` may be uninitialized. |
+| 3036 | 15 | LOW | `UltimateFilesystem/FilesystemStrategyBase.cs:74` | `BlockIoOptions.Priority` (int 0-7) conflicts with `IoPriority` enum in ScalingManager. Two siloed priority concepts with no mapping. |
+| 3037 | 15 | LOW | `UltimateFilesystem/Strategies/NetworkFilesystemStrategies.cs:19` | `NfsStrategy` claims `MaxFileSize = 8TB` but NFSv3 without LFS limited to 4GB. Should separate v3/v4 or detect version. |
+| 3038 | 6 | LOW | `UltimateFilesystem/FilesystemStrategyBase.cs:236-243` | `AutoDiscover` uses `Activator.CreateInstance` on all concrete types. Strategies with constructor parameters fail silently. No deduplication. |
+| 3039 | 13 | LOW | `UltimateFilesystem/Strategies/DetectionStrategies.cs:47-58,125-136` | `AutoDetectStrategy`/`NtfsStrategy` `ReadBlockAsync` use synchronous `fs.Read()` inside async method with `Task.FromResult`. Blocks threadpool thread during I/O. |
+
+**Clean files:** UltimateFilesystemPlugin.cs, DeviceDiscoveryStrategy.cs, DeviceHealthStrategy.cs, WindowsWinFspFilesystemStrategy.cs, UnixFuseFilesystemStrategy.cs
+
+---
+
+### Chunk 095 — UltimateFilesystem (Plugin) + UltimateIntelligence (ChatCapabilities, ConcreteChannels, DomainModels, EdgeNative, Federation, IIntelligenceStrategy, Inference, IntelligenceDiscoveryHandler, IntelligenceGateway, IntelligenceStrategyBase, IntelligenceTestSuites)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3040 | 1 | P0 | `UltimateIntelligence/EdgeNative/AutoMLEngine.cs:219-234` | `ExtractParquetSchemaAsync` is full stub — returns hardcoded `column_0` with zero rows. Any Auto-ML pipeline on Parquet source silently produces garbage model. |
+| 3041 | 1 | P0 | `UltimateIntelligence/EdgeNative/AutoMLEngine.cs:237-254` | `ExtractDatabaseSchemaAsync` same stub — returns `id`/`data` with zero rows. Database connection string silently produces degenerate model. |
+| 3042 | 2 | P0 | `UltimateIntelligence/EdgeNative/InferenceEngine.cs:399-401,437-441` | `WasiNnGpuBridge._gpuAvailable` (bool) and `_gpuFailureCount` (int) are plain fields written concurrently without synchronization. GPU lock-out mechanism unreliable under concurrent inference. |
+| 3043 | 5 | P1 | `UltimateFilesystem/UltimateFilesystemPlugin.cs:244-247` | `HandleDetectAsync` bare `catch { }` swallows all detection strategy exceptions with no logging. Broken strategies silently skipped. |
+| 3044 | 1 | P1 | `UltimateFilesystem/UltimateFilesystemPlugin.cs:458-463` | `HandleQuotaAsync` is a no-op that always returns `success = true` without performing any quota work. |
+| 3045 | 1 | P1 | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:1077-1096` | `StreamingHandler.StreamAsync` fakes streaming — retrieves full response then emits 20-char chunks with `Task.Delay(10)`. Artificial latency, not real streaming. |
+| 3046 | 13 | P1 | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:683-699` | `ConversationManager.GetOrCreate` eviction uses `.OrderBy(...).FirstOrDefault()` — O(n) full scan on every call when count exceeds max. |
+| 3047 | 6 | P1 | `UltimateIntelligence/Federation/FederationSystem.cs:651-658` | Health check timer callback is `async _ => await ...` (fire-and-forget async void lambda). Unobserved exceptions crash process or leave stale health. |
+| 3048 | 2 | P1 | `UltimateIntelligence/Federation/FederationSystem.cs:341-361` | `InstanceRegistry.RegisterAsync` TOCTOU race: `ContainsKey` then index-assign. Concurrent registrations leak HTTP clients and semaphores. |
+| 3049 | 4 | P1 | `UltimateIntelligence/Federation/FederationSystem.cs:608-611` | `ValidateServerCertificate = false` bypasses all TLS validation. Full bypass accessible via config on untrusted networks. |
+| 3050 | 14 | P1 | `UltimateIntelligence/EdgeNative/AutoMLEngine.cs:204` | CSV column access `r[header]` without ContainsKey check. Throws KeyNotFoundException when CSV row has fewer values than headers. |
+| 3051 | 2 | P1 | `UltimateIntelligence/IntelligenceStrategyBase.cs:158,168` | `_lastOperationTime = DateTime.UtcNow` written from multiple threads without synchronization. All other stats use Interlocked but this field does not. |
+| 3052 | 5 | P2 | `UltimateIntelligence/Channels/ConcreteChannels.cs:204-209` | `ChannelRegistry.BroadcastAsync` catch discards channel send errors with only Debug.WriteLine. Malfunctioning channels invisible in production. |
+| 3053 | 5 | P2 | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:329-333` | `FunctionCall.ParsedArguments` silently returns null on bad JSON. Malformed function calls proceed with empty arguments. |
+| 3054 | 15 | P2 | `UltimateIntelligence/EdgeNative/InferenceEngine.cs:592` | `WasiNnModelCache` described as "zero-copy" but uses `File.ReadAllBytesAsync` — full copy on every cache miss. |
+| 3055 | 13 | P2 | `UltimateIntelligence/EdgeNative/InferenceEngine.cs:594-638` | `WasiNnModelCache.GetOrAddAsync` check-then-act window: TryGetValue and write not in same lock. Concurrent callers load same model twice. |
+| 3056 | 5 | P2 | `UltimateIntelligence/Federation/FederationSystem.cs:527-530` | `PerformHealthCheckAsync` catch discards JSON parse error with Debug.WriteLine only. |
+| 3057 | 14 | P2 | `UltimateIntelligence/EdgeNative/AutoMLEngine.cs:293-294` | `AnonymizeValue` phone detection heuristic too broad — matches zip codes, order numbers, numeric IDs as `[PHONE]`. |
+| 3058 | 9 | P2 | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:432` | `HandleChatAsync` calls `messages.Last()` without checking non-empty. Throws InvalidOperationException if BuildMessages returns only system messages. |
+| 3059 | 12 | P2 | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:857-866` | `BuildMessages` history trimming inserts at fixed index in reverse loop — produces reversed message order when context is trimmed. |
+| 3060 | 7 | P2 | `UltimateIntelligence/IntelligenceTestSuites.cs:194` | Message bus subscription created but never disposed. IDisposable leaks for process lifetime. |
+| 3061 | 15 | LOW | `UltimateIntelligence/Capabilities/ChatCapabilities.cs:547` | `EmbeddingResponse.TotalTokens` is `inputs.Sum(s => s.Length / 4)` — rough estimate, not actual token count. Name implies accuracy. |
+| 3062 | 9 | LOW | `UltimateFilesystem/UltimateFilesystemPlugin.cs:924-929` | `ListAsync` silently yields nothing instead of throwing NotSupportedException. Callers believe there is no data. |
+
+**Clean files:** IIntelligenceStrategy.cs, IntelligenceDiscoveryHandler.cs, IntelligenceGateway.cs, DomainModels/ModelScoping.cs, DomainModels/DomainModelRegistry.cs, DomainModels/InstanceLearning.cs
+
+---
+
+### Chunk 096 — UltimateIntelligence (KernelKnowledgeIntegration, KnowledgeAwarePluginExtensions, KnowledgeSystem, Modes/InteractionModes, NLP, Provenance, Quota, Scaling, Security, Simulation, Agents/AgentStrategies, ConnectorIntegration x4, IntelligenceStrategies)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3063 | 6 | P0 | `UltimateIntelligence/KernelKnowledgeIntegration.cs:180` | `_ = _messageBus.PublishAsync(...)` in OnKnowledgeChanged discards Task. Knowledge synchronization events silently lost on failure. |
+| 3064 | 1 | P0 | `UltimateIntelligence/Strategies/ConnectorIntegration/ConnectorIntegrationStrategy.cs:126,160` | Hardcoded `"http://localhost:5000"` as connector registry endpoint. Validation always passes — no-op in production. |
+| 3065 | 6 | P0 | `UltimateIntelligence/Modes/InteractionModes.cs:1263,1523` | `_ = ExecuteTaskAsync(task, ct)` and `_ = ExecuteScheduledTaskAsync(task, ct)` — scheduler fire-and-forget. Failed tasks indistinguishable from successful ones. |
+| 3066 | 2 | P1 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:756,802` | `LangGraphAgentStrategy._currentNode` and `_graph` are mutable instance fields written concurrently from ExecuteTaskAsync. Race on concurrent calls. |
+| 3067 | 9 | P1 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:297,498,713,804,981,1008,1184` | Seven `float.Parse`/`int.Parse`/`bool.Parse` on config values without try-catch. FormatException on misconfigured value crashes agent. |
+| 3068 | 5 | P1 | `UltimateIntelligence/KernelKnowledgeIntegration.cs:168-173` | Silent catch logs only fixed string without exception message/type/stack. Knowledge registration silently fails. |
+| 3069 | 5 | P1 | `UltimateIntelligence/KnowledgeAwarePluginExtensions.cs:217-221,547-551,584-587` | Three catch blocks swallow all exceptions with only fixed-string Debug.WriteLine. Plugin knowledge queries silently return empty. |
+| 3070 | 1 | P1 | `UltimateIntelligence/Strategies/ConnectorIntegration/ConnectorIntegrationStrategy.cs:264-362` | Five async observation handlers (BeforeRequest, AfterResponse, SchemaDiscovered, Error, ConnectionEstablished) are all no-ops with `await Task.CompletedTask`. |
+| 3071 | 1 | P1 | `UltimateIntelligence/Strategies/ConnectorIntegration/IntelligenceStrategies.cs:801-807` | `CompileInWasmSandboxAsync` always returns null. WASM sandbox feature advertised but non-functional. |
+| 3072 | 12 | P1 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:393-407` | `ReActAgentStrategy.ExtractToolAction` always returns hardcoded `ToolId = "example_tool"` regardless of LLM output. Agent loop always calls wrong tool. |
+| 3073 | 13 | P1 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:474,508` | `AutoGptAgentStrategy` uses hardcoded `totalTokens += 500/300` instead of real usage. Quota enforcement and cost estimation falsified. |
+| 3074 | 13 | P2 | `UltimateIntelligence/NLP/NaturalLanguageProcessing.cs:390,412,425,439,453,466` | `ExtractEntitiesRuleBased` allocates 5 new Regex objects (with Compiled flag) on every ParseAsync call. Hot path for every NLP query. |
+| 3075 | 13 | P2 | `UltimateIntelligence/NLP/NaturalLanguageProcessing.cs:776-813` | `DetermineIntentWithConfidence` allocates per-call Regex objects in loop for every user query. |
+| 3076 | 2 | P2 | `UltimateIntelligence/Provenance/ProvenanceSystem.cs:833-840` | `TransformationTracker.historyList` is unsynchronized `List<T>` returned from GetOrAdd, mutated with AddRange without lock. |
+| 3077 | 2 | P2 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:755,866-873` | `LangGraphAgentStrategy._graph` is plain `Dictionary<string, WorkflowNode>` written concurrently — dictionary corruption on simultaneous writes. |
+| 3078 | 14 | P2 | `UltimateIntelligence/KernelKnowledgeIntegration.cs:592-593` | `QueryKnowledgeAsync` maxResults has no upper bound. Int32.MaxValue materializes entire knowledge store. |
+| 3079 | 9 | P2 | `UltimateIntelligence/Strategies/ConnectorIntegration/IntelligenceStrategies.cs:349-364` | `FetchDocumentationAsync` throws raw ArgumentException for non-URL/non-file locations. No structured error type. |
+| 3080 | 4 | P2 | `UltimateIntelligence/Quota/QuotaManagement.cs:461-465` | `InMemoryAuthProvider` ships hardcoded dev API keys ("dev-free", "dev-basic", "dev-pro", "dev-enterprise", "dev-byok") in production code. |
+| 3081 | 15 | P2 | `UltimateIntelligence/Strategies/ConnectorIntegration/ConnectorIntegrationStrategy.cs:155-172` | `CheckConnectorRegistryReachabilityAsync` creates new disposable HttpClient per call instead of reusing managed dictionary. Socket exhaustion. |
+| 3082 | 5 | P2 | `UltimateIntelligence/KnowledgeSystem.cs:231-235` | `GetAllKnowledgeAsync` catch logs only fixed string without exception or source ID. |
+| 3083 | 12 | P2 | `UltimateIntelligence/Strategies/Agents/AgentStrategies.cs:711-720` | `CrewAiAgentStrategy.CreateCrew` hardcodes 3-role list but accepts TeamSize config > 3. TeamSize > 3 silently uses only 3 agents. |
+| 3084 | 15 | LOW | `UltimateIntelligence/KernelKnowledgeIntegration.cs:266-276` | `ExecuteSubscribeAsync`/`ExecuteUnsubscribeAsync` return true without performing any subscription management. |
+| 3085 | 13 | LOW | `UltimateIntelligence/Modes/InteractionModes.cs` | `ConversationMemory.TrimIfNeeded` recalculates token sum by iterating list instead of decrementing. O(n) per add past limit. |
+| 3086 | 4 | LOW | `UltimateIntelligence/Strategies/ConnectorIntegration/IntelligenceStrategies.cs:791-795` | `ValidateGeneratedCode` pattern blacklist uses simple string Contains — trivially bypassed with whitespace/aliases. |
+| 3087 | 10 | LOW | `UltimateIntelligence/Provenance/ProvenanceSystem.cs:649-657` | `ProvenanceRecorder.StoreRecordAsync` writes in-memory cache before external store. Persistence failure creates split-brain state. |
+
+**Clean files:** IntelligenceScalingMigration.cs, ConnectorIntegrationMode.cs, INTEGRATION_EXAMPLE.cs (excluded from compilation), IntelligenceSecurity.cs
+
+---
+
+
+### Chunk 097 — UltimateIntelligence (ConnectorIntegration/IntelligenceTopics+TransformationPayloads, DataSemantic x2, Evolution, Features/AccessAndFailurePrediction+AccessPrediction+AnomalyDetection+ContentClassification+ContentProcessing+IntelligenceBusFeatures+PerformanceAI+PsychometricIndexing+Search+SemanticSearch)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3088 | 10 | P1 | `UltimateIntelligence/Strategies/DataSemantic/DataSemanticStrategies.cs:129-138` | `RecordLineageAsync` mutates `LineageNode` properties (`Version++`, `UpstreamCount++`) from BoundedDictionary without lock. Non-atomic increments on class reference — lost-update race. |
+| 3089 | 13 | P1 | `UltimateIntelligence/Strategies/DataSemantic/DataSemanticStrategies.cs:176-240` | `GetUpstreamLineageAsync`/`GetDownstreamLineageAsync` BFS inner loop scans `_edges.Values.Where(...)` — O(V × E) per traversal. Needs adjacency list. |
+| 3090 | 1 | P1 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:626-629` | `ContinualLearningStrategy.LearnNewTaskAsync` is no-op `await Task.CompletedTask` with "In production" comment. Rule 13 stub. |
+| 3091 | 1 | P1 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:643-646` | `EvaluateOnAllTasksAsync` returns fabricated accuracy `0.85 + Random.Shared.NextDouble() * 0.1`. Fake data. |
+| 3092 | 1 | P1 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:668,785,804,898,934,948` | Six stubs: `ConsolidateKnowledgeAsync`, `ReceiveKnowledgeAsync`, `DistillExpertiseAsync`, `LearnFromFewExamplesAsync`, `TransferKnowledgeAsync`, `OptimizeLearningStrategyAsync` — all no-op `await Task.CompletedTask`. |
+| 3093 | 2 | P1 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:609-610` | `_learnedTasks` plain `List<string>` mutated with `Contains` + `Add` without lock. Race on concurrent calls. |
+| 3094 | 9 | P1 | `UltimateIntelligence/Strategies/Features/AccessAndFailurePredictionStrategies.cs:310` | `LogAnalysisResult.Patterns` always returns empty list. Comment says "Would parse from response" — stub. |
+| 3095 | 13 | P2 | `UltimateIntelligence/Strategies/Features/SearchStrategies.cs:131-140` | `FullTextSearchStrategy.SearchAsync` fuzzy path iterates all `_invertedIndex` keys computing Levenshtein — O(|query| × |index|). CPU-bound on thread pool. |
+| 3096 | 2 | P2 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:918` | `_learningEfficiency` double mutated non-atomically with read-modify-write. Torn read possible on 32-bit. |
+| 3097 | 6 | P2 | `UltimateIntelligence/Strategies/Features/AccessPredictionStrategies.cs:78` | `Task.Run(() => TrainModelsAsync())` fire-and-forget. Exceptions silently swallowed. |
+| 3098 | 15 | P2 | `UltimateIntelligence/Strategies/Features/SemanticSearchStrategy.cs:153-173` | `RerankResultsAsync` fetches AI reranking response but ignores it — returns original list unchanged. |
+| 3099 | 13 | P2 | `UltimateIntelligence/Strategies/Features/AnomalyDetectionStrategy.cs:169` + `ContentClassificationStrategy.cs:116` + `PsychometricIndexingStrategy.cs:109` | Batch methods call AI serially with `foreach + await`. No parallelism for large batches. |
+| 3100 | 9 | P2 | `UltimateIntelligence/Strategies/Features/AccessPredictionStrategies.cs:251,274` | `orderedEvents[0]` accessed without Count > 0 check. IndexOutOfRangeException if guard logic changes. |
+| 3101 | 12 | P2 | `UltimateIntelligence/Strategies/Features/ContentProcessingStrategies.cs:526-530` | `DetectLanguageAsync` Latin range `'A'..'z'` includes 6 non-letter ASCII characters (91-96). |
+| 3102 | 4 | P2 | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:388-393,744-749` | `GetConfig("StoragePath")` used directly in `Directory.CreateDirectory`/`Path.Combine` without traversal validation. |
+| 3103 | 7 | P2 | `UltimateIntelligence/Strategies/DataSemantic/DataSemanticStrategies.cs:38` | `ReaderWriterLockSlim` not disposed. Class does not implement `IDisposable`. |
+| 3104 | 15 | LOW | `UltimateIntelligence/Strategies/Features/IntelligenceBusFeatures.cs:108-127` | `MarkUnhealthy`/`MarkHealthy` mutate multiple `ModelHealthStatus` properties without lock. Partial states visible. |
+| 3105 | 14 | LOW | `UltimateIntelligence/Strategies/Features/SearchStrategies.cs` + `SemanticSearchStrategy.cs` + `ContentClassificationStrategy.cs` | No null/empty guards on public API parameters (`documentId`, `content`, `query`). NullReferenceException from internal helpers. |
+| 3106 | 5 | LOW | `UltimateIntelligence/Strategies/Features/ContentProcessingStrategies.cs:200,235,270,421` | Four `catch { }` blocks in ZIP extraction methods swallow all exceptions including OutOfMemoryException. |
+| 3107 | 12 | LOW | `UltimateIntelligence/Strategies/DataSemantic/DataSemanticStrategies.cs` | `_graphLock` declared but never acquired for reads. `GetUpstreamLineageAsync`/`GetDownstreamLineageAsync` read `_edges.Values` unlocked. |
+| 3108 | 13 | LOW | `UltimateIntelligence/Strategies/Features/SearchStrategies.cs:226` | `CalculateBM25Score` calls `Tokenize(document)` per scored candidate per search. Term frequencies should be pre-computed at index time. |
+| 3109 | 12 | LOW | `UltimateIntelligence/Strategies/Evolution/EvolvingIntelligenceStrategies.cs:547-553` | `AdaptToFeedbackAsync` is empty no-op stub. Method promises adaptation but body is pure placeholder. |
+
+**Clean files:** IntelligenceTopics.cs, TransformationPayloads.cs, SemanticIntelligenceStrategies.cs
+
+---
+
+### Chunk 098 — UltimateIntelligence (Features/SnapshotIntelligence+StorageIntelligence, Innovations/FutureInnovations, KnowledgeGraphs/Neo4j+OtherGraph, Memory/AIContextEncoder+ContextRegenerator, Embeddings/AzureOpenAI+Cohere+EmbeddingCache+EmbeddingProviderFactory+EmbeddingProviderRegistry+HuggingFace+IEmbeddingProvider+Jina)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3110 | 1 | P1 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:443-453` | `ExecuteTemporalQueryAsync` returns empty results list with "In production: parse response and query actual snapshots" comment. Dead stub. |
+| 3111 | 1 | P1 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:540-549` | `SearchHistoryAsync` calls AI but returns empty `Results = new List<HistoricalSearchMatch>()`. No actual search performed. |
+| 3112 | 1 | P1 | `UltimateIntelligence/Strategies/KnowledgeGraphs/Neo4jGraphStrategy.cs:269-271` | `TraverseAsync` — loop body is empty comment. Always returns zero nodes/edges regardless of query result. |
+| 3113 | 1 | P1 | `UltimateIntelligence/Strategies/KnowledgeGraphs/Neo4jGraphStrategy.cs:302-308` | `FindPathAsync` executes `shortestPath` Cypher but never parses response. Returns empty `GraphPath` with `TotalWeight = 0`. |
+| 3114 | 1 | P1 | `UltimateIntelligence/Strategies/KnowledgeGraphs/Neo4jGraphStrategy.cs:315-328` | `QueryAsync` executes Cypher but discards result entirely. Returns empty Nodes/Edges. |
+| 3115 | 1 | P1 | `UltimateIntelligence/Strategies/KnowledgeGraphs/OtherGraphStrategies.cs:117-134` | `ArangoGraphStrategy` — `GetEdgesAsync`, `FindNodesByLabelAsync`, `FindNodesByPropertyAsync`, `TraverseAsync`, `FindPathAsync`, `QueryAsync` all return hardcoded empty results. |
+| 3116 | 1 | P1 | `UltimateIntelligence/Strategies/KnowledgeGraphs/OtherGraphStrategies.cs:422-449` | `TigerGraphStrategy` — `AddEdgeAsync` makes no HTTP call, `GetNodeAsync` returns null, 8 other methods return empty stubs. |
+| 3117 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Embeddings/EmbeddingCache.cs:146-152` | TOCTOU on LRU eviction: `_cache.Count >= _maxEntries` checked outside lock, `EvictLru()` acquires lock separately. Unbounded growth under concurrent writes. |
+| 3118 | 5 | P2 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:317,794` + `StorageIntelligenceStrategies.cs:385,425,680,720` | Six bare `catch { }` blocks swallow JSON parse failures in prediction/recommendation parsing. Default values returned with no failure signal. |
+| 3119 | 5 | P2 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:662-665` | `GetUnifiedViewAsync` catch uses Debug.WriteLine only — stripped in Release. Federation failures invisible. |
+| 3120 | 10 | P2 | `UltimateIntelligence/Strategies/Memory/ContextRegenerator.cs:244` | `Interlocked.Exchange(ref _cumulativeAccuracy, _cumulativeAccuracy + accuracy)` — non-atomic read of `_cumulativeAccuracy` before Exchange. Lost updates. |
+| 3121 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/AzureOpenAIEmbeddingProvider.cs:274-283` + `CohereEmbeddingProvider.cs:228-235` + `HuggingFaceEmbeddingProvider.cs:336-346` + `JinaEmbeddingProvider.cs:296-306` | Four embedding providers catch all `ValidateConnectionAsync` exceptions with Debug.WriteLine only. Auth/network failures invisible in production. |
+| 3122 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/EmbeddingProviderRegistry.cs:200-208,282-287,404-408` | Three catch sites swallow provider validation/discovery/instantiation errors with Debug.WriteLine only. |
+| 3123 | 15 | P2 | `UltimateIntelligence/Strategies/KnowledgeGraphs/Neo4jGraphStrategy.cs:313-329` | `QueryAsync` name promises query results but returns empty. Contract violation independent of stub finding. |
+| 3124 | 9 | P2 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:62` + `StorageIntelligenceStrategies.cs:482-485,567` | `int.Parse`/`double.Parse` on config values without try-catch. FormatException on malformed config terminates strategy. |
+| 3125 | 12 | P2 | `UltimateIntelligence/Strategies/KnowledgeGraphs/OtherGraphStrategies.cs:96` | ArangoGraphStrategy `GetNodeAsync` AQL uses `UNION(single_array)` — invalid AQL syntax. Throws on every call. |
+| 3126 | 7 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/EmbeddingCache.cs:212-220` | `Clear()` doesn't stop `_cleanupTimer`. Timer continues firing on empty cache after reset. |
+| 3127 | 2 | P2 | `UltimateIntelligence/Strategies/Features/StorageIntelligenceStrategies.cs:621-625` | `RecordAccess` mutates `AccessHistory.TotalAccesses++` and `LastAccess` without lock. Race on concurrent calls for same objectId. |
+| 3128 | 2 | P2 | `UltimateIntelligence/Strategies/Features/SnapshotIntelligenceStrategies.cs:560-583` | `IndexSnapshot` GetOrAdd + separate `lock(versions)` — TOCTOU if BoundedDictionary evicts between GetOrAdd and lock acquisition. |
+| 3129 | 15 | LOW | `UltimateIntelligence/Strategies/KnowledgeGraphs/OtherGraphStrategies.cs:157-161` | `NeptuneGraphStrategy` is fully in-memory despite accepting AWS credentials. No connection to Neptune, no error. |
+| 3130 | 12 | LOW | `UltimateIntelligence/Strategies/Memory/Embeddings/EmbeddingProviderRegistry.cs:258-263` | `DiscoverProviders` operator precedence bug: `||` lower than `&&` includes non-IEmbeddingProvider types with matching constructor. |
+| 3131 | 13 | LOW | `UltimateIntelligence/Strategies/Memory/AIContextEncoder.cs:427-451` + `ContextRegenerator.cs:682-703` | Duplicated `LevenshteinDistance` implementations each allocate O(m×n) 2D array. |
+| 3132 | 9 | LOW | `UltimateIntelligence/Strategies/Memory/AIContextEncoder.cs:104-109` | `DecodeAsync` catch silently returns raw base64-encoded payload as "decoded" string. Callers receive garbage data. |
+| 3133 | 13 | LOW | `UltimateIntelligence/Strategies/Memory/Embeddings/EmbeddingCache.cs:313` | O(n) `LinkedList.Find` on every LRU access. Self-annotated TODO for O(1) Dictionary lookup. |
+
+**Clean files:** IEmbeddingProvider.cs, EmbeddingProviderFactory.cs, FutureInnovations.cs
+
+---
+
+
+### Chunk 099 — UltimateIntelligence (Memory/Embeddings ONNX+Ollama+OpenAI+VoyageAI, EvolvingContextManager, HybridMemoryStore, Indexing/AINavigator+CompositeContextIndex+CompressedManifestIndex+EntityRelationshipIndex+HierarchicalSummaryIndex+IContextIndex+IndexManager+SemanticClusterIndex+TemporalContextIndex)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3134 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:343-381` | `RunInferenceAsync` does not invoke ONNX Runtime — generates SHA-256 hash-based pseudo-embeddings. All downstream similarity/clustering produces garbage. |
+| 3135 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/Indexing/SemanticClusterIndex.cs:780-784` | `GeneratePlaceholderEmbedding` produces `Random`-seeded vectors. Entire semantic clustering index clusters on random data when no pre-computed embedding. |
+| 3136 | 1 | P1 | `UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:215-220` | Tokenizer JSON file read but never parsed. All tokens fall back to `[UNK]`, producing identical embeddings for every input. |
+| 3137 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:170-174` | Double-checked locking with `_isLoaded` not marked `volatile`. Second thread may see `true` before model fully initialized. |
+| 3138 | 4 | P1 | `UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:140-144,200-213` | User-controlled model path used in File.Exists/ReadAllLines/ReadAllText without traversal validation. Arbitrary file read. |
+| 3139 | 6 | P1 | `UltimateIntelligence/Strategies/Memory/Embeddings/OllamaEmbeddingProvider.cs:184-189` | Recursive retry on 404 is unbounded — `PullModelAsync` then recursive `GetEmbeddingCoreAsync`. Stack overflow on persistent 404. |
+| 3140 | 6 | P0 | `UltimateIntelligence/Strategies/Memory/HybridMemoryStore.cs:50-61` | Timer callbacks `_ = MigrateBasedOnAccessPatternsAsync(...)` and `_ = FlushPendingWritesAsync(...)` fire-and-forget. Silent data loss if flush throws. |
+| 3141 | 10 | P1 | `UltimateIntelligence/Strategies/Memory/HybridMemoryStore.cs:245-257` | `GetEntryCountAsync` returns `Math.Max(hotCount, persistentCount)` ignoring overlap. Consistently overstates unique entry count. |
+| 3142 | 10 | P1 | `UltimateIntelligence/Strategies/Memory/HybridMemoryStore.cs:71` | `StoreAsync` always resets `_accessCounts[entryId] = 1` even on updates. Corrupts eviction scoring for re-stored entries. |
+| 3143 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/EvolvingContextManager.cs:519-537` | `_evolutionHistory` GetOrAdd + lock(history) — racing GetOrAdd may return discarded list. Data permanently lost. |
+| 3144 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Indexing/EntityRelationshipIndex.cs:563-584,195` | `HashSet<string>` in `_entityToContent`/`_contentToEntities` mutated without locks. HashSet corruption on concurrent calls. |
+| 3145 | 6 | P1 | `UltimateIntelligence/Strategies/Memory/Indexing/IndexManager.cs:88-91` | Timer callbacks `_ = RunOptimizationAsync()` and `_ = RunConsistencyCheckAsync()` fire-and-forget. Failures silently swallowed. |
+| 3146 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/HybridMemoryStore.cs:68-71` | `_hotCache`, `_accessTimes`, `_accessCounts` updated non-atomically in `StoreAsync`. Concurrent eviction can leave orphaned entries. |
+| 3147 | 1 | P2 | `UltimateIntelligence/Strategies/Memory/EvolvingContextManager.cs:728-735` | `ExtractEntities` looks for capitalized words — returns "The", "I", "SQL". Comment: "would use NLP in production". |
+| 3148 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/OllamaEmbeddingProvider.cs:258-262` | `ListLocalModelsAsync` bare catch returns empty list. Network/DNS/cert failures invisible. |
+| 3149 | 14 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/OpenAIEmbeddingProvider.cs:299-300` | `double.Parse` in `ParseDurationToSeconds` without InvariantCulture. FormatException on non-US locales. |
+| 3150 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs:300-306` | Every `Tokenize()` pads to `_maxSequenceLength` (512) unconditionally. Wastes memory for short inputs. |
+| 3151 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/AINavigator.cs:381,419` | O(n) LINQ `relatedConcepts.Any(...)` inside nested loops. O(k²) for large concept lists. |
+| 3152 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/CompositeContextIndex.cs:153-163` | Silent catch swallows sub-index exceptions. Partial results returned with no failure signal. |
+| 3153 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/CompressedManifestIndex.cs:730-737` | Bloom filter `Math.Abs(int.MinValue)` returns negative — `IndexOutOfRangeException` on that value. |
+| 3154 | 1 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/HierarchicalSummaryIndex.cs:544-555` | `UpdateAncestorSummaries` only updates timestamps, never regenerates summaries. Core feature non-functional. |
+| 3155 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/HierarchicalSummaryIndex.cs:26,931-934` | `_treeLock` declared and disposed but never acquired for any read/write. All tree mutations unprotected. |
+| 3156 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/IndexManager.cs:391-400` | `_pendingTasks`/`_completedTasks`/`_failedTasks` read as plain fields in `GetStats()` — stale/cached values. |
+| 3157 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/TemporalContextIndex.cs:454-466` | `GetRecentActivity` scans all `_entries.Values` once per hour. O(hours × entries). Temporal indices exist but not used. |
+| 3158 | 15 | LOW | `UltimateIntelligence/Strategies/Memory/Indexing/CompressedManifestIndex.cs:572-584` | `MurmurHash3` is not MurmurHash3 — simple multiplicative hash with different constants. Lower quality, mislabeled. |
+| 3159 | 15 | LOW | `UltimateIntelligence/Strategies/Memory/EvolvingContextManager.cs:603-634,704-725` | `DiscoverRelationshipsAsync`/`ClusterSemanticallyAsync` are not async — end with `await Task.CompletedTask`. |
+
+**Clean files:** VoyageAIEmbeddingProvider.cs, IContextIndex.cs
+
+---
+
+### Chunk 100 — UltimateIntelligence (Memory/Indexing/TopicModelIndex, LongTermMemoryStrategies, MemoryTopics, Persistence/Cassandra+CloudStorage+EventStreaming+IProductionPersistenceBackend+MongoDB+PersistenceInfrastructure+Postgres+Redis+RocksDb, PersistentMemoryStore, Regeneration/AccuracyVerifier+BinaryFormatRegeneration)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3160 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/Persistence/CassandraPersistenceBackend.cs:113-116,160-162` | All six persistence backends (Cassandra, MongoDB, PostgreSQL, Redis, Kafka, Azure Blob) are in-memory simulations. Comments: "simulates X behavior using in-memory structures." Never connect to real databases. |
+| 3161 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:399-407` | `RocksDbMemoryStore.FlushAsync` is comment-only stub — returns true without persisting. Data lost on process termination. |
+| 3162 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:704-726` | `ObjectStorageMemoryStore.FlushAsync` dequeues write-queue entries and discards them. Comment: "would upload batch to S3". Guaranteed data loss. |
+| 3163 | 1 | P0 | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:1097-1107` | `CompressRecordAsync`/`DecompressRecordAsync` are no-ops returning unchanged record. `EnableCompression = true` default is a lie. |
+| 3164 | 2 | P0 | `UltimateIntelligence/Strategies/Memory/Persistence/RedisPersistenceBackend.cs:876-884` | `StoreIfNotExistsAsync` TOCTOU: `ContainsKey` then `StoreAsync` not atomic. Violates SET-NX semantics. |
+| 3165 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:860` | `DistributedMemoryStore.StoreAsync` writes `_entryToShardMap` before `Task.WhenAll` — concurrent reads see uncommitted shard index. |
+| 3166 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:209-217` | `RocksDbMemoryStore` — HashSet mutated in `StoreAsync` under lock, but `SearchAsync` reads without lock. Data race. |
+| 3167 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:641-651` | `TopicEvolution.Events` (List<T>) mutated without synchronization. Concurrent optimize/index calls corrupt list. |
+| 3168 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:508-519` | `MergeTopics` mutates inner `Dictionary<string, float>` distribution maps without lock. Concurrent reads corrupted. |
+| 3169 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Persistence/PostgresPersistenceBackend.cs:475-481` + `RocksDbPersistenceBackend.cs:569-574` | `_scopeIndex` HashSets read in `QueryAsync` without lock while `UpdateIndexes` locks for writes. Partial mutations visible. |
+| 3170 | 5 | P1 | `UltimateIntelligence/Strategies/Memory/Persistence/PostgresPersistenceBackend.cs:936-941` | Silent `catch { /* Ignore deserialization errors */ }` in `ToMemoryRecord`. Corrupt JSONB masked. |
+| 3171 | 5 | P1 | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:916-921` | Silent catch in `CreateSnapshotAsync` hides I/O errors leaving orphaned snapshot directories. |
+| 3172 | 13 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/AccuracyVerifier.cs:363-383` | `CalculateLevenshteinDistance` allocates O(m×n) matrix on unbounded strings. Called per verification on megabyte contexts. |
+| 3173 | 13 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/AccuracyVerifier.cs:447-465` | `CalculateLCSLength` same O(m×n) allocation alongside Levenshtein — triple O(n²) per verification. |
+| 3174 | 15 | P1 | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:860-870` | `IsHealthyAsync` uses synchronous `File.WriteAllText`/`File.Delete` inside async method. Blocks thread pool. |
+| 3175 | 9 | P1 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:1043-1056` | `GetPrimaryShardIndex` returns 0 when `_shards` empty → `IndexOutOfRangeException` in `StoreAsync`. |
+| 3176 | 1 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/BinaryFormatRegenerationStrategies.cs:493` | Parquet `structuralIntegrity = 0.9` hardcoded magic number. Always reports 0.9 regardless of reconstruction quality. |
+| 3177 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:844` | `_snapshots.Count` read in `GetStatisticsAsync` without `_snapshotLock`. |
+| 3178 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/Persistence/RedisPersistenceBackend.cs:777` | `_activeConnections` read without `Interlocked` while incremented/decremented with it. Torn read on 32-bit. |
+| 3179 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:395,405,697,719` | `_lastCompaction`/`_lastFlush` (DateTimeOffset?) set without synchronization in multiple stores. |
+| 3180 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:70` | `results.Any(r => r.ContentId == entry.ContentId)` inside loop — O(n×m) for large collections. |
+| 3181 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:690-707` | `UpdateTopicSimilarities` iterates all topic pairs O(T²). 1000 topics → 500K iterations with `Intersect().Count()`. |
+| 3182 | 9 | P2 | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:248-259` | `DocumentCount` can go negative in `RemoveFromIndexAsync`. No `Math.Max(0, ...)` guard. |
+| 3183 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/Persistence/EventStreamingBackends.cs:283-288` | Kafka `GetAsync` non-compacted miss path doesn't record `CacheMiss` metric. |
+| 3184 | 14 | P2 | `UltimateIntelligence/Strategies/Memory/Persistence/IProductionPersistenceBackend.cs:350` | `MemoryQuery.Limit` has no max bound. `int.MaxValue` materializes entire dataset. |
+| 3185 | 1 | P2 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:411,729` | `RocksDbMemoryStore`/`ObjectStorageMemoryStore` `HealthCheckAsync` stubs return `!_disposed`. No actual health verification. |
+| 3186 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/Persistence/RedisPersistenceBackend.cs:817-832` | `SubscribeToChangesAsync` skips the matching `fromId` entry (off-by-one). Consumers miss one event on replay. |
+| 3187 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:966,975` | `GetEntryCountAsync`/`GetTotalBytesAsync` divide by `_replicationFactor` which can be 0. DivideByZeroException. |
+| 3188 | 15 | LOW | `UltimateIntelligence/Strategies/Memory/Regeneration/AccuracyVerifier.cs:522-529` | `CalculateHashSimilarity` compares hex chars of SHA-256 — no meaningful content similarity. Misleading metric. |
+| 3189 | 4 | LOW | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:1063-1079` | `PersistToDiskAsync` writes single JSON with no atomic rename or checksum. Crash leaves truncated file. |
+| 3190 | 4 | LOW | `UltimateIntelligence/Strategies/Memory/Persistence/RocksDbPersistenceBackend.cs:889-890` | Snapshot `name` used directly in `Path.Combine` without sanitization. Path traversal possible. |
+| 3191 | 6 | LOW | `UltimateIntelligence/Strategies/Memory/PersistentMemoryStore.cs:867` | `StoreBatchAsync` fans out `Task.WhenAll` without concurrency bound. Unbounded parallel I/O for large batches. |
+| 3192 | 10 | LOW | `UltimateIntelligence/Strategies/Memory/Indexing/TopicModelIndex.cs:186-211` | Concurrent `IndexContentAsync` for same `contentId` — second write silently drops first's topic distribution. |
+
+**Clean files:** MemoryTopics.cs, LongTermMemoryStrategies.cs, CloudStorageBackends.cs, MongoDbPersistenceBackend.cs, PersistenceInfrastructure.cs
+
+---
+
+
+### Chunk 102 — UltimateIntelligence (VectorStores: Chroma, Elasticsearch, Hybrid, IProductionVectorStore, Milvus, PgVector, Pinecone, ProductionBase, Qdrant, Redis, Factory, Registry, Weaviate) + VolatileMemoryStore + Providers/AdditionalProviders
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3193 | 1 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/PgVectorStore.cs:88-91,119-455` | Entire `PgVectorStore` backed by in-memory `Dictionary`. SQL commented with "In production:" markers. `IsHealthyAsync` returns `true` unconditionally. Full stub masquerading as production. |
+| 3194 | 6 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/HybridVectorStore.cs:150-162,199-210` | `PrimaryWithAsyncReplication` write strategy launches `_ = Task.Run(...)` fire-and-forget. Replication exceptions silently swallowed via `Debug.WriteLine`. Silent data divergence between primary and secondary. |
+| 3195 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:89-128` | `EnsureCollectionAsync` TOCTOU race: checks `_collectionId != null` then performs HTTP call and writes `_collectionId` — no lock/semaphore. Concurrent callers can double-create. |
+| 3196 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/PgVectorStore.cs:113-134` | Same TOCTOU pattern: `_initialized` read without synchronization, set at line 130 with no lock/volatile. Concurrent init runs multiple times. |
+| 3197 | 10 | P1 | `UltimateIntelligence/Strategies/Memory/VolatileMemoryStore.cs:119-121` | `GetAsync` mutates `entry.AccessCount++` and `entry.LastAccessedAt` on shared `TieredMemoryEntry` with no lock. Class claims "Thread-safe for concurrent access patterns." Lost increments and torn writes. |
+| 3198 | 10 | P1 | `UltimateIntelligence/Strategies/Memory/VolatileMemoryStore.cs:337,340` | `ConsolidateSimilarAsync` directly modifies `AccessCount` on live shared entries without synchronization. Races with concurrent `GetAsync` calls on same objects. |
+| 3199 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreFactory.cs:83-116` | `_instances` Dictionary read under lock, async health check outside lock, write under second lock. Two threads can both create+install, one instance leaks undisposed. |
+| 3200 | 4 | P1 | `UltimateIntelligence/Strategies/Providers/AdditionalProviders.cs:88,135` | Gemini API key appended to URL as query parameter `?key={apiKey}`. Query strings appear in server/proxy logs in plaintext. Should use Authorization header. |
+| 3201 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:411-416` + `ElasticsearchVectorStore.cs:457-461` + `MilvusVectorStore.cs:435-439` + `QdrantVectorStore.cs:316-320` + `WeaviateVectorStore.cs:389-393` + `RedisVectorStore.cs:438-443` | All `CollectionExistsAsync` implementations swallow all exceptions with bare `catch {}` and return `false`. Config errors indistinguishable from "collection does not exist." |
+| 3202 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:463-467` + 6 other stores | All `IsHealthyAsync` methods swallow every exception via bare catch + `Debug.WriteLine`. Systematic failures (wrong URL, expired cert) completely unobservable in production. |
+| 3203 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreFactory.cs:413-421` | `DisposeAsync` swallows disposal exceptions silently. |
+| 3204 | 5 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreRegistry.cs:343-349,408-412` | `GetHealthyInstancesAsync` and `GetAllStatisticsAsync` silently swallow all exceptions. Crashing store disappears from results with no indication. |
+| 3205 | 14 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:102-104,125-126` | `EnsureCollectionAsync` does not validate `_collectionId` was populated. If server returns null id, subsequent calls send requests to `/api/v1/collections/` with null path segment. |
+| 3206 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/WeaviateVectorStore.cs:210-217` | `DeleteBatchAsync` issues one HTTP request per record. Weaviate supports batch delete endpoint. O(n) round-trips. |
+| 3207 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/RedisVectorStore.cs:198-204` | `UpsertBatchAsync` issues one HTTP request per record. Redis supports pipelining/MULTI-EXEC. |
+| 3208 | 9 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreFactory.cs:354-363` | `CreateOptions` deserializes via reflection. `required` properties (ConnectionString, ApiKey) are compile-time only — `JsonSerializer` silently produces invalid options objects. |
+| 3209 | 15 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/HybridVectorStore.cs:471-483` | `PromoteToColdAsync` actually demotes from hot to cold store. Name is inverted from standard tiering terminology. |
+| 3210 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/VolatileMemoryStore.cs:308-357` | `ConsolidateSimilarAsync` O(n²) nested loop over all entries with cosine similarity. Up to 500K comparisons on full 1000-entry store. |
+| 3211 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:179` + 5 other stores | `UpsertBatchAsync` records `Metrics.RecordUpsert(TimeSpan.Zero, batch.Count - 1)`. Off-by-one: for batch of 1 records 0 upserts. |
+| 3212 | 3 | P2 | `UltimateIntelligence/Strategies/Memory/VectorStores/HybridVectorStore.cs:313-315` | `.Result` after `Task.WhenAll` — if one task faulted, `.Result` throws `AggregateException` instead of unwrapping. Should `await` instead. |
+| 3213 | 15 | LOW | `UltimateIntelligence/Strategies/Memory/VectorStores/PineconeVectorStore.cs:300-304` | `CollectionExistsAsync` checks if namespace has vectors, not if namespace exists. Empty but valid namespace returns `false`. |
+| 3214 | 7 | LOW | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreFactory.cs:51` + `AdditionalProviders.cs:59,321,598,827` | Multiple `static readonly HttpClient` fields without `SocketsHttpHandler` + `PooledConnectionLifetime`. No DNS refresh, no socket pooling coordination. |
+| 3215 | 12 | LOW | `UltimateIntelligence/Strategies/Memory/VolatileMemoryStore.cs:603-617` | `SemanticVectorIndex.Remove` O(n) over all buckets, replaces `ConcurrentBag` non-atomically — concurrent adds lost during replacement. |
+| 3216 | 12 | LOW | `UltimateIntelligence/Strategies/Memory/VectorStores/ChromaVectorStore.cs:85` | Empty `X-Chroma-Token` header sent unconditionally when ApiKey is null. Some proxy configs reject empty auth headers. |
+| 3217 | 4 | LOW | `UltimateIntelligence/Strategies/Providers/AdditionalProviders.cs:88,135` | Gemini model name from user input interpolated into URL without sanitization. Path traversal possible with `../../admin`. |
+| 3218 | 9 | LOW | `UltimateIntelligence/Strategies/Memory/VectorStores/VectorStoreFactory.cs:248-262` | `CreatePgVectorAsync` passes `connectionString` without null guard. Null flows to Npgsql producing confusing exception. |
+
+**Clean files:** IProductionVectorStore.cs, ProductionVectorStoreBase.cs
+
+---
+
+
+### Chunk 101 — UltimateIntelligence (Regeneration strategies: Code, Config, Graph, Interface, JSON, Markdown, Metrics, Pipeline, Registry, SQL, Tabular, TimeSeries, XML) + TieredMemoryStrategy + AzureAISearchVectorStore
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3219 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/IAdvancedRegenerationStrategy.cs:276` | `Interlocked.Exchange(ref _cumulativeAccuracy, _cumulativeAccuracy + accuracy)` — read of `_cumulativeAccuracy` not atomic with the exchange. Concurrent calls lose accumulation values. |
+| 3220 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/RegenerationMetrics.cs:604-609` | `CalculateRecentTrend()` reads `_recentAccuracies` list without holding `_lock`, while `RecordSuccess()` mutates same list under `_lock`. Data race: trend calculation observes half-written/resized list. |
+| 3221 | 2 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/RegenerationMetrics.cs:372-376` | `_eventLog.Count` (O(n) on ConcurrentQueue) not atomic with `TryDequeue`. Under concurrency queue grows past limit or over-dequeues. |
+| 3222 | 7 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/JsonSchemaRegenerationStrategy.cs:357-368` | `MemoryStream(65536)` never disposed in `ReconstructJsonAsync`. Leaks 64KB backing buffer per call until GC. |
+| 3223 | 7 | P1 | `UltimateIntelligence/Strategies/Memory/Regeneration/JsonSchemaRegenerationStrategy.cs:232-252` | `JsonDocument.Parse(json)` return value discarded without dispose in `ExtractJsonContent`. Leaks pooled memory per validity probe. |
+| 3224 | 14 | P1 | `UltimateIntelligence/Strategies/Memory/VectorStores/AzureAISearchVectorStore.cs:96-103` | Constructor validates `ApiKey` but not `Endpoint`. Null/empty endpoint produces malformed URL with cryptic `HttpRequestException` at call time. |
+| 3225 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Regeneration/GraphDataRegenerationStrategy.cs:225-234,320-323,405-408` | `graph.Nodes.Any(n => n.Id == id)` inside loop over all matches — O(n²) for graphs with many nodes. Should use `HashSet<string>`. |
+| 3226 | 13 | P2 | `UltimateIntelligence/Strategies/Memory/Regeneration/TimeSeriesRegenerationStrategy.cs:475-479` | `labelKeys` recomputed via `SelectMany`/`Distinct` per data point inside loop — O(n²) reconstruction. |
+| 3227 | 9 | P2 | `UltimateIntelligence/Strategies/Memory/Regeneration/JsonSchemaRegenerationStrategy.cs:75-77` | Second `JsonDocument.Parse` after `RepairJson` can throw. `doc` remains null, subsequent `doc.RootElement` throws `NullReferenceException`. |
+| 3228 | 15 | P2 | `UltimateIntelligence/Strategies/Memory/TieredMemoryStrategy.cs:193-203` | `FlushAsync`/`RestoreAsync` on `InMemoryTieredMemorySystem` return `Task.CompletedTask`. Tiers configured with `MemoryPersistence.Persistent` — contract promises persistence but delivers none. |
+| 3229 | 2 | P2 | `UltimateIntelligence/Strategies/Memory/TieredMemoryStrategy.cs:118-127` | `RecallAsync` mutates `entry.AccessCount++` and `entry.LastAccessedAt` on shared `TieredMemoryEntry` without synchronization. Races with concurrent readers. |
+| 3230 | 12 | P2 | `UltimateIntelligence/Strategies/Memory/Regeneration/RegenerationStrategyRegistry.cs:62-78,97-107` | `Unregister` mutates `List<string>` under `_registrationLock` but `GetStrategiesForFormat` reads same list without lock. Data race on concurrent unregister+read. |
+| 3231 | 1 | LOW | `UltimateIntelligence/Strategies/Memory/Regeneration/CodeRegenerationStrategy.cs:151` + 5 other regen strategies | All `AssessCapabilityAsync` return hardcoded `0.9999999` base accuracy regardless of content quality. Misleads pipeline strategy selection. |
+| 3232 | 13 | LOW | `UltimateIntelligence/Strategies/Memory/Regeneration/CodeRegenerationStrategy.cs:685-686,744-745,795-796,846-847` | JS/Go/Rust/Java handlers create `new CSharpHandler()` per call for `NormalizeIndentation`/`StripComments`. Defeats handler cache, unnecessary allocations. |
+
+**Clean files:** SqlRegenerationStrategy.cs, TabularDataRegenerationStrategy.cs, XmlDocumentRegenerationStrategy.cs, MarkdownDocumentRegenerationStrategy.cs, ConfigurationRegenerationStrategy.cs
+
+---
+
+
+### Chunk 103 — UltimateIntelligence (Providers: AwsBedrock, AzureOpenAi, Claude, EmbeddingProviders, HuggingFace, Ollama, OpenAi) + SemanticStorage + TabularModels + VectorStores (Milvus/Qdrant/Chroma, Pinecone, Weaviate) + TemporalKnowledge + UltimateIntelligencePlugin + UltimateInterface (MoonshotDashboardProvider)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3233 | 1 | P1 | `UltimateIntelligence/Strategies/TabularModels/LargeTabularModelStrategies.cs:183-921` | All 6 tabular model strategies (TabPfn, TabNet, Saint, TabTransformer, AutoMl, XgBoostLlm) return hardcoded `"ClassA"`/`"ClassB"` with fixed confidence 0.85/0.92. `TrainAsync` sets `IsModelTrained = true` with `await Task.CompletedTask`. No real ML inference. |
+| 3234 | 5 | P1 | `UltimateIntelligence/UltimateIntelligencePlugin.cs:331-342` | `DiscoverAndRegisterStrategies` bare `catch {}` swallows all strategy instantiation failures. Broken strategies silently dropped from registry with no diagnostic. |
+| 3235 | 2 | P1 | `UltimateIntelligence/Strategies/SemanticStorage/SemanticStorageStrategies.cs:677-700` | `SemanticDataLinkingStrategy.CreateLinkAsync` calls `.Add()` on `HashSet<string>` values in `BoundedDictionary`. HashSet not thread-safe — concurrent calls corrupt data. |
+| 3236 | 6 | P1 | `UltimateIntelligence/UltimateIntelligencePlugin.cs:494-499,539-543` | `OnMessageAsync` handlers for `intelligence.ultimate.list/stats` compute results then immediately discard them. Callers waiting for bus response receive nothing. |
+| 3237 | 1 | P2 | `UltimateIntelligence/Strategies/Providers/AwsBedrockProviderStrategy.cs:281-298` | `ParseStreamChunk` treats Bedrock stream as flat JSON lines. AWS Bedrock uses binary event-stream format (vnd.amazon.eventstream). Returns null for all real frames. |
+| 3238 | 4 | P2 | `UltimateIntelligence/Strategies/Providers/AwsBedrockProviderStrategy.cs:75-78` | User-controlled `model` interpolated into URL path `/model/{model}/invoke` without sanitization. Path traversal possible. Same in `HuggingFaceProviderStrategy.cs:75`, `OllamaProviderStrategy.cs:71`, `AzureOpenAiProviderStrategy.cs:72`, `OpenAiProviderStrategy.cs:75`. |
+| 3239 | 4 | P2 | `UltimateIntelligence/Strategies/VectorStores/WeaviateVectorStrategy.cs:172-189,248-260` | GraphQL query built via string interpolation. `className` injected without escaping — `}`/`{` characters can inject arbitrary GraphQL operations. |
+| 3240 | 9 | P2 | `UltimateIntelligence/Strategies/VectorStores/MilvusQdrantChromaStrategies.cs:466-590` | `PgVectorStrategy` declares `ConnectionString` required and tagged `production` but uses only in-memory `BoundedDictionary`. All data lost on restart. Contract lie. |
+| 3241 | 5 | P2 | `UltimateIntelligence/Strategies/Providers/EmbeddingProviders.cs:279-285` | `UnifiedEmbeddingProvider` fallback chain uses `catch { continue; }`. If all providers fail, caller gets "All providers failed" with zero diagnostic about which failed or why. |
+| 3242 | 14 | P2 | `UltimateIntelligence/Strategies/Providers/EmbeddingProviders.cs:70-98` + `HuggingFaceProviderStrategy.cs:170` + `OllamaProviderStrategy.cs:162` | `GetEmbeddingsAsync` accepts null/empty text without validation. Empty strings sent to APIs return 400/422 that may leak billing/quota info. |
+| 3243 | 13 | P2 | `UltimateIntelligence/Strategies/SemanticStorage/SemanticStorageStrategies.cs:541-543` | `BuildHierarchyNode` scans all `_instances.Values` per node — O(D×N) under read lock. Should maintain per-class count index. |
+| 3244 | 13 | P2 | `UltimateIntelligence/Strategies/SemanticStorage/SemanticStorageStrategies.cs:241-242` | `ClassifyDataAsync` decodes `byte[]` to UTF-8 string before read lock. Large payload allocation held for entire lock duration. |
+| 3245 | 14 | P2 | `UltimateIntelligence/Strategies/SemanticStorage/SemanticStorageStrategies.cs:682,723` | `bool.Parse`/`float.Parse` on user config values without TryParse. `FormatException` on misconfigured values (locale comma, "yes" for bool). |
+| 3246 | 15 | LOW | `AwsBedrockProviderStrategy.cs:61` + 5 other provider strategies | All providers share 30-second `HttpClient` timeout. AI completions routinely take 60-120s. Spurious timeouts indistinguishable from network failures. |
+| 3247 | 15 | LOW | `UltimateIntelligence/Strategies/VectorStores/MilvusQdrantChromaStrategies.cs:484` | `PgVectorStrategy` declares `ConnectionString` as `Required = true` but never reads it. Config validation demands value that code ignores. |
+| 3248 | 15 | LOW | `UltimateIntelligence/UltimateIntelligencePlugin.cs:323-343` | `DiscoverAndRegisterStrategies` uses parameterless `Activator.CreateInstance`. Strategies needing DI-injected `HttpClient` silently fall back to shared static client. |
+
+**Clean files:** AzureOpenAiProviderStrategy.cs, ClaudeProviderStrategy.cs, OllamaProviderStrategy.cs, OpenAiProviderStrategy.cs, PineconeVectorStrategy.cs, TemporalKnowledge.cs, MoonshotDashboardProvider.cs
+
+---
+
+
+### Chunk 104 — UltimateInterface (MoonshotDashboardStrategy, MoonshotMetricsCollector, Dashboard Services: AccessControl, DataSource, Persistence, Template) + Convergence strategies (Choice, InstanceArrival, MasterInstance, MergePreview, MergeProgress, MergeResults, MergeStrategy, SchemaConflict) + AlexaChannelStrategy
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3249 | 1 | P1 | `UltimateInterface/Strategies/Convergence/InstanceArrivalNotificationStrategy.cs:162-200` | `HandleGetPendingAsync` returns hardcoded fake instances (`instance-001`, `instance-002`) with fabricated timestamps/counts. Comment admits "In production, this would query the metadata store." |
+| 3250 | 1 | P1 | `UltimateInterface/Strategies/Convergence/MasterInstanceSelectionStrategy.cs:99-158` | `HandleGetInstancesAsync` returns hardcoded instances with fixed scores (97.8, 93.2) and constant conflict count 23. |
+| 3251 | 1 | P1 | `UltimateInterface/Strategies/Convergence/MergePreviewStrategy.cs:101-153` | `HandleGetPreviewAsync` returns hardcoded 2 adds, 2 updates, 1 delete with fixed "15-20 minutes" estimate. No dry-run executed. |
+| 3252 | 1 | P1 | `UltimateInterface/Strategies/Convergence/MergeProgressTrackingStrategy.cs:150-194` | `HandleGetProgressAsync` returns static `percentComplete = 67.5` with fabricated timestamps. No stored/queried job state. |
+| 3253 | 1 | P1 | `UltimateInterface/Strategies/Convergence/MergeResultsSummaryStrategy.cs:98-166` | `HandleGetResultsAsync` returns hardcoded 12500 records, +315 MB, literal audit-log path with hard-coded date. |
+| 3254 | 1 | P1 | `UltimateInterface/Strategies/Convergence/SchemaConflictResolutionUIStrategy.cs:98-181` | `HandleGetConflictsAsync` returns same three hardcoded conflicts (`c001-c003`). Comment: "In production, this would query conflict detection service." |
+| 3255 | 1 | P1 | `UltimateInterface/Strategies/Convergence/ConvergenceChoiceDialogStrategy.cs:97-139` | `HandleGetChoiceAsync` returns hardcoded `recordCount = 12500` and `estimatedConflicts = 23` regardless of instanceId. |
+| 3256 | 2 | P2 | `UltimateInterface/Moonshots/Dashboard/MoonshotMetricsCollector.cs:122,143,324-328` | `_subscriptions` plain `List<IDisposable>` mutated without lock. `Dispose` races with late `StartCollectingAsync` — iteration can throw or skip entries. |
+| 3257 | 2 | P2 | `UltimateInterface/Moonshots/Dashboard/MoonshotMetricsCollector.cs:212-216` | `RecordStageCompletion` TOCTOU on `state.WindowStart` — two concurrent callers both reset window, losing counter data. |
+| 3258 | 5 | P2 | `UltimateInterface/Services/Dashboard/DashboardDataSourceService.cs:66-68` | `catch { /* Don't let subscriber errors propagate */ }` — bare catch discards all subscriber exceptions with zero observability. |
+| 3259 | 9 | P2 | `UltimateInterface/Services/Dashboard/DashboardPersistenceService.cs:259-273` | `LoadFromStorageAsync` catches only `JsonException`. IOException/UnauthorizedAccessException propagate unhandled, aborting entire load with partial state. |
+| 3260 | 4 | P2 | `UltimateInterface/Strategies/Conversational/AlexaChannelStrategy.cs:285-292` | Alexa signature verification incomplete: only checks headers present + timestamp within 150s. No certificate-chain or RSA-SHA256 validation. Requests forgeable. |
+| 3261 | 1 | P2 | `UltimateInterface/Strategies/Conversational/AlexaChannelStrategy.cs:176-179` | NLP routing block empty: `if (IsIntelligenceAvailable) { // In production, this would send to "nlp.intent.parse" }`. All intent routing falls through to static switch. |
+| 3262 | 14 | P2 | `UltimateInterface/Services/Dashboard/DashboardAccessControlService.cs:176` + `DashboardPersistenceService.cs:284` | `BuildKey` concatenates tenantId:dashboardId with `:` separator. Colon in either value causes key collision across tenants. |
+| 3263 | 14 | P2 | `UltimateInterface/Services/Dashboard/DashboardAccessControlService.cs:18,35,62,85` + `DashboardPersistenceService.cs:30,56,77,86` | No null/empty checks on `tenantId`/`dashboardId`/`userId` in any public API method. Null produces key `":dashboardId"` corrupting tenant isolation. |
+| 3264 | 12 | P2 | `UltimateInterface/Strategies/Convergence/SchemaConflictResolutionUIStrategy.cs:248` | `remainingConflicts = 23 - resolutions.Count` — magic number 23 hardcoded. Never looked up from real state. |
+| 3265 | 15 | LOW | `UltimateInterface/Services/Dashboard/DashboardPersistenceService.cs:244` | `FlushToStorageAsync` replaces `:` in key for filename but not `\`, `/`, `*`, `?` — path injection on Windows with unsanitized tenant/dashboard IDs. |
+| 3266 | 13 | LOW | `UltimateInterface/Services/Dashboard/DashboardPersistenceService.cs:296-307` + `DashboardAccessControlService.cs:193-195` | `RemoveAt(0)` on `List<T>` for bounded capping — O(n) shift on every insert at capacity (50 versions, 5000 audit entries). |
+
+**Clean files:** MoonshotDashboardStrategy.cs, DashboardTemplateService.cs, MergeStrategySelectionStrategy.cs
+
+---
+
+
+### Chunk 105 — UltimateInterface (Conversational: ChatGptPlugin, ClaudeMcp, Discord, GenericWebhook, GoogleAssistant, Siri, Slack, Teams) + Dashboards (Analytics, CloudNative, Consciousness, DashboardStrategyBase, Embedded, EnterpriseBi, Looker)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3267 | 4 | P0 | `UltimateInterface/Strategies/Conversational/SlackChannelStrategy.cs:263-275` | Slack signature verification returns `true` unconditionally. No HMAC computed against signing secret. Any caller passes authentication. |
+| 3268 | 4 | P0 | `UltimateInterface/Strategies/Conversational/DiscordChannelStrategy.cs:261-278` | Discord Ed25519 verification only checks hex length (128 chars), returns `true`. No actual Ed25519 cryptographic verification. Requests forgeable. |
+| 3269 | 4 | P0 | `UltimateInterface/Strategies/Conversational/GenericWebhookStrategy.cs:241-260` | Webhook HMAC verification returns `true` after prefix/length check. Commented-out production code shows correct approach skipped with `return true`. |
+| 3270 | 4 | P0 | `UltimateInterface/Strategies/Conversational/TeamsChannelStrategy.cs:342-358` | JWT verification checks only non-empty + 3 dot-separated parts. No signature, issuer, audience, or expiration validation. `a.b.c` passes auth. |
+| 3271 | 1 | P0 | `UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs:107-111` | Manifest embeds hardcoded `"chatgpt-plugin-token-placeholder"` verification token. ChatGPT will reject registration. |
+| 3272 | 1 | P1 | `UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs:237-247` | `HandleQueryAsync` returns three fabricated records (`Dataset A/B/C`) regardless of query. Comment confirms NLP path missing. |
+| 3273 | 1 | P1 | `UltimateInterface/Strategies/Conversational/ClaudeMcpStrategy.cs:211-243` | MCP `tools/call` handler returns hardcoded static text for all three tools (`query_data`, `check_status`, `get_analytics`). No real DataWarehouse integration. |
+| 3274 | 1 | P1 | `UltimateInterface/Strategies/Conversational/ClaudeMcpStrategy.cs:303-320` | MCP `resources/read` returns `"Resource content placeholder"` for all URIs. |
+| 3275 | 2 | P1 | `UltimateInterface/Strategies/Dashboards/DashboardStrategyBase.cs:571-619` | `GetOAuth2TokenAsync` TOCTOU on `_cachedAccessToken`/`_tokenExpiry` — plain fields read/written without synchronization. Concurrent requests both refresh. |
+| 3276 | 2 | P1 | `UltimateInterface/Strategies/Dashboards/Embedded/EmbeddedStrategies.cs:13,127,215,311` | All 4 embedded strategies (EmbeddedSdk, Iframe, ApiRendering, WhiteLabel) use plain `Dictionary<string,Dashboard>` — not thread-safe for concurrent CRUD. |
+| 3277 | 4 | P1 | `UltimateInterface/Strategies/Dashboards/Embedded/EmbeddedStrategies.cs:202-207` | `GenerateIframeHtml` injects unvalidated URL into `<iframe src>`. `javascript:` URI executes script in host page. |
+| 3278 | 4 | P1 | `UltimateInterface/Strategies/Dashboards/Embedded/EmbeddedStrategies.cs:108-113` | `GenerateEmbedHtml` injects unescaped `dashboard.Title`/`widget.Title` into `<h2>`/`<h3>` tags. Stored XSS via malicious title. |
+| 3279 | 6 | P1 | `UltimateInterface/Strategies/Dashboards/DashboardStrategyBase.cs:844-865` | `StartRateLimitRefresh` launches `_ = Task.Run(async () => { while(true)... })` — no cancellation token, no stored reference, no exit condition on dispose. |
+| 3280 | 13 | P2 | `UltimateInterface/Strategies/Dashboards/ConsciousnessDashboardStrategies.cs:490-511` | `DarkDataDashboardStrategy.GenerateReportAsync` O(n×m) with nested `.Any()` on list. Should build `HashSet`. |
+| 3281 | 1 | P2 | `UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs:230-233` + 6 other conversational strategies | Dead NLP routing block: `if (IsIntelligenceAvailable) { // In production... }` — empty body. Intelligence routing universally absent. |
+| 3282 | 9 | P2 | `UltimateInterface/Strategies/Dashboards/EnterpriseBi/LookerStrategy.cs:408-413` | `CreateDashboardElementAsync` discards HTTP response. 4xx/5xx silently ignored while `ProvisionDashboardAsync` reports success. |
+| 3283 | 4 | P2 | `UltimateInterface/Strategies/Dashboards/EnterpriseBi/LookerStrategy.cs:416-428` | `GenerateInsertSql` concatenates `tableName` directly into SQL. Unquoted identifier allows SQL injection via `targetId`. |
+| 3284 | 1 | P2 | `UltimateInterface/Strategies/Dashboards/CloudNative/CloudNativeStrategies.cs:137` | `GoogleDataStudioStrategy.PushDataAsync` comment "simulate data source update". Known simulation, not production-correct BigQuery integration. |
+| 3285 | 15 | LOW | `UltimateInterface/Strategies/Conversational/ChatGptPluginStrategy.cs:116,119-121,149` | Manifest hardcodes `https://api.datawarehouse.local` base URL, logo, contact, legal URLs. All `.local` placeholders. |
+| 3286 | 15 | LOW | `UltimateInterface/Strategies/Dashboards/DashboardStrategyBase.cs:174` | Static `SharedHttpClient` with no timeout, no `SocketsHttpHandler`, no DNS refresh. Prone to staleness. |
+| 3287 | 1 | LOW | `DiscordChannelStrategy.cs:192,224` + `SlackChannelStrategy.cs:192,217` + `TeamsChannelStrategy.cs:191,278` + `SiriChannelStrategy.cs:123,185` | 11 async methods with no `await` — compiler CS1998, unnecessary state machine overhead. |
+
+**Clean files:** GoogleAssistantChannelStrategy.cs, SiriChannelStrategy.cs (beyond shared dead-NLP finding), AnalyticsStrategies.cs
+
+---
+
+
+### Chunk 106 — UltimateInterface (Dashboards: PowerBi, Qlik, Tableau, Export, Metabase, OpenSource, RealTime) + DeveloperExperience (ApiVersioning, BreakingChange, Changelog, InstantSdk, InteractivePlayground, MockServer) + Innovation (Adaptive, IntentBased)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3288 | 1 | P1 | `UltimateInterface/Strategies/DeveloperExperience/ApiVersioningStrategy.cs:174-206` | `RouteToVersionHandlerAsync` returns fabricated success JSON. No actual dispatch to version-specific handler. Comment: "For now, return a success response." |
+| 3289 | 1 | P1 | `UltimateInterface/Strategies/DeveloperExperience/InteractivePlaygroundStrategy.cs:111-156` | `ExecutePlaygroundRequestAsync` returns hardcoded "Operation executed successfully" without routing. Comment: "In production, route to actual operation via message bus." |
+| 3290 | 1 | P1 | `UltimateInterface/Strategies/Innovation/IntentBasedApiStrategy.cs:245-269` | `ExecuteOperations` marks all steps "completed" with fake durations. Comment: "Simulate execution." Non-preview path is a stub. |
+| 3291 | 1 | P1 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:76-107` | `PdfGenerationStrategy.GeneratePdf` returns UTF-8 text bytes, not PDF. Comment: "In production, use QuestPDF." |
+| 3292 | 1 | P1 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:201-232` | `ImageExportStrategy` prepends PNG magic bytes then appends plain text. Comment: "return a placeholder PNG header." Corrupt image output. |
+| 3293 | 1 | P1 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:469-487` | `EmailDeliveryStrategy.SendDashboardAsync` uses `Task.Delay(100)` + returns `Success = true`. Comment: "Simulate sending." No email sent. |
+| 3294 | 1 | P1 | `UltimateInterface/Strategies/DeveloperExperience/InstantSdkGenerationStrategy.cs:150-185` | `GenerateSdkAsync` generates hardcoded skeleton client. Comment: "In production, introspect strategies via message bus." |
+| 3295 | 2 | P2 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:12,137,254,404` | All 4 export strategies use plain `Dictionary<string,Dashboard>` — not thread-safe for concurrent CRUD. |
+| 3296 | 2 | P2 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:255,336,354` | `_schedules` is `Dictionary<string,List<ScheduledReport>>` mutated without synchronization. `TriggerReportAsync` uses `[]` indexer — throws on concurrent deletion. |
+| 3297 | 4 | P2 | `UltimateInterface/Strategies/Dashboards/OpenSource/OpenSourceStrategies.cs:39-41` | `RedashStrategy.PushDataAsync` SQL injection: `targetId` interpolated into INSERT without quoting/validation. |
+| 3298 | 4 | P2 | `UltimateInterface/Strategies/Dashboards/OpenSource/OpenSourceStrategies.cs:133-135` | `ApacheSupersetStrategy.PushDataAsync` same SQL injection via unquoted `targetId` in INSERT. |
+| 3299 | 2 | P2 | `UltimateInterface/Strategies/Dashboards/EnterpriseBi/TableauStrategy.cs:14-15,476-482` | `_siteId`/`_authToken` TOCTOU race in `EnsureAuthenticatedAsync`. Concurrent callers both sign in, one overwrites other's site ID. |
+| 3300 | 2 | P2 | `UltimateInterface/Strategies/Dashboards/OpenSource/MetabaseStrategy.cs:365-395` + `OpenSourceStrategies.cs:201-212` | Metabase and Superset `_sessionToken`/`_accessToken` TOCTOU auth race. No lock across check-then-set. |
+| 3301 | 6 | P2 | `UltimateInterface/Strategies/Dashboards/RealTime/RealTimeStrategies.cs:93-104` | `DeleteDashboardCoreAsync` fire-and-forgets `socket.CloseAsync()` in loop. Sockets leaked after dashboard deletion. |
+| 3302 | 12 | P2 | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:362-383` | `TriggerReportAsync` uses `_schedules[dashboardId]` indexer without TryGetValue. `KeyNotFoundException` on missing schedule. |
+| 3303 | 14 | P2 | `UltimateInterface/Strategies/DeveloperExperience/MockServerStrategy.cs:132-143` | `RegisterMockAsync` accepts `delayMs = Int32.MaxValue` (25-day hang) and `statusCode = 99` (invalid). No bounds validation. |
+| 3304 | 1 | P2 | `UltimateInterface/Strategies/DeveloperExperience/BreakingChangeDetectionStrategy.cs:185-197` | `GetCurrentApiSpec` returns hardcoded three-endpoint stub. Comment: "introspect via message bus." Compatibility checks compare against fiction. |
+| 3305 | 15 | P2 | `UltimateInterface/Strategies/Innovation/AdaptiveApiStrategy.cs:175-202` | `GetSampleData` returns hardcoded 2 records to every client. Method name implies live query. |
+| 3306 | 14 | P2 | `UltimateInterface/Strategies/Innovation/IntentBasedApiStrategy.cs:74-76` | Empty `request.Body` causes `JsonDocument.Parse("")` → `JsonException` propagated unhandled instead of 400 Bad Request. |
+| 3307 | 15 | LOW | `UltimateInterface/Strategies/Dashboards/RealTime/RealTimeStrategies.cs:30-43` | `TestConnectionAsync` returns `true` on exception ("Local mode always works"). Cannot detect real connectivity problems. |
+| 3308 | 15 | LOW | `UltimateInterface/Strategies/DeveloperExperience/ChangelogGenerationStrategy.cs:52-97` | "Auto-generated changelog" is a static hardcoded dictionary. Nothing compared or generated. |
+| 3309 | 14 | LOW | `UltimateInterface/Strategies/Dashboards/EnterpriseBi/QlikStrategy.cs:281-284` + `TableauStrategy.cs:284-289` | `DateTimeOffset.Parse` without `CultureInfo.InvariantCulture`. Fails on non-ISO culture servers. |
+| 3310 | 12 | LOW | `UltimateInterface/Strategies/Dashboards/Export/ExportStrategies.cs:392` | Weekly `CalculateNextRun` adds +7 days unconditionally. Skips today even if target time hasn't passed. |
+
+**Clean files:** none
+
+---
+
+### Chunk 107 — UltimateInterface (Innovation: NaturalLanguage, Predictive, ProtocolMorphing, SelfDocumenting, Unified, Versionless, VoiceFirst, ZeroConfig) + Messaging (AMQP, CoAP, KafkaRest, MQTT, NATS, STOMP) + Query (ApolloFederation)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3311 | 1 | P1 | `UltimateInterface/Strategies/Innovation/NaturalLanguageApiStrategy.cs:113-118` | Dead `IsIntelligenceAvailable` branch falls through; response claims `mode = "ai"` while AI path never executes. |
+| 3312 | 1 | P1 | `UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs:193-197` | Same: `PredictNextQueries` dead intelligence branch, `mode: "ai"` claim is false. |
+| 3313 | 1 | P1 | `UltimateInterface/Strategies/Innovation/VoiceFirstApiStrategy.cs:98-101` | Same dead intelligence branch pattern, `mode: "ai"` claim false. |
+| 3314 | 6 | P1 | `UltimateInterface/Strategies/Messaging/StompStrategy.cs:259-261` | `CommitTransaction` fires `_ = DeliverMessage(...)` — committed transaction silently drops undeliverable messages. |
+| 3315 | 10 | P1 | `UltimateInterface/Strategies/Messaging/AmqpStrategy.cs:261-265,380` | `AmqpQueue.Messages` is plain `List<AmqpMessage>` mutated concurrently — `Add`/`Remove`/`Take` without lock. Data race produces lost messages or index exceptions. |
+| 3316 | 10 | P1 | `UltimateInterface/Strategies/Messaging/KafkaRestStrategy.cs:250-251,411-413` | `KafkaConsumerGroup.Instances` plain `List<string>`, `Subscriptions`/`Offsets` plain `Dictionary` — all mutated concurrently without locks. |
+| 3317 | 10 | P1 | `UltimateInterface/Strategies/Messaging/NatsStrategy.cs:289-297,315-323` + `MqttStrategy.cs:319-321` | NATS `Subscription.Messages`/`Stream.Messages` and MQTT `QueuedMessages` are plain `List<T>` appended concurrently. Corrupt lists on concurrent publish. |
+| 3318 | 1 | P2 | `UltimateInterface/Strategies/Query/ApolloFederationStrategy.cs:128-161` | `HandleEntitiesQuery` ignores representations, returns hardcoded `{ __typename: "Item", id: "1" }`. Core Federation contract broken. |
+| 3319 | 1 | P2 | `UltimateInterface/Strategies/Query/ApolloFederationStrategy.cs:164-186` | `ExecuteFederatedQuery` returns static synthetic response. Comment: "Message bus dispatch would happen here." |
+| 3320 | 14 | P2 | `UltimateInterface/Strategies/Innovation/VersionlessApiStrategy.cs:123-133` | User-Agent split used verbatim as response header `X-Client-Version-Detected`. No length/character validation. |
+| 3321 | 14 | P2 | `UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs:141-155` | `X-Client-Id` header accepted verbatim as dictionary key. No length limit — memory exhaustion vector. |
+| 3322 | 12 | P2 | `UltimateInterface/Strategies/Messaging/AmqpStrategy.cs:400-421` | AMQP topic-match returns `true` on `#` mid-pattern. Spec requires `#` to match only from position to end. `a.#.b` incorrectly matches any `a.*`. |
+| 3323 | 12 | P2 | `UltimateInterface/Strategies/Messaging/MqttStrategy.cs:326-347` | MQTT `#` wildcard same premature-return bug. `a/#/b` wrongly equivalent to `a/#`. |
+| 3324 | 12 | P2 | `UltimateInterface/Strategies/Messaging/NatsStrategy.cs:341-365` | NATS `>` wildcard same premature-return bug at any position. Spec requires `>` only as last token. |
+| 3325 | 13 | P2 | `UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs:179-184` | `_popularQueries` dictionary grows without bound. Every unique path added, never evicted. |
+| 3326 | 13 | P2 | `UltimateInterface/Strategies/Messaging/StompStrategy.cs:343-346` + `NatsStrategy.cs:301-304` | STOMP `_destinations` and NATS `_subjects` message lists grow unbounded. No TTL or max-depth. |
+| 3327 | 14 | P2 | `UltimateInterface/Strategies/Messaging/AmqpStrategy.cs:260` + `KafkaRestStrategy.cs:272-275` | AMQP `count` and Kafka `timeout`/`max_bytes` query params not range-validated. Negative/max values accepted. |
+| 3328 | 15 | LOW | `NaturalLanguageApiStrategy.cs:131` | `executionTime = "15ms"` hardcoded literal, not measured. |
+| 3329 | 15 | LOW | `NaturalLanguageApiStrategy.cs:201` + 3 other Innovation strategies | `uptime = "72 hours"` hardcoded constant across all strategies. Fabricated system state. |
+| 3330 | 15 | LOW | `NaturalLanguageApiStrategy.cs:201` | `activeConnections = 42` — known joke value, no real metric. |
+| 3331 | 15 | LOW | `UltimateInterface/Strategies/Innovation/ZeroConfigApiStrategy.cs:327-360` | `DiscoverOperations` returns compile-time constant array. HATEOAS discovery promise is fiction. |
+| 3332 | 4 | LOW | `UltimateInterface/Strategies/Innovation/PredictiveApiStrategy.cs:148-151` | `GetClientId` uses `string.GetHashCode()` — randomized per process, collides across clients. |
+| 3333 | 15 | LOW | `UltimateInterface/Strategies/Messaging/StompStrategy.cs:291-323` | `AcknowledgeMessage`/`NegativeAcknowledgeMessage` validate messageId then return success. Comment: "In production, remove/requeue." Ack modes all behave as `auto`. |
+
+**Clean files:** SelfDocumentingApiStrategy.cs, ProtocolMorphingStrategy.cs, CoApStrategy.cs
+
+---
+
+
+### Chunk 108 — UltimateInterface (Query: GraphQL/Hasura/PostGraphile/Prisma/Relay/SQL, REST: Falcor/HATEOAS/JsonApi/OData/OpenApi/Rest, RPC: ConnectRpc/Grpc/GrpcWeb)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3334 | 1 | P1 | `UltimateInterface/Strategies/Query/GraphQLInterfaceStrategy.cs:109-135` | `ExecuteGraphQLQuery` has empty message bus dispatch block, returns hardcoded mock `{"data":{"query":"result"}}`. No actual GraphQL execution. |
+| 3335 | 1 | P1 | `UltimateInterface/Strategies/Query/HasuraInterfaceStrategy.cs:*` | All 5 Hasura operation branches (query/mutation/subscription/metadata/migrate) are stubs returning fabricated counts (100/50/75) with no Hasura API calls. |
+| 3336 | 1 | P1 | `UltimateInterface/Strategies/Query/PostGraphileInterfaceStrategy.cs:*` | All 6 Execute* methods contain empty bus blocks + hardcoded returns. PostGraphile integration non-functional. |
+| 3337 | 1 | P1 | `UltimateInterface/Strategies/Query/PrismaInterfaceStrategy.cs:*` | All 7 Prisma operation methods same stub pattern — empty bus dispatch, fabricated result counts. |
+| 3338 | 1 | P1 | `UltimateInterface/Strategies/Query/RelayInterfaceStrategy.cs:*` | Relay query stub returns `hasNextPage = true` always, `edges` hardcoded from 1000-element loop. No actual Relay connection resolution. |
+| 3339 | 1 | P1 | `UltimateInterface/Strategies/Query/SqlInterfaceStrategy.cs:*` | SQL query stub returns `ExecutionTimeMs = 42` and fabricated column metadata. No SQL parsing or execution. |
+| 3340 | 1 | P1 | `UltimateInterface/Strategies/REST/FalcorInterfaceStrategy.cs:*` | All Falcor get/set/call operations return hardcoded JSON model fragments with no virtual model resolution. |
+| 3341 | 4 | P1 | `UltimateInterface/Strategies/RPC/GrpcWebInterfaceStrategy.cs:187-190` | Error path sets `Access-Control-Allow-Origin: *` (CORS wildcard). Combined with credentials, allows any origin to receive gRPC-Web error details. |
+| 3342 | 4 | P2 | `UltimateInterface/Strategies/REST/ODataInterfaceStrategy.cs:166-170` | SQL injection check uses simple `Contains("--")` which is trivially bypassable. Real OData $filter values can embed SQL via encoding or alternate comment syntax. |
+| 3343 | 12 | P2 | `UltimateInterface/Strategies/REST/ODataInterfaceStrategy.cs:152-155` | `$top=0` causes infinite loop: `Enumerable.Range(0, 0)` returns empty but the response claims `totalCount = 1000` with `nextLink` pointing to offset 0 again. Client loops forever. |
+| 3344 | 1 | P2 | `UltimateInterface/Strategies/REST/HateoasInterfaceStrategy.cs:*` | HATEOAS strategy generates correct link structure but resource content is hardcoded `{"id":"...","name":"Sample"}`. No data retrieval. |
+| 3345 | 1 | P2 | `UltimateInterface/Strategies/REST/JsonApiInterfaceStrategy.cs:*` | JSON:API strategy returns well-formed envelopes but `attributes` are hardcoded `{"name":"Sample","type":"resource"}`. No bus dispatch for data. |
+| 3346 | 1 | P2 | `UltimateInterface/Strategies/REST/OpenApiInterfaceStrategy.cs:*` | OpenAPI spec generation returns hardcoded paths/schemas that don't reflect actual registered strategies. Schema drift from real API surface. |
+| 3347 | 5 | P2 | `UltimateInterface/Strategies/RPC/GrpcInterfaceStrategy.cs:186-190` | `catch { }` in ProcessServerStreaming swallows exceptions from stream iteration. Client receives truncated stream with no error frame. |
+| 3348 | 5 | P2 | `UltimateInterface/Strategies/RPC/ConnectRpcInterfaceStrategy.cs:173-176` | `catch { }` in streaming response loop silently drops serialization errors. Partial response delivered as complete. |
+| 3349 | 12 | P2 | `UltimateInterface/Strategies/RPC/GrpcWebInterfaceStrategy.cs:145-148` | gRPC-Web base64 response encoding uses `Convert.ToBase64String` on pre-framed bytes but omits the 5-byte gRPC length-prefix on the trailers frame. Non-conformant gRPC-Web response. |
+| 3350 | 14 | P2 | `UltimateInterface/Strategies/REST/RestInterfaceStrategy.cs:88-92` | PUT/PATCH/DELETE accept any `resourceId` path segment without format validation. Empty string or path-traversal characters (`../`) passed through to bus topic. |
+| 3351 | 14 | LOW | `UltimateInterface/Strategies/REST/ODataInterfaceStrategy.cs:128-130` | `$orderby` value used directly in LINQ `OrderBy` delegate name matching with no sanitization. Unrecognized properties silently ignored rather than returning 400. |
+| 3352 | 15 | LOW | `UltimateInterface/Strategies/REST/FalcorInterfaceStrategy.cs:275-280` | `InvalidateCacheAsync` and `RefreshAsync` are no-ops returning success. Cache invalidation contract unfulfilled. |
+| 3353 | 15 | LOW | `UltimateInterface/Strategies/RPC/ConnectRpcInterfaceStrategy.cs:89-91` | `Protocol => InterfaceProtocol.gRPC` — Connect RPC is a distinct protocol from gRPC (uses HTTP/1.1+, different framing). Misclassified in registry. |
+| 3354 | 13 | LOW | `UltimateInterface/Strategies/Query/SqlInterfaceStrategy.cs:198-210` | `FormatSqlResult` allocates a new `Dictionary<string,object>` per row from `Enumerable.Range`. O(rows * cols) allocations for mock data that is never used. |
+
+**Clean files:** RestInterfaceStrategy.cs (aside from validation gap noted above)
+
+---
+
+### Chunk 109 — UltimateInterface (RPC: JsonRpc/Twirp/XmlRpc, RealTime: LongPolling/SSE/SignalR/SocketIo/WebSocket, Security: AnomalyDetection/CostAware/EdgeCached/QuantumSafe/SmartRateLimit/ZeroTrust, UltimateInterfacePlugin)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3355 | 1 | P1 | `UltimateInterface/Strategies/Security/AnomalyDetectionApiStrategy.cs:296-305` | `DetectAnomaliesWithIntelligenceAsync` publishes to bus then ignores response, returns hardcoded `mockScore`. ML anomaly detection is a fiction. |
+| 3356 | 1 | P1 | `UltimateInterface/Strategies/Security/SmartRateLimitStrategy.cs:283-288` | `CheckForAbuseAsync` "AI-driven abuse detection" publishes to bus, ignores response, returns `requestsLastMinute > 50 ? 0.7 : 0.1`. Identical to fallback heuristic. |
+| 3357 | 1 | P1 | `UltimateInterface/Strategies/Security/ZeroTrustApiStrategy.cs:117-122` | After publishing to `security.auth.verify`, unconditionally sets `isAuthenticated = true` with "simulate success" comment. Zero Trust guarantee nullified. |
+| 3358 | 1 | P1 | `UltimateInterface/Strategies/Security/QuantumSafeApiStrategy.cs:160-171` | `HandleKeyExchangeAsync` returns `new byte[N]` (all-zeroes) as both encapsulated key and shared secret. Zero cryptographic protection. Sign fallback (line 203) same. |
+| 3359 | 1 | P1 | `UltimateInterface/Strategies/Security/QuantumSafeApiStrategy.cs:250-260` | `HandleVerifyAsync` fallback sets `isValid = !string.IsNullOrEmpty(signature)` — any non-empty string passes as valid post-quantum signature. |
+| 3360 | 2 | P1 | `UltimateInterface/Strategies/RealTime/WebSocketInterfaceStrategy.cs:406-417` | `WebSocketConnection._messageQueue` is plain `List<string>` mutated from concurrent callers (heartbeat + request threads). List corruption risk. |
+| 3361 | 2 | P1 | `UltimateInterface/Strategies/Security/AnomalyDetectionApiStrategy.cs:384-415; CostAwareApiStrategy.cs:156-164` | `ClientBaseline`/`ClientBudget` read-modify-write (`TotalRequests++`, `UsedBudget +=`, `List.Add`) with no lock. Concurrent per-client races. |
+| 3362 | 5 | P2 | `UltimateInterface/UltimateInterfacePlugin.cs:944-952` | `InterfaceStrategyRegistry.AutoDiscover` bare `catch { }` silently drops strategy instantiation failures. Broken strategies invisible. |
+| 3363 | 5 | P2 | `UltimateInterface/Strategies/RPC/JsonRpcStrategy.cs:199-207` | `catch { // Skip malformed responses }` in batch processing silently omits elements. Batch response array inconsistent with request. |
+| 3364 | 5 | P2 | `UltimateInterface/Strategies/Security/ZeroTrustApiStrategy.cs:222-238` | `ExtractIdentity` catches all JWT parse exceptions and returns null silently. Security-critical path should log malformed tokens. |
+| 3365 | 13 | P2 | `UltimateInterface/Strategies/Security/SmartRateLimitStrategy.cs:145-146` | Sliding window counts via `Count(predicate)` over full `ConcurrentQueue` twice per request. O(n) per request under load. |
+| 3366 | 12 | P2 | `UltimateInterface/Strategies/RealTime/LongPollingStrategy.cs:147-154` | Always returns 304 on timeout regardless of `If-None-Match` presence. RFC 7232 violation — 304 invalid without matching ETag. |
+| 3367 | 12 | P2 | `UltimateInterface/Strategies/RPC/TwirpStrategy.cs:31` | `Protocol => InterfaceProtocol.gRPC` — Twirp is HTTP/1.1-based, not gRPC. Misclassified in strategy registry routing. |
+| 3368 | 4 | P2 | `UltimateInterface/Strategies/RealTime/SignalRStrategy.cs:195-206; SocketIoStrategy.cs:177-189` | Both reflect `Origin` header verbatim into `Access-Control-Allow-Origin`. With `Allow-Credentials: true` (SocketIo), any origin makes credentialed requests. |
+| 3369 | 9 | P2 | `UltimateInterface/Strategies/Security/QuantumSafeApiStrategy.cs:294-300` | `HandleEncryptAsync` does direct cast `(byte[])message.Payload["result"]` without null/type check. Unhandled `InvalidCastException` on malformed bus response. |
+| 3370 | 14 | P2 | `UltimateInterface/Strategies/RPC/XmlRpcStrategy.cs:175-180` | `ParseXmlRpcValue` calls `int.Parse`/`double.Parse`/`Convert.FromBase64String` without try-catch. `FormatException` on malformed XML-RPC values. |
+| 3371 | 12 | LOW | `UltimateInterface/Strategies/RealTime/ServerSentEventsStrategy.cs:171-177` | `BuildSseData` emits hardcoded "sample event" `{"message":"Event from topic X"}` on every connection. Dev placeholder in production path. |
+| 3372 | 15 | LOW | `UltimateInterface/Strategies/RealTime/SignalRStrategy.cs:328-332,383-387` | `HandleCompletion` and `HandleCancelInvocation` are no-ops. SignalR hub protocol contract violated — cancellation has no effect. |
+| 3373 | 15 | LOW | `UltimateInterface/Strategies/RealTime/SocketIoStrategy.cs:365,390` | `LeaveNamespace`/`RemoveConnection` are empty — `ConcurrentBag` can't remove. Stale connections iterated during broadcast. |
+| 3374 | 8 | LOW | `UltimateInterface/UltimateInterfacePlugin.cs:74-77` | `_totalResponses`, `_totalBytesReceived`, `_totalBytesSent`, `_totalFailures` initialized but never incremented. Stats always report zero. |
+| 3375 | 15 | LOW | `UltimateInterface/UltimateInterfacePlugin.cs:448-467` | `HandleBridgeAsync` constructs bridge ID, sets `success = true`, does nothing. No bridge established; caller receives false success. |
+| 3376 | 3 | LOW | `UltimateInterface/UltimateInterfacePlugin.cs:895` | `StopAsync().Wait(5s)` in Dispose for all 68+ strategies. Total blocking time up to 340s on sync context. |
+| 3377 | 12 | LOW | `UltimateInterface/Strategies/RealTime/ServerSentEventsStrategy.cs:171-177` | Duplicate of #3371 — consolidated. |
+
+**Clean files:** EdgeCachedApiStrategy.cs, LongPollingStrategy.cs (aside from 304 bug)
+
+---
+
+
+### Chunk 110 — UltimateIoTIntegration (IoTStrategyBase, Interfaces, Registry, Types, Analytics, DeviceManagement, Edge, Hardware, Protocol, Provisioning, Security)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3378 | 4 | P0 | `UltimateIoTIntegration/Strategies/Security/SecurityStrategies.cs:24-31` | `EncryptAsync` generates new AES key+IV per call then discards both. Ciphertext is immediately unrecoverable — caller cannot decrypt. |
+| 3379 | 1+15 | P0 | `UltimateIoTIntegration/Strategies/Security/SecurityStrategies.cs:33-36` | `DecryptAsync` returns input unchanged ("Simplified for demo"). Ciphertext returned as plaintext silently. |
+| 3380 | 1 | P0 | `UltimateIoTIntegration/Strategies/Provisioning/ProvisioningStrategies.cs:123-125; Security/SecurityStrategies.cs:376-377` | `X509ProvisioningStrategy`/`CertificateManagementStrategy` produce fake PEM certs with Guid bytes. Not valid X.509 DER — rejected by any TLS stack. |
+| 3381 | 1 | P0 | `UltimateIoTIntegration/Strategies/Analytics/AnalyticsStrategies.cs:*` | All 5 analytics strategies + base `ComputeAggregationsAsync` return `Random.Shared` values. Entire analytics tier non-functional. |
+| 3382 | 6+2 | P0 | `UltimateIoTIntegration/IoTStrategyBase.cs:175-193` | `PublishMessage` wraps async in `Task.Run`, callers don't await. Fire-and-forget with exceptions swallowed. All bus publishes unreliable. |
+| 3383 | 1 | P1 | `UltimateIoTIntegration/Strategies/Hardware/BusControllerStrategies.cs:218-222,327-329` | I2C `ReadRegisterAsync` and SPI `TransferAsync` return `Random.Shared.NextBytes` instead of real hardware data or `PlatformNotSupportedException`. |
+| 3384 | 1 | P1 | `UltimateIoTIntegration/Strategies/Edge/EdgeStrategies.cs:55-362` | `EdgeDeploymentStrategy`, `EdgeSyncStrategy`, `FogComputingStrategy`, `EdgeComputeStrategy`, `EdgeMonitoringStrategy` all return `Random.Shared` metrics. |
+| 3385 | 1 | P1 | `UltimateIoTIntegration/Strategies/Protocol/MedicalDeviceStrategies.cs:381-431` | `DicomNetworkStrategy.CFind`/`CMove` return fabricated patient names/study UIDs. HIPAA/IEC 62304 violation. |
+| 3386 | 4 | P1 | `UltimateIoTIntegration/Strategies/Provisioning/ProvisioningStrategies.cs:29-34` | `ValidateCredentialsAsync` uses `==` string comparison — timing-attack vulnerable. Should use `CryptographicOperations.FixedTimeEquals`. |
+| 3387 | 2 | P1 | `UltimateIoTIntegration/IoTStrategyBase.cs:103,113` | `_lastActivity` (DateTimeOffset?) written without sync while `_totalOperations` uses Interlocked correctly. Torn read on 32-bit. |
+| 3388 | 2 | P1 | `UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs:300,322-384` | `FleetManagementStrategy._deviceGroups` uses `HashSet<string>` inside BoundedDictionary. Concurrent Add/Remove corrupt. |
+| 3389 | 5 | P1 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:222-238` | `OfflineSyncStrategy.ReplaySyncAsync` catches all exceptions (including OOM/cancel) silently. Infinite retry loop for bugs. |
+| 3390 | 9 | P1 | `UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs:232,268-290` | `DeviceTwinStrategy.SyncAsync` lazy-inits `_syncService`/`_projectionEngine`/`_simulator` with non-atomic `??=`. Race creates mismatched pair. |
+| 3391 | 13 | P1 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:215-216` | `OfflineSyncStrategy.ReplaySyncAsync` sorts by wall-clock `Timestamp` but claims "vector clock for causal ordering". VectorClock field ignored. |
+| 3392 | 1 | P1 | `UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs:436-439` | `FirmwareOtaStrategy.DeleteDeviceAsync` returns `true` unconditionally regardless of device existence. |
+| 3393 | 13 | P2 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:50,89-90` | `EdgeCachingStrategy.HitCount++` not atomic. `IsDirty` read/write race between `Get` and `FlushDirty`. |
+| 3394 | 14 | P2 | `UltimateIoTIntegration/Strategies/DeviceManagement/ContinuousSyncService.cs:185-188` | `RegisterTwin` TOCTOU race: count check then assign — concurrent inserts exceed `MaxDevices`. |
+| 3395 | 13 | P2 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:330` | `BandwidthEstimationStrategy._currentEstimateBps` double EWMA not atomic on 32-bit. Torn reads corrupt estimate. |
+| 3396 | 13 | P2 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:326-327` | `BandwidthEstimationStrategy` trim loop `while (_samples.Count > max)` can spin indefinitely under concurrent enqueues. |
+| 3397 | 15 | P2 | `UltimateIoTIntegration/Strategies/Protocol/ProtocolStrategies.cs:222-226` | CoAP option delta encoding hardcodes delta 11, length in 4 bits. RFC 7252 extended encoding missing — invalid packets for delta>12 or segments>12 bytes. |
+| 3398 | 14 | P2 | `UltimateIoTIntegration/Strategies/Protocol/IndustrialProtocolStrategies.cs:441` | `Iec104ProtocolStrategy._sendSequence` not bounded to 15-bit (32767). Overflow produces invalid IEC 104 frames. |
+| 3399 | 15 | P2 | `UltimateIoTIntegration/Strategies/Protocol/IndustrialProtocolStrategies.cs:978-991` | `BuildRtuFrame` double-allocates: first `data.Length+3`, then copies to `Length+2` for CRC. Wasteful + misleading comment. |
+| 3400 | 14 | P2 | `UltimateIoTIntegration/Strategies/Protocol/MedicalDeviceStrategies.cs:127-128` | HL7 `GenerateOruR01` doesn't escape `|^~\&` in patientId/Name. Malformed HL7 messages at receiving system. |
+| 3401 | 13 | P2 | `UltimateIoTIntegration/Strategies/Edge/AdvancedEdgeStrategies.cs:772-790` | `SlidingWindow.OldestTimestamp` never updated after eviction. Permanently holds first-ever timestamp. |
+| 3402 | 15 | LOW | `UltimateIoTIntegration/Strategies/Protocol/IndustrialProtocolStrategies.cs:229-231` | `Dnp3FunctionCode.DirectOperate` and `SelectBeforeOperate` both = 0x03. Switch statements conflate them. |
+| 3403 | 14 | LOW | `UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs:42-43` | `DeviceRegistryStrategy` generates keys with `Guid.NewGuid().ToByteArray()`. Not contractually crypto-random. |
+| 3404 | 12 | LOW | `UltimateIoTIntegration/Strategies/Protocol/IndustrialProtocolStrategies.cs:985` | `ComputeModbusCrc(frame, 0, frame.Length - 2)` skips last data byte from CRC. Incorrect checksum. |
+| 3405 | 15 | LOW | `UltimateIoTIntegration/Strategies/DeviceManagement/ContinuousSyncService.cs:431-458,568-595` | `TryConvertToDouble` duplicated identically in `StateProjectionEngine` and `WhatIfSimulator`. |
+
+**Clean files:** IoTStrategyInterfaces.cs, IoTStrategyRegistry.cs, IoTTypes.cs
+
+---
+
+### Chunk 111 — UltimateIoTIntegration (SensorFusion: Complementary/Kalman/MatrixMath/Engine/Models/Strategy/Temporal/Voting/WeightedAvg, SensorIngestion, Transformation, Plugin) + UltimateKeyManagement (Configuration, BreakGlass, EncryptionConfigModes)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3406 | 12 | P0 | `UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionEngine.cs:150-152` | `GetEstimate` is a method, not property. `_kalmanFilter!.GetEstimate == null` compares method group (never null) — filter **never initialized**. Every call throws. |
+| 3407 | 5 | P0 | `UltimateKeyManagement/Features/BreakGlassAccess.cs:964-981` | `PublishEventAsync` silently swallows all audit event failures. Break-glass compliance audit trail silently lost when bus is down. |
+| 3408 | 2 | P1 | `UltimateKeyManagement/Features/BreakGlassAccess.cs:544-551` | `BreakGlassSession.Status` mutated to Expired **outside** `_accessLock`. Concurrent `AccessKeyAsync`/`EndSessionAsync` race. |
+| 3409 | 6 | P1 | `UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs:236,314` | `BufferedIngestionStrategy`/`TimeSeriesIngestionStrategy.IngestBatchAsync` calls `IngestAsync` without await. Fire-and-forget silently drops exceptions. |
+| 3410 | 5 | P1 | `UltimateIoTIntegration/UltimateIoTIntegrationPlugin.cs:1036-1040` | `DiscoverAndRegisterStrategies` bare `catch { }` — strategy instantiation failures invisible. Plugin silently degraded. |
+| 3411 | 1 | P1 | `UltimateIoTIntegration/UltimateIoTIntegrationPlugin.cs:914-920` | `DeserializeRequest<T>` always returns `new T()` with comment "property mapping would go here". All 8 bus handlers process empty requests. |
+| 3412 | 1 | P1 | `UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs:43-78` | `FormatConversionStrategy.TransformAsync` discards input, returns fabricated `{converted:true}` for JSON/XML/CSV paths. |
+| 3413 | 1 | P1 | `UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs:245-255` | `DataEnrichmentStrategy` hardcodes `_region="us-east-1"`, `_building="HQ-Building-A"`, `_floor=3` for all devices. |
+| 3414 | 1 | P1 | `UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs:417-428` | `AggregatingIngestionStrategy.SubscribeAsync` yields fabricated aggregate (window_count=1) decoupled from actual `_windows` state. |
+| 3415 | 10 | P1 | `UltimateKeyManagement/Features/BreakGlassAccess.cs:22` | `_auditLog` BoundedDictionary(1000) silently evicts old entries. Compliance audit trail incomplete for long-running systems. |
+| 3416 | 2 | P1 | `UltimateIoTIntegration/Strategies/SensorFusion/VotingFusion.cs:16,162,175-177` | `_faultySensors` is plain `HashSet<string>` used concurrently from `Vote`/`GetSensorHealth`. Corruption risk. |
+| 3417 | 2 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/ComplementaryFilter.cs:14-16` | `_roll`/`_pitch`/`_yaw` plain doubles mutated by `Update` and read by `GetOrientation` without sync. Torn reads on 32-bit. |
+| 3418 | 2 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/KalmanFilter.cs:91,138` | `_state` record replaced with `with { }` expression. Read-then-replace race between concurrent `Predict` and `Update`. |
+| 3419 | 13 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/WeightedAverageFusion.cs:82-129` | `FilterOutliers` computes mean/stddev twice per dimension — first in variance tracking, then repeated in LINQ. O(N×D) redundant. |
+| 3420 | 13 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/VotingFusion.cs:116-143` | `GroupSimilarReadings` recomputes group average via `.Average()` in `IsSimilar` for every (reading,group) pair. O(N²×D). |
+| 3421 | 14 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/TemporalAligner.cs:176-181` | `InterpolateBetween` uses `before.Value.Length` without validating `== after.Value.Length`. Mismatched dims → IndexOutOfRange. |
+| 3422 | 12 | P2 | `UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs:256-263` | `BufferedIngestionStrategy.SubscribeAsync` holds lock across `yield return`. Blocks other threads during entire iteration. |
+| 3423 | 12 | P2 | `UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs:337-344` | `TimeSeriesIngestionStrategy.SubscribeAsync` same lock-across-yield pattern. |
+| 3424 | 14 | P2 | `UltimateIoTIntegration/Strategies/SensorFusion/ComplementaryFilter.cs:40` | `dt <= 0` not rejected in `Update`. Zero/negative dt from clock skew produces wrong orientation. |
+| 3425 | 9 | P2 | `UltimateKeyManagement/Features/EncryptionConfigModes.cs:378-383` | `PolicyEnforcedConfigMode.ValidateAgainstPolicy` skips HSM validation with stub comment. `RequireHsmBackedKek` policy ineffective. |
+| 3426 | 15 | LOW | `UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionStrategy.cs:46-68` | `GetEngine()`/`ProcessSensorDataAsync` both lazy-init `_engine`. Two concurrent first calls create separate engines, discarding Kalman state. |
+| 3427 | 15 | LOW | `UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs:151-155` | `ProtocolTranslationStrategy` claims CoAP→CBOR but passes bytes through unchanged. |
+| 3428 | 15 | LOW | `UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs:25-28` | `ValidateSchemaAsync` base always returns `true`. Schema parameter ignored. 3 of 4 strategies inherit no-op. |
+| 3429 | 2 | LOW | `UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs:368` | `AggregationWindow.Count++` plain int increment without Interlocked. Concurrent IngestAsync races. |
+
+**Clean files:** MatrixMath.cs, SensorFusionModels.cs, Configuration.cs
+
+---
+
+
+### Chunk 112 — UltimateKeyManagement (EnvelopeVerification, KeyDerivationHierarchy, KeyEscrowRecovery, TamperProofEncryption, TamperProofManifest, ZeroDowntimeRotation, KeyRotationScheduler, Migration, AdvancedKeyOperations, CloudKms: Alibaba/AWS/Azure/DigitalOcean)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3430 | 4 | P0 | `UltimateKeyManagement/Strategies/CloudKms/DigitalOceanVaultStrategy.cs:281-306` | `GetProjectMetadataAsync`/`SetProjectMetadataAsync` are no-ops ("In a real implementation"). Keys never persisted — `LoadKeyFromStorage` generates fresh random key every restart. Data loss. |
+| 3431 | 1 | P0 | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:665-770` | Shamir Secret Sharing uses `% 256` (not a prime field). `ModInverse` fails for even values (returns 1 silently). Incorrect key reconstruction for majority of bytes. |
+| 3432 | 10 | P0 | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:848-933` | AES-KWP `UnwrapKey` never validates integrity check value (`0xA6595960`). Corrupted/adversarial wrapped keys silently produce garbage plaintext. |
+| 3433 | 2 | P0 | `UltimateKeyManagement/Strategies/CloudKms/DigitalOceanVaultStrategy.cs:37,132-237` | `_keyCache` is plain `Dictionary<string,byte[]>` accessed concurrently without sync. Corruption under concurrent operations. |
+| 3434 | 4 | P0 | `UltimateKeyManagement/Strategies/CloudKms/DigitalOceanVaultStrategy.cs:309-317` | Master secret derived from bearer token with static hardcoded salt. Token compromise = all wrapped keys compromised. Token rotation = all keys undecryptable. |
+| 3435 | 3 | P1 | `UltimateKeyManagement/KeyRotationScheduler.cs:315-328` | `Dispose()` calls `DisposeAsync().AsTask().Wait()`. Deadlock risk on sync context. |
+| 3436 | 5 | P1 | `UltimateKeyManagement/KeyRotationScheduler.cs:213-246` | `DetermineKeysToRotateAsync` bare catch swallows all exceptions, silently falls back to rotating current key. Config errors trigger unintended rotation. |
+| 3437 | 5 | P1 | `UltimateKeyManagement/Features/TamperProofManifestExtensions.cs:410-438` | `DeserializeEncryptionMetadata` bare `catch { return null }`. Corrupt metadata indistinguishable from absent. |
+| 3438 | 8 | P1 | `UltimateKeyManagement/Migration/DeprecationManager.cs:303-307` | `EmitWarning` calls `Console.WriteLine` + `Console.ForegroundColor` mutation. Not thread-safe. `EmitToConsole=true` by default. |
+| 3439 | 13 | P1 | `UltimateKeyManagement/Migration/DeprecationManager.cs:278-282` | Duplicate warning check is O(n) scan on `ConcurrentBag` + check-then-act TOCTOU race. Use ConcurrentDictionary. |
+| 3440 | 14 | P1 | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:338-367` | `ApproveRecoveryAsync` checks expiry + duplicate-approval OUTSIDE `_escrowLock`. Two concurrent approvals from same agent bypass dedup → threshold bypass. |
+| 3441 | 12 | P1 | `UltimateKeyManagement/Features/KeyDerivationHierarchy.cs:214-229` | `DeriveChildKeyAsync` ignores caller-provided `salt` parameter entirely. Derivation loop uses hardcoded per-component salts. Stored `SaltUsed` doesn't match actual salt. |
+| 3442 | 10 | P1 | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:185-193` | `EscrowKeyAsync` stores key shares unencrypted ("simplified" comment). `EncryptedShares` property name is a lie. M-of-N security model defeated. |
+| 3443 | 13 | P2 | `UltimateKeyManagement/Features/EnvelopeVerification.cs:140-141` | `SupportsEnvelopeEncryption` calls `VerifyInterfaceImplementation` twice with same arg. Double reflection scan. |
+| 3444 | 2 | P2 | `UltimateKeyManagement/Strategies/CloudKms/AzureKeyVaultStrategy.cs:271-293` | `EnsureTokenAsync` check-then-act on `_accessToken`/`_tokenExpiry` without sync. Concurrent token refresh race. |
+| 3445 | 7 | P2 | `UltimateKeyManagement/Features/ZeroDowntimeRotation.cs:260-279` | `StartReEncryptionAsync` captures key byte arrays in lambda closures. No `CryptographicOperations.ZeroMemory` after Task.WhenAll. Key residency risk. |
+| 3446 | 14 | P2 | `UltimateKeyManagement/Migration/ConfigurationMigrator.cs:286-318` | Migration writes `Token`, `ClientSecret`, `SecretAccessKey` as plaintext to output config file. |
+| 3447 | 12 | P2 | `UltimateKeyManagement/Features/ZeroDowntimeRotation.cs:166-169` | `ValidateKey` returns `IsValid = keyStore != null` without verifying keyId exists in store. Any keyId "valid" if store exists. |
+| 3448 | 9 | P2 | `UltimateKeyManagement/Migration/PluginMigrationHelper.cs:113-115` | `ScanForDeprecatedReferencesAsync` fans out unlimited parallel file I/O via `Task.WhenAll`. Can exhaust thread pool + file handles. |
+| 3449 | 12 | P2 | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:248-262` | `AdvancedHkdfStrategy.GetKeyMetadataAsync` returns `CreatedAt = DateTime.UtcNow` always. Key age unknowable for rotation policies. |
+| 3450 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/AlibabaKmsStrategy.cs:70` | All 4 cloud KMS strategies create `new HttpClient()` in singleton constructors. Socket exhaustion over time. Use IHttpClientFactory. |
+| 3451 | 15 | LOW | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:992` | `EncryptedShares` property name is a lie — stores unencrypted shares. |
+| 3452 | 15 | LOW | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:81-85` | `_masterIkm` defaults to random 32 bytes on each restart if not configured. Silently breaks decryption across restarts. |
+
+**Clean files:** TamperProofEncryptionIntegration.cs
+
+---
+
+### Chunk 113 — UltimateKeyManagement (CloudKms: GCP/IBM/Oracle, Container: Docker/ExternalSecrets/Kubernetes/SealedSecrets/Sops, Database: SqlTde, DevCiCd: Age/Bitwarden/Environment/GitCrypt/1Password/Pass)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3453 | 1+12 | P0 | `UltimateKeyManagement/Strategies/CloudKms/GcpKmsStrategy.cs:137-175` | `LoadKeyFromStorage` generates random bytes, encrypts via KMS, then immediately decrypts. Ciphertext never persisted — new random key per call. Data loss. |
+| 3454 | 1 | P0 | `UltimateKeyManagement/Strategies/CloudKms/IbmKeyProtectStrategy.cs:129-138` | `LoadKeyFromStorage` generates random 32-byte key with no persistence ("in practice, this would be persisted"). New key per call. |
+| 3455 | 12+10 | P0 | `UltimateKeyManagement/Strategies/CloudKms/OracleVaultStrategy.cs:147-167` | `LoadKeyFromStorage` generates random key, encrypts, discards ciphertext, returns plaintext. Comment confirms stub. Data loss on access. |
+| 3456 | 4 | P0 | `UltimateKeyManagement/Strategies/DevCiCd/BitwardenConnectStrategy.cs:352-359` | Token split on `.` to extract clientId/clientSecret. Bitwarden tokens use base64 with `.` in body — wrong parse. Auth failure or token leak. |
+| 3457 | 4 | P0 | `UltimateKeyManagement/Strategies/Container/SopsStrategy.cs:407-428` | Writes key plaintext to `Path.GetTempFileName()` (world-readable `/tmp`). Crash leaves plaintext on disk. Plaintext key exposure. |
+| 3458 | 4 | P0 | `UltimateKeyManagement/Strategies/DevCiCd/AgeStrategy.cs:374-391,498-508` | Writes private identity key to temp file for age CLI. Same `/tmp` race + crash-leaves-plaintext risk. `SecureDeleteFile` caps at 1MB. |
+| 3459 | 2 | P1 | `UltimateKeyManagement/Strategies/CloudKms/GcpKmsStrategy.cs:33-34,400-406; IbmKeyProtectStrategy.cs:32-33,353-359` | `_accessToken`/`_tokenExpiry` read/written across threads without sync. Concurrent token refresh race in both strategies. |
+| 3460 | 2 | P1 | `UltimateKeyManagement/Strategies/CloudKms/OracleVaultStrategy.cs:30-35,193` | `_currentKeyId` written without any guard. No auth token synchronization. |
+| 3461 | 12 | P1 | `UltimateKeyManagement/Strategies/Database/SqlTdeMetadataStrategy.cs:142-153` | `GetCurrentKeyIdAsync` sorts full `_certificates.Values` inside lock. Extended lock hold for large collections. |
+| 3462 | 5 | P1 | `UltimateKeyManagement/Strategies/CloudKms/IbmKeyProtectStrategy.cs:326-329` | `GetKeyMetadataAsync` bare `catch { return null }`. Auth failures indistinguishable from "key not found". Same in GCP (367) and Oracle (329). |
+| 3463 | 5 | P1 | `UltimateKeyManagement/Strategies/Container/ExternalSecretsStrategy.cs:196-200` | `InitializeCurrentKeyIdAsync` bare catch falls back to "default". CRD/namespace errors invisible. Same in SealedSecrets (297). |
+| 3464 | 6 | P1 | `UltimateKeyManagement/Strategies/DevCiCd/GitCryptStrategy.cs:211` | `ExecuteGitAsync` called without CancellationToken propagation. Git operations uncancellable. |
+| 3465 | 14 | P1 | `UltimateKeyManagement/Strategies/Container/DockerSecretsStrategy.cs:520-527` | `GetSecretName` only strips spaces. Slashes, null bytes, path traversal chars pass through to Docker API / filesystem. |
+| 3466 | 14 | P1 | `UltimateKeyManagement/Strategies/DevCiCd/PassStrategy.cs:566-577` | `GetPassPath` regex allows `/`. `../../etc/shadow` passes sanitization — path traversal within password store. |
+| 3467 | 9 | P1 | `UltimateKeyManagement/Strategies/Container/SopsStrategy.cs:406-428` | `SaveKeyToStorage` finally block may delete wrong path if `File.Move` fails. Should attempt deletion of both temp paths. |
+| 3468 | 12 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/GitCryptStrategy.cs:320` | `IsRepositoryUnlockedAsync` operator precedence bug: `!result.Output?.Contains("encrypted:") == true` evaluates incorrectly. |
+| 3469 | 13 | P2 | `UltimateKeyManagement/Strategies/Container/ExternalSecretsStrategy.cs:352-378` | Double JSON serialize-deserialize round-trip for K8s object conversion. |
+| 3470 | 4 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/OnePasswordConnectStrategy.cs:116-117` | Bearer token set on `_httpClient.DefaultRequestHeaders`. Leaks to redirect hosts. |
+| 3471 | 14 | P2 | `UltimateKeyManagement/Strategies/Database/SqlTdeMetadataStrategy.cs:348-354` | `ImportCertificateFromFileAsync` sets `HasPrivateKey=true` for .pvk file that is never parsed. Contract lie. |
+| 3472 | 13 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/BitwardenConnectStrategy.cs:440-461` | `GetSecretIdByNameAsync` lists all secrets on every key lookup. O(n) per operation. Cache not populated on save. |
+| 3473 | 9 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/EnvironmentKeyStoreStrategy.cs:104-114` | `LoadKeyFromStorage` silently swallows base64 decode errors, falls through to `DeriveKeyFromString`. Silent key substitution. |
+| 3474 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/GcpKmsStrategy.cs:392-397` | ADC auth advertised in docs but throws `InvalidOperationException("not implemented")`. Contract lie. |
+| 3475 | 8 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/EnvironmentKeyStoreStrategy.cs:146` | `Trace.TraceInformation` emits base64-encoded key material to trace log. Secret-in-logs violation. |
+| 3476 | 15 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/GitCryptStrategy.cs:59` | `EncryptionType = "AES-256-CTR"` but git-crypt uses AES-256-GCM or CBC depending on version. |
+| 3477 | 13 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/AgeStrategy.cs:601-602` | `SecureDeleteFile` caps overwrite at 1MB. Private keys >1MB partially survive on disk. |
+| 3478 | 15 | LOW | `UltimateKeyManagement/Strategies/Container/SopsStrategy.cs:58` | `Capabilities.SupportsHsm = true` unconditionally but only valid for specific backends, not age. |
+
+**Clean files:** KubernetesSecretsStrategy.cs (minor issues only)
+
+---
+
+
+### Chunk 114 — UltimateKeyManagement Hardware (Ledger, Nitrokey, OnlyKey, QKD, SoloKey, TPM, Trezor, Yubikey) + HSM (AwsCloudHsm, AzureDedicated, Fortanix, GcpCloudHsm, HsmRotation, Ncipher, Pkcs11)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3479 | 10 | P0 | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:700-717,804-811` | `PersistDerivedKeys` writes actual 32-byte symmetric key (`DerivedKey`) as plaintext Base64 into `ledger-keys.json`. Anyone who reads the file can decrypt data without the Ledger device. Must persist only derivation parameters. |
+| 3480 | 10 | P0 | `UltimateKeyManagement/Strategies/Hardware/OnlyKeyStrategy.cs:610-622` | `PersistSlotMappings` writes plaintext JSON to `LocalApplicationData` without integrity protection. Attacker with write access can remap any keyId to a different slot, silently redirecting all key operations. |
+| 3481 | 1 | P0 | `UltimateKeyManagement/Strategies/Hardware/SoloKeyStrategy.cs:171-196` | `CreateCredential` generates random credential from host CPU — never touches the SoloKey device. Comment: "In a real FIDO2 implementation." Keys provide zero hardware security. |
+| 3482 | 12 | P0 | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:456-492` | `EncodeMessage` allocates `byte[6 + payload.Length]` but writes to indices 6-7 and returns `message[..8]`. For empty payloads (`Initialize`, `ButtonAck`), reads past array bounds → `IndexOutOfRangeException`. |
+| 3483 | 5 | P1 | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:694-698` | Silent catch in `LoadDerivedKeys`. Corrupted or tampered key file silently discarded, strategy starts with no keys. |
+| 3484 | 13 | P1 | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:562-599` | `ReceiveResponse` has unbounded `while(true)` loop with no timeout, no cap on `expectedLen` (attacker-controlled from response bytes). Can spin indefinitely. |
+| 3485 | 4 | P1 | `UltimateKeyManagement/Strategies/Hardware/NitrokeyStrategy.cs:103-106` | PIN stored in configuration field for strategy lifetime as plain string. Heap dump reveals it. Should be zeroed after `Login()`. |
+| 3486 | 12 | P1 | `UltimateKeyManagement/Strategies/Hardware/OnlyKeyStrategy.cs:298-305` | `DeriveKeyFromChallenge` copies 20 bytes from response without bounds-checking. Short/error response (2-byte NACK) reads garbage as HMAC material; HKDF produces silently wrong key. |
+| 3487 | 5 | P1 | `UltimateKeyManagement/Strategies/Hardware/OnlyKeyStrategy.cs:603-607` | Silent catch in `LoadSlotMappings`. Errors loading mapping file silently swallowed. |
+| 3488 | 1 | P1 | `UltimateKeyManagement/Strategies/Hardware/QkdStrategy.cs:251-258` | `ExecuteQkdProtocolAsync` always throws `InvalidOperationException` when `_simulationMode = false`. Hard-throw stub (not PlatformNotSupportedException). |
+| 3489 | 5 | P1 | `UltimateKeyManagement/Strategies/Hardware/SoloKeyStrategy.cs:392-396` | Silent catch in `LoadStoredCredentials`. Errors loading credentials from disk silently swallowed. |
+| 3490 | 5 | P1 | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:750-753` | Silent catch in `LoadDerivedKeys`. Same pattern as other hardware strategies. |
+| 3491 | 4 | P1 | `UltimateKeyManagement/Strategies/Hsm/AwsCloudHsmStrategy.cs:213-216` | Fallback assigns random GUID as `_hsmHandle` on HTTP failure. Comment: "Fallback for testing." Failed connection must throw, not silently proceed with fake handle. |
+| 3492 | 6 | P1 | `UltimateKeyManagement/Strategies/Hsm/HsmRotationStrategy.cs:80-84` | Fire-and-forget in timer callback. `async _ => await CheckAndRotateAsync(...)` is `async void`-equivalent `TimerCallback`. Exceptions silently lost or tear down process. |
+| 3493 | 15 | P2 | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:222-237` | `SaveKeyToStorage` ignores `keyData` parameter, re-derives fresh key from Ledger device. Silently drops caller-provided key material. |
+| 3494 | 14 | P2 | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:491` | `BuildApdu` does not check `data.Length > 255`. `(byte)data.Length` silently truncates to 0 for 256+ byte payloads. |
+| 3495 | 5 | P2 | `UltimateKeyManagement/Strategies/Hardware/NitrokeyStrategy.cs:730-733` | Broad `catch` in `GetKeyMetadataAsync` returns `null`, hiding PKCS#11 errors like token removal or session expiry. |
+| 3496 | 14 | P2 | `UltimateKeyManagement/Strategies/Hardware/OnlyKeyStrategy.cs:280-305` | No check that `totalRead >= 21` before extracting HMAC from response buffer. |
+| 3497 | 2 | P2 | `UltimateKeyManagement/Strategies/Hardware/QkdStrategy.cs:231,236` | `_totalBitsGenerated` and `_totalErrors` mutated with `+=` inside `Task.Run` without `Interlocked`. Non-atomic 64-bit increments on 32-bit processes. |
+| 3498 | 10 | P2 | `UltimateKeyManagement/Strategies/Hardware/SoloKeyStrategy.cs:399-415` | Credentials written to JSON file without integrity protection. `CredentialId` and `PublicKey` stored as plaintext Base64 with no HMAC or signature. |
+| 3499 | 1 | P2 | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:690-705` | `ParseFeatures` is heuristic stub — model detection uses `payload.Length > 50 ? "Model T" : "Model One"`. `text` variable assigned but never used. |
+| 3500 | 2 | P2 | `UltimateKeyManagement/Strategies/Hsm/HsmRotationStrategy.cs:382-395` | Audit trail `List<T>` mutated without synchronisation via `AddOrUpdate`. Timer fires independently; concurrent mutations can corrupt the list. |
+| 3501 | 2 | P2 | `UltimateKeyManagement/Strategies/Hsm/FortanixDsmStrategy.cs:447-482` | `_accessToken` and `_tokenExpiry` have no synchronisation. Concurrent calls can race on token refresh. |
+| 3502 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:246` | `string.GetHashCode()` used as BIP32 key index — randomised per-process in .NET 6+. Same keyId maps to different key on each restart. |
+| 3503 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/NitrokeyStrategy.cs:56` | `MaxKeySizeBytes = 0`. Zero as "unlimited" is ambiguous; consumers validating `keyData.Length <= MaxKeySizeBytes` always fail. |
+| 3504 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/QkdStrategy.cs:234` | `new Random()` inside hot path — unseeded, returns correlated values. Use `Random.Shared`. |
+| 3505 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:234-248` | `SaveKeyToStorage` discards `keyData` without warning. Same contract lie as LedgerStrategy. |
+| 3506 | 12 | LOW | `UltimateKeyManagement/Strategies/Hsm/AzureDedicatedHsmStrategy.cs:450` | `Version = 1` hardcoded in `GetKeyMetadataAsync`. Comment says "Could parse" but always returns 1. |
+
+**Clean files:** NcipherStrategy.cs (inherits Pkcs11 base only), ThalesLunaStrategy.cs, UtimacoStrategy.cs
+
+---
+
+### Chunk 115 — UltimateKeyManagement HSM (Pkcs11Base) + IndustryFirst (AiCustodian, Biometric, DNA, GeoLocked, QKD, SmartContract, SocialRecovery, StellarAnchors, TimeLock, VerifiableDelay) + Local (FileKeyStore) + PasswordDerived (Argon2)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3507 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/BiometricDerivedKeyStrategy.cs:484-494` | `ComputeBchParity` uses SHA256 hash instead of BCH generator polynomial. Error correction is completely non-functional. Fuzzy extractor cannot correct biometric noise — entire strategy broken. |
+| 3508 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/BiometricDerivedKeyStrategy.cs:529-553` | `FindErrorLocations`/`IsErrorLocation` use `syndrome[0] & (1 << (position % 8))` instead of Berlekamp-Massey + Chien search. Error positions misidentified, corrupting keys on every decode with errors. |
+| 3509 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/DnaEncodedKeyStrategy.cs:488-496` | `RsDecode` is stub: "in production would use Berlekamp-Massey algorithm / For now, return data portion." No Reed-Solomon error correction. DNA sequencing errors silently corrupt recovered keys. |
+| 3510 | 4 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/DnaEncodedKeyStrategy.cs:867-869` | `PersistKeyRegistry` writes `DecodedKey` (raw key bytes) as plaintext base64 to JSON file on disk. |
+| 3511 | 7 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:40,100,~700` | `SharedHttpClient` is `static readonly` but `Dispose()` calls `_httpClient?.Dispose()` on it. First disposed instance corrupts shared client for all remaining instances → `ObjectDisposedException`. |
+| 3512 | 4 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:266-268` | Geolocation lookup uses plaintext `http://ip-api.com/json/{ipAddress}`. MITM can replace coordinates, bypassing all geographic access controls. |
+| 3513 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:511-512` | `EstimateQber` hardcodes `errorCount = 0`. QBER always 0.0 — eavesdropping detection completely disabled. BB84 security guarantee voided. |
+| 3514 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:535-542` | `ApplyCascadeErrorCorrection` inner loop body is empty — only a comment. No error correction performed. |
+| 3515 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/SmartContractKeyStrategy.cs:329-376` | `WithdrawKeyFromContract` executes on-chain withdrawal but returns `entry.EncryptedKey` from local cache, not chain result. If cache and chain diverge, wrong keys returned silently. |
+| 3516 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/SmartContractKeyStrategy.cs:84` | `ContractBytecode` is ~44-byte stub with "simplified - in production use full deployment" comment. Not a functional Solidity contract. |
+| 3517 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/SmartContractKeyStrategy.cs:691` | Default `RpcUrl` is `"https://mainnet.infura.io/v3/YOUR_PROJECT_ID"` — hardcoded placeholder. HTTP 401 on every Ethereum call. |
+| 3518 | 4 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/SocialRecoveryStrategy.cs:421` | `share.SequenceEqual(guardian.EncryptedShare)` performs early-exit comparison on secret share material. Timing side-channel enables byte-by-byte oracle attack on Shamir shares. Must use `CryptographicOperations.FixedTimeEquals`. |
+| 3519 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/TimeLockPuzzleStrategy.cs:573-574` | `ResumeSolvingAsync` contains only `// ... (abbreviated for space)`. Modular squaring loop absent. Puzzle solving cannot resume from checkpoints — keys permanently unrecoverable after restart. |
+| 3520 | 10 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs:582` | `BigInteger.Two.Pow(t.IntValue)` — `.IntValue` truncates to 32-bit int. If `TotalSquarings > Int32.MaxValue`, exponent silently wraps, producing cryptographically invalid proof. |
+| 3521 | 1 | P0 | `UltimateKeyManagement/Strategies/IndustryFirst/AiCustodianStrategy.cs:153` | Azure OpenAI case defaults to `"https://your-resource.openai.azure.com/"` — placeholder URL. Any AzureOpenAI deployment without explicit config fails every AI access-control decision. |
+| 3522 | 10 | P0 | `UltimateKeyManagement/Strategies/Local/FileKeyStoreStrategy.cs:326-329` | `DeriveMachineKey` uses `MachineName`, `UserName`, `OSVersion.ToString()` as entropy. These change on machine rename, user rename, or OS update — permanently and irrecoverably breaks all existing encrypted key files. |
+| 3523 | 1 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/AiCustodianStrategy.cs:675` | `SendEscalationNotificationAsync` is commented out. High-risk key access events never escalated to administrators. |
+| 3524 | 15 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/AiCustodianStrategy.cs` | `AiProtectedKeyData.EncryptedKeyMaterial` stores raw key bytes — no encryption applied. Field name implies at-rest protection that does not exist. |
+| 3525 | 5 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/BiometricDerivedKeyStrategy.cs:399,845-849` | Silent catches in `ReproduceFuzzyExtractor` (returns null) and `LoadKeyRegistry` (starts empty). Any exception silently swallowed. |
+| 3526 | 10 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/DnaEncodedKeyStrategy.cs:299-345` | Homopolymer rotation marker "Store rotation marker" never stored. `DecodeDnaToBinary` performs no rotation reversal. Encoded data with homopolymer avoidance cannot be decoded — silent key corruption. |
+| 3527 | 12 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:111` | `HealthCheckAsync` returns `_keys.Count >= 0` — always true for `int`. Health check is meaningless. |
+| 3528 | 14 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:266-268` | `ipAddress` from user-controlled security context interpolated directly into outbound HTTP URL without `IPAddress.TryParse` validation. Potential SSRF. |
+| 3529 | 1 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:579-597` | `MonitorChannelHealth` detects high QBER but takes no action. Comment: "In production, this would trigger alerts." Compromised channel stays open indefinitely. |
+| 3530 | 4 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:742` | `PersistCachedKeys` stores raw quantum key bytes as plaintext base64 in JSON file on disk. |
+| 3531 | 6 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:571-576` | Timer callback invokes async `MonitorChannelHealth` without awaiting. Errors silently lost. |
+| 3532 | 2 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/SmartContractKeyStrategy.cs:504` | `RevokeKeyAsync` calls `_keyStore.Remove(keyId)` without acquiring `_lock`. Concurrent calls on `Dictionary<>` → thread safety violation. |
+| 3533 | 15 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/SocialRecoveryStrategy.cs:174` | `Guardian.EncryptedShare` stores raw Shamir share bytes. No encryption applied. Field name implies at-rest protection that does not exist. |
+| 3534 | 12 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/SocialRecoveryStrategy.cs:112` | `HealthCheckAsync` returns `_keys.Count >= 0` — always true. Same tautology. |
+| 3535 | 4 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:153` | `_config.AccountSecret = _masterKeyPair.SecretSeed` stores ED25519 private key seed as plain string. Persists in GC heap dumps. |
+| 3536 | 4 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs` | `PersistCache` writes `DerivedKey` as plaintext base64 to JSON file on disk. Same unencrypted-key-at-rest pattern. |
+| 3537 | 10 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:371` | `DeriveKeyFromStellarAccount` uses `SecretSeed` (56-char base32 string) as raw UTF-8 IKM for HKDF instead of the actual 32-byte raw seed. Inconsistent and lossy. |
+| 3538 | 12 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/TimeLockPuzzleStrategy.cs:143` | `HealthCheckAsync` returns `_keys.Count >= 0` — always true. |
+| 3539 | 6 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/TimeLockPuzzleStrategy.cs:370` | `_ = Task.Run(async () => {...})` discards task. Exceptions from solving loop silently lost. |
+| 3540 | 4 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs` | `VdfKeyData.DecryptedKey` written to disk as plaintext base64 in JSON. Same unencrypted-key-at-rest pattern. |
+| 3541 | 6 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs:359` | `_ = Task.Run(async () => {...})` discards task. VDF evaluation exceptions silently lost. |
+| 3542 | 12 | P1 | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs:133` | `HealthCheckAsync` returns `_keys.Count >= 0` — always true. |
+| 3543 | 15 | P1 | `UltimateKeyManagement/Strategies/Local/FileKeyStoreStrategy.cs:356-390` | `CredentialManagerTier` name implies Windows Credential Manager API but actually derives key from `MachineName + UserName` via PBKDF2. No Win32 `CredRead`/`CredWrite` calls. |
+| 3544 | 4 | P1 | `UltimateKeyManagement/Strategies/Local/FileKeyStoreStrategy.cs:167-183` | `DeleteKeyAsync` calls `File.Delete` without overwriting key bytes first. Key material remnants remain on disk. |
+| 3545 | 2 | P1 | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedArgon2Strategy.cs:204,239` | `ListKeysAsync` and `GetKeyMetadataAsync` read `_storedKeys` (`Dictionary<>`) without acquiring `_storageLock`. Concurrent writes go through lock → unsafe reads. |
+| 3546 | 12 | P2 | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:120` | `_config.SlotId.Value < 0` where `SlotId` is `ulong?`. Unsigned integer can never be negative — dead validation. |
+| 3547 | 5 | P2 | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:477-490,572-575` | Silent catches in `ListKeysAsync` (partial list, no indication of omitted objects) and `GetKeyMetadataAsync` (returns null, cannot distinguish "not found" from "HSM error"). |
+| 3548 | 2 | P2 | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:236,288,331,396,588` | `_sessionLock.WaitAsync()` called without `CancellationToken` in several internal methods. Caller's token ignored; calls can block indefinitely. |
+| 3549 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/AiCustodianStrategy.cs:480-483,838` | Silent catches: `ParseAiDecision` returns default `AiDecision` on JSON failure (fail-open), `LoadKeysFromStorage` starts with empty store on any error. |
+| 3550 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/DnaEncodedKeyStrategy.cs:839-842` | Silent catch in `LoadKeyRegistry`. Load failures silently ignored. |
+| 3551 | 13 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:287-288` | `double.Parse` without `CultureInfo.InvariantCulture`. On systems using comma as decimal separator, lat/lon parsing fails or produces wrong values. |
+| 3552 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:299-302` | Silent catch in `GetLocationFromIp`. Network failures return null; access decision falls to caller's default (potentially fail-open). |
+| 3553 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/SmartContractKeyStrategy.cs:546-549,640-645` | Silent catches in `LoadKeysFromContract` and `GetKeyMetadataAsync`. Cache/contract failures silently ignored. |
+| 3554 | 10 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:565` | `long.Parse(tx.PagingToken ?? "0")` — PagingToken is opaque Horizon cursor, not numeric sequence number. Semantically incorrect and fragile. |
+| 3555 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:574-578` | Silent catch in inner loop of `ScanBlockchainHistory`. Per-transaction processing errors silently swallowed. |
+| 3556 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/TimeLockPuzzleStrategy.cs:765-766` | Silent catch in `LoadKeysFromStorage`. Load failures silently ignored. |
+| 3557 | 15 | LOW | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:439` | Counter label `"hsm.sign"` emitted inside `UnwrapKeyAsync`. Should be `"hsm.unwrap"`. Misleads metrics dashboards. |
+| 3558 | 13 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/BiometricDerivedKeyStrategy.cs:~631` | Dead code: `var prk = new byte[32]` allocated but never read or returned. |
+| 3559 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:625-626` | Silent catch in `LoadKeysFromStorage`. Startup load failures silently ignored. |
+| 3560 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:724-727` | Silent catch in `LoadCachedKeys`. Storage load failures silently ignored. |
+| 3561 | 10 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:331` | Memo truncated to 28 bytes without logging. Metadata exceeding 28 bytes silently dropped. |
+| 3562 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs:781-782` | Silent catch in `LoadKeysFromStorage`. Load failures silently ignored. |
+
+**Clean files:** ThalesLunaStrategy.cs, UtimacoStrategy.cs
+
+---
+
+### Chunk 116 — UltimateKeyManagement PasswordDerived (Balloon, PBKDF2, Scrypt) + Platform (Linux, macOS, PGP, SSH, Windows) + Privacy (SMPC) + SecretsManagement (Akeyless, BeyondTrust, CyberArk, Delinea, Doppler, Infisical)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3563 | 4 | P0 | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:80-81` | Password stored in `string _masterPassword` field for strategy lifetime. Plain string in managed heap — captured by memory dumps, crash dumps, GC inspection. Same pattern in PBKDF2 (line 76-77) and Scrypt (line 78-79). |
+| 3564 | 10 | P1 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:759-763` | `UnwrapKeyAsync` performs single-party partial decryption instead of threshold aggregation. Comment: "For single-party fallback (production needs aggregation protocol)." Any single party can unwrap DEK unilaterally — defeats the entire threshold guarantee. |
+| 3565 | 1 | P1 | `UltimateKeyManagement/Strategies/Platform/SshAgentStrategy.cs:376-418` | `EncryptWithAgentKeyAsync` never involves the SSH agent — derives symmetric key from public key only. `DecryptWithAgentKeyAsync` re-derives same key from public key alone. SSH agent private key never required for decryption. Comment: "Since we can't do true ECDH with SSH agent." |
+| 3566 | 15 | P1 | `UltimateKeyManagement/Strategies/Platform/SshAgentStrategy.cs:44-45` | `Capabilities.SupportsHsm = true` declared but implementation never calls SSH agent for any crypto operation. Contract lie — callers relying on HSM guarantees misled. |
+| 3567 | 4 | P1 | `UltimateKeyManagement/Strategies/Platform/PgpKeyringStrategy.cs:472-477` | `DeriveDefaultPassphrase` constructs passphrase from `MachineName:UserName:DataWarehouse.PGP.v1` hashed with SHA-256. Easily observable by any process on the same machine. |
+| 3568 | 12 | P1 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:590-598` | `CreatePartialSignatureAsync` formula `s_i = k + r * lambda_i * x_i (mod n)` does not include message hash `m`. Variable `m` computed but never used — all partial signatures are message-independent and trivially forgeable. |
+| 3569 | 5 | P1 | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:479-497` | Silent catch in `LoadStoredKeysAsync` — all I/O and deserialization errors swallowed. Strategy generates new key, permanently losing stored material. Same in PBKDF2 (344-367) and Scrypt (348-371). |
+| 3570 | 5 | P1 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:1037` | Silent catch in `LoadKeysFromStorage` — key-share data loss or tampered data silently ignored. Can lead to empty DKG state and fresh inconsistent share. |
+| 3571 | 2 | P1 | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:202-207` | `ListKeysAsync` reads `_storedKeys` (plain `Dictionary<>`) without `_storageLock`. Write paths hold lock. Concurrent enumeration → torn reads or exception. Same in PBKDF2 (219-223) and Scrypt (208-212). |
+| 3572 | 9 | P2 | `UltimateKeyManagement/Strategies/Platform/LinuxSecretServiceStrategy.cs:192,304-322` | `secret-tool` arguments built by string interpolation of unsanitized `ApplicationName`, `keyId`, `label`. Shell metacharacters corrupt arguments. Same pattern in macOS `security` CLI (283-289, 303). |
+| 3573 | 7 | P2 | `UltimateKeyManagement/Strategies/SecretsManagement/AkeylessStrategy.cs:30,71-73` | `HttpClient` created without `IHttpClientFactory` — foregoes connection pooling and DNS refresh. No double-dispose guard. Same in BeyondTrust, CyberArk, Delinea, Doppler, Infisical. |
+| 3574 | 5 | P2 | `UltimateKeyManagement/Strategies/Platform/LinuxSecretServiceStrategy.cs:103-115` | Silent catch in `InitializeStorage` during metadata deserialization. `_currentKeyId` stays null, new key ID generated silently. Same in macOS (88-97) and Windows (91-102). |
+| 3575 | 14 | P2 | `UltimateKeyManagement/Strategies/SecretsManagement/AkeylessStrategy.cs:115-135` | `LoadKeyFromStorage` no null/format validation on `keyBase64` before `FromBase64String`. Unexpected API response → unhandled exception with no context. |
+| 3576 | 14 | P2 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:746-752` | `UnwrapKeyAsync` reads `ephemeralLen` from untrusted wire data (`ReadInt32()`), passes directly to `ReadBytes`. Large value → huge heap allocation. Missing max-size bound check. |
+| 3577 | 1 | P2 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:435` | DKG round 1 sends raw unencrypted shares in `encryptedShares`. Comment: "In production: Encrypt share with party i's public key." Variable name implies encryption that doesn't exist. |
+| 3578 | 13 | LOW | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:330-344` | `BalloonHash` inner loop allocates `byte[]` per iteration via `.Concat().ToArray()`. ~147K allocations per key derivation with default params. |
+| 3579 | 4 | LOW | `UltimateKeyManagement/Strategies/Platform/LinuxSecretServiceStrategy.cs:376-379` | `DeriveMachineKey` uses static salt `"DataWarehouse.Linux.SecretService.Salt.v1"`. Predictable salt eliminates per-key uniqueness benefit. |
+| 3580 | 15 | LOW | `UltimateKeyManagement/Strategies/SecretsManagement/BeyondTrustStrategy.cs:88` | `GetCurrentKeyIdAsync` always returns hardcoded `"default"`. Method name implies active key tracking that doesn't exist. |
+
+**Clean files:** None — all 15 files had findings.
+
+---
+
+### Chunk 117 — UltimateKeyManagement SecretsManagement (Vault) + Threshold (FROST, MPC, Shamir, SSSS, BLS12-381, ECDSA) + Plugin + UltimateMicroservices (Base, ApiGateway, CircuitBreaker, Communication, LoadBalancing, Monitoring, Orchestration)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3581 | 1 | P0 | `UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:401-407` | `VerifySignatureAsync` returns `true` whenever `signature.Length == 96 && publicKey.Length == 48`. Comment: "For now, verify structure and return true if well-formed / Real implementation would use a pairing library." Any 96-byte blob passes. Zero BLS12-381 security. |
+| 3582 | 1 | P0 | `UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:456-522,577-606` | `ScalarMultiplyG1/G2`, `HashToG2`, `AddG1Points/G2Points` all use HKDF/SHA-256 instead of actual elliptic-curve operations. Signatures are not valid BLS; threshold aggregatability, Lagrange interpolation, Feldman VSS completely broken. |
+| 3583 | 1 | P0 | `UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:632-641` | Feldman VSS verification only checks `expected.Length == 48` — never verifies share against commitments. Malicious party can inject incorrect share. |
+| 3584 | 1 | P0 | `UltimateKeyManagement/Strategies/Threshold/ThresholdEcdsaStrategy.cs:468-476` | MtA (Multiplicative-to-Additive) protocol replaced with `GenerateRandomScalar()` commented `// Placeholder for MtA result`. `sigmaI` is random garbage; GG20 signatures assembled from this are invalid. |
+| 3585 | 1 | P0 | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:851-866` | Guardian identity verification derives 6-hex-char code from `SHA256(guardianId + yyyyMMdd)`. Easily computed by any observer knowing guardian ID + date. Comment: "placeholder." Defeats `RequireIdentityVerification` control. |
+| 3586 | 1 | P1 | `UltimateKeyManagement/Strategies/Threshold/ThresholdEcdsaStrategy.cs:608-631` | Paillier key generation — `GenerateSafePrime` may not use cryptographically vetted sieve, weakening Paillier modulus for MtA ciphertext. |
+| 3587 | 5 | P1 | `UltimateKeyManagement/Strategies/SecretsManagement/VaultKeyStoreStrategy.cs:109-113,249-253,258-267` | Silent catches in `HealthCheckAsync`, `GetKeyMetadataAsync`, `IsHealthyAsync` — all return false/null without logging. Cannot distinguish "key not found" from "vault down" or "access denied." |
+| 3588 | 5 | P1 | `UltimateKeyManagement/Strategies/Threshold/MultiPartyComputationStrategy.cs:762` | Silent catch in `LoadKeysFromStorage`. Corrupted storage → strategy starts empty, all key IDs silently lost. |
+| 3589 | 5 | P1 | `UltimateKeyManagement/Strategies/Threshold/ShamirSecretStrategy.cs:562-565` | Silent catch in `LoadSharesFromStorage`. Corrupted file → all Shamir shares silently lost at startup. |
+| 3590 | 5 | P1 | `UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:840` | Silent catch in `LoadKeysFromStorage`. I/O or deserialization error → all BLS keys silently vanish. |
+| 3591 | 5 | P1 | `UltimateKeyManagement/Strategies/Threshold/ThresholdEcdsaStrategy.cs:973` | Silent catch in `LoadKeysFromStorage`. Same pattern. |
+| 3592 | 5 | P1 | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:960` | Silent catch in `LoadFromStorage`. All guardian and key data lost on corrupted file. |
+| 3593 | 5 | P1 | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:575-589` | Silent catch in `PublishEventAsync`. All message bus publish errors silently swallowed — security audit events (rotation, startup, shutdown) can be lost. |
+| 3594 | 5 | P1 | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:325-327` | Silent catch in `DiscoverAndRegisterStrategiesAsync`. `assembly.GetTypes()` failures silently discarded — strategies may fail to register with no log entry. |
+| 3595 | 4 | P1 | `UltimateKeyManagement/Strategies/SecretsManagement/VaultKeyStoreStrategy.cs:270-274` | `X-Vault-Token` header added directly from `_config.Token`. If HttpClient shared with logging middleware, token appears in diagnostic logs. No scrubbing. |
+| 3596 | 4 | P1 | `UltimateKeyManagement/Strategies/SecretsManagement/VaultKeyStoreStrategy.cs:119-125` | No CancellationToken passed to `_httpClient.SendAsync()`. Hung vault requests cannot be cancelled — strategy blocks indefinitely under outage. |
+| 3597 | 14 | P1 | `UltimateKeyManagement/Strategies/SecretsManagement/VaultKeyStoreStrategy.cs:118-125` | `keyId` interpolated directly into URL path without validation. Path traversal via `../` or encoded slashes. Also `keyBase64` has no null guard — `GetString()` returns null for absent property but null-forgiving operator masks it. |
+| 3598 | 2 | P2 | `UltimateKeyManagement/Strategies/Threshold/MultiPartyComputationStrategy.cs:253-255` | DKG round 2 shares sent unencrypted. Comment: "In real implementation, encrypt share with party i's public key." Raw share bytes exposed in plaintext. |
+| 3599 | 1 | P2 | `UltimateKeyManagement/Strategies/Threshold/ThresholdBls12381Strategy.cs:228-229` | `BlsDkgRound1.ShareForRecipient` exposes all shares to all parties. Comment: "In real impl, encrypt for each recipient." Broadcast of all shares breaks DKG security. |
+| 3600 | 9 | P2 | `UltimateKeyManagement/Strategies/SecretsManagement/VaultKeyStoreStrategy.cs:116-140` | `LoadKeyFromStorage`/`SaveKeyToStorage` have no try-catch. `EnsureSuccessStatusCode()` throws on HTTP errors; callers get uncontextualized `HttpRequestException`. |
+| 3601 | 2 | P2 | `UltimateKeyManagement/Strategies/Threshold/MultiPartyComputationStrategy.cs:383-384` | Message hash `m` computed but never used in partial signature formula. Omission makes partial sigs message-independent. |
+| 3602 | 2 | P2 | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:197-218` | Fire-and-forget async lambda in `SubscribeToKeyRotationRequests`. `async` lambda registered as `Action<PluginMessage>` — exceptions silently swallowed by `async void` equivalent. |
+| 3603 | 14 | P2 | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:416-419` | `expectedHash` falls back to `Array.Empty<byte>()` when `ShareHash` is null. `FixedTimeEquals` on two empty arrays returns true — any share value passes hash check for legacy shares without hashes. |
+| 3604 | 15 | LOW | `UltimateKeyManagement/Strategies/Threshold/MultiPartyComputationStrategy.cs:382-386` | `CreatePartialSignatureAsync` formula `s_i = k + r * lambda_i * x_i` does not match ECDSA (requires `k^-1 * (m + r * lambda_i * x_i)`). |
+| 3605 | 12 | LOW | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:641-645` | `OnHandshakeAsync` has dead empty `if` block: `if (request.Context != null) { }`. |
+| 3606 | 13 | LOW | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:749-751` | Share export concatenates IV + Key + encrypted data without length tags. Parsing requires hardcoded field lengths — brittle. |
+| 3607 | 1 | P2 | `UltimateKeyManagement/Strategies/Threshold/FrostStrategy.cs:~989-993` | `DeleteKeyAsync` throws bare `UnauthorizedAccessException()` without message. Uninformative error in audit logs. |
+
+**Clean files:** MicroservicesStrategyBase.cs, ApiGatewayStrategies.cs, CircuitBreakerStrategies.cs, CommunicationStrategies.cs, LoadBalancingStrategies.cs, MonitoringStrategies.cs, OrchestrationStrategies.cs
+
+---
+
+### Chunk 118 — UltimateMicroservices (Security, ServiceDiscovery, Plugin) + UltimateMultiCloud (Base, Abstraction, Arbitrage, CostOptimization, Failover, Hybrid, Enhanced, Portability, Replication, Security, Plugin) + UltimateRAID Features (BadBlockRemapping)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3608 | 4 | P0 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:411-413` | `CrossCloudSecretsStrategy.StoreSecret` stores secrets as plain Base64 (`Convert.ToBase64String(Encoding.UTF8.GetBytes(value))`). Comment: "Simplified." Base64 is not encryption — any stored secret is trivially decoded. |
+| 3609 | 4 | P0 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:136-155` | `CrossCloudEncryptionStrategy.Encrypt` copies plaintext into `ciphertext` without applying any cipher, pads 16 bytes. Comment: "In production, this would use actual encryption." Callers believe data is encrypted. |
+| 3610 | 5 | P0 | `UltimateMicroservices/UltimateMicroservicesPlugin.cs:519-525` | Silent catch in `DiscoverAndRegisterStrategies` swallows all strategy instantiation exceptions. Broken strategy types silently skipped. |
+| 3611 | 5 | P1 | `UltimateMultiCloud/MultiCloudStrategyBase.cs:213-227` | Silent catch in `MultiCloudStrategyRegistry.DiscoverStrategies`. Comment: "Skip strategies that fail to instantiate." Same silent discard pattern. |
+| 3612 | 2 | P1 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:53-58` | `UnifiedIamStrategy.MapRole` calls `GetOrAdd` then `list.Add()` without lock. Concurrent callers race on same list. |
+| 3613 | 2 | P1 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:442-445` | `CrossCloudSecretsStrategy.GetSecret` — `List<SecretAccess>` mutated inside `AddOrUpdate` factory without lock. |
+| 3614 | 2 | P1 | `UltimateMultiCloud/Strategies/MultiCloudEnhancedStrategies.cs:105-110` | `CloudArbitrageStrategy.Recommend` — initial `AddOrUpdate` factory not locked; second thread can create duplicate list. |
+| 3615 | 2 | P1 | `UltimateMultiCloud/MultiCloudStrategyBase.cs:182-185` | `_lastSuccess`/`_lastFailure` are plain `DateTimeOffset?` fields without lock or Volatile.Write. Concurrent writes can tear. |
+| 3616 | 1 | P1 | `UltimateMultiCloud/Strategies/Hybrid/HybridCloudStrategies.cs:85-99` | `OnPremiseIntegrationStrategy.SyncDataAsync` returns hardcoded `ObjectsSynced = 100, BytesSynced = 10MB`. `EdgeSynchronizationStrategy` line 267: "Simulate sync." |
+| 3617 | 1 | P1 | `UltimateMultiCloud/Strategies/Portability/CloudPortabilityStrategies.cs:54,98,182,232,274-336,400,430,496` | All portability strategies are simulation stubs with `Task.Delay` and hardcoded counts: Deploy/Migrate/Invoke/Execute all fake. `DataMigrationStrategy` hardcodes 1000 objects/10 GB. `DatabasePortability` hardcodes `TablesConverted = 25`. |
+| 3618 | 1 | P1 | `UltimateRAID/Features/BadBlockRemapping.cs:258-271` | `ReadBlockFromDiskAsync` returns `new byte[512]`. `WriteToSpareBlockAsync` returns `Task.CompletedTask`. `TestBlockAsync` always returns `Good`. Core RAID block I/O entirely simulated. |
+| 3619 | 5 | P2 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:822-831` | Silent catch in `SiemIntegrationStrategy.SendEventAsync`. Transport failures silently absorbed. |
+| 3620 | 13 | P2 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:564-567` | `GetRecentEventCount` enumerates entire `ConcurrentQueue` on every brute-force check. O(n) per event → O(n^2) overall. |
+| 3621 | 13 | P2 | `UltimateMultiCloud/Strategies/Arbitrage/CloudArbitrageStrategies.cs:97-98` | O(n) LINQ on `BoundedDictionary.Values` inside `GetCurrentState`. Called frequently for health/monitoring. |
+| 3622 | 14 | P2 | `UltimateMultiCloud/Strategies/Abstraction/CloudAbstractionStrategies.cs:125-135,159-169` | `AwsCloudAdapterStrategy.CreateAdapter` ignores `accessKey`/`secretKey` params. `AzureCloudAdapterStrategy` ignores `subscriptionId`/`tenantId`. Credentials silently dropped. |
+| 3623 | 15 | P2 | `UltimateMultiCloud/Strategies/Portability/CloudPortabilityStrategies.cs:307,422` | Counter name mismatches: `DataMigrationStrategy` increments `"container_abstraction.operation"`, `VendorAgnosticApi` increments `"serverless_portability.operation"`. |
+| 3624 | 10 | P2 | `UltimateMultiCloud/Strategies/CostOptimization/CostOptimizationStrategies.cs:33-37` | `RecordCost` — `data.Entries.Add()` and `data.TotalCost +=` without lock. Concurrent calls lose entries or corrupt total. |
+| 3625 | 2 | P2 | `UltimateMicroservices/UltimateMicroservicesPlugin.cs:169-173` | `RecordRequest` — TOCTOU: `TryGetValue` outside lock, `lock(history)` inside. Service deregistration between check and lock creates subtle race. |
+| 3626 | 1 | LOW | `UltimateMultiCloud/Strategies/Portability/CloudPortabilityStrategies.cs:487-509` | `IaCPortabilityStrategy.ConvertTemplate` prepends a comment string. No actual IaC transpilation. |
+| 3627 | 12 | LOW | `UltimateMultiCloud/Strategies/Failover/CloudFailoverStrategies.cs:404-408` | `HandleFailoverAsync` unconditionally increments `_failedOperations` for every failover — successful failovers are not failures. |
+| 3628 | 12 | LOW | `UltimateMultiCloud/Strategies/Replication/CrossCloudReplicationStrategies.cs:552-557` | `SetBandwidthLimit` validates args but does nothing. Comment: "TokenBucketRateLimiter doesn't support dynamic reconfiguration." Silent no-op. |
+| 3629 | 2 | LOW | `UltimateMultiCloud/Strategies/Failover/CloudFailoverStrategies.cs:111-112` | `_random = new Random()` — not thread-safe. Use `Random.Shared`. |
+| 3630 | 14 | LOW | `UltimateMultiCloud/Strategies/Replication/CrossCloudReplicationStrategies.cs:413-417` | `VectorClock.Clocks` is plain `Dictionary<string, long>` without lock. Concurrent `Increment` corrupts dictionary. |
+| 3631 | 15 | LOW | `UltimateMultiCloud/Strategies/Portability/CloudPortabilityStrategies.cs:256` | Counter `"on_premise_integration.operation"` in `EdgeSynchronizationStrategy`. Should be `"edge_synchronization.operation"`. |
+
+**Clean files:** SecurityStrategies.cs (descriptor-only), ServiceDiscoveryStrategies.cs
+
+---
+
+### Chunk 119 — UltimateRAID Features (Deduplication, GeoRaid, Monitoring, PerformanceOptimization, QuantumSafeIntegrity, RaidLevelMigration, RaidPluginMigration, Snapshots) + IRaidStrategy + RaidStrategyBase + RaidTopics + Strategies (Adaptive, ErasureCoding, ErasureCodingB7, Extended)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3632 | 1 | P0 | `UltimateRAID/Features/Deduplication.cs:383-384` | `AllocateStorageAddress` returns `DateTime.UtcNow.Ticks`. Comment: "Simulated storage allocation." Collisions under high throughput; all references meaningless. |
+| 3633 | 1 | P0 | `UltimateRAID/Features/Snapshots.cs:527-548` | `RestoreBlockAsync`, `CompressBlock`, `EncryptBlock`, `SendBlockToRemoteAsync` all stubs. `ReplicateSnapshotAsync` calls `EncryptBlock`/`CompressBlock` believing data is protected — silently sends plaintext uncompressed data. |
+| 3634 | 1 | P0 | `UltimateRAID/Features/QuantumSafeIntegrity.cs:293-341` | All six "quantum-safe" hash methods use classical SHA-256/SHA-512. `CalculateSHA3_256` uses SHA-256, `CalculateSHAKE256` fabricates from two SHA-256 calls, `CalculateBLAKE3` uses XOR of two SHA-256. `DilithiumHash`/`SPHINCSHash` use SHA-512. API claims post-quantum security but delivers none. |
+| 3635 | 1 | P1 | `UltimateRAID/Features/Deduplication.cs:393-408` | `ReadBlockFromRaidAsync` returns `new byte[BlockSize]` (zeroed). `UpdateBlockReferenceAsync` and `FreeStorageAddressAsync` are no-ops. Post-RAID dedup "deduplicates" all-zero blocks. |
+| 3636 | 1 | P1 | `UltimateRAID/Features/RaidLevelMigration.cs:229-264` | `PrepareNewLayoutAsync`, `MigrateBlockAsync`, `FinalizeLayoutAsync`, `RollbackMigrationAsync` all return `Task.CompletedTask`. Migration reports `Success = true` without moving any data. |
+| 3637 | 1 | P1 | `UltimateRAID/Features/RaidPluginMigration.cs:180-221` | Entire migration pipeline is stubs. `MigrateArrayMetadataAsync` returns hardcoded `["array-1", "array-2"]`. Reports success without performing work. |
+| 3638 | 1 | P1 | `UltimateRAID/Features/Snapshots.cs:560-609` | `CowBlockManager` hardcodes `BlockCount = 1000000`, `GetModifiedBlocks` returns `Range(0, 1000)`, `GetSharedBlocks` returns `Range(0, 100)`, `GetDeltaBlocks` returns 50. All CoW logic on fake data. |
+| 3639 | 1 | P1 | `UltimateRAID/Features/GeoRaid.cs:317-328` | `CalculateParityForBlock` copies input as parity (no XOR computation). `SendParityUpdateAsync` simulates with `Task.Delay`. No real parity. |
+| 3640 | 1 | P1 | `UltimateRAID/Features/Monitoring.cs:339-426` | `RaidCliCommands` and `RaidRestApi` return hardcoded strings/JSON (`"Status: Healthy"`, `"IOPS: 15000"`, `"arrays": ["array-1"]`). No interaction with actual RAID state. |
+| 3641 | 1 | P1 | `UltimateRAID/Features/Monitoring.cs:474-477` | `CalculateNextRun` ignores `cronExpression`, always returns "2 AM tomorrow". All scheduled operations fire at wrong times. |
+| 3642 | 1 | P1 | `UltimateRAID/Features/QuantumSafeIntegrity.cs:232-265` | `CreateAttestation` calls `SimulateBlockchainTransaction` (SHA-256 of payload). `VerifyAttestationAsync` always sets `IsValid = true`. Blockchain attestation entirely simulated. |
+| 3643 | 2 | P1 | `UltimateRAID/Features/Deduplication.cs:50-83` | `DeduplicateInline` mutates shared `DedupEntry` (`ReferenceCount++`, `LastReferenced`) without synchronization. Concurrent callers lose increments. |
+| 3644 | 2 | P1 | `UltimateRAID/Features/Snapshots.cs:192-204` | `WriteToCloneAsync` mutates `clone.SharedBlocks--`, `clone.UniqueBlocks++` without lock. Concurrent writes produce wrong counts. |
+| 3645 | 6 | P1 | `UltimateRAID/Features/PerformanceOptimization.cs:84,107` | Two fire-and-forget `_ = _prefetcher.PrefetchAheadAsync(...)`. Exceptions silently discarded. |
+| 3646 | 12 | P1 | `UltimateRAID/Features/Monitoring.cs:579-606` | Compliance checks (`CheckSoc2Compliance`, `CheckHipaaCompliance`, `CheckGdprCompliance`, `CheckPciCompliance`) all hard-return `Passed = true`. Compliance reports are always "compliant" regardless of actual state. |
+| 3647 | 12 | P1 | `UltimateRAID/Strategies/Adaptive/AdaptiveRaidStrategies.cs:220-267` | `WriteWithCurrentStrategy` disk write bodies commented out (`// In production, would write...`). Write operations are no-ops. Same for `ReadWithCurrentStrategy` (271-353). |
+| 3648 | 1 | P2 | `UltimateRAID/Features/PerformanceOptimization.cs:382-390` | `PrefetchAheadAsync` allocates zeroed byte arrays as "prefetched data." Cache hits return all-zeros instead of actual data. |
+| 3649 | 1 | P2 | `UltimateRAID/Strategies/Adaptive/AdaptiveRaidStrategies.cs:127-130` | Rebuild reads replaced with `new byte[StripeSize]` (zeros). Comment: "In production: var chunk = diskList[diskIndex].Read(...)". Rebuild writes zeros to target. |
+| 3650 | 1 | P2 | `UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategies.cs:493-497` | `SimulateReadFromDisk` fills buffer with seeded `Random` bytes. Read operations return random data, not disk content. |
+| 3651 | 2 | P2 | `UltimateRAID/Features/RaidPluginMigration.cs:33,364` | `_adapters` plain Dictionary and `MigrationRegistry._entries` plain List — both mutated without locking. Concurrent access races. |
+| 3652 | 2 | P2 | `UltimateRAID/Features/Monitoring.cs:503-512` | `AuditLogger.Log` trims with `while (_entries.Count > MaxEntries)` — non-atomic on ConcurrentQueue. Entries can be lost under high throughput. |
+| 3653 | 9 | P2 | `UltimateRAID/Features/Snapshots.cs:495-523` | `EnforceRetentionAsync` calls `DeleteSnapshot` in loop that modifies `SnapshotTree` concurrently. No error handling if deletion fails. |
+| 3654 | 12 | P2 | `UltimateRAID/Features/PerformanceOptimization.cs:425-429` | `WriteBackCache.CacheWrite` — `EvictOldest` may evict nothing when all entries dirty. Check not repeated → cache grows unboundedly. |
+| 3655 | 12 | P2 | `UltimateRAID/Features/PerformanceOptimization.cs:296-303` | `WriteCoalescer.GetStatistics` — `CoalesceRatio` formula uses pending batch count, not coalesced writes. Always near 1.0. |
+| 3656 | 14 | P2 | `UltimateRAID/Features/GeoRaid.cs:127-132` | `.Max()`/`.Min()` on `DataDiskAssignments` without empty check. `dataChunks = 0` → `InvalidOperationException`. |
+| 3657 | 14 | P2 | `UltimateRAID/Features/RaidLevelMigration.cs:237-240` | `disks.Min(d => d.Capacity)` without empty check. Empty disks → unhandled exception. |
+| 3658 | 13 | P2 | `UltimateRAID/Features/Monitoring.cs:447` | `samples.Average()` on ConcurrentQueue — O(n) snapshot allocation per call. Running sum would avoid allocations. |
+| 3659 | 4 | P2 | `UltimateRAID/Features/Monitoring.cs:667-671` | `IntegrityProof.SignData` uses SHA-256 as "signing" — no secret key. Anyone can compute the same hash. Not a signature. |
+| 3660 | 1 | LOW | `UltimateRAID/Features/PerformanceOptimization.cs:237-240` | `FlushToDiskAsync` stub using `Task.Delay(1)`. WriteThrough/WriteAround modes believe they're persisting — nothing written. |
+| 3661 | 12 | LOW | `UltimateRAID/RaidStrategyBase.cs:188-190` | `VerifyAsync` calls `Task.Delay(10)` per disk and reports no errors. No actual data verification. |
+| 3662 | 12 | LOW | `UltimateRAID/RaidStrategyBase.cs:279-292` | `VerifyBlockAsync`/`CorrectBlockAsync` base implementations are `Task.CompletedTask`. Scrub always reports zero errors. No `abstract` enforcement. |
+| 3663 | 14 | LOW | `UltimateRAID/Features/QuantumSafeIntegrity.cs:56-63` | Invalid `Algorithm` enum falls through to default `CalculateSHA3_256`. Mismatched algorithms silently verify as equal. |
+| 3664 | 14 | LOW | `UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategies.cs:369-371` | `InvertMatrix` with singular matrix — `pivot == 0` breaks without throwing. Resulting "inverse" is garbage → `DecodeReedSolomon` silently corrupts data. |
+| 3665 | 2 | LOW | `UltimateRAID/Features/Snapshots.cs:648-651` | `SnapshotTree.AddSnapshot` unconditionally sets `ActiveSnapshotId` without thread safety. Concurrent create + clone race on field. |
+
+**Clean files:** IRaidStrategy.cs (interface only), RaidTopics.cs (constants only), ErasureCodingStrategiesB7.cs, ExtendedRaidStrategies.cs
+
+---
+
+### Chunk 120 — UltimateRAID Strategies (ExtendedB6, AdvancedNested, Nested, Standard, StandardB1, Vendor, VendorB5, ZFS) + UltimateRaidPlugin + UltimateRTOSBridge (IRtosStrategy, DeterministicIo, RtosProtocolAdapters, Plugin) + UltimateReplication Features (BandwidthAware, CrossCloud)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3666 | 1 | P0 | `UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs:271-272,581-582,889-890` | `WriteToDiskAsync` returns `Task.CompletedTask`, `ReadFromDiskAsync` returns `new byte[length]`. All disk I/O in Raid10, Raid50, Raid60 is faked. Same in `NestedRaidStrategies.cs:377-385` (Raid03). |
+| 3667 | 1 | P0 | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:287-291` | `FlushWriteOperationAsync` does `await Task.Yield()` with "Simulate flushing" comment. NVRAM write-back cache never persists data. Same I/O stubs at lines 429-435 and 786-792. |
+| 3668 | 1 | P0 | `UltimateRAID/Strategies/Extended/ExtendedRaidStrategiesB6.cs:347-348,437-438,512-513,770-771,875-876,936-937,1134-1135,1198-1199` | `WriteToDiskAsync`/`ReadFromDiskAsync` stubs across all extended RAID strategies in B6 (Raid7X, RAID-TP, Encrypted RAID, etc.). |
+| 3669 | 1 | P1 | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:707-711,750-758` | `RecordDirtyBlock` is empty ("In production, would persist"). `UpdateParityForDirtyBlocksAsync` does `Task.Yield()`. FlexRaidFr snapshot/dirty-block system never tracks or repairs. |
+| 3670 | 1 | P1 | `UltimateRAID/Strategies/ZFS/ZfsRaidStrategies.cs:~302,~362-377` | ZFS self-healing and actual I/O not implemented. Comments: "In production, would rewrite corrupted blocks", "In production: Write data + metadata", "Read from actual disk". |
+| 3671 | 12 | P1 | `UltimateRAID/Strategies/Standard/StandardRaidStrategies.cs:799-800,1229-1230,1539-1540` | `speed = bytesRebuilt / elapsed.TotalSeconds` with no zero-guard. First iteration → divide by zero → `Infinity` cast to `long` → `long.MinValue`. Same in StandardB1 (215, 686, 1047), Nested (247), ExtendedB6 (430, 868, 1081). |
+| 3672 | 2 | P1 | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:~430-446` | StorageTekRaid7 `WriteAsync` — `_writeCache.Count > _cacheMaxSize` non-atomic read, then dequeue loop without lock. Concurrent writes can duplicate-flush or miss entries. |
+| 3673 | 5 | P1 | `UltimateRTOSBridge/UltimateRTOSBridgePlugin.cs:219-223` | Silent catch in strategy discovery. Critical errors silently discarded. |
+| 3674 | 1 | P1 | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:203-207` | `ResetWatchdogAsync` (VxWorks) is stub: "Watchdog reset simulation." Safety-critical DO-178C/IEC 61508 code does nothing. |
+| 3675 | 1 | P1 | `UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs:729-734` | `ExecuteRecoveryAction` (WatchdogIntegration): "For simulation, just record event." Recovery on watchdog expiry does nothing. |
+| 3676 | 2 | P1 | `UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs:144,159,174,647` | `IoChannel.ReadCount++`, `WriteCount++`, `KickCount++` — non-atomic `++` on `long` fields without Interlocked. Data races on multi-core. |
+| 3677 | 2 | P1 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:139-140` | `Interlocked.Exchange(ref _totalEgressCostEstimate, Volatile.Read(...) + egressCost)` — read-modify-write without CAS retry loop. Under contention, overwrites another thread's update. |
+| 3678 | 14 | P2 | `UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs:65-66,101-102` | No `diskCount > 0` validation before modulo. `groupCount == 0` possible → division by zero. |
+| 3679 | 1 | P2 | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:347-352` | StorageTekRaid7 double-failure reconstruction replaces failed chunks with `new byte[_chunkSize]`. No actual reconstruction — silent data corruption. |
+| 3680 | 1 | P2 | `UltimateRAID/Strategies/ZFS/ZfsRaidStrategies.cs` | `_checksumCache` is plain Dictionary with inconsistent `_checksumLock` usage. Concurrent reads during resize → undefined behavior. Also never evicted → unbounded growth. |
+| 3681 | 2 | P2 | `UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs:~559-560` | Timer instances replaced via `_timers[path] = timer` without disposing previous timer. Resource leak if `StopWatchdogTimer` bypassed. |
+| 3682 | 10 | P2 | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:707-711` | `RecordDirtyBlock` empty — data written between snapshots never tracked. Disk failure before snapshot → silently unrecoverable. |
+| 3683 | 15 | P2 | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:162-163` | VxWorks queue has no backpressure. Unbounded growth violates RTOS bounded-latency guarantee. |
+| 3684 | 15 | P2 | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:354-379` | QNX `SemaphoreSlim` per message never disposed on timeout path. Resource leak. |
+| 3685 | 12 | P2 | `UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs:737-739` | Raid60 `ReadAsync` returns zeroed buffers for all groups. Always returns zeros. |
+| 3686 | 14 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:104-115` | `GetProviderStatus` returns null for unknown providers → silently treated as healthy. |
+| 3687 | 9 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:255-259` | Broad `catch { return false }` swallows `OperationCanceledException`. Cancellation silently returns false instead of propagating. |
+| 3688 | 15 | LOW | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:100,146` | `WriteAsync` increments `_cacheHits` — a write is not a cache hit. Metrics lie. |
+| 3689 | 13 | LOW | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:163-165` | `GetFromCache` iterates entire ConcurrentQueue on every read — O(n) scan. |
+| 3690 | 14 | LOW | `UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs:877-879` | `taskId` defaults to 0 — all tasks without explicit ID share same `TaskInfo`, priority inheritance bleeds. |
+| 3691 | 9 | LOW | `UltimateReplication/Features/BandwidthAwareSchedulingFeature.cs:312-325` | `HandleBandwidthReportAsync` silently ignores messages with null/empty sourceNode. No logging. |
+| 3692 | 9 | LOW | `UltimateRAID/UltimateRaidPlugin.cs` | Strategy discovery catches all exceptions with bare `catch { }`. Should exclude fatal CLR exceptions. |
+| 3693 | 1 | LOW | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:179` | VxWorks `SynchronizeAsync` body is `Task.Delay(1)` — "Simulated critical section." |
+
+**Clean files:** IRtosStrategy.cs (interface only), StandardRaidStrategies.cs (clean beyond div-by-zero), StandardRaidStrategiesB1.cs (clean beyond div-by-zero)
+
+---
+
+### Chunk 121 — UltimateReplication Features (GeoDistributedSharding, GeoWorm, GlobalTransactionCoordination, IntelligenceIntegration, PartialReplication, PriorityBasedQueue, RaidIntegration, ReplicationLagMonitoring, SmartConflictResolution, StorageIntegration) + ReplicationStrategyBase + ReplicationStrategyRegistry + ReplicationTopics + Scaling/ReplicationScalingManager + Strategies/AI/AiReplicationStrategies
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3694 | 5 | P1 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:470-474` | Silent catch in `CheckGeofenceForShardAsync` swallows all exceptions. Returns `true` on failure — security-relevant optimistic fallback with no logging. |
+| 3695 | 5 | P1 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:519-522` | Silent catch in `WriteShardToRegionAsync`. Storage write failures invisible to operators. |
+| 3696 | 4 | P1 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:403-404` | When all geofence checks fail (compliance service down), falls back to ALL regions including non-compliant ones. Data-residency/regulatory violation with no alerting. |
+| 3697 | 5 | P1 | `UltimateReplication/Features/GeoWormReplicationFeature.cs:373-376,427-430` | Silent catches in `WriteToWormStorageAsync` and `VerifyWormIntegrityAsync`. WORM write failures and integrity failures both invisible. |
+| 3698 | 6 | P1 | `UltimateReplication/Features/IntelligenceIntegrationFeature.cs:547-560` | `_messageBus.PublishAsync(...)` called without `await`. Task discarded — anomaly detection responses never reliably sent. |
+| 3699 | 2 | P1 | `UltimateReplication/Features/ReplicationLagMonitoringFeature.cs:118-130` | `LagNodeStatus` fields (`CurrentLagMs`, `MaxLagMs`, `SampleCount`, etc.) are plain non-volatile properties mutated concurrently without sync. Rolling stats corrupted. |
+| 3700 | 1 | P1 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:262,422,633,849` | All four AI strategies (`Predictive`, `Semantic`, `Adaptive`, `Intelligent`) implement `ReplicateAsync` as `Task.Delay(30-40ms)` — no actual replication. Data only stored in-memory `_dataStore`. |
+| 3701 | 1 | P1 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:283,442,654,877` | `VerifyConsistencyAsync` in all four AI strategies only checks local `_dataStore`. No cross-node verification. Method name claims consistency but only reflects local writes. |
+| 3702 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:333-354` | `WaitForVotesAsync` uses busy-wait polling with 50ms sleep instead of `TaskCompletionSource`. CPU churn and latency. |
+| 3703 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:126-128` | `TransactionState.Phase` is non-volatile mutable property modified concurrently. `GetTransactionState` can observe torn state. |
+| 3704 | 12 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:410` | `state.Votes[nodeId] = vote` uses direct indexing on `BoundedDictionary`. `Clear()` at line 208 then written concurrently → race. |
+| 3705 | 5 | P2 | `UltimateReplication/ReplicationStrategyBase.cs:687-689,808-810,931-933` | Three `catch { }` blocks in prediction/lag/conflict reporting. "Best-effort" but no logging at all. |
+| 3706 | 13 | P2 | `UltimateReplication/Features/PartialReplicationFeature.cs:219` | `Regex.IsMatch` without compiled regex or timeout on every `ShouldReplicate` call. ReDoS vulnerable with complex patterns. |
+| 3707 | 14 | P2 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:484` | `correlationId = $"shard-write-{shardId}"` not sanitized. Predictable/injectable if shardId is attacker-controlled. |
+| 3708 | 10 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:393-400` | `PurgeExpiredWalEntriesAsync` — `cutoff` variable computed but never used in condition. Only checks `seq <= minOffset`. Entries older than retention never purged if not yet acknowledged → unbounded growth. |
+| 3709 | 12 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:255-258` | `lock (_walLock)` around `Interlocked.Increment` is redundant. Same `_walSequence` read via `Interlocked.Read` outside lock elsewhere. Confusing but not broken. |
+| 3710 | 5 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:808-841` | `DeserializeWalEntry` has bare `catch { return null; }`. Corrupted WAL entries silently skipped — data loss masked. |
+| 3711 | 2 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:899-900` | `_episodes` plain `List<TuningEpisode>` appended from concurrent `ReplicateAsync` tasks. No lock. |
+| 3712 | 13 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:570-604` | `AdaptConfiguration` does `.Sum()` and `.Average()` across all metrics on every `RecordMetrics` call. O(n) per write. |
+| 3713 | 15 | LOW | `UltimateReplication/ReplicationStrategyBase.cs:573,578` | Method named `ResolveBytMergeAsync` (typo: "Byt" → "By"). |
+| 3714 | 14 | LOW | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:350` | `dataShards[0].Length` without empty check. Empty list → `IndexOutOfRangeException`. |
+| 3715 | 12 | LOW | `UltimateReplication/ReplicationStrategyRegistry.cs:209-222` | `DiscoverFromAssembly` with bare `catch {}` silently skips failed strategy instantiations. |
+| 3716 | 13 | LOW | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:1018` | `_episodes.Average()` iterates unbounded history. Grows without cap. |
+
+**Clean files:** ReplicationTopics.cs (constants only), PriorityBasedQueueFeature.cs, RaidIntegrationFeature.cs, SmartConflictResolutionFeature.cs, StorageIntegrationFeature.cs
+
+---
+
+### Chunk 123 — UltimateResilience (Base, Scaling, Bulkhead, ChaosEngineering, ChaosVaccination, CircuitBreaker, Consensus, DisasterRecovery, Fallback, HealthChecks, LoadBalancing, RateLimiting, Retry, Timeout)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3717 | 1 | P0 | `UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs:112-117,161-165,326-356,484-522,648-654,801-808` | All 5 consensus protocols (Raft, Paxos, PBFT, Zab, Viewstamped) use `Random.Shared.NextDouble()` to simulate network responses. Comments: "In production: send RequestVote RPC". No real distributed communication. |
+| 3718 | 1 | P0 | `UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs:194,254,512` | Failover/failback/restore all stub `Task.Delay(10)` with "Simulate failover work" comments. No real region switching or data restoration. |
+| 3719 | 6 | P1 | `UltimateResilience/Scaling/ResilienceScalingManager.cs:482-487` | Fire-and-forget in `WireCircuitBreakerStateChange`: `PublishCircuitBreakerStateAsync(...).ConfigureAwait(false)` in synchronous handler — Task abandoned, exceptions silently lost. |
+| 3720 | 2 | P1 | `UltimateResilience/Scaling/AdaptiveResilienceThresholds.cs:73-74,243-248` | `_disposed` flag checked/set without synchronization. Timer callback races with `Dispose()`. Needs `volatile` or `Interlocked`. |
+| 3721 | 2 | P1 | `UltimateResilience/Strategies/ChaosEngineering/ChaosEngineeringStrategies.cs:18,144,255,357,465,619` | Non-thread-safe `Random _random = new()` in 6 chaos strategies (Fault, Latency, ProcessTermination, ResourceExhaustion, NetworkPartition, ChaosMonkey). Called concurrently from `ExecuteCoreAsync`. Use `Random.Shared`. |
+| 3722 | 2 | P1 | `UltimateResilience/Strategies/RetryPolicies/RetryStrategies.cs:601-602,133` | Non-thread-safe `Random` in `DecorrelatedJitterRetryStrategy`, `JitteredExponentialBackoffStrategy`, and `GradualRecoveryCircuitBreakerStrategy` (CB line 739). Use `Random.Shared`. |
+| 3723 | 2 | P1 | `UltimateResilience/ResilienceStrategyBase.cs:251,257,264` | Unsynchronized writes to `_lastFailure`/`_lastSuccess` (`DateTimeOffset?`). Not atomic on 32-bit. Read in `GetStatistics()` line 323-324 without lock. |
+| 3724 | 12 | P1 | `UltimateResilience/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs:157-172` | `OnSuccess` in HalfOpen increments `_failureCount` to count successes. Field reused for both failures and successes — circuit may fail to close correctly. Needs separate `_halfOpenSuccessCount`. |
+| 3725 | 2 | P1 | `UltimateResilience/Strategies/LoadBalancing/LoadBalancingStrategies.cs:277-294` | `WeightedRoundRobinLoadBalancingStrategy.SelectEndpoint` reads `_currentIndex`, `_currentWeight`, `_maxWeight`, `_gcd` without sync while `RecalculateWeights` writes them under lock. |
+| 3726 | 2 | P1 | `UltimateResilience/Strategies/RateLimiting/RateLimitingStrategies.cs:163-166,289-295` | `LeakyBucketRateLimitingStrategy.Dispose()` does not cancel pending `TaskCompletionSource` entries. Callers waiting on `tcs.Task` leak forever. |
+| 3727 | 15 | P1 | `UltimateResilience/Strategies/Bulkhead/BulkheadStrategies.cs:40-46,193-198` | `Dispose` hides base via `new` in ThreadPool/Semaphore BulkheadStrategies. If held as `StrategyBase`/`IDisposable`, semaphores never disposed. Same in LeakyBucket (line 289). |
+| 3728 | 13 | P2 | `UltimateResilience/Strategies/LoadBalancing/LoadBalancingStrategies.cs:370-371,774-775` | O(n) `OrderBy(...).First()` sort on every `SelectEndpoint` call in LeastConnections and LeastResponseTime. Hot-path allocation. Use linear min scan. |
+| 3729 | 13 | P2 | `UltimateResilience/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs:354-358,675-676` | LINQ `Where(...).ToList()` in `PruneOldBuckets` and `Aggregate` in `CheckFailureRate` inside state lock. Allocates on every request. |
+| 3730 | 13 | P2 | `UltimateResilience/ResilienceStrategyBase.cs:394-396` | `times.Average()` and `times.OrderBy(...).ToArray()` in `GetStatistics()`. Allocates on every metrics call. |
+| 3731 | 2 | P2 | `UltimateResilience/Strategies/ChaosEngineering/ChaosEngineeringStrategies.cs:513-519,530` | `_enabled` plain `bool` without `volatile` in NetworkPartitionStrategy. All chaos strategy `Enabled` setters unsynchronized. |
+| 3732 | 13 | P2 | `UltimateResilience/Scaling/ResilienceScalingManager.cs:413` | `TrackedStrategies` allocates `_strategyMetrics.Keys.ToArray()` every adaptation cycle. Cache or use Keys directly. |
+| 3733 | 2 | P2 | `UltimateResilience/Strategies/Bulkhead/BulkheadStrategies.cs:393,425` | `PartitionBulkheadStrategy` — `TryGetValue` at 357 and `AddOrUpdate` at 393 are separate ops. BoundedDictionary eviction between them loses consistency. |
+| 3734 | 14 | P2 | `UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs:45-51` | `RaftConsensusStrategy` constructor: no null/whitespace check on `nodeId`, no null check on `clusterNodes`, no lower-bound on `electionTimeout`/`heartbeatInterval`. |
+| 3735 | 2 | P2 | `UltimateResilience/Strategies/RetryPolicies/RetryStrategies.cs:600-601,645-646` | Non-thread-safe `_previousDelay` in `DecorrelatedJitterRetryStrategy`. Written on every retry without lock. Concurrent callers corrupt backoff. |
+| 3736 | 12 | P2 | `UltimateResilience/Strategies/RetryPolicies/RetryStrategies.cs:79,195,288,369,450,563,662` | Redundant double-check `attempts <= _maxRetries` in `when` filter AND inside body across all 7 retry strategies. Inner check always true. Dead code. |
+| 3737 | 9 | P2 | `UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs:342-344` | Silent catch swallows failover-retry second failure. No logging or rethrow. Outer catch also no logging of original `ex`. |
+| 3738 | 1 | P2 | `UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs:110` | Comments explicitly document "In production: send RequestVote RPC to nodeId" + "Simulate vote response" across all 5 consensus protocols. |
+| 3739 | 2 | P2 | `UltimateResilience/Strategies/Bulkhead/BulkheadStrategies.cs:605-609` | `AdaptiveBulkheadStrategy.Adapt()` — `_currentCapacity` read outside lock after `Adapt()` call in error message (line 711). Constructor calls `_semaphore.Wait()` in loop — blocks thread pool if called from async context. |
+| 3740 | 1 | LOW | `UltimateResilience/Strategies/ChaosEngineering/ChaosEngineeringStrategies.cs:755-759` | Defines `public sealed class IOException : Exception` — shadows `System.IO.IOException`. Naming collision. Rename to `ChaosIOException`. |
+| 3741 | 15 | LOW | `UltimateResilience/Strategies/HealthChecks/HealthCheckStrategies.cs:487` | Silent catch swallowing startup probe errors without logging or counter. |
+| 3742 | 14 | LOW | `UltimateResilience/Strategies/Bulkhead/BulkheadStrategies.cs:344-349` | Dead code in `PartitionBulkheadStrategy.ConfigurePartition` — retrieves semaphore, does nothing with it. Comment: "Can't resize SemaphoreSlim". |
+| 3743 | 15 | LOW | `UltimateResilience/Strategies/CircuitBreaker/CircuitBreakerStrategies.cs:161-162` | Naming lie: `_failureCount` incremented on success in `OnSuccess`. Field semantics contradictory. |
+| 3744 | 4 | LOW | `UltimateResilience/Strategies/LoadBalancing/LoadBalancingStrategies.cs:542-546` | MD5 used for hash in IpHash/ConsistentHashing LB. Acceptable for distribution but triggers security scanners. Use FNV-1a. |
+| 3745 | 9 | LOW | `UltimateResilience/Strategies/ChaosEngineering/ChaosVaccination/ChaosInjectionStrategies.cs:173-178` | `ImmuneAutoRemediationStrategy` pure passthrough — catch rethrows with comment about bus delegation. Borderline Rule 13 stub. |
+| 3746 | 13 | LOW | `UltimateResilience/Strategies/RateLimiting/RateLimitingStrategies.cs:682-683` | `AdaptiveRateLimitingStrategy` rate-check compares unbounded queue count vs limit. Queue pruned only in `AdaptLimit()`. Racy under sustained load. |
+| 3747 | 12 | LOW | `UltimateResilience/Scaling/ResilienceScalingManager.cs:449-455` | `ExecuteWithRetryAsync` asymmetric retry logic: `when` filter uses `attempt < maxRetries` (before increment), inner check uses `attempt >= maxRetries` (after). Correct but confusing. |
+
+**Clean files:** FallbackStrategies.cs, TimeoutStrategies.cs
+
+---
+
+### Chunk 122 — UltimateReplication Strategies (ActiveActive, AirGap, Async, CDC, Cloud, Conflict, Core, DR, Federation, Geo, GeoReplication, Specialized, Synchronous, Topology) + Plugin
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3748 | 1 | P0 | `UltimateReplication/Strategies/Asynchronous/AsynchronousReplicationStrategy.cs:148-162` | `VerifyConsistencyAsync` returns `Random.Shared.Next(0,2) == 0 ? "hash-v1" : "hash-v2"` — randomized fake hashes. Always returns `true` regardless of actual replica state. |
+| 3749 | 1 | P0 | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:204-221` | `VerifyConsistencyAsync` — `primaryHash = "primary-hash-value"` hardcoded; secondaries return it or `"stale-hash"` randomly. Fabricated 80% match. |
+| 3750 | 1 | P0 | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:283-293` | `CheckPrimaryHealthAsync` returns `Random.Shared.Next(0,10) > 0` (90% chance). Auto-failover decisions on random data. |
+| 3751 | 1 | P0 | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:308-317` | `SelectBestSecondaryForPromotionAsync` — secondary lag is `Random.Shared.Next(100, 1000)`. Failover target randomly chosen. |
+| 3752 | 1 | P0 | `UltimateReplication/Strategies/Synchronous/SynchronousReplicationStrategy.cs:146-158` | `VerifyConsistencyAsync` returns hardcoded `"consistent-hash-value"` for every node. `distinctHashes == 1` always true. Strong consistency guarantee is a lie. |
+| 3753 | 6 | P1 | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:162-181` | Fire-and-forget `_ = Task.Run(...)` for secondary replication. No error surfacing, no completion tracking. |
+| 3754 | 5 | P1 | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:173-177` | Silent catch in fire-and-forget — comment "Log replication failure" but does nothing. Failed secondary replication invisible. |
+| 3755 | 5 | P1 | `UltimateReplication/Strategies/Asynchronous/AsynchronousReplicationStrategy.cs:231-235` | `ProcessReplicationQueueAsync` catch: "Log replication failure in production" — no logging, no counter. Failed replications vanish silently. |
+| 3756 | 5 | P1 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:482-497` | `StartStreamAsync` fire-and-forget `_ = Task.Run(...)`. Non-cancellation exceptions escape unobserved. Streaming channel silently dies on fault. |
+| 3757 | 1 | P1 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:536-539` | 2PC prepare phase stub: `var vote = true; // Simulated: all regions vote YES`. No actual region communication. |
+| 3758 | 1 | P1 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:580-583` | 2PC commit phase stub: `state.CommitAcks[region] = true` without sending COMMIT message. Fabricated acks. |
+| 3759 | 2 | P1 | `UltimateReplication/Strategies/Specialized/SpecializedReplicationStrategies.cs:457` | `_masterKey = new byte[32]` — encryption key all zeros. No security if `SetMasterKey`/`GenerateMasterKey` never called. |
+| 3760 | 2 | P1 | `UltimateReplication/Strategies/Specialized/SpecializedReplicationStrategies.cs:512-516` | `GenerateMasterKey` returns reference to internal `_masterKey` field. Caller can corrupt key; stale refs after rotation. |
+| 3761 | 2 | P1 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:869-876` | `RouteWriteConflictFree` uses `dataId.GetHashCode()` — non-deterministic across processes. Different processes route same key to different regions. |
+| 3762 | 1 | P2 | `UltimateReplication/Strategies/CDC/CdcStrategies.cs:537` | `_currentPosition++` non-interlocked on `long` shared across concurrent calls. Positions duplicated/skipped. |
+| 3763 | 2 | P2 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:354-355` | NWayActive `_writeQuorum`/`_readQuorum` plain `int` fields settable without sync. Torn reads during concurrent replication. |
+| 3764 | 13 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:671-699` | `_versionChains` unbounded growth per dataId. No cap or compaction. Memory exhaustion on long-lived deployments. |
+| 3765 | 13 | P2 | `UltimateReplication/Strategies/Cloud/CloudReplicationStrategies.cs:845` | `_pendingSyncs` is plain `Queue<T>` (not `ConcurrentQueue<T>`) accessed concurrently from Replicate/Sync. Data race. |
+| 3766 | 2 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:567` | `_failoverHistory` plain `List<FailoverEvent>` appended/read concurrently. `InvalidOperationException` or torn reads. |
+| 3767 | 1 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:268-276` | CRDT merge is payload-size heuristic: "take the larger payload". Not a real CRDT merge despite CRDT types existing in same file. |
+| 3768 | 13 | P2 | `UltimateReplication/Strategies/Topology/TopologyStrategies.cs:970-975` | `GetNodeLevel` uses `nodes.Contains(nodeId)` on `List<string>` per level. O(levels × nodes) per call. Need reverse lookup. |
+| 3769 | 5 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:899-904` | `InitiateFailoverAsync` catches all exceptions, returns `false` without logging. Failover failure invisible to operators. |
+| 3770 | 5 | P2 | `UltimateReplication/Strategies/Federation/FederationStrategies.cs:294-299` | `CommitTransactionAsync` catch transitions to Aborted without logging exception. Distributed transaction failures silent. |
+| 3771 | 1 | LOW | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:164` | `Task.Delay(Random.Shared.Next(10, 30))` replaces real primary write. Comment: "In production, this would..." — stub. |
+| 3772 | 15 | LOW | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:782` | `CheckTargets` RTO hardcoded `true` — "RTO requires actual failover measurement." Contract lies about RTO checking. |
+| 3773 | 12 | LOW | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:679-680` | Delta computation XORs previous delta vs new data instead of previous full data vs new data. ApplyDelta produces wrong output. |
+| 3774 | 13 | LOW | `UltimateReplication/Strategies/Asynchronous/AsynchronousReplicationStrategy.cs:165-173` | `GetReplicationLagAsync` adds `Random.Shared.Next(50, 200)` noise. Monitoring/alerting gets unstable telemetry. |
+| 3775 | 8 | LOW | `UltimateReplication/UltimateReplicationPlugin.cs:86` | KafkaConnectCdcStrategy `_bootstrapServers = "localhost:9092"` hardcoded. Fails silently in non-local deployments. |
+
+**Clean files:** AirGapReplicationStrategies.cs, ConflictResolutionStrategies.cs
+
+---
+
+### Chunk 124 — UltimateResilience Plugin + UltimateResourceManager (Base, Container, CPU, GPU, IO, Memory, Network, Power, Plugin) + UltimateSDKPorts (Base, Registry, CrossLanguage, Go, JavaScript)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3776 | 1 | P0 | `UltimateResourceManager/UltimateResourceManagerPlugin.cs:474-481` | `HandleReserveAsync` stub — comment "placeholder implementation", returns `success=true` with GUID. Nothing actually reserved. Advertised as capability. |
+| 3777 | 5 | P1 | `UltimateResourceManager/ResourceStrategyBase.cs:332-333` | `AutoDiscover` bare `catch {}` swallows all exceptions including OOM. Broken strategy types silently skipped with no diagnostic. |
+| 3778 | 2 | P1 | `UltimateResourceManager/Strategies/ContainerStrategies.cs:12,66,98,153,182,248,276,323,350,401,429,487,515,565` | Plain `Dictionary<string,…>` in 8 container strategies (Cgroup, Docker, K8s, Podman, WinJob, WinContainer, ProcessGroup, Namespace). Concurrent Allocate/Release corrupts state. |
+| 3779 | 2 | P1 | `UltimateResourceManager/Strategies/CpuStrategies.cs:11-12,43-44,62` | `FairShareCpuStrategy._weights` (Dictionary) and `_totalWeight` (double) unprotected. Concurrent allocations produce phantom weights. |
+| 3780 | 2 | P1 | `UltimateResourceManager/Strategies/CpuStrategies.cs:119-120` | `AffinityCpuStrategy._usedCores` (HashSet) no lock. Concurrent Contains/Add races. `ReleaseCoreAsync` not implemented — cores never returned. |
+| 3781 | 2 | P1 | `UltimateResourceManager/Strategies/GpuStrategies.cs:9,39-57` | `TimeSlicingGpuStrategy._allocatedPercent` TOCTOU race. Two concurrent 60% requests both succeed → 160% allocated. |
+| 3782 | 2 | P1 | `UltimateResourceManager/Strategies/PowerStrategies.cs:12-14,56-66` | `DvfsCpuStrategy._pStates` (Dictionary) and `_currentPState` (int) unprotected. Concurrent modify/read race. |
+| 3783 | 2 | P1 | `UltimateResourceManager/Strategies/PowerStrategies.cs:94-98,138-139` | `CStateStrategy._wakeLatencyBudgets` (Dictionary) and `_currentCState` unprotected. `.Values.Min()` during concurrent modification. |
+| 3784 | 12 | P1 | `UltimateResourceManager/Strategies/CpuStrategies.cs:90-95,195-198` | `GetMetricsAsync` returns hardcoded values: PriorityCpu=50.0, RealTimeCpu=25.0, NumaCpu=30.0. Fake live metrics served to monitoring. |
+| 3785 | 1 | P1 | `UltimateResourceManager/Strategies/GpuStrategies.cs:155-175,197-205` | `MpsGpuStrategy.GetMetricsAsync`=60.0, `VgpuStrategy`=50.0/4GB. Fabricated live metrics. |
+| 3786 | 1 | P1 | `UltimateResourceManager/Strategies/IoStrategies.cs:147-153,192-197` | BandwidthLimit returns 500MB/s, PriorityIo returns 50000 IOPS/200MB/s. Hardcoded fake metrics. |
+| 3787 | 1 | P1 | `UltimateResourceManager/Strategies/NetworkStrategies.cs:88-93,130-141` | QosNetwork returns 1Gbps, Composite returns 40%CPU/10000IOPS/30%GPU/500MB/s. All hardcoded. |
+| 3788 | 5 | P2 | `UltimateResourceManager/UltimateResourceManagerPlugin.cs:303-320` | `HandleMetricsAsync` silent catch — "Skip strategies that fail to report metrics". Failed strategy invisibly omitted. |
+| 3789 | 12 | P2 | `UltimateResourceManager/Strategies/ContainerStrategies.cs:549-550` | `ProcessGroupStrategy` PGID = `ProcessId + handle.GetHashCode()`. Negative GetHashCode → invalid PGID on Unix. Hash collisions → duplicate PGIDs. |
+| 3790 | 10 | P2 | `UltimateResourceManager/Strategies/GpuStrategies.cs:110` | `MigGpuStrategy` marks slots with `handle.GetHashCode()`. Hash collisions prevent release. `ReleaseCoreAsync` not implemented — GPU MIG leak. |
+| 3791 | 12 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:39-40` | `DvfsCpuStrategy.GetMetricsAsync` — `cpuTime / TickCount64` divides process CPU by wall-clock since boot. Meaningless near-zero value. |
+| 3792 | 12 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:113-116` | `CStateStrategy.GetMetricsAsync` — operator precedence bug: `TickCount64 - Ticks / TicksPerMs` always large negative. |
+| 3793 | 12 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:190-192` | `IntelRaplStrategy` — "Simulate reading RAPL counters", maps CPU seconds to milliwatts. Dimensionally nonsensical. |
+| 3794 | 12 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:403-406` | `BatteryAwareStrategy` — `_batteryLevelPercent = 100 - (tickSeconds % 100)`. Fake oscillating battery level affects real allocation decisions. |
+| 3795 | 12 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:321-335` | `CarbonAwareStrategy` — hardcoded UTC-hour carbon intensity (200/700/450). "Simulate" comment. Side-effect in metrics method. |
+| 3796 | 15 | P2 | `UltimateResourceManager/Strategies/PowerStrategies.cs:190-196` | `IntelRaplStrategy` named "Intel RAPL Power Manager" — reads no MSR, touches no sysfs, measures no domains. Contract lie. |
+| 3797 | 2 | P2 | `UltimateResourceManager/Strategies/IoStrategies.cs:9-10,41-51` | `DeadlineIoStrategy` TOCTOU — check `_currentIops + request.Iops > _maxIops` not atomic with `Interlocked.Add`. Over-allocation. |
+| 3798 | 1 | LOW | `UltimateResilience/UltimateResiliencePlugin.cs:253-258` | `HandleExecuteAsync` stub — sets `success=true` without executing operation. Message-bus callers get fake success. |
+| 3799 | 6 | LOW | `UltimateResilience/UltimateResiliencePlugin.cs:569-594` | Fire-and-forget in `SubscribeToStrategyRecommendationRequests`. Async lambda exceptions swallowed by bus. |
+| 3800 | 15 | LOW | `UltimateSDKPorts/Strategies/GoBindings/GoBindingStrategies.cs:83` | Generated Go code emits `grpc.WithInsecure()`. Ships TLS-disabled client to consumers. |
+| 3801 | 12 | LOW | `UltimateResourceManager/UltimateResourceManagerPlugin.cs:457-466` | `HandlePreemptAsync` uses `RequestId` (GUID) for quota lookup instead of `RequesterId`. Preemption never finds quota — always preempts 0. |
+| 3802 | 14 | LOW | `UltimateResourceManager/Strategies/ContainerStrategies.cs:228` | `KubernetesResourceStrategy` — `hasLimits` computed but never used. Dead variable, likely missing validation gate. |
+| 3803 | 13 | LOW | `UltimateSDKPorts/SDKPortStrategyRegistry.cs:23` | `RegisteredStrategies` materialises `.Keys.ToList().AsReadOnly()` on every access. Constant GC pressure. |
+| 3804 | 14 | LOW | `UltimateResourceManager/Strategies/ContainerStrategies.cs:461-462` | `WindowsContainerStrategy` — `ProcessorWeight = Priority * 100` unclamped. Priority > 100 yields invalid Win32 weight. |
+
+**Clean files:** MemoryStrategies.cs, CrossLanguageStrategies.cs, JavaScriptBindingStrategies.cs
+
+---
+
+### Chunk 125 — UltimateSDKPorts (Python, Rust, Plugin) + UltimateServerless (Base, ColdStart, CostTracking, EventTriggers, FaaS, Monitoring, Scaling, Security, StateManagement, Plugin) + UltimateStorage Features (AutoTiering, CostBasedSelection)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3805 | 1 | P1 | `UltimateSDKPorts/Strategies/RustBindings/RustBindingStrategies.cs:192-194` | `RustWasmStrategy.GenerateBindingCodeAsync` emits `Ok(JsValue::NULL)` — stub WASM body. Generated binding returns null for every method. |
+| 3806 | 1 | P1 | `UltimateSDKPorts/Strategies/PythonBindings/PythonBindingStrategies.cs:38` | `PythonCtypesStrategy.GenerateBindingCodeAsync` emits `pass # Implementation via ctypes` for every method. Non-functional Python code. |
+| 3807 | 1 | P1 | `UltimateServerless/Strategies/ColdStart/ColdStartOptimizationStrategies.cs:103-104,237-242,286-294,436-442` | Fake metrics via `Random.Shared` in ProvisionedConcurrency, WarmupScheduler, LazyLoading, PredictiveWarming. Scaling decisions on garbage data. |
+| 3808 | 1 | P1 | `UltimateServerless/Strategies/CostTracking/CostTrackingStrategies.cs:42-57,151-156,264-317` | Fake cost data via `Random` in UsageAnalytics, CostEstimation, CostOptimization, PowerTuning. Financial decisions on fabricated data. |
+| 3809 | 1 | P1 | `UltimateServerless/Strategies/EventTriggers/EventTriggerStrategies.cs:411-415` | `WebhookTriggerStrategy.ValidateSignatureAsync` always returns `true`. Webhook authentication completely bypassed. |
+| 3810 | 1 | P1 | `UltimateServerless/Strategies/EventTriggers/EventTriggerStrategies.cs:187-191,195` | `ScheduleTriggerStrategy.GetNextExecutionsAsync` uses `Random.Shared.Next(1,60)` instead of parsing cron expression. Fabricated schedule. |
+| 3811 | 1 | P1 | `UltimateServerless/Strategies/FaaS/FaaSIntegrationStrategies.cs:76-91,194-209,279-291,354-366` | All 4 FaaS strategies (Lambda, AzureFunctions, GCF, Cloudflare) simulate with Random, return hardcoded `Succeeded`. No real platform calls. |
+| 3812 | 1 | P1 | `UltimateServerless/Strategies/Monitoring/MonitoringStrategies.cs:76-82,130-137,262-271` | DistributedTracing, CloudWatchMetrics, PerformanceInsights all return randomly generated metrics. Observability is meaningless. |
+| 3813 | 1 | P1 | `UltimateServerless/Strategies/StateManagement/StateManagementStrategies.cs:492-503,523,555` | `DurableObjectsState.GetStateAsync` returns null unconditionally. Same for Firestore and VercelKv. Silent data loss — reads always empty. |
+| 3814 | 5 | P1 | `UltimateServerless/UltimateServerlessPlugin.cs:546-551` | `DiscoverAndRegisterStrategies` bare `catch {}` — strategy instantiation failures silently skipped. |
+| 3815 | 2 | P1 | `UltimateServerless/Strategies/StateManagement/StateManagementStrategies.cs:52-68` | `DurableEntitiesStrategy.SignalEntityAsync` — `entity.Version++` and `LastModified` without sync. Concurrent signals produce lost updates. |
+| 3816 | 1 | P2 | `UltimateServerless/Strategies/Security/SecurityStrategies.cs:96-106` | `SecretsManagementStrategy.GetSecretAsync` returns literal `"***REDACTED***"` string. Credential injection gets placeholder. |
+| 3817 | 1 | P2 | `UltimateServerless/Strategies/Monitoring/MonitoringStrategies.cs:176-178` | `LogAggregationStrategy.CreateLogGroupAsync` returns ARN with `123456789` fake account ID. |
+| 3818 | 1 | P2 | `UltimateServerless/Strategies/Scaling/ScalingStrategies.cs:186-193` | `TargetTrackingStrategy.GetActivitiesAsync` fabricates scaling descriptions with Random. |
+| 3819 | 1 | P2 | `UltimateServerless/Strategies/CostTracking/CostTrackingStrategies.cs:363-376` | `CostAnomalyDetectionStrategy.DetectAnomaliesAsync` returns hardcoded static anomaly every call. |
+| 3820 | 1 | P2 | `UltimateServerless/Strategies/CostTracking/CostTrackingStrategies.cs:389-400` | `SavingsPlansStrategy.GetRecommendationAsync` returns hardcoded Commitment=50, Term="1 year", Savings=17%. No actual analysis. |
+| 3821 | 13 | P2 | `UltimateServerless/UltimateServerlessPlugin.cs:86-93,127,133` | `.Values.Where(...).ToList()` on every property access for StrategiesByCategory/Platform. 72 strategies materialized per call. |
+| 3822 | 2 | P2 | `UltimateStorage/Features/AutoTieringFeature.cs:109,122` | `RecordAccess` — `LastAccess`/`Temperature` updated without sync after concurrent `GetOrAdd`. Torn state possible. |
+| 3823 | 2 | P2 | `UltimateStorage/Features/CostBasedSelectionFeature.cs:32,322-332` | `_costHistory` plain `List<CostEntry>` never pruned. Unbounded growth until OOM. |
+| 3824 | 6 | P2 | `UltimateServerless/Strategies/EventTriggers/EventTriggerStrategies.cs:40-44` | `HttpTriggerStrategy.CreateTriggerAsync` returns `https://api.example.com/` — literal placeholder endpoint. |
+| 3825 | 15 | P2 | `UltimateServerless/Strategies/FaaS/FaaSIntegrationStrategies.cs:100-101` | `PublishVersionAsync` — `int.Parse` on version string throws if not parseable. `$LATEST` replaced once then never restorable. |
+| 3826 | 14 | P2 | `UltimateStorage/Features/AutoTieringFeature.cs:391-399` | `AccessesInPeriod` checks total lifetime accesses, not windowed. Hot-to-cold based on all-time count is logically wrong. |
+| 3827 | 14 | P2 | `UltimateStorage/Features/AutoTieringFeature.cs:395-399` | `SizeGreaterThan` condition is no-op (`break` only). Size-based policies silently match everything. |
+| 3828 | 2 | P2 | `UltimateServerless/UltimateServerlessPlugin.cs:170-188` | `_totalBilledMs` (double) written under lock, read without lock in GetMetadata/HandleStats. Non-atomic on some architectures. |
+| 3829 | 1 | LOW | `UltimateServerless/Strategies/ColdStart/ColdStartOptimizationStrategies.cs:156-159` | `LambdaSnapStartStrategy.RegisterRestoreHookAsync` silently discards provided hook. |
+| 3830 | 1 | LOW | `UltimateServerless/Strategies/StateManagement/StateManagementStrategies.cs:498-502,529-532,560-563` | DurableObjects/Firestore/VercelKv PutState/SetDocument/SetAsync are silent no-ops. Writes discarded without error. |
+| 3831 | 15 | LOW | `UltimateServerless/Strategies/FaaS/FaaSIntegrationStrategies.cs:404-407` | WebhookTrigger endpoint uses `webhooks.example.com` — placeholder URL. |
+| 3832 | 1 | LOW | `UltimateServerless/UltimateServerlessPlugin.cs:390-395` | `HandleInvokeAsync` sets `status=invocation_queued`, returns without invoking. "Placeholder for actual invocation." |
+| 3833 | 1 | LOW | `UltimateServerless/UltimateServerlessPlugin.cs:558-560` | `ExecuteWorkloadAsync` returns `"executed"` without executing. |
+| 3834 | 13 | LOW | `UltimateServerless/UltimateServerlessPlugin.cs:203-222` | `GetFunctionStatistics` calls `OrderBy` 3 times for P50/P95/P99 instead of sorting once. |
+| 3835 | 9 | LOW | `UltimateServerless/Strategies/Security/SecurityStrategies.cs:258-262` | `CodeSigningStrategy` returns ARN with fake `123456789` account ID. |
+| 3836 | 9 | LOW | `UltimateServerless/Strategies/Monitoring/MonitoringStrategies.cs:67` | `EndSegmentAsync` — null-forgiving `segment!` after concurrent TryGetValue. NRE if removed between check and return. |
+| 3837 | 14 | LOW | `UltimateStorage/Features/AutoTieringFeature.cs:59-63` | Timer started in constructor captures `this` before fully initialized. |
+
+**Clean files:** ServerlessStrategyBase.cs
+
+---
+
+### Chunk 126 — UltimateStorage Features (CrossBackendMigration, CrossBackendQuota, LatencyBasedSelection, LifecycleManagement, MultiBackendFanOut, RaidIntegration, ReplicationIntegration, StoragePoolAggregation) + Migration (Deprecation, MigrationGuide, PluginRemoval, DocGen, MigrationService) + Scaling + StorageStrategyBase
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3838 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:314-315,434-437` | `RebuildArrayAsync` = `Task.Delay(100)` stub. RAID 6 delegates to RAID 5 ("Simplified"). Dual-parity never computed — arrays silently behave as RAID 5. |
+| 3839 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:398-431` | `WriteRaid5Async` copies data stripe as parity verbatim (no XOR). Comment: "simplified — real RAID 5 would calculate XOR parity". Recovery from failure produces corrupt data. |
+| 3840 | 2 | P1 | `UltimateStorage/Features/MultiBackendFanOutFeature.cs:352-376` | `PrimaryPlusAsync` — fire-and-forget `Task.Run` mutates `result.SuccessCount/FailureCount` after caller already returned result. Torn reads. |
+| 3841 | 2 | P1 | `UltimateStorage/Features/ReplicationIntegrationFeature.cs:233-245` | Fire-and-forget `Task.Run` for async replication. Unhandled exceptions silently swallowed. |
+| 3842 | 5 | P1 | `UltimateStorage/Features/MultiBackendFanOutFeature.cs:421-464` | `ReadFromFastestAsync` — `Task.WhenAny` races backends but losing tasks' streams never disposed. 2 streams leaked per call in 3-backend scenario. |
+| 3843 | 10 | P1 | `UltimateStorage/Features/CrossBackendMigrationFeature.cs:393-398` | `VerifyMigrationAsync` — ETag comparison uses `OrdinalIgnoreCase`. Case-insensitive match on opaque hashes → false positives. |
+| 3844 | 10 | P1 | `UltimateStorage/Features/CrossBackendMigrationFeature.cs:128-136` | `GetMetadataAsync` called before `ExistsAsync`. Non-existent object → exception or garbage metadata used for `.Size`. |
+| 3845 | 5 | P1 | `UltimateStorage/Features/StoragePoolAggregationFeature.cs:308` | `GetPoolCapacity` returns `backends.Count * EstimatedBackendCapacityBytes` (1TB constant). Placement decisions on fabricated data. |
+| 3846 | 5 | P1 | `UltimateStorage/Features/LifecycleManagementFeature.cs:519-572` | `TransitionObjectAsync` — if delete-from-source fails, object duplicated with no flag. Infinite retry cycle possible. |
+| 3847 | 5 | P1 | `UltimateStorage/Features/CrossBackendQuotaFeature.cs:114-122` | `SetQuota` ignores `perBackendLimits` parameter. Both branches create empty BoundedDictionary. Caller's limits silently discarded. |
+| 3848 | 2 | P1 | `UltimateStorage/Features/LifecycleManagementFeature.cs:62-66` | Timer callback `async _ => await ...` is unobserved async void. Exceptions crash process or swallowed. Same in LatencyBased (55-59), ReplicationIntegration (65-69). |
+| 3849 | 6 | P2 | `UltimateStorage/Features/MultiBackendFanOutFeature.cs:519-533` | `RollbackWritesAsync` bare `catch {}` — rollback failures create orphaned data across backends. |
+| 3850 | 5 | P2 | `UltimateStorage/Features/LifecycleManagementFeature.cs:480-484` | `ExecuteRuleActionAsync` — exception only in Debug.WriteLine. Lifecycle actions fail silently in production. |
+| 3851 | 5 | P2 | `UltimateStorage/Features/LifecycleManagementFeature.cs:513-517` | `DeleteObjectAsync` — deletion failures unobservable. Counter never incremented on failure. |
+| 3852 | 13 | P2 | `UltimateStorage/Features/CrossBackendMigrationFeature.cs:428-438` | `MigrationHistory.Migrations.Add` on plain `List` — concurrent batch migrations race. |
+| 3853 | 2 | P2 | `UltimateStorage/Features/LatencyBasedSelectionFeature.cs:55-59` | Timer fires with `dueTime: TimeSpan.Zero` before constructor returns. Callback on partially constructed object. |
+| 3854 | 13 | P2 | `UltimateStorage/Scaling/SearchScalingManager.cs:547-566` | `Search()` materializes entire posting list before Skip/Take pagination. Defeats block-based paging infrastructure. |
+| 3855 | 13 | P2 | `UltimateStorage/Scaling/SearchScalingManager.cs:787-803` | `TokenizeWithAnalyzer` allocates stop-word HashSet on every call. Hot-path GC pressure. Should be static readonly. |
+| 3856 | 2 | P2 | `UltimateStorage/Features/RaidIntegrationFeature.cs:255-259` | `MarkBackendFailedAsync` — `array.FailedBackends.Add` and `array.BackendIds.Remove/Add` on plain collections without lock. Concurrent race. |
+| 3857 | 15 | P2 | `UltimateStorage/Features/ReplicationIntegrationFeature.cs:337-343` | `FailoverAsync` mutates `ReplicaBackendIds` list without lock while readers iterate concurrently. |
+| 3858 | 9 | P2 | `UltimateStorage/Features/ReplicationIntegrationFeature.cs:46` | `_totalConflicts` field never incremented despite conflict-resolution policy configured. Counter is a naming lie. |
+| 3859 | 13 | P2 | `UltimateStorage/Features/StoragePoolAggregationFeature.cs:226-285` | `SelectBackendFromPool` — multiple `.Where().ToList().OrderByDescending().Where().ToList()` on ConcurrentBag per call. |
+| 3860 | 13 | P2 | `UltimateStorage/Features/CrossBackendQuotaFeature.cs:322-326` | LINQ `.Where` sum on all `_backendUsage.Values` in `GetTotalUsage`. On write hot path. O(n) per write. |
+| 3861 | 1 | P2 | `UltimateStorage/Features/RaidIntegrationFeature.cs:610-613` | `HandleRaidStatusMessageAsync` = `await Task.CompletedTask`. RAID status messages subscribed but never acted on. Same in ReplicationIntegration (510-513). |
+| 3862 | 15 | LOW | `UltimateStorage/Features/RaidIntegrationFeature.cs:120` | `CalculateTotalCapacity` hardcodes 1TB per backend. Never queries actual capacity. |
+| 3863 | 15 | LOW | `UltimateStorage/Features/LatencyBasedSelectionFeature.cs:493-496` | Off-by-one in `GetPercentile` — P95 equals P50 for single sample. |
+| 3864 | 14 | LOW | `UltimateStorage/Features/StoragePoolAggregationFeature.cs:166-168` | `AddBackendToPool` TOCTOU on ConcurrentBag — duplicate backends possible. |
+| 3865 | 12 | LOW | `UltimateStorage/Scaling/SearchScalingManager.cs:619-621` | `SearchStreamAsync` multi-term AND uses O(n*m) linear scan with lock per entry. No binary search on sorted lists. |
+| 3866 | 15 | LOW | `UltimateStorage/Migration/DeprecationManager.cs:113-114` | Read-modify-write inconsistency — `_deprecatedPlugins` reads lockless while writes locked. |
+| 3867 | 14 | LOW | `UltimateStorage/Features/CrossBackendMigrationFeature.cs:264` | Batch job stored in `_activeJobs` before validation. Failed jobs visible via `GetActiveJobs()`. |
+| 3868 | 14 | LOW | `UltimateStorage/StorageStrategyBase.cs:419-428` | `RetrieveBatchAsync`/`DeleteBatchAsync` bare `catch {}` — individual failures silently skipped. |
+| 3869 | 9 | LOW | `UltimateStorage/Features/LifecycleManagementFeature.cs:33` | `_auditTrail` trimmed via `RemoveRange(0,...)` O(n). Exceeds limit under high event rates. Use Queue/circular buffer. |
+| 3870 | 4 | LOW | `UltimateStorage/Migration/StorageMigrationService.cs:55-56` | `IsStoragePlugin` uses hardcoded namespace type check. Fragile if SDK hierarchy changes. |
+| 3871 | 9 | LOW | `UltimateStorage/Features/CrossBackendMigrationFeature.cs:139-162` | `ProgressTrackingStream` never disposed — double-dispose on inner `sourceStream`. |
+| 3872 | 13 | LOW | `UltimateStorage/Scaling/SearchScalingManager.cs:1010` | Percentile index uses `int` cast truncation. P50/P95 same element for count=2. |
+
+**Clean files:** MigrationGuide.cs, PluginRemovalTracker.cs, StorageDocumentationGenerator.cs, StorageStrategyRegistry.cs
+
+---
+
+### Chunk 127 — UltimateStorage StorageStrategyRegistry + Archive (Azure, BluRay, GCS, ODA, S3Glacier, Tape) + Cloud (Alibaba, Azure, GCS, IBM, Minio, Oracle, S3, Tencent)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3873 | 10 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:842-847` | `GenerateChecksum` hashes only `cartridgeBarcode + key` — no content. Fabricated ETag written to catalog. Data corruption passes silently. |
+| 3874 | 4 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:849-855` | `CalculateFileChecksumAsync` uses MD5 for WORM write verification. Only integrity check for archival media uses collision-vulnerable hash. |
+| 3875 | 1 | P0 | `UltimateStorage/Strategies/Cloud/MinioStrategy.cs:745-778` | `SetBucketReplicationAsync` sets "replication-enabled" tag then `Task.CompletedTask`. No actual replication. Data redundancy contract broken. |
+| 3876 | 6 | P1 | `UltimateStorage/Strategies/Cloud/AzureBlobStrategy.cs:286-290` | Fire-and-forget `_ = AutoTransitionTierAsync(...).ContinueWith(...)`. Tier transitions fail silently in production. |
+| 3877 | 3 | P1 | `UltimateStorage/Strategies/Cloud/AlibabaOssStrategy.cs:242-245,363-364` | Sync-over-async `Task.Run(() => _client.PutObject(...))` wrapping sync OSS SDK. Saturates thread pool under load. Same in TencentCos (~12 sites). |
+| 3878 | 3 | P1 | `UltimateStorage/Strategies/Cloud/TencentCosStrategy.cs:207-268,325-366` | Temp-file upload with retry: stream seek not reset between retries → corrupt/partial data. `finally` may delete temp before retry reads it. |
+| 3879 | 7 | P1 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:550-553` | `RetrieveViaRestApiAsync` — HttpResponseMessage never disposed. Leaks socket handles on high-throughput retrieval. |
+| 3880 | 7 | P1 | `UltimateStorage/Strategies/Archive/S3GlacierStrategy.cs:362-368` | `RetrieveAsyncCore` — BlobDownloadInfo response (network stream) never disposed. |
+| 3881 | 12 | P1 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:728-730` | Cartridge load waits fixed `Task.Delay(_loadTimeout)` with no polling. Writes may begin before cartridge seated → media errors. Same in UnloadCartridgeAsync (line 754). |
+| 3882 | 12 | P1 | `UltimateStorage/Strategies/Archive/BluRayJukeboxStrategy.cs:182-197` | `dataLength` stays 0 for non-seekable streams after reassignment. Catalog entry gets `Size = 0` for all non-seekable inputs. |
+| 3883 | 2 | P1 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:54-55,972-973` | `OpticalCatalog._entries` capped at 1000 via BoundedDictionary. Archive catalogs evict entries → `FileNotFoundException` on valid data. Same in BluRay and Tape strategies. |
+| 3884 | 5 | P1 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:695-701` | `RefreshCartridgeInventoryAsync` rethrows as InvalidOperationException but `LoadCartridgeAsync` (706) has no retry for stale inventory. |
+| 3885 | 12 | P2 | `UltimateStorage/Strategies/Archive/AzureArchiveStrategy.cs:224-244` | Rehydration state machine logic: first `if` check is dead code when status contains "RehydratePending". Confusing but functionally correct. |
+| 3886 | 12 | P2 | `UltimateStorage/Strategies/Archive/AzureArchiveStrategy.cs:680-696` | Lifecycle tiering uses cumulative age from LastModified. Field names (`_coolToColdDays`) imply time-in-tier — misleading. |
+| 3887 | 5 | P2 | `UltimateStorage/Strategies/Archive/S3GlacierStrategy.cs:319-340` | Multipart abort silently swallows all exceptions including OperationCanceledException. Partial uploads leaked on abort failure. |
+| 3888 | 4 | P2 | `UltimateStorage/Strategies/Cloud/AzureBlobStrategy.cs:99-100` | `_accountKey` stored as plaintext string for strategy lifetime. Memory dump exposure risk. |
+| 3889 | 14 | P2 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:157-179` | Non-seekable stream copied entirely to MemoryStream for length. OOM on multi-GB archives. Same in BluRay and Tape. |
+| 3890 | 4 | P2 | `UltimateStorage/Strategies/Cloud/TencentCosStrategy.cs:49` | `_customerProvidedKey` (SSE-C 256-bit) stored as plain string. Should be wiped after use. |
+| 3891 | 13 | P2 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:431-432,467-470` | `GetHealthAsyncCore` — LINQ `.Sum()` on `BoundedDictionary.Values` twice. Allocates snapshot each call. Same in BluRay. |
+| 3892 | 12 | P2 | `UltimateStorage/Strategies/Cloud/OracleObjectStorageStrategy.cs:386-396` | `ExistsAsyncCore` uses `ex.Message.Contains("404")`. Brittle. Returns false for all non-404 errors including auth failures. |
+| 3893 | 12 | P2 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:162-164` | WORM existence check outside `_driveLock`. Another thread can write same key between check and lock acquisition. |
+| 3894 | 12 | P2 | `UltimateStorage/Strategies/Cloud/TencentCosStrategy.cs:292-297` | Large-file metadata configured on PutObjectRequest but never passed to COSXMLUploadTask. Metadata silently discarded on multipart. |
+| 3895 | 5 | P2 | `UltimateStorage/Strategies/Archive/S3GlacierStrategy.cs:588-595` | RestoreObject 409 Conflict silently suppressed. Callers can't distinguish "initiated" from "already running". |
+| 3896 | 12 | P2 | `UltimateStorage/Strategies/Cloud/OracleObjectStorageStrategy.cs:193-194` | `StoreSinglePartAsync` returns `data.Length` not `data.Length - data.Position`. Inflated size for partial streams. |
+| 3897 | 14 | P2 | `UltimateStorage/Strategies/Archive/GcsArchiveStrategy.cs:111-116` | Storage class validation may conflict with ParseStorageClass enum mapping. |
+| 3898 | 8 | P2 | `UltimateStorage/Strategies/Cloud/AlibabaOssStrategy.cs:200-246` | `UploadSimpleAsync` resets stream Position=0 inside retry. Non-seekable wrapper throws. CanSeek guard incomplete. |
+| 3899 | 15 | LOW | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:61` | StrategyId "optical-disc-archive" overlaps with BluRayJukeboxStrategy's taxonomy. Confusing selection. |
+| 3900 | 15 | LOW | `UltimateStorage/Strategies/Cloud/TencentCosStrategy.cs:762-766` | `ShouldRetry` declares retry code array but never uses it. Always retries `errorCode > 0`. Dead code. |
+| 3901 | 15 | LOW | `UltimateStorage/Strategies/Archive/AzureArchiveStrategy.cs:199` | `IncrementBytesStored` uses `data.Position` as proxy — may not equal bytes consumed after Azure SDK upload. |
+| 3902 | 12 | LOW | `UltimateStorage/Strategies/Cloud/GcsStrategy.cs:692` | Bucket location hardcoded `"US"`. Non-US deployments silently create buckets in wrong region. Same in GcsArchiveStrategy. |
+| 3903 | 13 | LOW | `UltimateStorage/StorageStrategyRegistry.cs` | File is interface/DTO definitions, no actual registry. Filename misleading. |
+| 3904 | 5 | LOW | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:820-824` | `CheckOdaAccessibilityAsync` returns false for all errors. Auth vs connectivity indistinguishable. |
+| 3905 | 9 | LOW | `UltimateStorage/Strategies/Archive/S3GlacierStrategy.cs:584-586` | Retrieval tier configured but never sent — "SDK version mismatch" comment. All restores use Standard tier silently. |
+
+**Clean files:** IbmCosStrategy.cs, S3Strategy.cs
+
+---
+
+### Chunk 128 — UltimateStorage Connectors (GraphQL, gRPC, JDBC, Kafka, NATS, ODBC, Pulsar, REST, Webhook) + Decentralized (Arweave, BitTorrent, Filecoin, IPFS, Sia, Storj)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3906 | 1 | P0 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:41,107-215` | Entire strategy non-functional. `IsProductionReady => false` but returns fake success data. TestConnection=CompletedTask, Retrieve=hardcoded JSON, Exists=always true, List=3 hardcoded names. |
+| 3907 | 1 | P0 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:61-77,156-158` | No real Kafka client. InitializeCoreAsync=CompletedTask. All ops on in-memory ConcurrentQueue. ExistsAsync returns IsEmpty (not per-key). |
+| 3908 | 1 | P0 | `UltimateStorage/Strategies/Connectors/NatsConnectorStrategy.cs:56-67,142-145` | No real NATS client. Same pattern: InitializeCoreAsync=CompletedTask, in-memory queue, ExistsAsync=IsEmpty. |
+| 3909 | 1 | P0 | `UltimateStorage/Strategies/Connectors/PulsarConnectorStrategy.cs:55-67,141-144` | No real Pulsar client. Same pattern. DeleteAsyncCore=CompletedTask. |
+| 3910 | 1 | P1 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:131-132` | ETag uses `HashCode.Combine` — process-local, non-deterministic. Must use SHA-256 for stable ETags. |
+| 3911 | 2 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:67-68` | `_keyToDealMap` (Dictionary) with lock, but background monitoring tasks race with Dispose. Use ConcurrentDictionary. |
+| 3912 | 6 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:554-557` | Fire-and-forget `MonitorDealStatusAsync` with caller's per-request `ct`. Background monitor killed when request completes. |
+| 3913 | 6 | P1 | `UltimateStorage/Strategies/Decentralized/SiaStrategy.cs:316-323` | Fire-and-forget health-monitor receives caller's `ct`. Premature cancellation on request completion. |
+| 3914 | 6 | P1 | `UltimateStorage/Strategies/Decentralized/IpfsStrategy.cs:1047-1051` | Fire-and-forget GC task with per-request `ct`. GC cancelled when store completes. |
+| 3915 | 4 | P1 | `UltimateStorage/Strategies/Connectors/OdbcConnectorStrategy.cs:222-231` | SQL injection: `query://` key path passes raw `target` as `sqlQuery`. Arbitrary SQL execution. |
+| 3916 | 4 | P1 | `UltimateStorage/Strategies/Connectors/OdbcConnectorStrategy.cs:433,337,290` | SQL injection: unvalidated `target` in `SELECT COUNT(*)`, `DELETE FROM`. No `ValidateTableName` in ODBC ParseKey. |
+| 3917 | 4 | P1 | `UltimateStorage/Strategies/Connectors/JdbcConnectorStrategy.cs:119-120` | SQL injection: caller-supplied `SqlCommand` metadata key executed without validation. |
+| 3918 | 7 | P1 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:117` | `_channelLock` declared and disposed but never acquired in store/retrieve. No concurrency guard on shared `_channel`. |
+| 3919 | 12 | P1 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:101,130-145` | TOCTOU: `.Count >= _maxQueueSize` check then `.Enqueue` not atomic. Exceeds limit under concurrent load. Same in NATS (90), Pulsar (89). |
+| 3920 | 12 | P1 | `UltimateStorage/Strategies/Connectors/WebhookConnectorStrategy.cs:113-116,130-136` | TOCTOU: duplicate-event check separate from TryAdd. Queue-full check separate from Enqueue. Concurrent bypass. |
+| 3921 | 12 | P1 | `UltimateStorage/Strategies/Connectors/GraphQlConnectorStrategy.cs:302-303` | `DeleteAsyncCore` mutation not passed through `ValidateGraphQlQuery`. Crafted key injects nested mutation bypassing depth/introspection guards. |
+| 3922 | 12 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:604-611` | `QueryAvailableMinersAsync` — `Reputation = _minMinerReputation + 10` hardcoded for all miners. Selection meaningless. |
+| 3923 | 1 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:875-896` | `RenewDealsAsync` stub — mutates in-memory `DurationEpochs` without Lotus API call. Nothing on-chain changes. |
+| 3924 | 2 | P2 | `UltimateStorage/Strategies/Decentralized/ArweaveStrategy.cs:53-54` | `_keyToTransactionMap` (Dictionary) protected by consistent `lock (_mapLock)`. ConcurrentDictionary preferred for safety margin. |
+| 3925 | 2 | P2 | `UltimateStorage/Strategies/Decentralized/IpfsStrategy.cs:1043-1044` | `_lastGcTime` (DateTime struct) read without lock. Not atomic on 32-bit platforms. |
+| 3926 | 9 | P2 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:87-98` | `TestConnectionAsync` hollow — `await Task.CompletedTask`. Init always succeeds regardless of network. |
+| 3927 | 5 | P2 | `UltimateStorage/Strategies/Connectors/WebhookConnectorStrategy.cs:321` | `VerifySignature` no distinction between "header missing" vs "wrong signature". Both return false. |
+| 3928 | 14 | P2 | `UltimateStorage/Strategies/Connectors/OdbcConnectorStrategy.cs:549-558` | `ConstructInsertCommand` builds column names from caller-controlled parameter keys. SQL injection in column list. |
+| 3929 | 13 | P2 | `UltimateStorage/Strategies/Connectors/JdbcConnectorStrategy.cs:298` | `GetSchema("Tables")` returns all tables unbounded. OOM on large databases. Same in ODBC (378). |
+| 3930 | 9 | P2 | `UltimateStorage/Strategies/Connectors/GraphQlConnectorStrategy.cs:399-423` | `GetMetadataAsyncCore` returns stub: `Size = 0`, `Created = DateTime.MinValue`. No GraphQL query executed. |
+| 3931 | 12 | P2 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:130-145` | `RetrieveAsyncCore` ignores `key` parameter. Dequeues oldest message regardless. Same in NATS (118-133), Pulsar (117-133). |
+| 3932 | 10 | P2 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:117` | ETag from `HashCode.Combine(topic, partition, offset)` — process-local hash. Same in NATS (106), Pulsar (105). |
+| 3933 | 14 | P2 | `UltimateStorage/Strategies/Decentralized/BitTorrentStrategy.cs:265-266,289-291,904` | Path traversal: key used directly in `Path.Combine` for download, torrent, and metadata directories. `../../` escape possible. |
+| 3934 | 1 | LOW | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:75-78` | TLS validation bypassed with `=> true` callback when `_useTls = false`. Suppresses errors on accidental TLS negotiation. |
+| 3935 | 9 | LOW | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:628-651` | `ProposeStorageDealAsync` sends empty `Wallet = ""`. Lotus node rejects or uses default wallet silently. |
+| 3936 | 13 | LOW | `UltimateStorage/Strategies/Decentralized/StorjStrategy.cs:681-698` | `GetNetworkStatsAsync` returns hardcoded `TotalNodeCount = 110`. Advisory, not operational. |
+| 3937 | 9 | LOW | `UltimateStorage/Strategies/Decentralized/ArweaveStrategy.cs:160` | Low-balance warning via Debug.WriteLine only. Production OOM on AR with no observable warning. |
+| 3938 | 5 | LOW | `UltimateStorage/Strategies/Decentralized/IpfsStrategy.cs:439` | `ListAsyncCore` — `catch (Exception)` with `yield break`. Swallows auth/network errors alongside directory-not-found. |
+| 3939 | 15 | LOW | `UltimateStorage/Strategies/Connectors/WebhookConnectorStrategy.cs:38` | Dedup cache holds events 10 min (`_replayWindowSeconds * 2`) but replay check is 5 min. Undocumented 2x multiplier. |
+
+**Clean files:** RestApiConnectorStrategy.cs, SiaStrategy.cs (mostly clean)
+
+---
+
+### Chunk 129 — UltimateStorage Decentralized/Swarm + DistributedStorageInfra + Enterprise (Dell ECS/PowerScale, HPE, NetApp, Pure, VastData, WekaIO) + FutureHardware (Crystal, DNA, Holographic, Neural, Quantum) + Import/BigQuery
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3940 | 1 | P0 | `UltimateStorage/Strategies/Import/BigQueryImportStrategy.cs:16-70` | Rule 13 stub: named `BigQueryImportStrategy` but does nothing related to BigQuery — no client, no load jobs. All ops use in-memory `BoundedDictionary`. `IsProductionReady = false` is an admission flag. |
+| 3941 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:549-560` | `ReconstructShard()` XOR-only, not Reed-Solomon. Valid only for 1-parity scheme; silently produces corrupted data for multi-parity without error. |
+| 3942 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:71-73` | Read-repair stub: sets `ReadRepairTriggered=true` but never writes back to stale replicas. Comment says "In production, this would write back". Consistency guarantee is a lie. |
+| 3943 | 6 | P1 | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:249-254` | Fire-and-forget replication via `_ = Task.Run(...)`. ContinueWith only logs on fault. Shares request's CancellationToken — replication abandoned if request completes. |
+| 3944 | 2 | P1 | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:677-683` | Token refresh race: `EnsureAuthenticatedAsync` reads/writes `_authToken`/`_tokenExpiry` without sync. Concurrent expired-token requests cause multiple re-auth flows. |
+| 3945 | 2 | P1 | `UltimateStorage/Strategies/Enterprise/WekaIoStrategy.cs:586-622` | Same token acquisition race: checks `_apiToken` then sets it without lock. Multiple threads can simultaneously POST to `/login`. |
+| 3946 | 4 | P1 | `UltimateStorage/Strategies/Enterprise/WekaIoStrategy.cs:883-892` | Path traversal: `GetFullPosixPath` does `Path.Combine(_mountPath, key)` then `GetFullPath` but no check that result is under `_mountPath`. `../../etc/passwd` escapes. |
+| 3947 | 4 | P1 | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:234-235` | Session token in plain Cookie header (`isisessid={_authToken}`) — unsanitized, potential header injection if token contains semicolons. |
+| 3948 | 1 | P1 | `UltimateStorage/Strategies/Enterprise/VastDataStrategy.cs:263-266` | NFS path throws `NotSupportedException("Only S3 protocol supported")`. Class claims NFS/SMB support but only S3 implemented. |
+| 3949 | 12 | P1 | `UltimateStorage/Strategies/Enterprise/WekaIoStrategy.cs:273-317` | S3 protocol silently falls back to POSIX filesystem. `StoreViaS3ProtocolAsync` ignores configured `_s3Endpoint`/`_s3AccessKey`/`_s3SecretKey`. Comment says "REST API simulation". |
+| 3950 | 7 | P1 | `UltimateStorage/Strategies/Decentralized/SwarmStrategy.cs:688-711` | `HttpClient` leak in `GetOrCreatePostageBatchAsync`: `debugClient` created without `using`. If `ReadAsStringAsync` or `JsonDocument.Parse` throws, client leaks. |
+| 3951 | 7 | P1 | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:258-267` | `MemoryStream` leak: allocated without `using` in `StoreAsyncCore`. If `SendWithRetryAsync` throws, stream not disposed. |
+| 3952 | 15 | P2 | `UltimateStorage/Strategies/Decentralized/SwarmStrategy.cs:670-678` | `ComputeFeedTopic` uses `HashCode.Combine(key)` (32-bit). Collision at ~65K keys means two keys silently overwrite each other's feed references. |
+| 3953 | 9 | P2 | `UltimateStorage/Strategies/Decentralized/SwarmStrategy.cs:394-413` | `ListAsyncCore` returns only in-memory `_keyToReferenceMap` — empty after restart. Silently incomplete results. |
+| 3954 | 9 | P2 | `UltimateStorage/Strategies/Enterprise/DellEcsStrategy.cs:160-177` | Non-seekable stream forces single-part upload. 2GB non-seekable stream buffered into small MemoryStream — potential OOM. |
+| 3955 | 13 | P2 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:47,96,301` | `.Values.Where(...).ToList()` in hot paths (ReadAsync, WriteAsync, RouteRead). Allocates new list per request with 1000+ replicas. |
+| 3956 | 12 | P2 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:145-154` | `SelectReplicas` uses `replicas.First().Region` as local region. Non-deterministic when replicas registered in different orders. |
+| 3957 | 2 | P2 | `UltimateStorage/Strategies/Enterprise/DellEcsStrategy.cs:306-340` | Multipart upload throws on short reads from stream (`bytesRead < partSize`), overly strict for partial-read-lawful streams. |
+| 3958 | 9 | P2 | `UltimateStorage/Strategies/Enterprise/NetAppOntapStrategy.cs:86-179` | Volume UUID lazily fetched without lock. Two concurrent Store calls race to GET UUID simultaneously. |
+| 3959 | 9 | P2 | `UltimateStorage/Strategies/Enterprise/WekaIoStrategy.cs:855-861` | `.metadata.json` sidecar files not deleted on `DeleteAsyncCore`. Stale metadata accumulates indefinitely. |
+| 3960 | 9 | P2 | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:399` | Directory listing hard-capped at 1000 objects (`?max=1000`) without pagination. Silently truncated results. |
+| 3961 | 5 | P2 | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:960-968` | Bare `catch {}` in `DisposeCoreAsync` during logout — no logging at all. |
+| 3962 | 5 | P2 | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:938-943` | Same: bare `catch {}` in `DisposeCoreAsync` during logout with no logging. |
+| 3963 | 15 | LOW | `UltimateStorage/Strategies/Enterprise/DellEcsStrategy.cs:833-840` | `AppendAsync` returns `Size = content.Length` (chunk size, not total object size). Capacity accounting incorrect. |
+| 3964 | 14 | LOW | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:230-235` | Metadata keys inserted directly as `X-Isi-Ifs-Set-Attr-{key}` header names — no validation for unsafe characters. |
+| 3965 | 14 | LOW | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:221-228` | Same: `X-HP-Meta-{key}` header names unsanitized. |
+| 3966 | 13 | LOW | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:332-333` | `_replicationLog` inner `List<ReplicationEvent>` unbounded. Memory grows without limit in long-lived process. |
+| 3967 | 12 | LOW | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:654-655` | `_failoverHistory` keyed by `{nodeId}:{DateTime.UtcNow.Ticks}` — 100ns resolution, rapid calls silently overwrite. |
+| 3968 | 9 | LOW | `UltimateStorage/Strategies/Enterprise/DellPowerScaleStrategy.cs:963` | `SendAsync` in `DisposeCoreAsync` without CancellationToken — can block indefinitely on network failure. |
+| 3969 | 9 | LOW | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:935-938` | Same: `SendAsync` without cancellation in Dispose — blocks for `_timeoutSeconds` (300s) during shutdown. |
+| 3970 | 14 | LOW | `UltimateStorage/Strategies/Import/BigQueryImportStrategy.cs:46` | `DeleteAsyncCore` doesn't call `IncrementBytesDeleted`. Inconsistent stats accounting vs other strategies. |
+
+**Clean files:** FutureHardware/CrystalStorageStrategy.cs, DnaDriveStrategy.cs, HolographicStrategy.cs, NeuralStorageStrategy.cs, QuantumMemoryStrategy.cs (all throw PlatformNotSupportedException — acceptable per rules)
+
+---
+
+### Chunk 130 — UltimateStorage Import (Cassandra, Databricks, Mongo, MySQL, Oracle, Postgres, Snowflake, SqlServer) + Innovation (AiTiered, CarbonNeutral, CollaborationAware, ContentAware, CostPredictive, CryptoEconomic, EdgeCascade)
+
+| # | Cat | Sev | Location | Description |
+|---|-----|-----|----------|-------------|
+| 3971 | 1 | P0 | `UltimateStorage/Strategies/Import/CassandraImportStrategy.cs:16-70` | Complete stub: in-memory BoundedDictionary, no CQL, no Cassandra.Driver. `IsProductionReady = false`. Rule 13 violation. |
+| 3972 | 1 | P0 | `UltimateStorage/Strategies/Import/DatabricksImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No Databricks SDK, no Delta Lake. Rule 13 violation. |
+| 3973 | 1 | P0 | `UltimateStorage/Strategies/Import/MongoImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No MongoDB.Driver. Rule 13 violation. |
+| 3974 | 1 | P0 | `UltimateStorage/Strategies/Import/SqlServerImportStrategy.cs:84-113` | Retrieve returns empty 4096-byte MemoryStream regardless of key. Exists unconditionally returns true. Delete no-op. StoreAsync connects but discards data — no SqlBulkCopy. |
+| 3975 | 1 | P1 | `UltimateStorage/Strategies/Import/MySqlImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no MySqlConnector, no LOAD DATA INFILE. |
+| 3976 | 1 | P1 | `UltimateStorage/Strategies/Import/OracleImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no Oracle.ManagedDataAccess. |
+| 3977 | 1 | P1 | `UltimateStorage/Strategies/Import/PostgresImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no Npgsql, no COPY protocol. |
+| 3978 | 1 | P1 | `UltimateStorage/Strategies/Import/SnowflakeImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no Snowflake.Data, no Snowpipe. |
+| 3979 | 5 | P1 | `UltimateStorage/Strategies/Innovation/AiTieredStorageStrategy.cs:151-154,167-170,603-606,643-646` | Four silent catch blocks swallow all exceptions in Load/SaveAccessProfiles, PerformAutoMigration, MigrateObject. Migration/save failures produce zero diagnostics. |
+| 3980 | 5 | P1 | `UltimateStorage/Strategies/Innovation/CarbonNeutralStorageStrategy.cs:151-154,164-168` | Two silent catches in Load/SaveCarbonMetadata. Failed metadata load silently loses all carbon accounting state on restart. |
+| 3981 | 5 | P1 | `UltimateStorage/Strategies/Innovation/CryptoEconomicStorageStrategy.cs:174-177,191-194,643-646` | Three silent catches in LoadObjectRecords, SaveObjectRecords, PerformStorageProofChallenges. Lost records mean phantom objects. |
+| 3982 | 6 | P1 | `UltimateStorage/Strategies/Innovation/CostPredictiveStorageStrategy.cs:390-394` | Fire-and-forget `_ = Task.Run(() => MigrateTierAsync(...))` twice in timer callback. Concurrent migrations can corrupt `CurrentTier` and files. |
+| 3983 | 2 | P1 | `UltimateStorage/Strategies/Innovation/CarbonNeutralStorageStrategy.cs:209-211,291-292` | Non-atomic `Interlocked.Exchange(ref _total, _total + delta)` — reads field outside lock, concurrent callers lose increments. |
+| 3984 | 2 | P1 | `UltimateStorage/Strategies/Innovation/CostPredictiveStorageStrategy.cs:349-362` | Unsynchronized mutation of `_currentMonthSpend` and `DailyCostMetrics` fields from storage ops + timer callback. Lost updates corrupt cost tracking. |
+| 3985 | 4 | P1 | `UltimateStorage/Strategies/Innovation/CollaborationAwareStorageStrategy.cs:97-107` | Path traversal: `Path.Combine(teamPath, key)` with user-controlled `key` and `TeamName`. `../../etc/passwd` escapes storage path. No canonicalization. |
+| 3986 | 4 | P1 | `UltimateStorage/Strategies/Innovation/ContentAwareStorageStrategy.cs:127-128` | Path traversal: `Path.Combine(_baseStoragePath, categoryPath, key)` — no canonicalization guard. |
+| 3987 | 4 | P1 | `UltimateStorage/Strategies/Innovation/EdgeCascadeStrategy.cs:109-116` | Path traversal: `Path.Combine(_originPath, key)` — no canonicalization. |
+| 3988 | 4 | P1 | `UltimateStorage/Strategies/Innovation/CostPredictiveStorageStrategy.cs:120-121` | Path traversal: `Path.Combine(_baseStoragePath, tierPath, key)` — no canonicalization. |
+| 3989 | 1 | P2 | `UltimateStorage/Strategies/Innovation/CarbonNeutralStorageStrategy.cs:456-499` | `SelectGreenestDatacenterAsync`/`PurchaseCarbonOffsetAsync` stubs with `Task.Delay` and "Simulate API call" comments. |
+| 3990 | 1 | P2 | `UltimateStorage/Strategies/Innovation/CryptoEconomicStorageStrategy.cs:528-555` | `PerformErasureCoding` is simple array-split, not erasure coding. Parity shards duplicated from last data shard — no actual redundancy. |
+| 3991 | 10 | P2 | `UltimateStorage/Strategies/Innovation/ContentAwareStorageStrategy.cs:106-124,406-411` | Dedup uses `HashCode.AddBytes` (32-bit non-crypto hash). Collision means wrong file content returned for colliding key. |
+| 3992 | 10 | P2 | `UltimateStorage/Strategies/Innovation/CryptoEconomicStorageStrategy.cs:682-687` | Proof-of-storage integrity uses 32-bit `HashCode.AddBytes`. Corrupt/malicious provider can pass 1-in-4B collision challenge. |
+| 3993 | 12 | P2 | `UltimateStorage/Strategies/Innovation/AiTieredStorageStrategy.cs:569` | Tier comparison `optimalTier < currentTier` relies on implicit enum ordering. Future enum insertion silently inverts logic. |
+| 3994 | 12 | P2 | `UltimateStorage/Strategies/Innovation/CostPredictiveStorageStrategy.cs:383-396` | `Warm→Cold` condition unreachable: outer `Where` filters to `StorageTier.Hot` only. Dead branch. |
+| 3995 | 13 | P2 | `UltimateStorage/Strategies/Innovation/AiTieredStorageStrategy.cs:417-420` | Four sequential LINQ `Count()` calls iterate `_objectTiers.Values` four times in `GetHealthAsyncCore`. |
+| 3996 | 13 | P2 | `UltimateStorage/Strategies/Innovation/AiTieredStorageStrategy.cs:582` | `PerformAutoMigrationAsync` snapshots all `_accessProfiles` via `.ToArray()` then sequential loop. O(n*m) blocking timer. |
+| 3997 | 14 | P2 | `UltimateStorage/Strategies/Innovation/AiTieredStorageStrategy.cs:206` | `GetSafeFileName` replaces invalid filename chars but `../../secret` has no invalid chars — path traversal passes through. |
+| 3998 | 2 | P2 | `UltimateStorage/Strategies/Innovation/CollaborationAwareStorageStrategy.cs:111-114` | Unsynchronized mutation of `TeamAccessInfo` properties from concurrent store/retrieve. `HashSet.Add` not thread-safe. |
+| 3999 | 15 | LOW | `UltimateStorage/Strategies/Import/SqlServerImportStrategy.cs:61` | `tableName` derived from key but never used — abandoned mid-implementation. |
+| 4000 | 15 | LOW | `UltimateStorage/Strategies/Innovation/CarbonNeutralStorageStrategy.cs:46` | `_random` field declared but never used — dead code. |
+| 4001 | 9 | LOW | `UltimateStorage/Strategies/Innovation/CostPredictiveStorageStrategy.cs:376-397` | Timer callback fires without re-entry guard. Two concurrent migrations for same object possible with no lock. |
+| 4002 | 9 | LOW | `UltimateStorage/Strategies/Innovation/EdgeCascadeStrategy.cs:220-225` | `ExistsAsyncCore` checks only `_originCache` + filesystem. Objects in edge cache but evicted from origin return false. |
+
+**Clean files:** (None — all files had findings)
+
+---

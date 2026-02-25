@@ -1,0 +1,153 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Connectors;
+using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
+{
+    /// <summary>
+    /// Connection strategy for Apache Druid real-time analytics database.
+    /// </summary>
+    public class ApacheDruidConnectionStrategy : DatabaseConnectionStrategyBase
+    {
+        private HttpClient? _httpClient;
+
+        public override string StrategyId => "druid";
+        public override string DisplayName => "Apache Druid";
+        public override string SemanticDescription => "Real-time analytics database designed for fast slice-and-dice analytics on large datasets";
+        public override string[] Tags => new[] { "specialized", "druid", "realtime", "analytics", "olap" };
+
+        public override ConnectionStrategyCapabilities Capabilities => new(
+            SupportsPooling: true,
+            SupportsStreaming: true,
+            SupportsTransactions: false,
+            SupportsBulkOperations: true,
+            SupportsSchemaDiscovery: true,
+            SupportsSsl: true,
+            SupportsCompression: true,
+            SupportsAuthentication: true,
+            MaxConcurrentConnections: 150,
+            SupportedAuthMethods: new[] { "basic", "kerberos" }
+        );
+
+        public ApacheDruidConnectionStrategy(ILogger<ApacheDruidConnectionStrategy>? logger = null) : base(logger) { }
+
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        {
+            var (host, port) = ParseHostPort(config.ConnectionString, 8082);
+            _httpClient = new HttpClient
+            {
+                BaseAddress = new Uri($"http://{host}:{port}"),
+                Timeout = config.Timeout
+            };
+
+            var response = await _httpClient.GetAsync("/status", ct);
+            response.EnsureSuccessStatusCode();
+
+            return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
+            {
+                ["host"] = host,
+                ["broker_port"] = port
+            });
+        }
+
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            if (_httpClient == null) return false;
+            try
+            {
+                var response = await _httpClient.GetAsync("/status", ct);
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; /* Connection validation - failure acceptable */ }
+        }
+
+        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            _httpClient?.Dispose();
+            _httpClient = null;
+            await Task.CompletedTask;
+        }
+
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var isHealthy = await TestCoreAsync(handle, ct);
+            return new ConnectionHealth(isHealthy, isHealthy ? "Druid healthy" : "Druid unhealthy",
+                TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
+        }
+
+        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+            IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return new List<Dictionary<string, object?>>();
+            try
+            {
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                if (!response.IsSuccessStatusCode)
+                    return new List<Dictionary<string, object?>>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var results = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object?>>>(json);
+                return results ?? new List<Dictionary<string, object?>>();
+            }
+            catch
+            {
+                return new List<Dictionary<string, object?>>();
+            }
+        }
+
+        public override async Task<int> ExecuteNonQueryAsync(
+            IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return 0;
+            try
+            {
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                return response.IsSuccessStatusCode ? 1 : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return new List<DataSchema>();
+            try
+            {
+                var response = await _httpClient.GetAsync("/druid/v2/datasources", ct);
+                if (!response.IsSuccessStatusCode)
+                    return new List<DataSchema>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var datasources = System.Text.Json.JsonSerializer.Deserialize<string[]>(json) ?? Array.Empty<string>();
+                var schemas = new List<DataSchema>();
+                foreach (var ds in datasources)
+                {
+                    schemas.Add(new DataSchema(ds, new[]
+                    {
+                        new DataSchemaField("__time", "Timestamp", false, null, null)
+                    }, new[] { "__time" }, new Dictionary<string, object> { ["type"] = "datasource" }));
+                }
+                return schemas;
+            }
+            catch
+            {
+                return new List<DataSchema>();
+            }
+        }
+
+        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            var clean = connectionString.Replace("http://", "").Split('/')[0];
+            var parts = clean.Split(':');
+            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+        }
+    }
+}

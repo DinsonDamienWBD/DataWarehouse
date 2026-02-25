@@ -340,7 +340,10 @@ namespace DataWarehouse.Kernel.Infrastructure
             }
         }
 
-        public void Flush() { }
+        public void Flush()
+        {
+            // Console output is already flushed automatically
+        }
     }
 
     /// <summary>
@@ -425,7 +428,7 @@ namespace DataWarehouse.Kernel.Infrastructure
 
             foreach (var file in files)
             {
-                try { File.Delete(file); } catch { }
+                try { File.Delete(file); } catch { /* Best-effort cleanup */ }
             }
 
             EnsureWriter();
@@ -464,7 +467,10 @@ namespace DataWarehouse.Kernel.Infrastructure
             }
         }
 
-        public void Flush() { }
+        public void Flush()
+        {
+            // In-memory target has no buffering to flush
+        }
 
         public IReadOnlyList<LogEntry> GetEntries() => _entries.ToList();
 

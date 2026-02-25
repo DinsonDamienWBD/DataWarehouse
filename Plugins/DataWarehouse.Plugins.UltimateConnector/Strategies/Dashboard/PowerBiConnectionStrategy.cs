@@ -1,0 +1,16 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Net.Http.Headers;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Dashboard;
+
+/// <summary>Power BI connection strategy. HTTPS to api.powerbi.com. Microsoft BI platform.</summary>
+public sealed class PowerBiConnectionStrategy : DashboardConnectionStrategyBase
+{
+    public override string StrategyId => "powerbi";public override string DisplayName => "Power BI";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Microsoft Power BI. Cloud BI service with natural language queries and Azure integration.";public override string[] Tags => ["powerbi", "microsoft", "bi", "cloud", "azure"];
+    public PowerBiConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "https://api.powerbi.com";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };if (config.Properties.TryGetValue("Token", out var token)){httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.ToString()!);}return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "PowerBI", ["BaseUrl"] = baseUrl });}
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(true);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "Power BI configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
+    public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default){var httpClient = handle.GetConnection<HttpClient>();var content = new StringContent(dashboardDefinition, Encoding.UTF8, "application/json");var response = await httpClient.PostAsync("/v1.0/myorg/dashboards", content, ct);response.EnsureSuccessStatusCode();var result = await response.Content.ReadAsStringAsync(ct);var json = JsonDocument.Parse(result);return json.RootElement.GetProperty("id").GetString() ?? "";}
+    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { rows = data });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync($"/v1.0/myorg/datasets/{datasetId}/tables/TABLE_NAME/rows", content, ct);response.EnsureSuccessStatusCode();}
+}

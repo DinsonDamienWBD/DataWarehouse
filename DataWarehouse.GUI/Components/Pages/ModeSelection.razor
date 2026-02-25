@@ -1,0 +1,199 @@
+@page "/mode-selection"
+@using DataWarehouse.SDK.VirtualDiskEngine.Format
+@inject NavigationManager Navigation
+
+<div class="content-header">
+    <h2>Welcome to DataWarehouse</h2>
+    <p class="text-muted">Select how you want to get started</p>
+</div>
+
+<div class="content-body">
+    <!-- Mode Selection Cards -->
+    <div class="d-flex gap-3" style="flex-wrap: wrap;">
+
+        <!-- Connect (Mode A) -->
+        <div class="card @(_selectedMode == StartupMode.Connect ? "border-primary" : "")"
+             style="flex: 1; min-width: 280px; cursor: pointer;"
+             @onclick="() => SelectMode(StartupMode.Connect)">
+            <div class="card-body text-center">
+                <div style="font-size: 2.5rem;">&#x1F517;</div>
+                <h4 class="mt-2">Connect</h4>
+                <p class="text-muted">Connect to an existing DataWarehouse instance</p>
+                @if (_selectedMode == StartupMode.Connect)
+                {
+                    <span class="badge badge-success">Selected</span>
+                }
+            </div>
+        </div>
+
+        <!-- Live (Mode B) -->
+        <div class="card @(_selectedMode == StartupMode.Live ? "border-primary" : "")"
+             style="flex: 1; min-width: 280px; cursor: pointer;"
+             @onclick="() => SelectMode(StartupMode.Live)">
+            <div class="card-body text-center">
+                <div style="font-size: 2.5rem;">&#x26A1;</div>
+                <h4 class="mt-2">Live</h4>
+                <p class="text-muted">Start a temporary in-memory instance</p>
+                @if (_selectedMode == StartupMode.Live)
+                {
+                    <span class="badge badge-success">Selected</span>
+                }
+            </div>
+        </div>
+
+        <!-- Install (Mode C) -->
+        <div class="card @(_selectedMode == StartupMode.Install ? "border-primary" : "")"
+             style="flex: 1; min-width: 280px; cursor: pointer;"
+             @onclick="() => SelectMode(StartupMode.Install)">
+            <div class="card-body text-center">
+                <div style="font-size: 2.5rem;">&#x1F4E6;</div>
+                <h4 class="mt-2">Install</h4>
+                <p class="text-muted">Install and configure a new DataWarehouse</p>
+                @if (_selectedMode == StartupMode.Install)
+                {
+                    <span class="badge badge-success">Selected</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Topology Sub-selection (visible when Install is selected) -->
+    @if (_selectedMode == StartupMode.Install)
+    {
+        <div class="mt-4">
+            <h4>Select Deployment Topology</h4>
+            <p class="text-muted">Choose how components are deployed on this host</p>
+
+            <div class="d-flex gap-3" style="flex-wrap: wrap;">
+
+                <!-- DW+VDE (default) -->
+                <div class="card @(_selectedTopology == DeploymentTopology.DwPlusVde ? "border-primary" : "")"
+                     style="flex: 1; min-width: 250px; cursor: pointer;"
+                     @onclick="() => SelectTopology(DeploymentTopology.DwPlusVde)">
+                    <div class="card-body text-center">
+                        <div style="font-size: 2rem;">&#x1F4BB;</div>
+                        <h5 class="mt-2">DW + VDE</h5>
+                        <p class="text-muted small">Full installation with local VDE storage</p>
+                        @if (_selectedTopology == DeploymentTopology.DwPlusVde)
+                        {
+                            <span class="badge badge-success">Selected</span>
+                        }
+                        <div><small class="text-muted">(default)</small></div>
+                    </div>
+                </div>
+
+                <!-- DW-Only -->
+                <div class="card @(_selectedTopology == DeploymentTopology.DwOnly ? "border-primary" : "")"
+                     style="flex: 1; min-width: 250px; cursor: pointer;"
+                     @onclick="() => SelectTopology(DeploymentTopology.DwOnly)">
+                    <div class="card-body text-center">
+                        <div style="font-size: 2rem;">&#x1F5A5;</div>
+                        <h5 class="mt-2">DW-Only</h5>
+                        <p class="text-muted small">DataWarehouse kernel connecting to remote VDE</p>
+                        @if (_selectedTopology == DeploymentTopology.DwOnly)
+                        {
+                            <span class="badge badge-success">Selected</span>
+                        }
+                    </div>
+                </div>
+
+                <!-- VDE-Only -->
+                <div class="card @(_selectedTopology == DeploymentTopology.VdeOnly ? "border-primary" : "")"
+                     style="flex: 1; min-width: 250px; cursor: pointer;"
+                     @onclick="() => SelectTopology(DeploymentTopology.VdeOnly)">
+                    <div class="card-body text-center">
+                        <div style="font-size: 2rem;">&#x1F4BE;</div>
+                        <h5 class="mt-2">VDE-Only</h5>
+                        <p class="text-muted small">VDE engine accepting remote DataWarehouse connections</p>
+                        @if (_selectedTopology == DeploymentTopology.VdeOnly)
+                        {
+                            <span class="badge badge-success">Selected</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topology Preview -->
+            <div class="mt-3">
+                <TopologyPreview Topology="_selectedTopology" ActiveModules="_previewModules" />
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="ContinueInstall">
+                    Continue to Install
+                </button>
+                <button class="btn btn-secondary" @onclick="GoToVdeComposer">
+                    Create VDE During Install
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private StartupMode _selectedMode = StartupMode.None;
+    private DeploymentTopology _selectedTopology = DeploymentTopology.DwPlusVde;
+    // Populated when user selects modules from VDE Composer; null shows no module badges
+#pragma warning disable CS0649 // Field is intentionally unassigned (null = no modules selected)
+    private IReadOnlyList<ModuleId>? _previewModules;
+#pragma warning restore CS0649
+
+    private enum StartupMode
+    {
+        None,
+        Connect,
+        Live,
+        Install,
+    }
+
+    private void SelectMode(StartupMode mode)
+    {
+        if (mode == _selectedMode && mode != StartupMode.Install)
+        {
+            // Double-click on Connect or Live navigates immediately
+            NavigateForMode(mode);
+            return;
+        }
+
+        _selectedMode = mode;
+
+        // Navigate immediately for Connect and Live
+        if (mode == StartupMode.Connect)
+        {
+            Navigation.NavigateTo("/connections");
+        }
+        else if (mode == StartupMode.Live)
+        {
+            Navigation.NavigateTo("/?mode=live");
+        }
+    }
+
+    private void SelectTopology(DeploymentTopology topology)
+    {
+        _selectedTopology = topology;
+    }
+
+    private void ContinueInstall()
+    {
+        Navigation.NavigateTo($"/config?topology={_selectedTopology}");
+    }
+
+    private void GoToVdeComposer()
+    {
+        Navigation.NavigateTo($"/vde-composer?topology={_selectedTopology}");
+    }
+
+    private void NavigateForMode(StartupMode mode)
+    {
+        switch (mode)
+        {
+            case StartupMode.Connect:
+                Navigation.NavigateTo("/connections");
+                break;
+            case StartupMode.Live:
+                Navigation.NavigateTo("/?mode=live");
+                break;
+        }
+    }
+}

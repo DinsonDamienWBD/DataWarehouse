@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateMultiCloud</RootNamespace>
+    <Description>Ultimate Multi-Cloud Plugin - Comprehensive multi-cloud orchestration with 50+ strategies for cloud abstraction, cross-cloud replication, failover, cost optimization, security, arbitrage, hybrid cloud, and portability</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Multi-Cloud</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- Cloud Provider SDKs -->
+  <ItemGroup>
+    <!-- AWS -->
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.4" />
+    <PackageReference Include="AWSSDK.EC2" Version="4.0.72" />
+    <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.6.7" />
+    <PackageReference Include="AWSSDK.CostExplorer" Version="4.0.11.5" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.5.9" />
+    <PackageReference Include="Azure.Monitor.Query.Logs" Version="1.0.0" />
+
+    <!-- Azure -->
+    <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+
+    <!-- Google Cloud -->
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.14.0" />
+    <PackageReference Include="Google.Cloud.Compute.V1" Version="3.23.0" />
+    <PackageReference Include="Google.Cloud.Monitoring.V3" Version="3.16.0" />
+    <PackageReference Include="Google.Cloud.Billing.V1" Version="3.10.0" />
+
+    <!-- Multi-Cloud Tools -->
+    <PackageReference Include="Pulumi.Automation" Version="3.101.0" />
+  </ItemGroup>
+
+  <!-- Networking and Security -->
+  <ItemGroup>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+  </ItemGroup>
+
+</Project>

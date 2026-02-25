@@ -73,7 +73,7 @@ public sealed class ShortcutEventArgs : EventArgs
     /// <summary>
     /// Gets the triggered shortcut.
     /// </summary>
-    public KeyboardShortcut Shortcut { get; init; } = null!;
+    public required KeyboardShortcut Shortcut { get; init; }
 
     /// <summary>
     /// Gets or sets whether the event was handled.

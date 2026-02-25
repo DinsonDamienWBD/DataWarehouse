@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using DataWarehouse.Kernel;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.Launcher.Integration;
 
 namespace DataWarehouse.Launcher.Adapters;
@@ -16,7 +17,7 @@ public sealed class DataWarehouseAdapter : IKernelAdapter
     private ILogger<DataWarehouseAdapter> _logger = NullLogger<DataWarehouseAdapter>.Instance;
     private KernelState _state = KernelState.Uninitialized;
     private DateTime _startedAt;
-    private long _operationsProcessed;
+    private long _operationsProcessed = 0;
 
     public string KernelId => _kernel?.KernelId ?? "";
 
@@ -143,6 +144,16 @@ public sealed class DataWarehouseAdapter : IKernelAdapter
                 ["ThreadPoolThreads"] = ThreadPool.ThreadCount
             }
         };
+    }
+
+    /// <summary>
+    /// Gets the capability registry from the kernel for dynamic endpoint generation.
+    /// </summary>
+    public IPluginCapabilityRegistry? GetCapabilityRegistry()
+    {
+        // Access the kernel's capability registry if available
+        // This enables dynamic endpoint generation based on loaded plugins
+        return _kernel?.CapabilityRegistry;
     }
 
     public async ValueTask DisposeAsync()
