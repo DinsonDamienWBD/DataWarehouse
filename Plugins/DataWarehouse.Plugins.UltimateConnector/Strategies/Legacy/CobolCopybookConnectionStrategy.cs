@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 {
@@ -68,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             var parts = modernCommand.Split(' ');
             var field = parts[0];
             // Example translation - field name to offset/length
-            var translated = $"READ {field.GetHashCode() % 1000} 80";
+            var translated = $"READ {StableHash.Compute(field) % 1000} 80";
             return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"COBOL Copybook\"}}");
         }
     }

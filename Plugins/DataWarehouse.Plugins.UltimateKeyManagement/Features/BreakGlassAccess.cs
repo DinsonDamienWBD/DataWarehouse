@@ -976,7 +976,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             }
             catch
             {
+
                 // Best-effort event publishing
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

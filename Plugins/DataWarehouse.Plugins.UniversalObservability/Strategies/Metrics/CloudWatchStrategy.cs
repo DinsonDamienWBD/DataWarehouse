@@ -371,6 +371,8 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _accessKeyId = string.Empty;
+                _secretAccessKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

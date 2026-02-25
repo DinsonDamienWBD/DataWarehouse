@@ -266,9 +266,11 @@ public sealed class DashboardPersistenceService
                     _dashboards[key] = dashboard;
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // Skip corrupted files
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

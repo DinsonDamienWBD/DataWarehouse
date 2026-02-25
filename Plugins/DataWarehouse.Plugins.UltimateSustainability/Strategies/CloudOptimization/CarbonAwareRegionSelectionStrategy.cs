@@ -43,7 +43,7 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
         InitializeRegionData();
-        _updateTimer = new Timer(async _ => await UpdateCarbonDataAsync(), null, TimeSpan.Zero, TimeSpan.FromHours(1));
+        _updateTimer = new Timer(async _ => { try { await UpdateCarbonDataAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromHours(1));
         return Task.CompletedTask;
     }
 

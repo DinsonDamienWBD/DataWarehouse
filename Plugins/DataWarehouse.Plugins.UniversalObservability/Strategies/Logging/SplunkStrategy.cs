@@ -60,6 +60,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         _sourcetype = sourcetype;
 
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Splunk {_hecToken}");
     }
 
@@ -156,6 +157,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     public async Task<string> GetHecHealthAsync(CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -171,6 +173,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         try
         {
             var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", cancellationToken);
+            response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
             return new HealthCheckResult(
@@ -220,6 +223,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _hecToken = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

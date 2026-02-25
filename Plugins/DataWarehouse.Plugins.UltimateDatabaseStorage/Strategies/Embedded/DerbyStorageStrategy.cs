@@ -107,7 +107,9 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Table might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         try
@@ -118,7 +120,9 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Index might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

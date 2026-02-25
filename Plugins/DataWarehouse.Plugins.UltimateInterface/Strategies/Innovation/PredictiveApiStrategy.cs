@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 
@@ -148,7 +149,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
         if (request.Headers.TryGetValue("Authorization", out var auth))
         {
             // Use hash of auth token as client ID
-            return $"auth-{Math.Abs(auth.GetHashCode())}";
+            return $"auth-{Math.Abs(StableHash.Compute(auth))}";
         }
 
         return "anonymous";

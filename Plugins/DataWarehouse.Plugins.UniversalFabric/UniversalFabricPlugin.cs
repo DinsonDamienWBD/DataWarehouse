@@ -123,9 +123,11 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
                 }
             }
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
+
             // No strategies responded to discovery -- this is normal during initial startup
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -133,7 +135,9 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
         }
         catch
         {
+
             // Discovery failed gracefully -- backends can be registered dynamically later
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -287,7 +291,9 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
             }
             catch
             {
+
                 // Metadata retrieval is best-effort for copy operations
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             var copyMetadata = sourceMeta?.CustomMetadata is not null
@@ -553,7 +559,9 @@ public sealed class UniversalFabricPlugin : StoragePluginBase, IStorageFabric, I
             }
             catch
             {
+
                 // Skip backends that fail capacity check
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

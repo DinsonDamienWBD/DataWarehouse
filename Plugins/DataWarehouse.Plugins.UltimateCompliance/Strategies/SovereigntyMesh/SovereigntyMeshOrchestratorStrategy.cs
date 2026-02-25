@@ -146,7 +146,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.issue_passport");
+            IncrementCounter("sovereignty_mesh.issue_passport");
 
         // Build compliance context from object and regulations
         var context = new ComplianceContext
@@ -171,7 +171,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.verify_passport");
+            IncrementCounter("sovereignty_mesh.verify_passport");
 
         // Look up passport from lifecycle registry first, then issuance cache
         var registryEntry = _lifecycleManager.GetRegistryEntry(passportId);
@@ -224,7 +224,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.check_sovereignty");
+            IncrementCounter("sovereignty_mesh.check_sovereignty");
 
         // 1. Look up zones for source and destination
         var sourceZones = await _zoneRegistry.GetZonesForJurisdictionAsync(sourceLocation, ct);
@@ -328,7 +328,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.check_and_issue");
+            IncrementCounter("sovereignty_mesh.check_and_issue");
 
         // Issue passport if not exists
         var passport = _passportIssuance.GetCachedPassport(objectId);
@@ -355,7 +355,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.generate_zk_proof");
+            IncrementCounter("sovereignty_mesh.generate_zk_proof");
 
         // Find the passport
         var registryEntry = _lifecycleManager.GetRegistryEntry(passportId);
@@ -384,7 +384,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.verify_zk_proof");
+            IncrementCounter("sovereignty_mesh.verify_zk_proof");
 
         return await _zkVerification.VerifyProofAsync(proof, ct);
     }
@@ -398,7 +398,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.get_status");
+            IncrementCounter("sovereignty_mesh.get_status");
 
         var allZones = await _zoneRegistry.GetAllZonesAsync(ct);
         var totalZones = allZones.Count;
@@ -452,7 +452,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
         CancellationToken cancellationToken)
     {
         EnsureMeshInitialized();
-        IncrementCounter("sovereignty_mesh.check");
+            IncrementCounter("sovereignty_mesh.check");
 
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();

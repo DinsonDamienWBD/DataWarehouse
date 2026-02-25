@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             // Start background lifecycle evaluation
             _lifecycleTimer = new Timer(
-                callback: async _ => await EvaluateLifecyclePoliciesAsync(),
+                callback: async _ => { try { await EvaluateLifecyclePoliciesAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 state: null,
                 dueTime: _evaluationInterval,
                 period: _evaluationInterval);

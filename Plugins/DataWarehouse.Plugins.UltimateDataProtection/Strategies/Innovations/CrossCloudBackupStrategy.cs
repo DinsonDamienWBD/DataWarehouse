@@ -691,7 +691,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     }
                     catch
                     {
+
                         // Best effort rollback
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 });
 

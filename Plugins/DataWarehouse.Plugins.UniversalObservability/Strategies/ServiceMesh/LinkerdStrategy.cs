@@ -82,7 +82,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Proxy admin not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -137,7 +139,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return stats;
@@ -188,7 +192,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return splits;
@@ -235,7 +241,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return edges;

@@ -183,7 +183,9 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             }
             catch
             {
+
                 // Strategy doesn't know this deployment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -221,7 +223,9 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             }
             catch
             {
+
                 // Strategy doesn't know this deployment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -687,7 +691,9 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

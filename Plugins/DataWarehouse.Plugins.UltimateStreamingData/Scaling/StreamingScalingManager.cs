@@ -364,13 +364,17 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
                         await mergedChannel.Writer.WriteAsync(evt, ct).ConfigureAwait(false);
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Expected on cancellation
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
-                catch (ChannelClosedException)
+                catch (ChannelClosedException ex)
                 {
+
                     // Channel closed
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }, ct));
         }

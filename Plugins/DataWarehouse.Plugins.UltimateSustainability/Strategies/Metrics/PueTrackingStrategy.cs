@@ -40,7 +40,7 @@ public sealed class PueTrackingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _trackingTimer = new Timer(async _ => await TrackPueAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
+        _trackingTimer = new Timer(async _ => { try { await TrackPueAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
         return Task.CompletedTask;
     }
 

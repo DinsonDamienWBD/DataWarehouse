@@ -39,7 +39,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(passport);
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("passport_lifecycle.registered");
+            IncrementCounter("passport_lifecycle.registered");
 
         var now = DateTimeOffset.UtcNow;
         var initialChange = new PassportStatusChange
@@ -94,7 +94,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
         if (!_registry.TryGetValue(passportId, out var existing))
             return Task.FromResult<PassportRegistryEntry?>(null);
 
-        IncrementCounter("passport_lifecycle.revoked");
+            IncrementCounter("passport_lifecycle.revoked");
 
         var change = new PassportStatusChange
         {
@@ -135,7 +135,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
         if (!_registry.TryGetValue(passportId, out var existing))
             return Task.FromResult<PassportRegistryEntry?>(null);
 
-        IncrementCounter("passport_lifecycle.suspended");
+            IncrementCounter("passport_lifecycle.suspended");
 
         var change = new PassportStatusChange
         {
@@ -177,7 +177,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
         if (existing.Status != PassportStatus.Suspended)
             return Task.FromResult<PassportRegistryEntry?>(null);
 
-        IncrementCounter("passport_lifecycle.reinstated");
+            IncrementCounter("passport_lifecycle.reinstated");
 
         var change = new PassportStatusChange
         {
@@ -208,7 +208,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
     public Task<IReadOnlyList<PassportRegistryEntry>> GetExpiredPassportsAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("passport_lifecycle.expiry_scan");
+            IncrementCounter("passport_lifecycle.expiry_scan");
 
         var now = DateTimeOffset.UtcNow;
         var expired = _registry.Values
@@ -253,7 +253,7 @@ public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
         ComplianceContext context,
         CancellationToken cancellationToken)
     {
-        IncrementCounter("passport_lifecycle.check");
+            IncrementCounter("passport_lifecycle.check");
 
         var objectId = context.ResourceId ?? string.Empty;
 

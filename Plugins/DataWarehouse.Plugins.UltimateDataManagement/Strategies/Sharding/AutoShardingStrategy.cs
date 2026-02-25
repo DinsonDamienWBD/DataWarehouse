@@ -498,13 +498,17 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
                 _operationLock.Release();
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Expected when cancellation requested
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         catch
         {
+
             // Log but don't throw from monitoring
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

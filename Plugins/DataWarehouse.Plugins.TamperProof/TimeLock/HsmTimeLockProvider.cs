@@ -529,7 +529,9 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
             }
             catch
             {
+
                 // Fall through to local computation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -574,7 +576,9 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Event publication failure must not disrupt HSM lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

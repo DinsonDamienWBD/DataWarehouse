@@ -169,7 +169,9 @@ public static class ReadPhaseHandlers
             }
             catch
             {
+
                 // Index doesn't exist, fall back to scanning
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             // Fall back to scanning versions starting from 1
@@ -195,7 +197,9 @@ public static class ReadPhaseHandlers
                 }
                 catch
                 {
+
                     // Continue checking in case of transient errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

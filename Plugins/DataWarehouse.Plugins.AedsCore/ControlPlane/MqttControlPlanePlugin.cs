@@ -176,8 +176,8 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         // Default client role: access own namespace, subscribed channels, own heartbeat
         _topicAcl["client"] = new List<Regex>
         {
-            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled),
-            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled),
+            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
             new Regex($@"^aeds/heartbeat/{escapedClientId}$", RegexOptions.Compiled)
         };
 
@@ -190,9 +190,9 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         // Manifest publisher role: client access + manifest publishing
         _topicAcl["manifest-publisher"] = new List<Regex>
         {
-            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled),
-            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled),
-            new Regex($@"^aeds/heartbeat/{escapedClientId}$", RegexOptions.Compiled),
+            new Regex($@"^aeds/client/{escapedClientId}/.*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+            new Regex(@"^aeds/channel/[a-zA-Z0-9_\-]+$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+            new Regex($@"^aeds/heartbeat/{escapedClientId}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
             new Regex(@"^aeds/manifest/.*$", RegexOptions.Compiled)
         };
 

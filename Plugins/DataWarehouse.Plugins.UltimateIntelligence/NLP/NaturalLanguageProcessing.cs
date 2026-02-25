@@ -387,7 +387,7 @@ public sealed class QueryParser
         var phrases = new List<QueryPhrase>();
 
         // Extract quoted phrases
-        var quotedRegex = new Regex(@"""([^""]+)""|'([^']+)'", RegexOptions.Compiled);
+        var quotedRegex = new Regex(@"""([^""]+)""|'([^']+)'", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in quotedRegex.Matches(originalText))
         {
             var phraseText = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
@@ -409,7 +409,7 @@ public sealed class QueryParser
         var entities = new List<ExtractedEntity>();
 
         // File path pattern
-        var filePathRegex = new Regex(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled);
+        var filePathRegex = new Regex(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in filePathRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
@@ -422,7 +422,7 @@ public sealed class QueryParser
         }
 
         // Size pattern (e.g., 10MB, 5.2 GB, 100KB)
-        var sizeRegex = new Regex(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var sizeRegex = new Regex(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in sizeRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
@@ -436,7 +436,7 @@ public sealed class QueryParser
         }
 
         // Date patterns
-        var dateRegex = new Regex(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|today|yesterday|tomorrow|last\s+(?:week|month|year)|next\s+(?:week|month|year))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var dateRegex = new Regex(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|today|yesterday|tomorrow|last\s+(?:week|month|year)|next\s+(?:week|month|year))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in dateRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
@@ -450,7 +450,7 @@ public sealed class QueryParser
         }
 
         // Email pattern
-        var emailRegex = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled);
+        var emailRegex = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in emailRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
@@ -463,7 +463,7 @@ public sealed class QueryParser
         }
 
         // URL pattern
-        var urlRegex = new Regex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var urlRegex = new Regex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         foreach (Match match in urlRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
@@ -966,12 +966,12 @@ public sealed class EntityExtractor
     private void InitializePatterns()
     {
         // Pre-compile common patterns
-        _compiledPatterns["filePath"] = new Regex(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled);
-        _compiledPatterns["size"] = new Regex(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        _compiledPatterns["date"] = new Regex(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4})\b", RegexOptions.Compiled);
-        _compiledPatterns["email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled);
-        _compiledPatterns["url"] = new Regex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        _compiledPatterns["number"] = new Regex(@"\b\d+(?:\.\d+)?\b", RegexOptions.Compiled);
+        _compiledPatterns["filePath"] = new Regex(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        _compiledPatterns["size"] = new Regex(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        _compiledPatterns["date"] = new Regex(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4})\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        _compiledPatterns["email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        _compiledPatterns["url"] = new Regex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        _compiledPatterns["number"] = new Regex(@"\b\d+(?:\.\d+)?\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
     }
 
     /// <summary>

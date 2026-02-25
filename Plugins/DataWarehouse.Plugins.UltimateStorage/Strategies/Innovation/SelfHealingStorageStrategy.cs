@@ -193,9 +193,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty records
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -210,9 +212,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = JsonSerializer.Serialize(_healthRecords.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(recordsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -325,9 +329,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     // Primary copy corrupted - queue repair
                     QueueRepair(key, RepairPriority.High, "Primary copy checksum mismatch");
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Primary copy inaccessible - fall through to replicas
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -354,9 +360,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                             }
                         }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
+
                         // Try next replica
+                        System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
@@ -588,9 +596,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort health checks
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -697,9 +707,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 await SaveHealthRecordsAsync(ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort scrubbing
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -754,9 +766,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort repair
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -808,9 +822,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     replica.IsHealthy = true;
                     replica.LastVerified = DateTime.UtcNow;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Skip failed repairs
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

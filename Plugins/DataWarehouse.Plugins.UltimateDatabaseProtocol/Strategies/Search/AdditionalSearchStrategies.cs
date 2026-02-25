@@ -485,6 +485,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         var baseUrl = $"{scheme}://{parameters.Host}:{port}";
 
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        _httpClient.DefaultRequestHeaders.Remove("X-TYPESENSE-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("X-TYPESENSE-API-KEY", parameters.Password ?? "");
 
         // Verify connection

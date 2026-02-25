@@ -335,7 +335,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
                     }
                     catch
                     {
+
                         // Log but don't fail on channel errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 });
 
@@ -366,7 +368,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
             _rotationInterval = interval;
             _rotationTimer?.Dispose();
             _rotationTimer = new Timer(
-                async _ => await RotateCanariesAsync(),
+                async _ => { try { await RotateCanariesAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 interval,
                 interval);
@@ -1906,7 +1908,9 @@ users:
             }
             catch
             {
+
                 // Forensic capture should not fail the main operation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return snapshot;

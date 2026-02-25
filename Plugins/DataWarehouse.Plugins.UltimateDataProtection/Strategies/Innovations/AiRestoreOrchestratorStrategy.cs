@@ -333,7 +333,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Fall back to static analysis
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

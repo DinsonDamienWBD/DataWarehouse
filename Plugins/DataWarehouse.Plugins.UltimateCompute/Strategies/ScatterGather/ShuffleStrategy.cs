@@ -53,7 +53,7 @@ internal sealed class ShuffleStrategy : ComputeRuntimeStrategyBase
                 if (shuffleMode == "sort-merge")
                 {
                     // Range-based partitioning via sort key comparison
-                    var keyHash = key.GetHashCode();
+                    var keyHash = StableHash.Compute(key);
                     partitionIdx = ((keyHash % targetPartitions) + targetPartitions) % targetPartitions;
                 }
                 else

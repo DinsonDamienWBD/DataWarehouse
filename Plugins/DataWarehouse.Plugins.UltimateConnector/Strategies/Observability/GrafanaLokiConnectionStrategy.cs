@@ -42,6 +42,7 @@ public sealed class GrafanaLokiConnectionStrategy : ObservabilityConnectionStrat
 
         if (config.Properties.TryGetValue("TenantId", out var tenantId))
         {
+            httpClient.DefaultRequestHeaders.Remove("X-Scope-OrgID");
             httpClient.DefaultRequestHeaders.Add("X-Scope-OrgID", tenantId.ToString()!);
         }
 

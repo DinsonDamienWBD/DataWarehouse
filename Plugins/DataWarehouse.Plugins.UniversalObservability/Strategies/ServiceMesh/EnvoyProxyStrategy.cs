@@ -91,7 +91,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -200,7 +202,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return clusters;
@@ -246,7 +250,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return listeners;
@@ -281,7 +287,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return info;

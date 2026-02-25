@@ -369,7 +369,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
             return Random.Shared.Next(partitionCount);
 
         // Simple hash-based partitioning
-        var hash = key.GetHashCode();
+        var hash = StableHash.Compute(key);
         return Math.Abs(hash) % partitionCount;
     }
 }

@@ -194,7 +194,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     }
                     catch
                     {
+
                         // Ignore save errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
 

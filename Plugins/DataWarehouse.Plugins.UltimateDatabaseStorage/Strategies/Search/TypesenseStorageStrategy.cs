@@ -60,6 +60,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
             BaseAddress = new Uri(connectionString),
             Timeout = TimeSpan.FromSeconds(30)
         };
+        _httpClient.DefaultRequestHeaders.Remove("X-TYPESENSE-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("X-TYPESENSE-API-KEY", _apiKey);
 
         await EnsureSchemaCoreAsync(ct);

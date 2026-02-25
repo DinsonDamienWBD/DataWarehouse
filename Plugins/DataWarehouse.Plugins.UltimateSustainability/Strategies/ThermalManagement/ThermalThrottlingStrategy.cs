@@ -49,7 +49,7 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _checkTimer = new Timer(async _ => await CheckAndThrottleAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        _checkTimer = new Timer(async _ => { try { await CheckAndThrottleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         return Task.CompletedTask;
     }
 

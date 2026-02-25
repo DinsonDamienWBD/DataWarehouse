@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("predictive_compliance.check");
+            IncrementCounter("predictive_compliance.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -77,14 +77,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("predictive_compliance.initialized");
+            IncrementCounter("predictive_compliance.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("predictive_compliance.shutdown");
+            IncrementCounter("predictive_compliance.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

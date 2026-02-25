@@ -34,6 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             // Send EDI document via AS2/HTTP
             var content = new StringContent(protocolCommand, System.Text.Encoding.ASCII, "application/edi-x12");
             var response = await client.PostAsync("/edi/submit", content, ct);
+ response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
 

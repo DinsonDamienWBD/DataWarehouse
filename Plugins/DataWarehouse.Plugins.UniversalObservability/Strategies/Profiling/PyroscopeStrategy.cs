@@ -108,9 +108,11 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Pyroscope unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -129,9 +131,11 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Pyroscope unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

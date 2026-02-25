@@ -63,7 +63,7 @@ public sealed class MeshNetworkAdapter : IDisposable, IAsyncDisposable
 
         // Start periodic topology discovery (every 5 minutes)
         _topologyTimer = new Timer(
-            callback: async _ => await DiscoverTopologyAsync(),
+            callback: async _ => { try { await DiscoverTopologyAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             state: null,
             dueTime: TimeSpan.FromMinutes(1),
             period: TimeSpan.FromMinutes(5));

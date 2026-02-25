@@ -155,9 +155,11 @@ public sealed class MigrationWorker : IDisposable
             {
                 _pauseGate.Release();
             }
-            catch (SemaphoreFullException)
+            catch (SemaphoreFullException ex)
             {
+
                 // Already released, no-op
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -231,9 +233,11 @@ public sealed class MigrationWorker : IDisposable
         {
             // Normal cancellation, do not propagate
         }
-        catch (ChannelClosedException)
+        catch (ChannelClosedException ex)
         {
+
             // Channel was completed, no more batches
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -426,7 +430,9 @@ public sealed class MigrationWorker : IDisposable
         }
         catch
         {
+
             // Progress reporting is best-effort; do not fail the migration
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -453,7 +459,9 @@ public sealed class MigrationWorker : IDisposable
         }
         catch
         {
+
             // Best-effort notification
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

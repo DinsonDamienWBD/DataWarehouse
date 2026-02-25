@@ -807,7 +807,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort enrichment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return metadata;

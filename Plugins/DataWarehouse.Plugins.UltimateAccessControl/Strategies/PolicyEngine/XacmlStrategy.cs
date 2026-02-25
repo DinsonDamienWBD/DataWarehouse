@@ -209,7 +209,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 }
                 catch
                 {
+
                     // PIP resolution failure is non-fatal — attribute simply unavailable
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

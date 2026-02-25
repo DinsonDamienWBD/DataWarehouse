@@ -529,7 +529,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Fall through to auto-detect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return CloudProviders.Auto;
@@ -575,7 +577,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // On failure, trust local clock since it already confirmed expiry
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return true;
@@ -616,7 +620,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
             }
             catch
             {
+
                 // Fall through to local computation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -660,7 +666,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Retention request failure is logged but must not disrupt lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -686,7 +694,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Event publication failure must not disrupt cloud lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

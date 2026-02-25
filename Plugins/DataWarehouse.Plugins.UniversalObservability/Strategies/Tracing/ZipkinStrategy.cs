@@ -70,12 +70,14 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"{_url}/api/v2/services", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetTraceAsync(string traceId, CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"{_url}/api/v2/trace/{traceId}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 

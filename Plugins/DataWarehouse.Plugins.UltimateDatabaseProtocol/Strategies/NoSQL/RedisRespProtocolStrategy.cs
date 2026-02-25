@@ -118,7 +118,9 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore info errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -532,7 +534,9 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

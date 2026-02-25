@@ -378,9 +378,11 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 if (costSelectedStrategy != null)
                     return costSelectedStrategy;
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
+
                 // No routes within cost limit; fall through to standard scoring
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -759,7 +761,9 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         }
         catch
         {
+
             // Message bus publish failures should not fail the transfer
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

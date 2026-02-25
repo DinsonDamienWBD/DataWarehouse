@@ -50,6 +50,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         _agentEndpoint = endpoint;
         _agentKey = agentKey;
+        _httpClient.DefaultRequestHeaders.Remove("X-Instana-Key");
         _httpClient.DefaultRequestHeaders.Add("X-Instana-Key", agentKey);
     }
 
@@ -133,9 +134,11 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Agent unavailable - data buffered locally
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

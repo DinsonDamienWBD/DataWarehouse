@@ -384,7 +384,9 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
+
             // Best-effort background refresh; stale data remains in cache
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

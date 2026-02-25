@@ -288,7 +288,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("pii_detection_masking.check");
+            IncrementCounter("pii_detection_masking.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -500,7 +500,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "ssn-us",
                 PiiType = "SSN",
                 Category = PiiCategory.Government,
-                Pattern = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled),
+                Pattern = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.9,
                 SensitivityLevel = PiiSensitivityLevel.Strict,
                 Validator = ValidateSsn,
@@ -514,7 +514,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "credit-card",
                 PiiType = "CREDIT_CARD",
                 Category = PiiCategory.Financial,
-                Pattern = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled),
+                Pattern = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.85,
                 SensitivityLevel = PiiSensitivityLevel.Strict,
                 Validator = ValidateLuhn,
@@ -528,7 +528,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "email",
                 PiiType = "EMAIL",
                 Category = PiiCategory.Contact,
-                Pattern = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled),
+                Pattern = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.95,
                 SensitivityLevel = PiiSensitivityLevel.Standard
             });
@@ -539,7 +539,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "phone-us",
                 PiiType = "PHONE",
                 Category = PiiCategory.Contact,
-                Pattern = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled),
+                Pattern = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.8,
                 SensitivityLevel = PiiSensitivityLevel.Standard,
                 ExpectedMinLength = 10
@@ -551,7 +551,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "dob",
                 PiiType = "DOB",
                 Category = PiiCategory.Personal,
-                Pattern = new Regex(@"\b(?:DOB|Date of Birth|Birth\s?Date)[:\s]*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+                Pattern = new Regex(@"\b(?:DOB|Date of Birth|Birth\s?Date)[:\s]*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.85,
                 SensitivityLevel = PiiSensitivityLevel.Standard
             });
@@ -562,7 +562,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "ip-address",
                 PiiType = "IP_ADDRESS",
                 Category = PiiCategory.Digital,
-                Pattern = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled),
+                Pattern = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.9,
                 SensitivityLevel = PiiSensitivityLevel.Relaxed,
                 Validator = ValidateIpAddress
@@ -574,7 +574,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "mrn",
                 PiiType = "MEDICAL_RECORD",
                 Category = PiiCategory.Health,
-                Pattern = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+                Pattern = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.75,
                 SensitivityLevel = PiiSensitivityLevel.Strict
             });
@@ -585,7 +585,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "drivers-license",
                 PiiType = "DRIVERS_LICENSE",
                 Category = PiiCategory.Government,
-                Pattern = new Regex(@"\b(?:DL|Driver'?s?\s*License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+                Pattern = new Regex(@"\b(?:DL|Driver'?s?\s*License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.7,
                 SensitivityLevel = PiiSensitivityLevel.Strict
             });
@@ -596,7 +596,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "passport",
                 PiiType = "PASSPORT",
                 Category = PiiCategory.Government,
-                Pattern = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+                Pattern = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.7,
                 SensitivityLevel = PiiSensitivityLevel.Strict
             });
@@ -607,7 +607,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 DetectorId = "bank-account",
                 PiiType = "BANK_ACCOUNT",
                 Category = PiiCategory.Financial,
-                Pattern = new Regex(@"\b(?:Account|Acct)[:\s#]*\d{8,17}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+                Pattern = new Regex(@"\b(?:Account|Acct)[:\s#]*\d{8,17}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
                 BaseConfidence = 0.65,
                 SensitivityLevel = PiiSensitivityLevel.Strict
             });
@@ -715,14 +715,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pii_detection_masking.initialized");
+            IncrementCounter("pii_detection_masking.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pii_detection_masking.shutdown");
+            IncrementCounter("pii_detection_masking.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

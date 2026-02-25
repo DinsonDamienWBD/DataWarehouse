@@ -130,7 +130,9 @@ public sealed class CouchDbStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Document doesn't exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         var doc = new StorageDocument

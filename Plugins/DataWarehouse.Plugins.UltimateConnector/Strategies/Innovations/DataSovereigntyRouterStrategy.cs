@@ -158,8 +158,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     $"Data transfer blocked by sovereignty rules: {sourceJurisdiction} -> {destinationJurisdiction}. " +
                     $"Regulations: {string.Join(", ", applicableRegulations)}");
 
+            client.DefaultRequestHeaders.Remove("X-Sovereignty-Route");
             client.DefaultRequestHeaders.Add("X-Sovereignty-Route", routeId);
+            client.DefaultRequestHeaders.Remove("X-Data-Classification");
             client.DefaultRequestHeaders.Add("X-Data-Classification", dataClassification);
+            client.DefaultRequestHeaders.Remove("X-Source-Jurisdiction");
             client.DefaultRequestHeaders.Add("X-Source-Jurisdiction", sourceJurisdiction);
 
             var verifyResponse = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/verify", ct);

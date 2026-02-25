@@ -173,7 +173,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.GeoReplication
                         }
                         catch
                         {
+
                             // Log replication failure to secondary
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
                     });
 

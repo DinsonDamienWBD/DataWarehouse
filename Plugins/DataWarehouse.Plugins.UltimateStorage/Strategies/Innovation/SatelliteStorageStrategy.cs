@@ -103,7 +103,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     BaseAddress = new Uri(_groundStationApiEndpoint),
                     Timeout = TimeSpan.FromSeconds(30)
                 };
+                _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+                _httpClient.DefaultRequestHeaders.Remove("User-Agent");
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-SatelliteStorage/1.0");
 
                 // Ensure fallback storage directory exists
@@ -212,9 +214,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue with cached positions
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -379,9 +383,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Fall through to fallback
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -418,9 +424,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     File.Delete(fallbackFilePath);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort deletion
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -448,9 +456,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to fallback check
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Check fallback storage
@@ -484,9 +494,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue to fallback listing
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Yield satellite results
@@ -540,9 +552,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to fallback
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Check fallback storage
@@ -589,9 +603,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     };
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to unhealthy status
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             return new StorageHealthInfo

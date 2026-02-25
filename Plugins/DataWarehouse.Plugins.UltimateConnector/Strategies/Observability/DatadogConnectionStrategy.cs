@@ -32,6 +32,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
 
         if (config.Properties.TryGetValue("ApiKey", out var apiKey))
         {
+            httpClient.DefaultRequestHeaders.Remove("DD-API-KEY");
             httpClient.DefaultRequestHeaders.Add("DD-API-KEY", apiKey.ToString()!);
         }
 

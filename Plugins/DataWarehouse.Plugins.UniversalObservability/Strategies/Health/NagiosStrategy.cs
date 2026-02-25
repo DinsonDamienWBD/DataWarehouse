@@ -37,6 +37,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 
         var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {auth}");
     }
 
@@ -163,7 +164,8 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _password = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 
     public enum NagiosStatus { Ok = 0, Warning = 1, Critical = 2, Unknown = 3 }
 }

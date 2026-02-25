@@ -178,9 +178,11 @@ public sealed class LifecyclePolicyEngineStrategy : LifecycleStrategyBase
             {
                 await _schedulerTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -520,7 +522,9 @@ public sealed class LifecyclePolicyEngineStrategy : LifecycleStrategyBase
                         }
                         catch
                         {
+
                             // Log and continue
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
 
                         schedule.LastExecution = now;

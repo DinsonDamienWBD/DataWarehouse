@@ -45,6 +45,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     public void Configure(string apiToken)
     {
         _apiToken = apiToken;
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
     }
 

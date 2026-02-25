@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("sox2.check");
+            IncrementCounter("sox2.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -350,14 +350,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("sox2.initialized");
+            IncrementCounter("sox2.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("sox2.shutdown");
+            IncrementCounter("sox2.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -363,7 +363,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
             }
             catch
             {
+
                 // Ignore load errors - start fresh
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

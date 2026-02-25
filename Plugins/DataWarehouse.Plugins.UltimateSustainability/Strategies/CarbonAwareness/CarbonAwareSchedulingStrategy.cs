@@ -67,7 +67,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
         _schedulerTimer = new Timer(
-            async _ => await ProcessPendingWorkloadsAsync(),
+            async _ => { try { await ProcessPendingWorkloadsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
@@ -204,7 +204,9 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
                 }
                 catch
                 {
+
                     // Log failure but continue processing
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -271,7 +273,9 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Fall through to default
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

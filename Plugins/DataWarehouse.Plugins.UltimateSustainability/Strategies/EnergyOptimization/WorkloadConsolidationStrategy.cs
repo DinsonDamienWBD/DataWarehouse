@@ -106,7 +106,7 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
         }
 
         _monitorTimer = new Timer(
-            async _ => await MonitorAndConsolidateAsync(),
+            async _ => { try { await MonitorAndConsolidateAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.FromSeconds(10),
             TimeSpan.FromSeconds(10));
@@ -189,7 +189,9 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Process not found or access denied
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -216,7 +218,9 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Monitoring failed
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -308,7 +312,9 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Cgroup not available
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

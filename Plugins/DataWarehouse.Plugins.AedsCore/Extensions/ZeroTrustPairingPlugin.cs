@@ -52,7 +52,7 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 
         _pendingPins[clientId] = (pin, expires);
 
-        Console.WriteLine($"[Pairing PIN] {pin} (expires {expires:HH:mm:ss})");
+        System.Diagnostics.Debug.WriteLine($"[Pairing PIN] {pin} (expires {expires:HH:mm:ss})");
         return pin;
     }
 
@@ -184,7 +184,9 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
             }
             catch
             {
+
                 // Fall through to inline implementation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

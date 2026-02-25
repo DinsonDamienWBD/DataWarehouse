@@ -412,9 +412,11 @@ internal sealed class BackpressureHandling : IDisposable
             {
                 await _messageBus.PublishAsync("streaming.backpressure.status", message, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Non-critical metrics reporting
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

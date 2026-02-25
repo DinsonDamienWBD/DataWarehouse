@@ -344,7 +344,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
             catch
             {
+
                 // Ignore permission errors on Windows
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new AgeIdentity

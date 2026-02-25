@@ -55,6 +55,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
         _serviceName = serviceName;
         _environment = environment;
 
+        _httpClient.DefaultRequestHeaders.Remove("DD-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("DD-API-KEY", apiKey);
     }
 
@@ -127,9 +128,11 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Datadog unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -144,9 +147,11 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Datadog unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -221,6 +226,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

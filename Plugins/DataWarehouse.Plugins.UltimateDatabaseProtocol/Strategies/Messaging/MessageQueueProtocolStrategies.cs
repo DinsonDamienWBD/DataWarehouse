@@ -1104,7 +1104,9 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -1342,9 +1344,11 @@ public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
                 }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Timeout
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         return new QueryResult

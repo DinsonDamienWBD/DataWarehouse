@@ -502,7 +502,9 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
                 }
                 catch
                 {
+
                     // Non-fatal: fall back to file-based reads
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -552,7 +554,9 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
             }
             catch
             {
+
                 // Skip corrupted segment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             bool isSealed = entryCount >= EntriesPerSegment;
@@ -647,7 +651,9 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
         }
         catch
         {
+
             // Non-fatal compaction failure
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

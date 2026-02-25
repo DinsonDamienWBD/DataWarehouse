@@ -1155,7 +1155,9 @@ public sealed class BlockLevelTieringStrategy : TieringStrategyBase
             }
             catch
             {
+
                 // Prefetch failures are non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new BlockReassemblyResult
@@ -1377,7 +1379,9 @@ public sealed class BlockLevelTieringStrategy : TieringStrategyBase
                     }
                     catch
                     {
+
                         // Prefetch failures are non-critical
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }, ct));
             }

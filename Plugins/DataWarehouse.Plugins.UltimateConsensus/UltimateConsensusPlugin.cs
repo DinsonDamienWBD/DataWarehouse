@@ -563,7 +563,9 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
             }
             catch
             {
+
                 // Individual handler failure should not block other handlers
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

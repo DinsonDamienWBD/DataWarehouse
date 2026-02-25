@@ -110,7 +110,9 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
             }
             catch
             {
+
                 // Continue monitoring even on transient errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

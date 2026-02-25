@@ -87,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             var apiKey = GetConfiguration(config, "ApiKey", string.Empty);
             if (!string.IsNullOrEmpty(apiKey))
+                client.DefaultRequestHeaders.Remove("Authorization");
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
             // Only test with introspection if enabled; otherwise use a safe health check query

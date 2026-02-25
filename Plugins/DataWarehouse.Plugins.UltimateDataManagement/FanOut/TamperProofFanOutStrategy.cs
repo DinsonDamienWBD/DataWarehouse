@@ -483,7 +483,9 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
             }
             catch
             {
+
                 // Rollback failures are logged but don't fail the overall operation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

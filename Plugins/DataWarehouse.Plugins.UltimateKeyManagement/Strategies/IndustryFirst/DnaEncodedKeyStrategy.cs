@@ -140,11 +140,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case DnaSynthesisProvider.TwistBioscience:
                     client.BaseAddress = new Uri("https://api.twistbioscience.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.SynthesisApiKey}");
                     break;
 
                 case DnaSynthesisProvider.Idt:
                     client.BaseAddress = new Uri("https://www.idtdna.com/api/v1/");
+                    client.DefaultRequestHeaders.Remove("X-API-KEY");
                     client.DefaultRequestHeaders.Add("X-API-KEY", _config.SynthesisApiKey);
                     break;
             }
@@ -163,11 +165,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case DnaSequencingProvider.Illumina:
                     client.BaseAddress = new Uri("https://api.illumina.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.SequencingApiKey}");
                     break;
 
                 case DnaSequencingProvider.OxfordNanopore:
                     client.BaseAddress = new Uri("https://api.nanoporetech.com/v1/");
+                    client.DefaultRequestHeaders.Remove("X-API-Key");
                     client.DefaultRequestHeaders.Add("X-API-Key", _config.SequencingApiKey);
                     break;
             }
@@ -838,7 +842,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
             catch
             {
+
                 // Ignore load errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

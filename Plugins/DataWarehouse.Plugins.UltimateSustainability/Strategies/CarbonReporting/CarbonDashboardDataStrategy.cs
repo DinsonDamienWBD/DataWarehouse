@@ -350,7 +350,9 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return Task.CompletedTask;
@@ -376,7 +378,9 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return Task.CompletedTask;
@@ -401,7 +405,9 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return Task.CompletedTask;

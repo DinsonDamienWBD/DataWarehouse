@@ -54,6 +54,7 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
 
         if (!string.IsNullOrEmpty(apiKey))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Key {apiKey}");
         }
     }
@@ -175,9 +176,11 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
                 response.EnsureSuccessStatusCode();
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Sensu backend unavailable - events lost
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -251,6 +254,7 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

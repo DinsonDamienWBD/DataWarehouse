@@ -299,9 +299,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                         state.DegradationEvents++;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

@@ -302,7 +302,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             if (_options.EmitToConsole)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[DEPRECATION WARNING] {warning.Message}");
+                System.Diagnostics.Debug.WriteLine($"[DEPRECATION WARNING] {warning.Message}");
                 Console.ResetColor();
             }
 

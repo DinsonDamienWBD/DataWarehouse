@@ -222,7 +222,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
                 }
                 catch
                 {
+
                     // Skip assemblies that can't be inspected
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

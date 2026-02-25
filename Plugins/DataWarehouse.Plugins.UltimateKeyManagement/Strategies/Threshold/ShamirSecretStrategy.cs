@@ -561,7 +561,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             }
             catch
             {
+
                 // Ignore load errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

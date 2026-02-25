@@ -205,7 +205,9 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

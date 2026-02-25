@@ -143,7 +143,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             var derivedSessionKey = DeriveSessionKey(classicalKeyMaterial, sessionNonce, serverPublicKey);
 
+            client.DefaultRequestHeaders.Remove("X-PQC-Session");
             client.DefaultRequestHeaders.Add("X-PQC-Session", sessionId);
+            client.DefaultRequestHeaders.Remove("X-PQC-Algorithm");
             client.DefaultRequestHeaders.Add("X-PQC-Algorithm", negotiatedKem);
 
             if (!string.IsNullOrEmpty(config.AuthCredential))

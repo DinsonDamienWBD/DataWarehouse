@@ -304,7 +304,9 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
         }
         catch
         {
+
             // Message bus publish failure is non-fatal for measurement
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

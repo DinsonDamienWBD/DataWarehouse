@@ -964,7 +964,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 }
                 catch
                 {
+
                     // Ignore logout errors during disposal
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

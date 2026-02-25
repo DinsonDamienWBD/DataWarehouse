@@ -119,9 +119,11 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(_collectorUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Sumo Logic unavailable - data lost
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

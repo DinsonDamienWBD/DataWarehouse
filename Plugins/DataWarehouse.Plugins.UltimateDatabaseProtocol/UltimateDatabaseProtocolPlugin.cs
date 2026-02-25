@@ -485,7 +485,9 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
         }
         catch
         {
+
             // Gracefully handle message bus unavailability
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -513,7 +515,9 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
             }
             catch
             {
+
             // Ignore disposal errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             }
             }

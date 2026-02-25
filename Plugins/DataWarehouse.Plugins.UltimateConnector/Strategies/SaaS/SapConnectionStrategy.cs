@@ -51,6 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 var creds = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", creds);
             }
+            httpClient.DefaultRequestHeaders.Remove("sap-client");
             httpClient.DefaultRequestHeaders.Add("sap-client", _client);
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -135,6 +136,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var url = $"/sap/opu/odata/sap/{servicePath}/{entitySet}?{string.Join("&", queryParams)}";
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -207,6 +209,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}&$format=json";
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             return new SapODataResult

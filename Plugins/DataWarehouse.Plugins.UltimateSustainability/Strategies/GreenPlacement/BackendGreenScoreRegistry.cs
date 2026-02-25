@@ -231,7 +231,9 @@ public sealed class BackendGreenScoreRegistry
         }
         catch
         {
+
             // Persistence failure is non-fatal; data remains in memory
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -311,7 +313,9 @@ public sealed class BackendGreenScoreRegistry
         }
         catch
         {
+
             // Load failure is non-fatal; will re-populate from known data
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

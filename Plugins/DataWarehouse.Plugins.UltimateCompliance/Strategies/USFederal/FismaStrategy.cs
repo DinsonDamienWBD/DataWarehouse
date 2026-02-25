@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("fisma.check");
+            IncrementCounter("fisma.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -200,14 +200,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("fisma.initialized");
+            IncrementCounter("fisma.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("fisma.shutdown");
+            IncrementCounter("fisma.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

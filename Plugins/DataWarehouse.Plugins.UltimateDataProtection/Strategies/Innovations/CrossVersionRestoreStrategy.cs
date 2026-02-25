@@ -946,7 +946,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -973,7 +975,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return pipeline;

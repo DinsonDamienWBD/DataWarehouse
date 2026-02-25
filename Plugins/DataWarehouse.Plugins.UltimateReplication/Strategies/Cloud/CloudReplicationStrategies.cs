@@ -179,9 +179,11 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
                     await Task.Delay(latency, cancellationToken);
                     RecordReplicationLag(targetRegion, DateTime.UtcNow - startTime);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Cancelled - don't record lag
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             });
 

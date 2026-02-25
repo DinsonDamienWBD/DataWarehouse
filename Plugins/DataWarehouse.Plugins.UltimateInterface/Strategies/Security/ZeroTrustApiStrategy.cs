@@ -234,7 +234,9 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
                 }
                 catch
                 {
+
                     // JWT parsing failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

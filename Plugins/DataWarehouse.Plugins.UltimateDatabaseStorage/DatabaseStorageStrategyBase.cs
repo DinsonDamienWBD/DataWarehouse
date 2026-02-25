@@ -604,7 +604,9 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
             }
             catch
             {
+
                 // Skip failed retrievals in batch operation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -631,7 +633,9 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
             }
             catch
             {
+
                 // Skip failed deletions
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

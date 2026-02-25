@@ -806,9 +806,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal cancellation
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -849,7 +851,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -876,7 +880,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             // Return simulated predictions (first 1000 blocks)
@@ -936,7 +942,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

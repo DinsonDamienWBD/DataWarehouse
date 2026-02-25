@@ -203,6 +203,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
             var response = await client.GetAsync($"/v3/templates?generations={generations}&page_size=50", ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

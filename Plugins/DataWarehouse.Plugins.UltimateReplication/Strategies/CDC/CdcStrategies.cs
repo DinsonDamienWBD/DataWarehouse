@@ -143,7 +143,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         /// </summary>
         public string GetPartition(string key)
         {
-            var hash = key.GetHashCode();
+            var hash = StableHash.Compute(key);
             var partitionIndex = Math.Abs(hash) % _partitionCount;
             return $"partition-{partitionIndex}";
         }

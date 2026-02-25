@@ -116,7 +116,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Fall back to text protocol
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Initialize text protocol
@@ -998,7 +1000,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore quit errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
         else if (_textWriter != null)
@@ -1009,7 +1013,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

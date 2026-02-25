@@ -129,7 +129,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
                     }
                     catch
                     {
+
                         // Ignore unparseable values
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
 

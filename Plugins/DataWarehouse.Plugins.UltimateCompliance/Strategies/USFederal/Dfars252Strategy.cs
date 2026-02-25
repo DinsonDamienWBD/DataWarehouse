@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("dfars252.check");
+            IncrementCounter("dfars252.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -190,14 +190,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dfars252.initialized");
+            IncrementCounter("dfars252.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dfars252.shutdown");
+            IncrementCounter("dfars252.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -86,7 +86,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
 
         // Start polling timer
         _pollingTimer = new Timer(
-            async _ => await PollCarbonIntensityAsync(),
+            async _ => { try { await PollCarbonIntensityAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.Zero,
             PollingInterval);

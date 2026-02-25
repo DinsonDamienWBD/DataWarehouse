@@ -95,9 +95,11 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Loggly unavailable - logs lost
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -140,9 +142,11 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Loggly unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -213,6 +217,7 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _token = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

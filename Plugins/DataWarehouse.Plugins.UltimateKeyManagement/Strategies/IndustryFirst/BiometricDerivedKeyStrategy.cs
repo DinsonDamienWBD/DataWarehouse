@@ -845,7 +845,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
             catch
             {
+
                 // Ignore load errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

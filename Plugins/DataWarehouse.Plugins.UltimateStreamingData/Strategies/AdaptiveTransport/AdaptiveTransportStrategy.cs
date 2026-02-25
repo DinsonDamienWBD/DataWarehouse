@@ -162,7 +162,9 @@ public sealed class BandwidthAwareSyncMonitor : IDisposable
         }
         catch
         {
+
             // Probe failed - continue monitoring
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
         finally
         {

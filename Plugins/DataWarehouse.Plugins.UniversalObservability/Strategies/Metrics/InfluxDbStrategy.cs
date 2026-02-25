@@ -54,6 +54,7 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
         _org = org;
         _bucket = bucket;
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {_token}");
     }
 
@@ -194,6 +195,7 @@ from(bucket: ""{_bucket}"")
         try
         {
             var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
+            response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
             return new HealthCheckResult(
@@ -243,6 +245,7 @@ from(bucket: ""{_bucket}"")
 
     protected override void Dispose(bool disposing)
     {
+                _token = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

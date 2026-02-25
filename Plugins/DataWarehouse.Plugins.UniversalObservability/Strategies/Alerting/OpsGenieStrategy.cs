@@ -31,6 +31,7 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
         _apiKey = apiKey;
         _region = region;
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"GenieKey {_apiKey}");
     }
 
@@ -154,5 +155,6 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
         await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _apiKey = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

@@ -781,24 +781,24 @@ public sealed class PatternDetectionStrategy : DataQualityStrategyBase
 {
     private static readonly (string Name, Regex Pattern)[] KnownPatterns = new[]
     {
-        ("SSN", new Regex(@"^\d{3}-\d{2}-\d{4}$", RegexOptions.Compiled)),
-        ("Phone-US", new Regex(@"^\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})$", RegexOptions.Compiled)),
-        ("Phone-Intl", new Regex(@"^\+\d{1,3}[-.\s]?\d{1,14}$", RegexOptions.Compiled)),
-        ("Email", new Regex(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", RegexOptions.Compiled)),
-        ("ZipCode-US", new Regex(@"^\d{5}(-\d{4})?$", RegexOptions.Compiled)),
-        ("PostalCode-CA", new Regex(@"^[A-Z]\d[A-Z]\s?\d[A-Z]\d$", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
-        ("CreditCard", new Regex(@"^\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}$", RegexOptions.Compiled)),
-        ("Date-ISO", new Regex(@"^\d{4}-\d{2}-\d{2}$", RegexOptions.Compiled)),
-        ("Date-US", new Regex(@"^\d{2}/\d{2}/\d{4}$", RegexOptions.Compiled)),
-        ("Date-EU", new Regex(@"^\d{2}\.\d{2}\.\d{4}$", RegexOptions.Compiled)),
-        ("Time-24H", new Regex(@"^\d{2}:\d{2}(:\d{2})?$", RegexOptions.Compiled)),
-        ("IPv4", new Regex(@"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", RegexOptions.Compiled)),
-        ("MAC", new Regex(@"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", RegexOptions.Compiled)),
-        ("UUID", new Regex(@"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.Compiled)),
-        ("URL", new Regex(@"^https?://[^\s]+$", RegexOptions.Compiled)),
-        ("Hex", new Regex(@"^(0x)?[0-9a-fA-F]+$", RegexOptions.Compiled)),
-        ("Currency-USD", new Regex(@"^\$[\d,]+(\.\d{2})?$", RegexOptions.Compiled)),
-        ("Percentage", new Regex(@"^\d+(\.\d+)?%$", RegexOptions.Compiled))
+        ("SSN", new Regex(@"^\d{3}-\d{2}-\d{4}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Phone-US", new Regex(@"^\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Phone-Intl", new Regex(@"^\+\d{1,3}[-.\s]?\d{1,14}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Email", new Regex(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("ZipCode-US", new Regex(@"^\d{5}(-\d{4})?$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("PostalCode-CA", new Regex(@"^[A-Z]\d[A-Z]\s?\d[A-Z]\d$", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5))),
+        ("CreditCard", new Regex(@"^\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Date-ISO", new Regex(@"^\d{4}-\d{2}-\d{2}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Date-US", new Regex(@"^\d{2}/\d{2}/\d{4}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Date-EU", new Regex(@"^\d{2}\.\d{2}\.\d{4}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Time-24H", new Regex(@"^\d{2}:\d{2}(:\d{2})?$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("IPv4", new Regex(@"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("MAC", new Regex(@"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("UUID", new Regex(@"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("URL", new Regex(@"^https?://[^\s]+$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Hex", new Regex(@"^(0x)?[0-9a-fA-F]+$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Currency-USD", new Regex(@"^\$[\d,]+(\.\d{2})?$", RegexOptions.Compiled, TimeSpan.FromSeconds(5))),
+        ("Percentage", new Regex(@"^\d+(\.\d+)?%$", RegexOptions.Compiled, TimeSpan.FromSeconds(5)))
     };
 
     /// <inheritdoc/>

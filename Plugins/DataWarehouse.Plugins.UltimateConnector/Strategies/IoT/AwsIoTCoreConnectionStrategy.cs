@@ -96,6 +96,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             try
             {
                 var response = await client.GetAsync(shadowUrl, ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 return new Dictionary<string, object>
                 {

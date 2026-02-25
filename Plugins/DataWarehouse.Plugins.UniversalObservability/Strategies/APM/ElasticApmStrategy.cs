@@ -56,6 +56,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
         if (!string.IsNullOrEmpty(secretToken))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {secretToken}");
         }
     }
@@ -246,6 +247,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _secretToken = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

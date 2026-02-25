@@ -193,7 +193,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Asynchronous
                     }
                     catch
                     {
+
                         // Log error in production
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }, _backgroundCts.Token);
@@ -231,8 +233,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Asynchronous
                 }
                 catch
                 {
+
                     // Log replication failure in production
                     // Could implement retry logic here
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             });
 

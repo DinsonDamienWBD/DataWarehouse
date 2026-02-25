@@ -508,7 +508,9 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
         }
         catch
         {
+
             // Ignore shutdown errors during disposal
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         _objectStore.Clear();

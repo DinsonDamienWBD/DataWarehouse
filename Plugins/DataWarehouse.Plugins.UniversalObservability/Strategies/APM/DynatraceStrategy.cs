@@ -33,6 +33,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
         _apiToken = apiToken;
         _entityId = entityId;
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Api-Token {_apiToken}");
     }
 

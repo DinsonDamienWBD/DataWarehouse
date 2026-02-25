@@ -94,7 +94,7 @@ public sealed class KafkaStreamProcessingStrategy : StreamingDataStrategyBase
         }
 
         var targetPartition = partition ?? (key != null
-            ? Math.Abs(key.GetHashCode()) % topicMeta.Partitions
+            ? Math.Abs(StableHash.Compute(key)) % topicMeta.Partitions
             : Random.Shared.Next(topicMeta.Partitions));
 
         var offset = Interlocked.Increment(ref _nextOffset);
@@ -1116,7 +1116,7 @@ public sealed class KinesisStreamProcessingStrategy : StreamingDataStrategyBase
             throw new InvalidOperationException($"Stream '{streamName}' does not exist");
         }
 
-        var shardIndex = Math.Abs(partitionKey.GetHashCode()) % stream.ShardCount;
+        var shardIndex = Math.Abs(StableHash.Compute(partitionKey)) % stream.ShardCount;
         var shardId = $"shard-{shardIndex:D12}";
         var sequenceNumber = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{Random.Shared.Next(1000000):D6}";
 

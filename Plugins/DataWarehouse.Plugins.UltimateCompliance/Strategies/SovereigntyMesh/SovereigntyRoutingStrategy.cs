@@ -161,7 +161,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
 
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _routingChecksTotal);
-        IncrementCounter("sovereignty_routing.check");
+            IncrementCounter("sovereignty_routing.check");
 
         // 1. Check cache
         var cacheKey = BuildCacheKey(objectId, intendedDestination);
@@ -353,7 +353,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(objectId);
         objectTags ??= new Dictionary<string, object>();
-        IncrementCounter("sovereignty_routing.get_compliant");
+            IncrementCounter("sovereignty_routing.get_compliant");
 
         var sourceJurisdiction = ExtractSourceJurisdiction(objectTags);
         return await FindAllowedBackendsForObject(objectId, sourceJurisdiction, objectTags, ct);
@@ -386,7 +386,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     /// <returns>Number of entries evicted.</returns>
     public int EvictExpiredCacheEntries()
     {
-        IncrementCounter("sovereignty_routing.cache_evict");
+            IncrementCounter("sovereignty_routing.cache_evict");
         var now = Environment.TickCount64;
         var ttlTicks = (long)_cacheTtl.TotalMilliseconds;
         var evicted = 0;
@@ -413,7 +413,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_routing.compliance_check");
+            IncrementCounter("sovereignty_routing.compliance_check");
 
         var objectId = context.ResourceId ?? "unknown";
         var sourceLocation = context.SourceLocation;

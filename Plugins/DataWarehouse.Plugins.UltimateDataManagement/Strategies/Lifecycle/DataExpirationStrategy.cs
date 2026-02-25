@@ -408,9 +408,11 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
             {
                 await _processorTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -833,7 +835,9 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
                         }
                         catch
                         {
+
                             // Log and continue
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
                     }
                 }
@@ -844,7 +848,9 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
             }
             catch
             {
+
                 // Log and continue
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

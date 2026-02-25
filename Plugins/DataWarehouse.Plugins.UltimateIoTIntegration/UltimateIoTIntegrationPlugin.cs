@@ -1036,7 +1036,9 @@ public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposa
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

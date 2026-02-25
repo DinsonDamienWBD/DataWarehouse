@@ -427,7 +427,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
             catch
             {
+
                 // Token parsing failed
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return null;

@@ -508,9 +508,11 @@ internal sealed class ComplexEventProcessing : IDisposable
         {
             await _messageBus.PublishAsync("streaming.cep.match", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical: match notification failure does not affect CEP processing
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

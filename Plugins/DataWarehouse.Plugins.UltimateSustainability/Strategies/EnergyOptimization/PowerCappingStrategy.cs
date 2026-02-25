@@ -93,7 +93,7 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
         DetectPowerCapabilities();
 
         _monitorTimer = new Timer(
-            async _ => await MonitorAndEnforcePowerCapAsync(),
+            async _ => { try { await MonitorAndEnforcePowerCapAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(1));
@@ -316,7 +316,9 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Monitoring failed
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -351,7 +353,9 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Fall back to software capping
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

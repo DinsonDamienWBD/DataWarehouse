@@ -67,6 +67,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
 
         var queryString = query.Count > 0 ? "?" + string.Join("&", query) : "";
         var response = await _httpClient.GetAsync($"{_url}/api/v2/alerts{queryString}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -98,6 +99,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
     public async Task<string> GetStatusAsync(CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"{_url}/api/v2/status", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 

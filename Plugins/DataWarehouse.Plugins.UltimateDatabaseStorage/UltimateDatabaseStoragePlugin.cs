@@ -466,7 +466,9 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             }
             catch
             {
+
                 // Ignore disposal errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

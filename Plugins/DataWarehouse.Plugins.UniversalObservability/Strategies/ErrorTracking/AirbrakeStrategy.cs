@@ -208,9 +208,11 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Airbrake unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -225,9 +227,11 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Airbrake unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

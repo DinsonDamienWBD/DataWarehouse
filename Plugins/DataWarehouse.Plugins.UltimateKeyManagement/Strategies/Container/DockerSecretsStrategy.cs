@@ -232,7 +232,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
                 }
                 catch
                 {
+
                     // Ignore API errors during initialization
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -423,7 +425,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
                 }
                 catch
                 {
+
                     // Ignore API errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

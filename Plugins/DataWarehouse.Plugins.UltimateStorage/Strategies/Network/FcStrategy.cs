@@ -1261,7 +1261,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 catch
                 {
+
                     // Ignore logout errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

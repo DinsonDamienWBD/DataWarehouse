@@ -36,9 +36,9 @@ public sealed class ZeroKnowledgePassportVerificationStrategy : ComplianceStrate
     public override string Framework => "CompliancePassport";
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        await base.InitializeAsync(configuration, cancellationToken);
 
         if (configuration.TryGetValue("SigningKey", out var keyObj) && keyObj is string keyStr && keyStr.Length > 0)
         {
@@ -49,7 +49,6 @@ public sealed class ZeroKnowledgePassportVerificationStrategy : ComplianceStrate
             _signingKey = RandomNumberGenerator.GetBytes(32);
         }
 
-        return Task.CompletedTask;
     }
 
     /// <summary>

@@ -630,7 +630,9 @@ public sealed class CircuitBreakerFallbackStrategy<TResult> : ResilienceStrategy
             }
             catch
             {
+
                 // Fall through to static value
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

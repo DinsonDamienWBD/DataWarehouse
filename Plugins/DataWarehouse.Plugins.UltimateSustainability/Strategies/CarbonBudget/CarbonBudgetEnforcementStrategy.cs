@@ -401,7 +401,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
                 }
                 catch
                 {
+
                     // Use default intensity if request fails
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
 
                 // Convert Wh to gCO2e: gCO2e = Wh * (gCO2e/kWh) / 1000
@@ -411,7 +413,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Swallow errors in event handler to avoid disrupting the bus
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         });
     }
@@ -550,7 +554,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Non-critical: don't let bus errors disrupt budget operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

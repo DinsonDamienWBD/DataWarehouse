@@ -220,7 +220,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("geolocation_service.check");
+            IncrementCounter("geolocation_service.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -395,7 +395,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 }
                 catch
                 {
+
                     // Suppress exceptions during disposal
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
                 finally
                 {
@@ -416,14 +418,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("geolocation_service.initialized");
+            IncrementCounter("geolocation_service.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("geolocation_service.shutdown");
+            IncrementCounter("geolocation_service.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

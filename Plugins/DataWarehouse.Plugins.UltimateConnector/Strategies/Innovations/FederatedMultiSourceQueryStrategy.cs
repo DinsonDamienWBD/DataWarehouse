@@ -132,6 +132,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ? sources.GetArrayLength()
                 : 0;
 
+            client.DefaultRequestHeaders.Remove("X-Federation-Session");
             client.DefaultRequestHeaders.Add("X-Federation-Session", sessionId);
 
             var info = new Dictionary<string, object>

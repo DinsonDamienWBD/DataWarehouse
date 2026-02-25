@@ -329,7 +329,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
             catch
             {
+
                 // Return empty list on error
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return identities;

@@ -141,8 +141,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sessionId = result.GetProperty("session_id").GetString()
                 ?? throw new InvalidOperationException("API healing endpoint did not return a session_id.");
 
+            client.DefaultRequestHeaders.Remove("X-Healing-Session");
             client.DefaultRequestHeaders.Add("X-Healing-Session", sessionId);
             if (!string.IsNullOrEmpty(versionInfo.ActiveVersion))
+                client.DefaultRequestHeaders.Remove("X-API-Version");
                 client.DefaultRequestHeaders.Add("X-API-Version", versionInfo.ActiveVersion);
 
             var info = new Dictionary<string, object>
@@ -283,7 +285,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             }
             catch
             {
+
                 // Version detection is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             if (availableVersions.Count == 0)

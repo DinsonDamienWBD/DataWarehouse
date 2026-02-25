@@ -212,9 +212,11 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync(sentryUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Sentry unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

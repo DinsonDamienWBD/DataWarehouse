@@ -501,9 +501,11 @@ internal sealed class StatefulStreamProcessing : IDisposable
         {
             await _messageBus.PublishAsync("streaming.state.checkpoint", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical: checkpoint notification failure does not affect processing
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

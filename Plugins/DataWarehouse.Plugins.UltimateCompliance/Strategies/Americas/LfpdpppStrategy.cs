@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("lfpdppp.check");
+            IncrementCounter("lfpdppp.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -52,14 +52,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("lfpdppp.initialized");
+            IncrementCounter("lfpdppp.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("lfpdppp.shutdown");
+            IncrementCounter("lfpdppp.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

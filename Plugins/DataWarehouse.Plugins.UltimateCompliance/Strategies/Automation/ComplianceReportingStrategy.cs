@@ -29,9 +29,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Multi-Framework Reporting";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Configure automatic report generation
             if (configuration.TryGetValue("AutoReportGeneration", out var autoObj) && autoObj is bool auto && auto)
@@ -40,20 +40,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     ? interval : 24; // Default daily
 
                 _reportGenerationTimer = new Timer(
-                    async _ => await GenerateScheduledReportsAsync(cancellationToken),
+                    async _ => { try { await GenerateScheduledReportsAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                     null,
                     TimeSpan.FromHours(intervalHours),
                     TimeSpan.FromHours(intervalHours)
                 );
             }
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("compliance_reporting.check");
+            IncrementCounter("compliance_reporting.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -334,7 +333,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 _reports[report.ReportId] = report;
 
                 // In production, this would export to storage/email
-                Console.WriteLine($"Generated scheduled report: {report.ReportId}");
+                System.Diagnostics.Debug.WriteLine($"Generated scheduled report: {report.ReportId}");
             }
 
             // Clean up old reports (keep last 90 days)
@@ -377,14 +376,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_reporting.initialized");
+            IncrementCounter("compliance_reporting.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_reporting.shutdown");
+            IncrementCounter("compliance_reporting.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

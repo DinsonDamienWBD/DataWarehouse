@@ -283,6 +283,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             }
             catch
             {
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -309,6 +310,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             }
             catch
             {
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

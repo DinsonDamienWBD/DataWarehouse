@@ -437,9 +437,11 @@ internal sealed class WatermarkManagement : IDisposable
         {
             await _messageBus.PublishAsync("streaming.watermark.advance", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical notification
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -471,9 +473,11 @@ internal sealed class WatermarkManagement : IDisposable
         {
             await _messageBus.PublishAsync("streaming.watermark.late", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical notification
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

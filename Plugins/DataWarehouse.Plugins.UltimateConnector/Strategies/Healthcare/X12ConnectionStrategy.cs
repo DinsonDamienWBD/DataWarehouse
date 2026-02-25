@@ -79,6 +79,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             try
             {
                 var response = await client.GetAsync(url, ct);
+ response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync(ct);
             }
             catch (Exception ex)

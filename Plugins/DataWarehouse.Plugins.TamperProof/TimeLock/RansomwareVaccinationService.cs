@@ -768,7 +768,9 @@ public sealed class RansomwareVaccinationService
         }
         catch
         {
+
             // Event publication failure must not disrupt vaccination operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

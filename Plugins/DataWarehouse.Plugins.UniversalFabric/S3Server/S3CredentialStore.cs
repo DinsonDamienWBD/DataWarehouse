@@ -198,9 +198,11 @@ public sealed class S3CredentialStore
                 }
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+
             // Corrupted file -- start fresh rather than crash
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

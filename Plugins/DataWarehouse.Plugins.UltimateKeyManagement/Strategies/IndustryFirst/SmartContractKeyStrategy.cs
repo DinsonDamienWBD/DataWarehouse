@@ -545,7 +545,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 }
                 catch
                 {
+
                     // Ignore cache load errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -644,7 +646,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 }
                 catch
                 {
+
                     // Use cached info if contract call fails
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
 
                 return new KeyMetadata

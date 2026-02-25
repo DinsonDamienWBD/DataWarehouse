@@ -315,7 +315,7 @@ public sealed class RangePartitioningStrategy : GraphPartitioningStrategyBase
         if (_rangeBoundaries.Count == 0)
         {
             // Fall back to simple modulo if no boundaries set
-            return Math.Abs(vertexId.GetHashCode()) % PartitionCount;
+            return Math.Abs(StableHash.Compute(vertexId)) % PartitionCount;
         }
 
         // Binary search for the appropriate partition

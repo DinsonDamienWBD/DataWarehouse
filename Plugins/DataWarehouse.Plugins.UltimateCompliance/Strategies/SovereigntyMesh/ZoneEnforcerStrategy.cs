@@ -69,7 +69,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.enforce");
+            IncrementCounter("zone_enforcer.enforce");
 
         if (string.IsNullOrWhiteSpace(objectId))
             throw new ArgumentNullException(nameof(objectId));
@@ -204,7 +204,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task<IReadOnlyList<ISovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.get_zones_for_jurisdiction");
+            IncrementCounter("zone_enforcer.get_zones_for_jurisdiction");
         var zones = await _registry.GetZonesForJurisdictionAsync(jurisdictionCode, ct);
         return zones.Cast<ISovereigntyZone>().ToList();
     }
@@ -213,7 +213,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task<ISovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.get_zone");
+            IncrementCounter("zone_enforcer.get_zone");
         return await _registry.GetZoneAsync(zoneId, ct);
     }
 
@@ -221,7 +221,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task RegisterZoneAsync(ISovereigntyZone zone, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.register_zone");
+            IncrementCounter("zone_enforcer.register_zone");
 
         if (zone is SovereigntyZone concreteZone)
         {
@@ -258,7 +258,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task DeactivateZoneAsync(string zoneId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.deactivate_zone");
+            IncrementCounter("zone_enforcer.deactivate_zone");
         await _registry.DeactivateZoneAsync(zoneId, ct);
 
         // Invalidate any cached results involving this zone
@@ -295,7 +295,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(
         ComplianceContext context, CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.check");
+            IncrementCounter("zone_enforcer.check");
 
         var sourceLocation = context.SourceLocation;
         var destLocation = context.DestinationLocation;
@@ -381,14 +381,14 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.initialized");
+            IncrementCounter("zone_enforcer.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.shutdown");
+            IncrementCounter("zone_enforcer.shutdown");
         _enforcementCache.Clear();
         return base.ShutdownAsyncCore(cancellationToken);
     }

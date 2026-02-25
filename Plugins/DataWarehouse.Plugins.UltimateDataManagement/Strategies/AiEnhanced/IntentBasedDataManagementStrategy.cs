@@ -464,7 +464,9 @@ public sealed class IntentBasedDataManagementStrategy : AiEnhancedStrategyBase
             }
             catch
             {
+
                 // Parsing failed, return null to trigger fallback
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

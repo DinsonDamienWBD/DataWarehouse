@@ -73,7 +73,7 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
         _options = options ?? RebalancerOptions.Default;
 
         _monitorTimer = new Timer(
-            async _ => await CheckAndRebalanceAsync(CancellationToken.None).ConfigureAwait(false),
+            async _ => { try { await CheckAndRebalanceAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             _options.CheckInterval,
             _options.CheckInterval);

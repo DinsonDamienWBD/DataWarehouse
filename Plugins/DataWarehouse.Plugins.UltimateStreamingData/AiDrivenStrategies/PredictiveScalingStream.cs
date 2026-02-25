@@ -264,9 +264,11 @@ internal sealed class PredictiveScalingStream : StreamingDataStrategyBase
                     return mlResult;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to rule-based fallback
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

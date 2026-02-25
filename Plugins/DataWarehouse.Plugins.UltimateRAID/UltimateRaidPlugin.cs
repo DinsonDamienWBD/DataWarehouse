@@ -1022,7 +1022,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.S
         await data.CopyToAsync(ms, ct).ConfigureAwait(false);
         var bytes = ms.ToArray();
 
-        var lba = (long)key.GetHashCode() & 0x7FFFFFFF;
+        var lba = (long)StableHash.Compute(key) & 0x7FFFFFFF;
         await strategy.WriteAsync(lba, bytes).ConfigureAwait(false);
 
         Interlocked.Increment(ref _totalWrites);
@@ -1048,7 +1048,7 @@ public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.S
         var strategy = _registry.Get(_defaultStrategyId)
             ?? throw new InvalidOperationException($"Default RAID strategy '{_defaultStrategyId}' not found");
 
-        var lba = (long)key.GetHashCode() & 0x7FFFFFFF;
+        var lba = (long)StableHash.Compute(key) & 0x7FFFFFFF;
         var data = await strategy.ReadAsync(lba, 4096).ConfigureAwait(false);
 
         Interlocked.Increment(ref _totalReads);

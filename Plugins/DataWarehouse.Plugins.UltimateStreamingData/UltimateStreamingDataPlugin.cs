@@ -131,7 +131,9 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
             }
             catch
             {
+
                 // Skip strategies that fail to instantiate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -312,9 +314,11 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
                 {
                     await channel.Writer.WriteAsync(msg.Payload).ConfigureAwait(false);
                 }
-                catch (ChannelClosedException)
+                catch (ChannelClosedException ex)
                 {
+
                     // Channel closed — subscriber gone; ignore.
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
         });

@@ -1375,7 +1375,9 @@ public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
                 }
             }
         }
-        catch { }
+        catch {
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+        }
         return null;
     }
 
@@ -1410,7 +1412,9 @@ public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
                 }
             }
         }
-        catch { }
+        catch {
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+        }
         return Task.FromResult<FilesystemMetadata?>(null);
     }
 
@@ -1644,7 +1648,9 @@ public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
                 });
             }
         }
-        catch { }
+        catch {
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+        }
         return Task.FromResult<FilesystemMetadata?>(null);
     }
 

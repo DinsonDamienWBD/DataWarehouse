@@ -38,7 +38,7 @@ public sealed class RenewableEnergyWindowStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _forecastTimer = new Timer(async _ => await UpdateForecastAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(15));
+        _forecastTimer = new Timer(async _ => { try { await UpdateForecastAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromMinutes(15));
         return Task.CompletedTask;
     }
 

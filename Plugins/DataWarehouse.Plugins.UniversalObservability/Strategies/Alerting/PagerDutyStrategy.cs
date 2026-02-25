@@ -32,6 +32,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
         _apiToken = apiToken;
         if (!string.IsNullOrEmpty(_apiToken))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token token={_apiToken}");
         }
     }

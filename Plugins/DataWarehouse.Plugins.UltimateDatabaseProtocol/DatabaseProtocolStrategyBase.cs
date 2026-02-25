@@ -642,7 +642,9 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
         finally
         {
@@ -1220,13 +1222,17 @@ public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategy
                     }
                     catch
                     {
+
                         // Skip types that can't be instantiated
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
             catch
             {
+
                 // Skip assemblies that can't be scanned
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

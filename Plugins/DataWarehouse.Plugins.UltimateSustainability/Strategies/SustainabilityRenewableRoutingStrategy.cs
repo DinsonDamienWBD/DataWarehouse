@@ -81,7 +81,9 @@ public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Fallback to cached/static data
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return _regionData.TryGetValue(zone, out var fallback) ? fallback : null;

@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cyber_resilience_act.check");
+            IncrementCounter("cyber_resilience_act.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -167,14 +167,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cyber_resilience_act.initialized");
+            IncrementCounter("cyber_resilience_act.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cyber_resilience_act.shutdown");
+            IncrementCounter("cyber_resilience_act.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

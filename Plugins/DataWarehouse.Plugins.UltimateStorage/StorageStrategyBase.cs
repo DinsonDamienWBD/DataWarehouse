@@ -421,7 +421,9 @@ namespace DataWarehouse.Plugins.UltimateStorage
                 }
                 catch
                 {
+
                     // Skip failed retrievals
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -454,7 +456,9 @@ namespace DataWarehouse.Plugins.UltimateStorage
                 }
                 catch
                 {
+
                     // Skip failed deletions
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

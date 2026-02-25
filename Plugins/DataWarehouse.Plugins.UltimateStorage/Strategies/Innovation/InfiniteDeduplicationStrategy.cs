@@ -114,9 +114,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty store
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -139,9 +141,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty manifests
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -164,9 +168,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty tenants
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -178,9 +184,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_globalChunkStore.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(storePath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -192,9 +200,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_tenantManifests.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(manifestsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -206,9 +216,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_tenants.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(tenantsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("hipaa.check");
+            IncrementCounter("hipaa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -315,14 +315,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("hipaa.initialized");
+            IncrementCounter("hipaa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("hipaa.shutdown");
+            IncrementCounter("hipaa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

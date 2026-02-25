@@ -148,7 +148,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 mirrorResponse.EnsureSuccessStatusCode();
             }
 
+            client.DefaultRequestHeaders.Remove("X-Twin-Id");
             client.DefaultRequestHeaders.Add("X-Twin-Id", twinId);
+            client.DefaultRequestHeaders.Remove("X-Twin-Mode");
             client.DefaultRequestHeaders.Add("X-Twin-Mode", twinMode);
 
             var info = new Dictionary<string, object>

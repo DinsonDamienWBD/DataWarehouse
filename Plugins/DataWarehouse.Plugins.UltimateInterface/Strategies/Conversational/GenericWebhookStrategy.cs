@@ -214,9 +214,11 @@ internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBas
                 }
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+
             // Body is not JSON or is malformed
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         return null;

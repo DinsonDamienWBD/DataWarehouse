@@ -55,7 +55,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
                 }
                 catch
                 {
+
                     // Fall through to heuristic-based recommendation
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -325,7 +327,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             }
             catch
             {
+
                 // Graceful degradation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return null;

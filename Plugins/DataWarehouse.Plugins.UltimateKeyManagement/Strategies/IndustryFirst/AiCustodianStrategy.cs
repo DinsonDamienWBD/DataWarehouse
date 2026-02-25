@@ -140,17 +140,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case LlmProvider.OpenAI:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://api.openai.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
                     break;
 
                 case LlmProvider.Anthropic:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://api.anthropic.com/v1/");
+                    client.DefaultRequestHeaders.Remove("x-api-key");
                     client.DefaultRequestHeaders.Add("x-api-key", _config.ApiKey);
+                    client.DefaultRequestHeaders.Remove("anthropic-version");
                     client.DefaultRequestHeaders.Add("anthropic-version", "2024-01-01");
                     break;
 
                 case LlmProvider.AzureOpenAI:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://your-resource.openai.azure.com/");
+                    client.DefaultRequestHeaders.Remove("api-key");
                     client.DefaultRequestHeaders.Add("api-key", _config.ApiKey);
                     break;
 
@@ -479,7 +483,9 @@ Provide your access decision in the following JSON format:
             }
             catch
             {
+
                 // Parse failed - escalate for safety
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new AiAccessDecision

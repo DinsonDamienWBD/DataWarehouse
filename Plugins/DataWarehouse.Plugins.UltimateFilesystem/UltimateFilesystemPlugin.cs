@@ -243,7 +243,9 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
             }
             catch
             {
+
                 // Try next strategy
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

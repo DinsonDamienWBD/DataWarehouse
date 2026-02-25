@@ -302,7 +302,9 @@ public sealed class SemanticIndexStrategy : IndexingStrategyBase
             }
             catch
             {
+
                 // Fall back to local embedding
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

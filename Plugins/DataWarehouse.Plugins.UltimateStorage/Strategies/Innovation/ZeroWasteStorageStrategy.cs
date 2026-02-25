@@ -126,9 +126,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty index
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -151,9 +153,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty allocations
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -165,9 +169,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_blockIndex.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(indexPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -179,9 +185,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_allocations.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(allocPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

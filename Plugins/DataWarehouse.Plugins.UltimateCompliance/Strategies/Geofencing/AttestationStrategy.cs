@@ -334,7 +334,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("attestation.check");
+            IncrementCounter("attestation.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -782,14 +782,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("attestation.initialized");
+            IncrementCounter("attestation.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("attestation.shutdown");
+            IncrementCounter("attestation.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

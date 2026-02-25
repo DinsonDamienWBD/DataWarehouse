@@ -304,7 +304,7 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
         ComplianceContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_observability.compliance_check");
+            IncrementCounter("sovereignty_observability.compliance_check");
 
         var health = await GetHealthAsync(cancellationToken);
 

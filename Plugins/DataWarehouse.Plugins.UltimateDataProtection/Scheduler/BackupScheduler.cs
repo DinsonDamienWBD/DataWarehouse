@@ -137,7 +137,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Scheduler
             }
 
             var timer = new Timer(
-                async _ => await OnTimerElapsedAsync(jobId),
+                async _ => { try { await OnTimerElapsedAsync(jobId); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 delay,
                 Timeout.InfiniteTimeSpan

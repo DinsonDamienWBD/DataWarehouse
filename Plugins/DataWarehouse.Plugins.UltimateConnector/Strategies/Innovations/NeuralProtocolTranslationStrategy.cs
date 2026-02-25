@@ -158,8 +158,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ? em.GetString() ?? "rule_based" : "rule_based";
             var llmAvailable = result.TryGetProperty("llm_available", out var la) && la.GetBoolean();
 
+            client.DefaultRequestHeaders.Remove("X-Translation-Session");
             client.DefaultRequestHeaders.Add("X-Translation-Session", sessionId);
+            client.DefaultRequestHeaders.Remove("X-Source-Protocol");
             client.DefaultRequestHeaders.Add("X-Source-Protocol", sourceProtocol);
+            client.DefaultRequestHeaders.Remove("X-Target-Protocol");
             client.DefaultRequestHeaders.Add("X-Target-Protocol", targetProtocol);
 
             var info = new Dictionary<string, object>

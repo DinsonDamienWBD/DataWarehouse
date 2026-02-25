@@ -299,7 +299,9 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Not JSON, treat as collection.operation format
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Default: find command

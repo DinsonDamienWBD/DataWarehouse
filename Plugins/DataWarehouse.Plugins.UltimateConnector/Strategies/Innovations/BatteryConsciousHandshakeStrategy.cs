@@ -125,8 +125,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
+            client.DefaultRequestHeaders.Remove("X-Transfer-Mode");
             client.DefaultRequestHeaders.Add("X-Transfer-Mode", transferMode);
+            client.DefaultRequestHeaders.Remove("X-Compression");
             client.DefaultRequestHeaders.Add("X-Compression", compression);
+            client.DefaultRequestHeaders.Remove("X-Battery-Percent");
             client.DefaultRequestHeaders.Add("X-Battery-Percent", powerState.ChargePercent.ToString());
 
             var response = await client.PostAsync("/api/v1/handshake/negotiate", content, ct);

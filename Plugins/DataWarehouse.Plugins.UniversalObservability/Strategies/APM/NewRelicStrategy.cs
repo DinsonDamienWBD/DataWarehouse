@@ -35,6 +35,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
         _region = region;
         _serviceName = serviceName;
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Api-Key");
         _httpClient.DefaultRequestHeaders.Add("Api-Key", _licenseKey);
     }
 

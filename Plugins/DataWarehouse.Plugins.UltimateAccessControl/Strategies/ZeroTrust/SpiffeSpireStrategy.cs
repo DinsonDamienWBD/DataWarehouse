@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
     /// </remarks>
     public sealed class SpiffeSpireStrategy : AccessControlStrategyBase
     {
-        private readonly Regex _spiffeIdRegex = new Regex(@"^spiffe://([a-z0-9\-\.]+)/(.+)$", RegexOptions.Compiled);
+        private readonly Regex _spiffeIdRegex = new Regex(@"^spiffe://([a-z0-9\-\.]+)/(.+)$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         private readonly Dictionary<string, TrustDomain> _trustDomains = new();
         private readonly Dictionary<string, WorkloadRegistration> _workloads = new();
         private TimeSpan _svidTtl = TimeSpan.FromHours(1);

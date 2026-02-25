@@ -36,9 +36,9 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
     public override string Framework => "CompliancePassport";
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        await base.InitializeAsync(configuration, cancellationToken);
 
         if (configuration.TryGetValue("SigningKey", out var keyObj) && keyObj is string keyStr && keyStr.Length > 0)
         {
@@ -50,7 +50,6 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
             _signingKey = RandomNumberGenerator.GetBytes(32);
         }
 
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -73,7 +72,7 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(context);
 
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("passport_issuance.issued");
+            IncrementCounter("passport_issuance.issued");
 
         var now = DateTimeOffset.UtcNow;
         var entries = new List<PassportEntry>(regulationIds.Count);
@@ -142,7 +141,7 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(existing);
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("passport_issuance.renewed");
+            IncrementCounter("passport_issuance.renewed");
 
         var now = DateTimeOffset.UtcNow;
 
@@ -225,7 +224,7 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
         ComplianceContext context,
         CancellationToken cancellationToken)
     {
-        IncrementCounter("passport_issuance.check");
+            IncrementCounter("passport_issuance.check");
 
         var objectId = context.ResourceId ?? string.Empty;
 
@@ -323,9 +322,11 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
                     }
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // Malformed evidence JSON -- skip gracefully
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

@@ -162,9 +162,11 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Mixpanel unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -204,9 +206,11 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Mixpanel unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -225,9 +229,11 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api.mixpanel.com/track", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Mixpanel unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

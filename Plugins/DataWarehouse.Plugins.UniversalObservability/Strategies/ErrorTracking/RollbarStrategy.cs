@@ -223,9 +223,11 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api.rollbar.com/api/1/item/", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Rollbar unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

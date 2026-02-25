@@ -49,9 +49,11 @@ public static class FfmpegTranscodeHelper
                 // (this allows downstream systems to retry with different settings)
             }
         }
-        catch (FfmpegNotFoundException)
+        catch (FfmpegNotFoundException ex)
         {
+
             // FFmpeg not installed - fall back to package generation
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         // Fallback: generate transcode package

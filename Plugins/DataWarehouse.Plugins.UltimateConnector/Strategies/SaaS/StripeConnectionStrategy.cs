@@ -160,6 +160,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var url = $"/v1/charges?{string.Join("&", queryParams)}";
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

@@ -718,7 +718,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 }
                 catch
                 {
+
                     // Ignore errors during disposal
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

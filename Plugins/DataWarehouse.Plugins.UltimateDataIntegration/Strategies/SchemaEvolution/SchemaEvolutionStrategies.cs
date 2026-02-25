@@ -712,7 +712,7 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
 
     private int GenerateSchemaId(string definition)
     {
-        return Math.Abs(definition.GetHashCode());
+        return Math.Abs(StableHash.Compute(definition));
     }
 
     private int GetNextVersionForSubject(string subjectName)

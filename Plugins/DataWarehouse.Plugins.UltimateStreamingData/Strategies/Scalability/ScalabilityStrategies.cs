@@ -91,7 +91,7 @@ public sealed class PartitioningStrategy : StreamingDataStrategyBase
         var partition = manager.Config.Strategy switch
         {
             PartitionStrategy.Hash => key != null
-                ? Math.Abs(key.GetHashCode()) % manager.Config.PartitionCount
+                ? Math.Abs(StableHash.Compute(key)) % manager.Config.PartitionCount
                 : Random.Shared.Next(manager.Config.PartitionCount),
             PartitionStrategy.RoundRobin => (int)(Interlocked.Increment(ref manager.RoundRobinCounter) % manager.Config.PartitionCount),
             PartitionStrategy.Random => Random.Shared.Next(manager.Config.PartitionCount),
@@ -934,7 +934,7 @@ public sealed class LoadBalancingStrategy : StreamingDataStrategyBase
         // Affinity routing
         if (affinityKey != null && balancer.Config.EnableAffinity)
         {
-            var affinityIndex = Math.Abs(affinityKey.GetHashCode()) % healthyWorkers.Count;
+            var affinityIndex = Math.Abs(StableHash.Compute(affinityKey)) % healthyWorkers.Count;
             var affinityWorker = healthyWorkers[affinityIndex];
             Interlocked.Increment(ref affinityWorker.ActiveConnections);
             Interlocked.Increment(ref affinityWorker.TotalRequests);

@@ -136,15 +136,15 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
     // Common PII patterns
     private static readonly Dictionary<string, Regex> PiiPatterns = new()
     {
-        ["SSN"] = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled),
-        ["CreditCard"] = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled),
-        ["Email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled),
-        ["Phone"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled),
-        ["IPAddress"] = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled),
-        ["DateOfBirth"] = new Regex(@"\b(?:DOB|Date of Birth|Birth ?Date)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["MedicalRecordNumber"] = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["DriversLicense"] = new Regex(@"\b(?:DL|Driver'?s? ?License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["Passport"] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        ["SSN"] = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["CreditCard"] = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["Email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["Phone"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["IPAddress"] = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["DateOfBirth"] = new Regex(@"\b(?:DOB|Date of Birth|Birth ?Date)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["MedicalRecordNumber"] = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["DriversLicense"] = new Regex(@"\b(?:DL|Driver'?s? ?License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["Passport"] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
         ["BankAccount"] = new Regex(@"\b(?:Account|Acct)[:\s#]*\d{8,17}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase)
     };
 
@@ -541,7 +541,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                 }
                 catch
                 {
+
                     // Invalid regex - skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -562,7 +564,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                 }
                 catch
                 {
+
                     // Invalid regex - skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -609,7 +613,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                     }
                     catch
                     {
+
                         // Invalid regex - skip
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }

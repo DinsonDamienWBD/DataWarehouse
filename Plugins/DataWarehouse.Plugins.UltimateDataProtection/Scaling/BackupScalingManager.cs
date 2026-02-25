@@ -542,9 +542,11 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Best-effort retention enforcement
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 

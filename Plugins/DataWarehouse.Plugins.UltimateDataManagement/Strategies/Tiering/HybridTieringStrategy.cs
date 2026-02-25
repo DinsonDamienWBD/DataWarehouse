@@ -290,7 +290,9 @@ public sealed class HybridTieringStrategy : TieringStrategyBase
             }
             catch
             {
+
                 // Strategy evaluation failed - skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

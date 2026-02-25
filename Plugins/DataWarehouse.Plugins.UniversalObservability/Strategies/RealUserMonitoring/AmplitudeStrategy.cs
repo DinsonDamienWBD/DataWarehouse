@@ -149,9 +149,11 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api2.amplitude.com/identify", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Amplitude unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -171,9 +173,11 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://api2.amplitude.com/2/httpapi", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Amplitude unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -220,6 +224,7 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

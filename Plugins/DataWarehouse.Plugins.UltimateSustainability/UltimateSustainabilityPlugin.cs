@@ -106,7 +106,9 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
             }
             catch
             {
+
                 // Continue with other strategies
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
         return allRecommendations.OrderByDescending(r => r.Priority).ToList().AsReadOnly();
@@ -167,7 +169,9 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

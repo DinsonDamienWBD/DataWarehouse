@@ -55,6 +55,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
 
         var baseUri = $"http{(parameters.UseSsl ? "s" : "")}://{parameters.Host}:{parameters.Port ?? 8086}";
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUri) };
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {_token}");
 
         return Task.CompletedTask;
@@ -79,6 +80,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
             $"/api/v2/query?org={Uri.EscapeDataString(_org)}",
             requestBody, ct);
 
+        response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -378,6 +380,7 @@ public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
         _httpClient = SharedHttpClient;
         if (!string.IsNullOrEmpty(parameters.Password))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {parameters.Password}");
         }
 
@@ -503,6 +506,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
 
         if (!string.IsNullOrEmpty(parameters.Password))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {parameters.Password}");
         }
 
@@ -525,6 +529,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
         var response = await _httpClient.GetAsync(
             $"/api/v1/query?query={Uri.EscapeDataString(query)}", ct);
 
+        response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)

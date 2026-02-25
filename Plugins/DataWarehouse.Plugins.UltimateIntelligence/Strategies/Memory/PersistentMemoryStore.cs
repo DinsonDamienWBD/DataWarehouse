@@ -1047,7 +1047,7 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
         if (_enableConsistentHashing)
         {
             // Consistent hashing using entry ID
-            var hash = entryId.GetHashCode();
+            var hash = StableHash.Compute(entryId);
             return Math.Abs(hash) % _shards.Count;
         }
 

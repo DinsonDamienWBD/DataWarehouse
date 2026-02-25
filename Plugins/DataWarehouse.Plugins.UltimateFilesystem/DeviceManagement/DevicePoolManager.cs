@@ -404,9 +404,11 @@ public sealed class DevicePoolManager : IAsyncDisposable
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Skip devices that cannot be read (offline, permission, etc.)
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -567,11 +569,13 @@ public sealed class DevicePoolManager : IAsyncDisposable
             {
                 await WriteMetadataBlockAsync(device, metadataBlock, ct).ConfigureAwait(false);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best-effort: mark member as degraded but don't fail the operation
                 // The member was already added as IsActive=true; in production you'd update
                 // the specific member's IsActive flag here
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

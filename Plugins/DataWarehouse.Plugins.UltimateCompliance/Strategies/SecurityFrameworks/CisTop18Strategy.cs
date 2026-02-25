@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cis_top18.check");
+            IncrementCounter("cis_top18.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -89,14 +89,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cis_top18.initialized");
+            IncrementCounter("cis_top18.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cis_top18.shutdown");
+            IncrementCounter("cis_top18.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

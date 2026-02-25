@@ -119,7 +119,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             }
             catch
             {
+
                 // Fallback for testing / dev environments
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return (Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(2));
@@ -143,6 +145,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var response = await client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -204,6 +207,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var response = await client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (response.IsSuccessStatusCode)

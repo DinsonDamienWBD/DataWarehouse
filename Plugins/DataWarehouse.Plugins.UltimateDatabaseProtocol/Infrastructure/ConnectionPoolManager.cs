@@ -311,7 +311,9 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Continue on error
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -418,7 +420,9 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Ignore warm-up failures
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -617,7 +621,9 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Ignore disposal errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             _manager.OnConnectionDestroyed();

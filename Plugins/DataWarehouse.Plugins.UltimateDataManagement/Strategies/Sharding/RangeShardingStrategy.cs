@@ -132,7 +132,7 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
 
         foreach (var (shardId, start, end) in ranges)
         {
-            var location = $"node-{shardId.GetHashCode() % 4}/db-range";
+            var location = $"node-{StableHash.Compute(shardId) % 4}/db-range";
 
             ShardRegistry[shardId] = new ShardInfo(shardId, location, ShardStatus.Online, 0, 0)
             {
@@ -538,7 +538,7 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
             var newShardId = $"shard-{Guid.NewGuid():N}".Substring(0, 15);
             var newShard = new ShardInfo(
                 newShardId,
-                $"node-{newShardId.GetHashCode() % 4}/db-range",
+                $"node-{StableHash.Compute(newShardId) % 4}/db-range",
                 ShardStatus.Online,
                 0, 0)
             {

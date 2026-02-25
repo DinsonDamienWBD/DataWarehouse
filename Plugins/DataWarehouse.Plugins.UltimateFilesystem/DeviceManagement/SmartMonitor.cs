@@ -213,7 +213,9 @@ public sealed class SmartMonitor
             }
             catch
             {
+
                 // Continue trying other paths
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -246,7 +248,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Temperature is optional
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Also try /sys/class/hwmon/ as fallback
@@ -273,7 +277,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Temperature is optional
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;
@@ -360,7 +366,9 @@ public sealed class SmartMonitor
                     }
                     catch
                     {
+
                         // Skip individual WMI object errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                     finally
                     {
@@ -425,7 +433,9 @@ public sealed class SmartMonitor
                     }
                     catch
                     {
+
                         // Skip individual parse errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                     finally
                     {
@@ -560,7 +570,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Sysfs reads are best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;
@@ -579,7 +591,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Sysfs reads are best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;

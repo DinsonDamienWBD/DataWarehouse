@@ -64,7 +64,9 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
         };
 
         var user = GetConfiguration("User", "datawarehouse");
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-User");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-User", user);
+        _httpClient.DefaultRequestHeaders.Remove("X-Trino-User");
         _httpClient.DefaultRequestHeaders.Add("X-Trino-User", user);
 
         await EnsureSchemaCoreAsync(ct);
@@ -260,6 +262,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
 
         var content = new StringContent(sql, Encoding.UTF8, "text/plain");
         _httpClient!.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-Schema");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-Schema", _schema);
 
         var response = await _httpClient.PostAsync("/v1/statement", content, ct);

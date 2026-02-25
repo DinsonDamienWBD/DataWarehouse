@@ -226,7 +226,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             }
             catch
             {
+
                 // Fall through to ElectricityMaps
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -244,7 +246,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             }
             catch
             {
+
                 // Fall through to estimation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -336,7 +340,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         }
         catch
         {
+
             // Registration from message bus is best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return Task.CompletedTask;
@@ -378,7 +384,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         }
         catch
         {
+
             // Audit publish failure is non-fatal
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

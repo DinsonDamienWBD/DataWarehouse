@@ -40,6 +40,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             var client = handle.GetConnection<HttpClient>();
             var url = string.IsNullOrEmpty(query) ? $"/{resourceType}" : $"/{resourceType}?{query}";
             var response = await client.GetAsync(url, ct);
+ response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
 

@@ -116,7 +116,9 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Schema might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

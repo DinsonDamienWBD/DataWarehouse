@@ -666,7 +666,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
                 }
                 catch
                 {
+
                     // Strategy failed to instantiate, skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

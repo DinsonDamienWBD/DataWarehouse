@@ -130,9 +130,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start fresh if loading fails
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -200,9 +202,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     await File.WriteAllBytesAsync(dataPath, kvp.Value.Serialize(), ct);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

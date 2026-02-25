@@ -42,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DataWarehouse/1.0");
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            httpClient.DefaultRequestHeaders.Remove("X-GitHub-Api-Version");
             httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
 
             if (!string.IsNullOrEmpty(_personalAccessToken))
@@ -103,6 +104,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var response = await client.GetAsync(url, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -131,6 +133,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             var response = await client.PostAsync($"/repos/{owner}/{repo}/issues", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -166,6 +169,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             var response = await client.PostAsync($"/repos/{owner}/{repo}/pulls", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -206,6 +210,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             var response = await client.PostAsync($"/repos/{owner}/{repo}/hooks", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

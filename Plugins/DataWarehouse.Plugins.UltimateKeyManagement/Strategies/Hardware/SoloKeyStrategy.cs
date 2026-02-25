@@ -392,7 +392,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
             catch
             {
+
                 // Ignore errors loading existing credentials
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

@@ -189,7 +189,9 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
         }
         catch
         {
+
             // API unavailable, use cached or default
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Return cached value or default

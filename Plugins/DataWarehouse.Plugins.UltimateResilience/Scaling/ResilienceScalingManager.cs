@@ -512,7 +512,9 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
+
             // Best-effort distributed state sharing -- do not fail the operation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

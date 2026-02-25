@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("coppa.check");
+            IncrementCounter("coppa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -182,14 +182,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("coppa.initialized");
+            IncrementCounter("coppa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("coppa.shutdown");
+            IncrementCounter("coppa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

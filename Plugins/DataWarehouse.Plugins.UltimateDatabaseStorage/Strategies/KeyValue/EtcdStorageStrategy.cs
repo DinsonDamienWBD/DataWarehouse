@@ -155,7 +155,9 @@ public sealed class EtcdStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Ignore metadata retrieval errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         var txnRequest = new TxnRequest();

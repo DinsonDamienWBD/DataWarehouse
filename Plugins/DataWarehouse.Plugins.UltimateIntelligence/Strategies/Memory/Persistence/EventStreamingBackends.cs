@@ -148,7 +148,7 @@ public sealed class KafkaPersistenceBackend : IProductionPersistenceBackend
     private string GetTopicName(MemoryTier tier) =>
         _config.UseTierTopics ? $"{_config.TopicPrefix}-{tier.ToString().ToLowerInvariant()}" : _config.TopicPrefix;
 
-    private int GetPartition(string key) => Math.Abs(key.GetHashCode()) % _config.NumPartitions;
+    private int GetPartition(string key) => Math.Abs(StableHash.Compute(key)) % _config.NumPartitions;
 
     #region Core CRUD Operations
 

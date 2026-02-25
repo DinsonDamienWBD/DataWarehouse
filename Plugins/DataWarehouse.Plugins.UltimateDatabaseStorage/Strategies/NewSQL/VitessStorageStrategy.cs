@@ -88,7 +88,9 @@ public sealed class VitessStorageStrategy : DatabaseStorageStrategyBase
             }
             catch
             {
+
                 // Keyspace might not exist yet
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

@@ -630,7 +630,7 @@ public sealed class DistributedStateStoreStrategy : StreamingDataStrategyBase
 
     private static int GetPartition(string key, int partitionCount)
     {
-        return Math.Abs(key.GetHashCode()) % partitionCount;
+        return Math.Abs(StableHash.Compute(key)) % partitionCount;
     }
 }
 

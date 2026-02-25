@@ -280,9 +280,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     AutoTuneGains(state);
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

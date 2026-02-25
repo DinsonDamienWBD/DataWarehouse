@@ -166,7 +166,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 $"/api/v1/discovery/resolutions/{resolutionId}/verify", ct);
             verifyResponse.EnsureSuccessStatusCode();
 
+            client.DefaultRequestHeaders.Remove("X-Resolution-Id");
             client.DefaultRequestHeaders.Add("X-Resolution-Id", resolutionId);
+            client.DefaultRequestHeaders.Remove("X-Resolved-Endpoint");
             client.DefaultRequestHeaders.Add("X-Resolved-Endpoint", resolvedEndpoint);
 
             var info = new Dictionary<string, object>

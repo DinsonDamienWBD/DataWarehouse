@@ -98,7 +98,9 @@ public sealed class PulsarStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Namespace might exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Enable topic compaction

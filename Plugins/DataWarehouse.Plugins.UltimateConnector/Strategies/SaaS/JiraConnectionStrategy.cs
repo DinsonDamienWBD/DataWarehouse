@@ -112,6 +112,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await client.PostAsync("/rest/api/3/search", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -179,6 +180,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var body = JsonSerializer.Serialize(new { fields });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await client.PostAsync("/rest/api/3/issue", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -242,6 +244,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
             var response = await client.GetAsync($"/rest/agile/1.0/board/{boardId}/sprint?state=active", ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -286,6 +289,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
             var response = await client.PostAsync("/rest/webhooks/1.0/webhook", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             return new JiraWebhookResult

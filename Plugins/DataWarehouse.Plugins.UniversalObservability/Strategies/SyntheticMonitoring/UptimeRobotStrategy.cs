@@ -282,6 +282,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

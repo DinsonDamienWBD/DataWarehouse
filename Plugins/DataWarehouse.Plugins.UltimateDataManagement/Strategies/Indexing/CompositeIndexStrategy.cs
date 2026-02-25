@@ -193,7 +193,9 @@ public sealed class CompositeIndexStrategy : IndexingStrategyBase
                 }
                 catch
                 {
+
                     // Fall back to string comparison
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -907,7 +909,9 @@ public sealed class CompositeIndexStrategy : IndexingStrategyBase
             }
             catch
             {
+
                 // Fall back to string comparison
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

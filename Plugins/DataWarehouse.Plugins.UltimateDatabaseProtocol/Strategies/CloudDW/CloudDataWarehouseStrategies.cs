@@ -69,6 +69,7 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
         };
 
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        _httpClient.DefaultRequestHeaders.Remove("User-Agent");
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse/1.0");
 
         _database = parameters.Database ?? "";
@@ -158,6 +159,7 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
             content,
             ct);
 
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 
@@ -405,6 +407,7 @@ public sealed class BigQueryProtocolStrategy : DatabaseProtocolStrategyBase
             content,
             ct);
 
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 
@@ -1021,6 +1024,7 @@ public sealed class DatabricksProtocolStrategy : DatabaseProtocolStrategyBase
             "application/json");
 
         var response = await _httpClient.PostAsync("/api/2.0/sql/statements", content, ct);
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 

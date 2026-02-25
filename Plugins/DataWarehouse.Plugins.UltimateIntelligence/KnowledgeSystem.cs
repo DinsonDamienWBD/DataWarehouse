@@ -853,7 +853,7 @@ public sealed class CapabilityMatrix
     {
         ArgumentException.ThrowIfNullOrEmpty(pattern);
 
-        var regex = new Regex("^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$", RegexOptions.IgnoreCase);
+        var regex = new Regex("^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
         return _matrix.Values
             .SelectMany(caps => caps)
@@ -2395,7 +2395,9 @@ public sealed class CommandExecutor
                 }
                 catch
                 {
+
                     // Rollback failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

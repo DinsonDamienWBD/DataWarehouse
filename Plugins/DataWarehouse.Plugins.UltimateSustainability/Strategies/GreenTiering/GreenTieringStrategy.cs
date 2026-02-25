@@ -188,7 +188,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     {
         // Background scan every 15 minutes
         _scanTimer = new Timer(
-            async _ => await RunScanCycleAsync(),
+            async _ => { try { await RunScanCycleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.FromMinutes(1),   // Initial delay: 1 minute after startup
             TimeSpan.FromMinutes(15)); // Repeat every 15 minutes
@@ -288,7 +288,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Storage listing failed -- return empty candidates rather than crashing
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return candidates.OrderByDescending(c => c.SizeBytes).ToList().AsReadOnly();
@@ -542,7 +544,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
                 }
                 catch
                 {
+
                     // Individual tenant scan failure should not stop other tenants
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -595,7 +599,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Scores unavailable -- return empty
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return scores;
@@ -641,7 +647,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Fall through to time-of-day estimation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         var fallbackHour = DateTimeOffset.UtcNow.Hour;

@@ -40,7 +40,7 @@ public sealed class ChargeAwareSchedulingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _checkTimer = new Timer(async _ => await CheckPowerStateAsync(), null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+        _checkTimer = new Timer(async _ => { try { await CheckPowerStateAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
         return Task.CompletedTask;
     }
 

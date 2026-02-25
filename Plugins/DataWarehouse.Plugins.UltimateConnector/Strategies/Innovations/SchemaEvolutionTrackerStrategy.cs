@@ -140,6 +140,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 }
             }
 
+            client.DefaultRequestHeaders.Remove("X-Schema-Tracker");
             client.DefaultRequestHeaders.Add("X-Schema-Tracker", trackerId);
 
             var info = new Dictionary<string, object>

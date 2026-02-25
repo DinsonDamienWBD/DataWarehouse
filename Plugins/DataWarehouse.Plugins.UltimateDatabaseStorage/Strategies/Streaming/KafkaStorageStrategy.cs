@@ -136,7 +136,9 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Topics might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

@@ -216,9 +216,11 @@ internal sealed class IntelligentRoutingStream : StreamingDataStrategyBase
                     return mlResult;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to hash-based routing
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

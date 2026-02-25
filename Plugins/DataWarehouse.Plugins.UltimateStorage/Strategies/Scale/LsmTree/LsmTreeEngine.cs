@@ -431,7 +431,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 }
                 catch
                 {
+
                     // Best effort
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

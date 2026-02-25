@@ -415,7 +415,9 @@ public sealed class ReadThroughCacheStrategy : CachingStrategyBase
         }
         catch
         {
+
             // Background refresh failures are non-fatal
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

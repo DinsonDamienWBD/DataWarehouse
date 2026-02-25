@@ -292,9 +292,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                     await SendAlertAsync(escalatedAlert, cancellationToken);
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Escalation cancelled - expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

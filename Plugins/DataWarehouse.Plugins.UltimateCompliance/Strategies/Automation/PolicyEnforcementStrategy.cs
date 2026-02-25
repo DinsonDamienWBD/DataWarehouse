@@ -28,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Policy-Based";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Load enforcement mode
             if (configuration.TryGetValue("EnforcementMode", out var modeObj) && modeObj is string mode)
@@ -53,13 +53,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 LoadDefaultPolicies();
             }
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("policy_enforcement.check");
+            IncrementCounter("policy_enforcement.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
             var enforcedPolicies = new List<string>();
@@ -350,14 +349,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("policy_enforcement.initialized");
+            IncrementCounter("policy_enforcement.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("policy_enforcement.shutdown");
+            IncrementCounter("policy_enforcement.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

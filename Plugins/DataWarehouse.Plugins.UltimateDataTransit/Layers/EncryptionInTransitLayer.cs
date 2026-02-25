@@ -196,7 +196,9 @@ internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
         }
         catch
         {
+
             // Message bus unavailable or encryption plugin not responding -- fall back to AES-GCM
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Fallback: AES-256-GCM encryption

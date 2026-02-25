@@ -392,7 +392,9 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

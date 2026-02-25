@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("blockchain_audit_trail.check");
+            IncrementCounter("blockchain_audit_trail.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify blockchain anchor
@@ -158,14 +158,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("blockchain_audit_trail.initialized");
+            IncrementCounter("blockchain_audit_trail.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("blockchain_audit_trail.shutdown");
+            IncrementCounter("blockchain_audit_trail.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

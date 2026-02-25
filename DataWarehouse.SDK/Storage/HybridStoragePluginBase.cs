@@ -149,7 +149,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         if (_config.EnableHealthMonitoring && _config.HealthCheckIntervalSeconds > 0)
         {
             _healthMonitorTimer = new Timer(
-                async _ => await CheckAllHealthAsync(),
+                async _ => { try { await CheckAllHealthAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds),
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds));

@@ -179,5 +179,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
         await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _accessKeyId = string.Empty;
+                _secretAccessKey = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

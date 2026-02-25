@@ -546,7 +546,9 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

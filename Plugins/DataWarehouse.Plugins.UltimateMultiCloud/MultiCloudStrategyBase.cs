@@ -221,7 +221,9 @@ public sealed class MultiCloudStrategyRegistry : IMultiCloudStrategyRegistry
             }
             catch
             {
+
                 // Skip strategies that fail to instantiate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

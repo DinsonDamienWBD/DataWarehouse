@@ -151,6 +151,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sessionId = result.GetProperty("session_id").GetString()
                 ?? throw new InvalidOperationException("Multipath endpoint did not return a session_id.");
 
+            client.DefaultRequestHeaders.Remove("X-Multipath-Session");
             client.DefaultRequestHeaders.Add("X-Multipath-Session", sessionId);
 
             var info = new Dictionary<string, object>

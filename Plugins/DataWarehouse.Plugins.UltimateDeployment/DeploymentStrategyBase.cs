@@ -393,7 +393,9 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
                 }
                 catch
                 {
+
                     // Rollback also failed, return failed state
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

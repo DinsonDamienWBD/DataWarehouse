@@ -1468,9 +1468,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 await Task.Delay(100, linkedCts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Timeout or cancellation - proceed with disposal
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -1484,7 +1486,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             catch
             {
+
                 // Ignore shutdown errors during disposal
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             // Dispose SDK resources

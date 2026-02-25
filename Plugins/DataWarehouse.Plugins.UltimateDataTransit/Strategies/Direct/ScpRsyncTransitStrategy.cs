@@ -127,7 +127,9 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
             }
             catch
             {
+
                 // Destination file does not exist; full upload required
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             byte[] dataToTransfer;

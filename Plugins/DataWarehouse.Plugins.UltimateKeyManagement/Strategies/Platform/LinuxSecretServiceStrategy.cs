@@ -495,7 +495,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             }
             catch
             {
+
                 // Ignore if machine-id is not accessible
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             var combinedEntropy = string.Join("|", entropyParts);

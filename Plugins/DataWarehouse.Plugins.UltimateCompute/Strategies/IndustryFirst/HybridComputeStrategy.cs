@@ -134,9 +134,11 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
             {
                 await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Shutdown timeout - continue with cleanup
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             _shutdownCts.Dispose();

@@ -304,7 +304,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Try next provider
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

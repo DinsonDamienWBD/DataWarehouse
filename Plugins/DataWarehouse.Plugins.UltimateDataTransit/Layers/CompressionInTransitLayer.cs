@@ -174,7 +174,9 @@ internal sealed class CompressionInTransitLayer : IDataTransitStrategy
         }
         catch
         {
+
             // Message bus unavailable or compression plugin not responding -- fall back to GZip
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Fallback: GZip compression using System.IO.Compression

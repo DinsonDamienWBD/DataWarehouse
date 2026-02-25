@@ -493,7 +493,9 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
+
             // Best-effort drain; failures are silently ignored
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

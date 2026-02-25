@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso27018.check");
+            IncrementCounter("iso27018.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -121,14 +121,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27018.initialized");
+            IncrementCounter("iso27018.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27018.shutdown");
+            IncrementCounter("iso27018.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

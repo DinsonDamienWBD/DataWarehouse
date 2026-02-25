@@ -543,7 +543,9 @@ public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore disconnect errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

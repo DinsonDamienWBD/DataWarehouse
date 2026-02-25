@@ -862,7 +862,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

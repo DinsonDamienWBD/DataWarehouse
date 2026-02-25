@@ -241,7 +241,9 @@ public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
         }
         catch
         {
+
             // Binary data
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         if (text != null && text.Length > 0)

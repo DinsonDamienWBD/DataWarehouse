@@ -778,7 +778,9 @@ public sealed class TenantShardingStrategy : ShardingStrategyBase
                     }
                     catch
                     {
+
                         // Continue with other tenants
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }

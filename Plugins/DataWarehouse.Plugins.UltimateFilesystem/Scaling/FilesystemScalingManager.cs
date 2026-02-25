@@ -394,9 +394,11 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
             {
                 break;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue dispatch loop on errors
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

@@ -52,7 +52,7 @@ public sealed class NotificationPlugin : PlatformPluginBase
         {
             case NotificationTier.Silent:
                 // Log only
-                Console.WriteLine($"[Silent] Manifest {manifest.ManifestId}: {manifest.Payload.Name}");
+                System.Diagnostics.Debug.WriteLine($"[Silent] Manifest {manifest.ManifestId}: {manifest.Payload.Name}");
                 break;
 
             case NotificationTier.Toast:
@@ -94,7 +94,7 @@ public sealed class NotificationPlugin : PlatformPluginBase
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             // Windows toast notification
-            Console.WriteLine($"[Toast/Windows] {title}: {message}");
+            System.Diagnostics.Debug.WriteLine($"[Toast/Windows] {title}: {message}");
             await Task.Delay(100, ct); // Simulate notification display
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -116,7 +116,7 @@ public sealed class NotificationPlugin : PlatformPluginBase
             }
             catch
             {
-                Console.WriteLine($"[Toast/Linux] {title}: {message}");
+                System.Diagnostics.Debug.WriteLine($"[Toast/Linux] {title}: {message}");
             }
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -138,13 +138,13 @@ public sealed class NotificationPlugin : PlatformPluginBase
             }
             catch
             {
-                Console.WriteLine($"[Toast/macOS] {title}: {message}");
+                System.Diagnostics.Debug.WriteLine($"[Toast/macOS] {title}: {message}");
             }
         }
         else
         {
             // Fallback: console
-            Console.WriteLine($"[Toast] {title}: {message}");
+            System.Diagnostics.Debug.WriteLine($"[Toast] {title}: {message}");
             Console.Beep();
         }
     }
@@ -152,9 +152,9 @@ public sealed class NotificationPlugin : PlatformPluginBase
     private async Task ShowModalAsync(string title, string message, CancellationToken ct)
     {
         // Modal requires persistent UI - for CLI, use console prompt
-        Console.WriteLine($"[Modal] {title}");
-        Console.WriteLine($"Message: {message}");
-        Console.WriteLine("Press ENTER to acknowledge...");
+        System.Diagnostics.Debug.WriteLine($"[Modal] {title}");
+        System.Diagnostics.Debug.WriteLine($"Message: {message}");
+        System.Diagnostics.Debug.WriteLine("Press ENTER to acknowledge...");
         await Task.Delay(100, ct);
         // In GUI, this would show an actual modal dialog
     }

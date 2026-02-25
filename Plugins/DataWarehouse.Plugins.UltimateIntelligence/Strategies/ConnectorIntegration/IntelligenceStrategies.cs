@@ -518,8 +518,8 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
     {
         // Basic YAML parsing for paths
         var endpoints = new List<DiscoveredEndpoint>();
-        var pathPattern = new Regex(@"^\s{2}(/[^\s:]+):\s*$", RegexOptions.Multiline);
-        var methodPattern = new Regex(@"^\s{4}(get|post|put|delete|patch):\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        var pathPattern = new Regex(@"^\s{2}(/[^\s:]+):\s*$", RegexOptions.Multiline, TimeSpan.FromSeconds(5));
+        var methodPattern = new Regex(@"^\s{4}(get|post|put|delete|patch):\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
         var pathMatches = pathPattern.Matches(content);
         foreach (Match pathMatch in pathMatches)
@@ -633,9 +633,9 @@ Return ONLY the JSON array, no other text.";
     private List<DiscoveredEndpoint> ParseGraphQLSchema(string content)
     {
         var endpoints = new List<DiscoveredEndpoint>();
-        var queryPattern = new Regex(@"type\s+Query\s*\{([^}]+)\}", RegexOptions.Singleline);
-        var mutationPattern = new Regex(@"type\s+Mutation\s*\{([^}]+)\}", RegexOptions.Singleline);
-        var fieldPattern = new Regex(@"(\w+)(?:\([^)]*\))?\s*:\s*(\w+)", RegexOptions.Multiline);
+        var queryPattern = new Regex(@"type\s+Query\s*\{([^}]+)\}", RegexOptions.Singleline, TimeSpan.FromSeconds(5));
+        var mutationPattern = new Regex(@"type\s+Mutation\s*\{([^}]+)\}", RegexOptions.Singleline, TimeSpan.FromSeconds(5));
+        var fieldPattern = new Regex(@"(\w+)(?:\([^)]*\))?\s*:\s*(\w+)", RegexOptions.Multiline, TimeSpan.FromSeconds(5));
 
         var queryMatch = queryPattern.Match(content);
         if (queryMatch.Success)
@@ -675,7 +675,7 @@ Return ONLY the JSON array, no other text.";
     private List<DiscoveredEndpoint> ParseWsdl(string content)
     {
         var endpoints = new List<DiscoveredEndpoint>();
-        var operationPattern = new Regex(@"<wsdl:operation\s+name=""(\w+)""", RegexOptions.IgnoreCase);
+        var operationPattern = new Regex(@"<wsdl:operation\s+name=""(\w+)""", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
         foreach (Match match in operationPattern.Matches(content))
         {
@@ -2825,6 +2825,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
                 await Task.Delay(options.DelayBetweenProbesMs / 2, ct);
                 var respWithout = await _httpClient.SendAsync(reqWithout, ct);
 
+                respWith.EnsureSuccessStatusCode();
                 var bodyWith = await respWith.Content.ReadAsStringAsync(ct);
                 var bodyWithout = await respWithout.Content.ReadAsStringAsync(ct);
 
@@ -2856,6 +2857,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
             var url = $"{baseUrl.TrimEnd('/')}{path}";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             var response = await _httpClient.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             var body = await response.Content.ReadAsStringAsync(ct);
 
             if (response.Content.Headers.ContentType?.MediaType?.Contains("json") == true)

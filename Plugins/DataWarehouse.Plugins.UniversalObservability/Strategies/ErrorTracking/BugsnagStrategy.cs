@@ -52,6 +52,7 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
         _releaseStage = releaseStage;
         _appVersion = appVersion;
 
+        _httpClient.DefaultRequestHeaders.Remove("Bugsnag-Api-Key");
         _httpClient.DefaultRequestHeaders.Add("Bugsnag-Api-Key", apiKey);
     }
 
@@ -216,9 +217,11 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
             var response = await _httpClient.PostAsync("https://notify.bugsnag.com", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Bugsnag unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -288,6 +291,7 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

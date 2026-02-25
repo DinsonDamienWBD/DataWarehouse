@@ -679,9 +679,11 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
                 return new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.Zero);
             }
         }
-        catch (FormatException)
+        catch (FormatException ex)
         {
+
             // Fall through to default
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         return DateTimeOffset.UtcNow;

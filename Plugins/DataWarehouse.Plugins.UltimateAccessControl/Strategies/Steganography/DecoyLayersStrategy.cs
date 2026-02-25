@@ -591,9 +591,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                     });
                 }
             }
-            catch (EndOfStreamException)
+            catch (EndOfStreamException ex)
             {
+
                 // Expected when reading corrupted or partial data
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             return layers;

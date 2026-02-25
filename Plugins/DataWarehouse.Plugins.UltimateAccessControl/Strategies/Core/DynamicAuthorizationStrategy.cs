@@ -75,7 +75,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
             // Start session monitoring
             _sessionMonitorTimer = new Timer(
-                async _ => await ReevaluateActiveSessionsAsync(),
+                async _ => { try { await ReevaluateActiveSessionsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 _sessionReevaluationInterval,
                 _sessionReevaluationInterval);
@@ -307,7 +307,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 }
                 catch
                 {
+
                     // Continue with other providers
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -620,7 +622,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 }
                 catch
                 {
+
                     // Continue with other sessions
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -908,7 +912,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 }
                 catch
                 {
+
                     // Continue with other enrichers
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

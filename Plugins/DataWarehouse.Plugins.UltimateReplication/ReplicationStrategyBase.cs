@@ -808,7 +808,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
             }
             catch
             {
+
                 // Silently ignore - feedback is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -932,7 +934,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
             }
             catch
             {
+
                 // Silently ignore - feedback is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

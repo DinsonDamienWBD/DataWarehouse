@@ -271,7 +271,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
         // Fix common issues
         // Close unclosed tags
         var openTags = new Stack<string>();
-        var tagPattern = new Regex(@"<(/?)(\w+)[^>]*(/?)>");
+        var tagPattern = new Regex(@"<(/?)(\w+)[^>]*(/?)>", RegexOptions.None, TimeSpan.FromSeconds(5));
 
         foreach (Match match in tagPattern.Matches(xml))
         {

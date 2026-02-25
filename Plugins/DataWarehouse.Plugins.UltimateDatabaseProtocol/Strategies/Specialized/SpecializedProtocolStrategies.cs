@@ -1116,8 +1116,11 @@ public sealed class PrestoProtocolStrategy : DatabaseProtocolStrategyBase
         _catalog = parameters.Database ?? "hive";
         _schema = parameters.ExtendedProperties?.GetValueOrDefault("Schema")?.ToString() ?? "default";
 
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-User");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-User", parameters.Username ?? "presto");
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-Catalog");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-Schema");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-Schema", _schema);
 
         return Task.CompletedTask;

@@ -268,7 +268,9 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
             }
             catch
             {
+
                 // Best-effort: continue shutting down remaining strategies
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -464,14 +466,18 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
                 }
                 catch
                 {
+
                     // Non-fatal: individual message handling failures don't prevent future operations
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             });
             _subscriptions.Add(subscription);
         }
         catch
         {
+
             // Non-fatal: topic subscription failures degrade functionality but don't prevent operation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

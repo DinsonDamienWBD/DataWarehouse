@@ -87,7 +87,7 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     {
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
-        IncrementCounter("enforcement_interceptor.write");
+            IncrementCounter("enforcement_interceptor.write");
 
         var sourceLocation = ResolveString(context, "SourceLocation") ?? DefaultHomeJurisdiction;
 
@@ -122,7 +122,7 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     {
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
-        IncrementCounter("enforcement_interceptor.read");
+            IncrementCounter("enforcement_interceptor.read");
 
         var dataLocation = ResolveString(context, "DataLocation");
 
@@ -165,7 +165,7 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(
         ComplianceContext context, CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.check");
+            IncrementCounter("enforcement_interceptor.check");
 
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
@@ -259,14 +259,14 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.initialized");
+            IncrementCounter("enforcement_interceptor.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.shutdown");
+            IncrementCounter("enforcement_interceptor.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 

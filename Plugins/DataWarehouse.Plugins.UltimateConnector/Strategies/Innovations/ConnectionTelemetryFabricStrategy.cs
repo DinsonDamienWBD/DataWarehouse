@@ -104,10 +104,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 DefaultRequestVersion = new Version(2, 0)
             };
 
+            client.DefaultRequestHeaders.Remove("traceparent");
             client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{spanId}-01");
 
             if (enableBaggage)
             {
+                client.DefaultRequestHeaders.Remove("baggage");
                 client.DefaultRequestHeaders.Add("baggage",
                     $"service.name={serviceName},connector.strategy=telemetry-fabric");
             }
@@ -160,6 +162,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             connectSpan?.SetTag("connector.session_id", telemetrySessionId);
             connectSpan?.SetStatus(ActivityStatusCode.Ok);
 
+            client.DefaultRequestHeaders.Remove("X-Telemetry-Session");
             client.DefaultRequestHeaders.Add("X-Telemetry-Session", telemetrySessionId);
 
             var info = new Dictionary<string, object>

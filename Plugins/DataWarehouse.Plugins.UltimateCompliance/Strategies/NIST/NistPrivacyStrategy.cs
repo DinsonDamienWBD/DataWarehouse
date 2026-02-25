@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("nist_privacy.check");
+            IncrementCounter("nist_privacy.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -115,14 +115,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist_privacy.initialized");
+            IncrementCounter("nist_privacy.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist_privacy.shutdown");
+            IncrementCounter("nist_privacy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

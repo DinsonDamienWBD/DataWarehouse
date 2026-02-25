@@ -616,9 +616,11 @@ public sealed class AedsScalingManager : IScalableSubsystem, IDisposable
         {
             Task.WaitAll(_partitionWorkers, TimeSpan.FromSeconds(5));
         }
-        catch (AggregateException)
+        catch (AggregateException ex)
         {
+
             // Workers may throw on cancellation
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         _workerCts.Dispose();

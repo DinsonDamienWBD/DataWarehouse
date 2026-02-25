@@ -158,9 +158,11 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
             {
                 await _workerTask.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
@@ -236,7 +238,9 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
                 }
                 catch
                 {
+
                     // Best-effort: don't throw during shutdown
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

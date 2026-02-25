@@ -156,6 +156,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ? na.GetString() ?? profile.Algorithm : profile.Algorithm;
             var dictionaryId = result.TryGetProperty("dictionary_id", out var di) ? di.GetString() : null;
 
+            client.DefaultRequestHeaders.Remove("X-Compression-Session");
             client.DefaultRequestHeaders.Add("X-Compression-Session", sessionId);
             client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue(negotiatedAlgorithm));
 

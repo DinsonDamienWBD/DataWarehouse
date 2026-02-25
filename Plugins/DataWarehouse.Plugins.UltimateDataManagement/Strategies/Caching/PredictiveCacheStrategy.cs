@@ -463,14 +463,18 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
                         }
                         catch
                         {
+
                             // Prefetch failures are non-fatal
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
                     }
                 }
             }
             catch
             {
+
                 // Timer callback failures should not propagate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         });
     }

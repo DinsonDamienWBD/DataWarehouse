@@ -77,7 +77,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     public IReadOnlyDictionary<string, object> PassportToTags(CompliancePassport passport)
     {
         ArgumentNullException.ThrowIfNull(passport);
-        IncrementCounter("passport_tag.to_tags");
+            IncrementCounter("passport_tag.to_tags");
 
         var tags = new Dictionary<string, object>
         {
@@ -122,7 +122,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
         if (tags == null || tags.Count == 0)
             return null;
 
-        IncrementCounter("passport_tag.from_tags");
+            IncrementCounter("passport_tag.from_tags");
 
         // Extract required scalar fields
         if (!TryGetTagString(tags, TagId, out var passportId) ||
@@ -177,7 +177,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     public IReadOnlyDictionary<string, object> GetPassportTagsForObject(string objectId)
     {
         ArgumentNullException.ThrowIfNull(objectId);
-        IncrementCounter("passport_tag.get_tags");
+            IncrementCounter("passport_tag.get_tags");
 
         if (_objectTags.TryGetValue(objectId, out var tags))
         {
@@ -197,7 +197,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(objectId);
         ArgumentNullException.ThrowIfNull(passport);
-        IncrementCounter("passport_tag.set_tags");
+            IncrementCounter("passport_tag.set_tags");
 
         // Convert passport to flat tag dictionary first, then copy into BoundedDictionary
         var flatTags = PassportToTags(passport);
@@ -215,7 +215,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     public bool RemovePassportTagsForObject(string objectId)
     {
         ArgumentNullException.ThrowIfNull(objectId);
-        IncrementCounter("passport_tag.remove_tags");
+            IncrementCounter("passport_tag.remove_tags");
         return _objectTags.TryRemove(objectId, out _);
     }
 
@@ -231,7 +231,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     public IReadOnlyList<string> FindObjectsByRegulation(string regulationId)
     {
         ArgumentNullException.ThrowIfNull(regulationId);
-        IncrementCounter("passport_tag.query_regulation");
+            IncrementCounter("passport_tag.query_regulation");
 
         var regKey = NormalizeRegulationKey(regulationId);
         var statusTag = $"{TagRegulationPrefix}{regKey}.status";
@@ -249,7 +249,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     /// <returns>List of matching object IDs.</returns>
     public IReadOnlyList<string> FindObjectsByStatus(PassportStatus status)
     {
-        IncrementCounter("passport_tag.query_status");
+            IncrementCounter("passport_tag.query_status");
         var statusStr = status.ToString();
 
         return _objectTags
@@ -266,7 +266,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     /// <returns>List of object IDs with passports expiring soon.</returns>
     public IReadOnlyList<string> FindObjectsExpiringSoon(TimeSpan within)
     {
-        IncrementCounter("passport_tag.query_expiring");
+            IncrementCounter("passport_tag.query_expiring");
         var cutoff = DateTimeOffset.UtcNow.Add(within);
 
         return _objectTags
@@ -291,7 +291,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
     /// <returns>List of non-compliant object IDs.</returns>
     public IReadOnlyList<string> FindNonCompliantObjects()
     {
-        IncrementCounter("passport_tag.query_noncompliant");
+            IncrementCounter("passport_tag.query_noncompliant");
         const double threshold = 0.8;
 
         return _objectTags
@@ -315,7 +315,7 @@ public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("passport_tag.check");
+            IncrementCounter("passport_tag.check");
 
         var objectId = context.ResourceId;
         if (string.IsNullOrWhiteSpace(objectId))

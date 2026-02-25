@@ -729,7 +729,9 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
             }
             catch
             {
+
                 // Log but don't fail
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

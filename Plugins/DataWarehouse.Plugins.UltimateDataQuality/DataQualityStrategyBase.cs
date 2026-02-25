@@ -706,13 +706,17 @@ public sealed class DataQualityStrategyRegistry
                     }
                     catch
                     {
+
                         // Skip types that cannot be instantiated
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
             catch
             {
+
                 // Skip assemblies that cannot be scanned
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

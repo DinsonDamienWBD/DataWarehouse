@@ -44,9 +44,11 @@ public sealed class SslCertificateMonitorService
                 ? host : $"https://{host}";
             await _httpClient.GetAsync(uri, ct);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Connection may fail but we still get the cert
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         return _certificateCache.TryGetValue(host, out var info) ? info : new SslCertificateInfo

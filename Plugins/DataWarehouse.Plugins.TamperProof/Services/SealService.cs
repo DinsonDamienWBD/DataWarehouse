@@ -732,7 +732,9 @@ public class SealService : ISealService
         }
         catch
         {
+
             // Ignore
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return "system";

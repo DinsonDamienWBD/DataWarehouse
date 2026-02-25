@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cmmc.check");
+            IncrementCounter("cmmc.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -211,14 +211,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cmmc.initialized");
+            IncrementCounter("cmmc.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cmmc.shutdown");
+            IncrementCounter("cmmc.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

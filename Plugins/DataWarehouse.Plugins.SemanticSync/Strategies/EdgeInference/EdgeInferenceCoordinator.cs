@@ -154,7 +154,9 @@ public sealed class EdgeInferenceCoordinator : SemanticSyncStrategyBase
             }
             catch
             {
+
                 // Cloud unavailable -- fall through to rule-based defaults
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -276,7 +278,9 @@ public sealed class EdgeInferenceCoordinator : SemanticSyncStrategyBase
             }
             catch
             {
+
                 // AI provider failed -- fall through to hash-based embedding
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

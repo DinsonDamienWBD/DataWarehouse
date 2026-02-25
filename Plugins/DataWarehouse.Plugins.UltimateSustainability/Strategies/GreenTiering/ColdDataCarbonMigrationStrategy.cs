@@ -550,7 +550,9 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Publishing completion event is best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

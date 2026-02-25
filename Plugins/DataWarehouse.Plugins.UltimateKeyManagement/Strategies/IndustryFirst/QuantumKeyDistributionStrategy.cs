@@ -114,6 +114,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             if (!string.IsNullOrEmpty(_config.ApiKey))
             {
+                _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
                 _httpClient.DefaultRequestHeaders.Add("X-API-Key", _config.ApiKey);
             }
 
@@ -570,7 +571,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private void StartChannelMonitoring()
         {
             _channelMonitorTimer = new Timer(
-                async _ => await MonitorChannelHealth(),
+                async _ => { try { await MonitorChannelHealth(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(10),
                 TimeSpan.FromSeconds(_config.ChannelMonitorIntervalSeconds));
@@ -592,7 +593,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
             catch
             {
+
                 // Monitoring failure - continue silently
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -722,7 +725,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
             catch
             {
+
                 // Ignore load errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

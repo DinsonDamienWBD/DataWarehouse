@@ -136,13 +136,17 @@ public sealed class S3HttpServer : IS3CompatibleServer
             {
                 await _listenerTask.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
-            catch (HttpListenerException)
+            catch (HttpListenerException ex)
             {
+
                 // Expected when listener is stopped
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

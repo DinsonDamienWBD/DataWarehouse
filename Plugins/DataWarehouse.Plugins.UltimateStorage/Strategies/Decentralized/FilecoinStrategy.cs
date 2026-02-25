@@ -178,10 +178,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             // Add authorization headers
             if (_useLotusApi && !string.IsNullOrEmpty(_authToken))
             {
+                _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_authToken}");
             }
             else if (!_useLotusApi && !string.IsNullOrEmpty(_web3StorageToken))
             {
+                _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_web3StorageToken}");
             }
 

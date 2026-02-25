@@ -684,9 +684,11 @@ internal sealed class FhirStreamStrategy : StreamingDataStrategyBase
                     if (!matches) return false;
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // If JSON parsing fails, skip this filter
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

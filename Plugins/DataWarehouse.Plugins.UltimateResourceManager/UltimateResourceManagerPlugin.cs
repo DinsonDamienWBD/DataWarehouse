@@ -317,7 +317,9 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
             }
             catch
             {
+
                 // Skip strategies that fail to report metrics
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

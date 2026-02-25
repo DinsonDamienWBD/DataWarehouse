@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("qatar_pdpl.check");
+            IncrementCounter("qatar_pdpl.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -50,14 +50,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("qatar_pdpl.initialized");
+            IncrementCounter("qatar_pdpl.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("qatar_pdpl.shutdown");
+            IncrementCounter("qatar_pdpl.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

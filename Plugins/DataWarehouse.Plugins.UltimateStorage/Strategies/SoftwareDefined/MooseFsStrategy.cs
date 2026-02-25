@@ -1162,7 +1162,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 }
                 catch
                 {
+
                     // Ignore cleanup errors during disposal
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

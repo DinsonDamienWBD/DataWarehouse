@@ -285,7 +285,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Re-auth failure is logged by the base class health monitoring
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }, null, TimeSpan.FromSeconds(intervalSec), TimeSpan.FromSeconds(intervalSec));
 

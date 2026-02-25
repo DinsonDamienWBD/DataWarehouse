@@ -371,9 +371,11 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
                         }
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Node unreachable
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             });
 
@@ -867,7 +869,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
                 return null;
 
             // Hash-based routing to a specific region
-            var hash = dataId.GetHashCode();
+            var hash = StableHash.Compute(dataId);
             var regions = _regions.Values.Where(r => r.Health == NodeHealthStatus.Active).ToArray();
             if (regions.Length == 0)
                 return null;

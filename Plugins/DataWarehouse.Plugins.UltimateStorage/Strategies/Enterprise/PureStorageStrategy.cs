@@ -170,6 +170,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             };
 
             // Set API version header and authentication
+            _httpClient.DefaultRequestHeaders.Remove("api-token");
             _httpClient.DefaultRequestHeaders.Add("api-token", _apiToken);
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

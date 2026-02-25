@@ -649,7 +649,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
             catch
             {
+
                 // Ignore errors loading existing keys
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

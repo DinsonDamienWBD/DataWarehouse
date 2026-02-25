@@ -486,7 +486,9 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
             }
             catch
             {
+
                 // Ignore individual check failures during startup
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             await Task.Delay(_checkInterval, cancellationToken);

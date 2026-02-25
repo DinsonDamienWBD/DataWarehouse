@@ -55,6 +55,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
         _httpClient.DefaultRequestHeaders.Clear();
         if (!string.IsNullOrEmpty(_tenant))
         {
+            _httpClient.DefaultRequestHeaders.Remove("X-Scope-OrgID");
             _httpClient.DefaultRequestHeaders.Add("X-Scope-OrgID", _tenant);
         }
     }

@@ -891,9 +891,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     }
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // If JSON parsing fails, return empty list
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             return items;

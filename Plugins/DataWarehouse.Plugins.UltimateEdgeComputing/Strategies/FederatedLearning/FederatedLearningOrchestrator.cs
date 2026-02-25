@@ -198,13 +198,17 @@ public sealed class FederatedLearningOrchestrator
 
                 updates.Add(update);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Straggler timeout or cancellation - skip this node
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
             catch
             {
+
                 // Training error - skip this node
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }).ToArray();
 
@@ -215,7 +219,9 @@ public sealed class FederatedLearningOrchestrator
         }
         catch
         {
+
             // Some tasks failed or timed out
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return updates.ToArray();

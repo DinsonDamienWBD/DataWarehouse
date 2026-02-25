@@ -50,7 +50,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(passport);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("cross_border.negotiate");
+            IncrementCounter("cross_border.negotiate");
 
         var key = BuildAgreementKey(sourceJurisdiction, destJurisdiction);
 
@@ -104,7 +104,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         _pendingNegotiations.TryUpdate(negotiation.NegotiationId, negotiation,
             _pendingNegotiations.GetValueOrDefault(negotiation.NegotiationId)!);
 
-        IncrementCounter("cross_border.agreement_created");
+            IncrementCounter("cross_border.agreement_created");
 
         return Task.FromResult(agreement);
     }
@@ -115,7 +115,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(transferId);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("cross_border.evaluate");
+            IncrementCounter("cross_border.evaluate");
 
         // Search for an agreement matching this transfer by looking up logs
         foreach (var logs in _transferLogs.Values)
@@ -164,7 +164,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(log);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("cross_border.log");
+            IncrementCounter("cross_border.log");
 
         _transferLogs.AddOrUpdate(
             log.ObjectId,
@@ -188,7 +188,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(objectId);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("cross_border.history");
+            IncrementCounter("cross_border.history");
 
         if (_transferLogs.TryGetValue(objectId, out var logs))
         {
@@ -214,7 +214,7 @@ public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase
         ComplianceContext context,
         CancellationToken cancellationToken)
     {
-        IncrementCounter("cross_border.check");
+            IncrementCounter("cross_border.check");
 
         var source = context.SourceLocation ?? string.Empty;
         var dest = context.DestinationLocation ?? string.Empty;

@@ -528,6 +528,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             // Step 2: Get wallet's last transaction (for nonce)
             var lastTxRequest = new HttpRequestMessage(HttpMethod.Get, $"{_gatewayUrl}/wallet/{_wallet!.Address}/last_tx");
             var lastTxResponse = await _httpClient.SendAsync(lastTxRequest, ct);
+            lastTxResponse.EnsureSuccessStatusCode();
             var lastTx = await lastTxResponse.Content.ReadAsStringAsync(ct);
             lastTx = lastTx.Trim('"');
 

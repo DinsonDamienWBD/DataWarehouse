@@ -114,6 +114,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var url = $"/api/now/table/{tableName}?{string.Join("&", queryParams)}";
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -158,6 +159,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await client.PostAsync($"/api/now/table/{tableName}", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

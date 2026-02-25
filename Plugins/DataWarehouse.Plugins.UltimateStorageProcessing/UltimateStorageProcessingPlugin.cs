@@ -448,7 +448,9 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
         }
         catch
         {
+
             // Gracefully handle message bus unavailability
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

@@ -104,7 +104,9 @@ public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
             }
             catch
             {
+
                 // Constraint might already exist
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         });
 
@@ -120,7 +122,9 @@ public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
             }
             catch
             {
+
                 // Index might already exist
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         });
     }

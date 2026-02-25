@@ -256,7 +256,9 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

@@ -296,7 +296,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             lock (_predictionLock)
             {
                 _predictionTimer ??= new Timer(
-                        async _ => await RunPredictionCycleAsync(),
+                        async _ => { try { await RunPredictionCycleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                         null,
                         PredictionInterval,
                         PredictionInterval);
@@ -326,7 +326,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort - don't crash the background worker
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -358,7 +360,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Fall back to local predictions
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -495,7 +499,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Best effort
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -622,7 +628,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -657,7 +665,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

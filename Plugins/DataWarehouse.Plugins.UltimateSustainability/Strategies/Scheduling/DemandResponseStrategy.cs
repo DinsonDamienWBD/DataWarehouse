@@ -40,7 +40,7 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _checkTimer = new Timer(async _ => await CheckForEventsAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        _checkTimer = new Timer(async _ => { try { await CheckForEventsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
 

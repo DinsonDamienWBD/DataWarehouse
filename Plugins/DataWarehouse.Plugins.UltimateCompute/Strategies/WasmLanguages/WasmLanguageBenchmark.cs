@@ -269,7 +269,9 @@ internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
             }
             catch
             {
+
                 // Skip types that cannot be instantiated
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

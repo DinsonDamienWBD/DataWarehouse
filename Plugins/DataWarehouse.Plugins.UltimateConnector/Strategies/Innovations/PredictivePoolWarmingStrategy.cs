@@ -259,7 +259,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                             }
                             catch
                             {
+
                                 // Endpoint unreachable, skip warming
+                                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                             }
                         }
                     }
@@ -290,9 +292,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

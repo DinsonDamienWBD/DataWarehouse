@@ -448,7 +448,9 @@ public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
             }
             catch
             {
+
                 // Fall through to local computation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -495,7 +497,9 @@ public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Event publication failure must not disrupt lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

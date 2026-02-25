@@ -176,9 +176,11 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
                 response.EnsureSuccessStatusCode();
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // VictorOps unavailable - alerts lost (could implement retry queue)
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -247,6 +249,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

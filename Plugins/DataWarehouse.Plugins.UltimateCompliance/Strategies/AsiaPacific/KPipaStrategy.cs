@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("k_pipa.check");
+            IncrementCounter("k_pipa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -122,14 +122,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("k_pipa.initialized");
+            IncrementCounter("k_pipa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("k_pipa.shutdown");
+            IncrementCounter("k_pipa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

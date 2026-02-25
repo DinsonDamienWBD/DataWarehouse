@@ -68,6 +68,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         _accessToken = accessToken;
         _metricPrefix = metricPrefix;
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
     }
 
@@ -131,9 +132,11 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             if (_logsBatch.Count > 0)
                 await FlushLogsAsync(cts.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Shutdown timeout exceeded, abandon remaining data
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {

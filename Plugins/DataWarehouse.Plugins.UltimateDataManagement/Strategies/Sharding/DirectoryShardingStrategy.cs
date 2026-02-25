@@ -83,7 +83,7 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
         if (persistencePath != null && persistenceIntervalSeconds > 0)
         {
             _persistenceTimer = new Timer(
-                async _ => await PersistDirectoryAsync(),
+                async _ => { try { await PersistDirectoryAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(persistenceIntervalSeconds),
                 TimeSpan.FromSeconds(persistenceIntervalSeconds));

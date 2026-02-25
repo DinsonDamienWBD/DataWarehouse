@@ -200,13 +200,17 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             // If no package-level zone found, use the first available zone
             _primaryZonePath ??= _zonePaths.Values.FirstOrDefault();
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+
             // Insufficient permissions to enumerate powercap zones
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+
             // Sysfs enumeration failure
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -243,13 +247,17 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
                 var text = await File.ReadAllTextAsync(path, ct);
                 totalUj += long.Parse(text.Trim());
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+
                 // Zone removed during operation -- skip
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+
                 // Permission lost -- skip
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

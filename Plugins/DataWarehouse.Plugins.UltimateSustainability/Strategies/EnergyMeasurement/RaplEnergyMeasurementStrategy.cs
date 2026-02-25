@@ -196,13 +196,17 @@ public sealed class RaplEnergyMeasurementStrategy : SustainabilityStrategyBase
                 _domainPaths[domainName] = energyFile;
             }
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+
             // Insufficient permissions to enumerate RAPL sub-domains
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+
             // Sysfs enumeration failure
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -258,7 +262,9 @@ public sealed class RaplEnergyMeasurementStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Individual domain read failure is non-fatal
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

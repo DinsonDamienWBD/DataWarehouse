@@ -249,7 +249,9 @@ public sealed class NumaAwareIoScheduler
         }
         catch
         {
+
             // Best-effort: if we can't set affinity, just continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -277,13 +279,17 @@ public sealed class NumaAwareIoScheduler
                 }
                 catch
                 {
+
                     // Affinity setting failed; continue without affinity (best-effort)
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
         catch
         {
+
             // Best-effort: if we can't set affinity, just continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

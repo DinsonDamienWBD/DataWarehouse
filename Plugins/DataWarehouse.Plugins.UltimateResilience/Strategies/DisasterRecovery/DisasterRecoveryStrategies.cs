@@ -341,7 +341,9 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                     }
                     catch
                     {
+
                         // Failover retry also failed
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
@@ -882,7 +884,9 @@ public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
                         }
                         catch
                         {
+
                             // Retry also failed
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
                     }
                 }
@@ -1302,7 +1306,9 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
                 }
                 catch
                 {
+
                     // Failover retry failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("worm_retention.check");
+            IncrementCounter("worm_retention.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify retention period is defined
@@ -179,14 +179,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_retention.initialized");
+            IncrementCounter("worm_retention.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_retention.shutdown");
+            IncrementCounter("worm_retention.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

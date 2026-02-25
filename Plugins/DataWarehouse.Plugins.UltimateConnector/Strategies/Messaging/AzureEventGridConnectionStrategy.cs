@@ -27,6 +27,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             var sasKey = config.AuthCredential;
             if (!string.IsNullOrEmpty(sasKey))
+                httpClient.DefaultRequestHeaders.Remove("aeg-sas-key");
                 httpClient.DefaultRequestHeaders.Add("aeg-sas-key", sasKey);
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Topic"] = topic, ["Endpoint"] = endpoint });
         }

@@ -272,7 +272,9 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Ignore collection errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

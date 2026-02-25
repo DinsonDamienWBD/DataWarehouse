@@ -39,11 +39,10 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
     public override string Framework => "CompliancePassport";
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        await base.InitializeAsync(configuration, cancellationToken);
         SeedPreConfiguredAgreements();
-        return Task.CompletedTask;
     }
 
     // ------------------------------------------------------------------
@@ -75,7 +74,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ArgumentNullException.ThrowIfNull(conditions);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.create");
+            IncrementCounter("agreement_manager.create");
 
         var now = DateTimeOffset.UtcNow;
         var agreement = new TransferAgreementRecord
@@ -118,7 +117,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(agreementId);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.renew");
+            IncrementCounter("agreement_manager.renew");
 
         if (!_agreementsById.TryGetValue(agreementId, out var existing))
         {
@@ -165,7 +164,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.revoke");
+            IncrementCounter("agreement_manager.revoke");
 
         if (!_agreementsById.TryGetValue(agreementId, out var existing))
         {
@@ -205,7 +204,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(destJurisdiction);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.get");
+            IncrementCounter("agreement_manager.get");
 
         var key = BuildKey(sourceJurisdiction, destJurisdiction);
         _agreements.TryGetValue(key, out var agreement);
@@ -223,7 +222,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.get_all");
+            IncrementCounter("agreement_manager.get_all");
 
         IReadOnlyList<TransferAgreementRecord> result = _agreementsById.Values.ToList();
         return Task.FromResult(result);
@@ -239,7 +238,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.get_expired");
+            IncrementCounter("agreement_manager.get_expired");
 
         var now = DateTimeOffset.UtcNow;
         IReadOnlyList<TransferAgreementRecord> result = _agreementsById.Values
@@ -269,7 +268,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(agreementId);
         ct.ThrowIfCancellationRequested();
 
-        IncrementCounter("agreement_manager.validate");
+            IncrementCounter("agreement_manager.validate");
 
         if (!_agreementsById.TryGetValue(agreementId, out var agreement))
         {
@@ -317,7 +316,7 @@ public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
         ComplianceContext context,
         CancellationToken cancellationToken)
     {
-        IncrementCounter("agreement_manager.check");
+            IncrementCounter("agreement_manager.check");
 
         var source = context.SourceLocation ?? string.Empty;
         var dest = context.DestinationLocation ?? string.Empty;

@@ -451,7 +451,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                 }
                 catch
                 {
+
                     // Skip strategies that fail to initialize
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("finra_worm.check");
+            IncrementCounter("finra_worm.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify WORM media compliance
@@ -186,14 +186,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("finra_worm.initialized");
+            IncrementCounter("finra_worm.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("finra_worm.shutdown");
+            IncrementCounter("finra_worm.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

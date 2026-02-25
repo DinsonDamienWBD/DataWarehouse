@@ -526,7 +526,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 }
                 catch
                 {
+
                     // Ignore rollback failures
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             });
 

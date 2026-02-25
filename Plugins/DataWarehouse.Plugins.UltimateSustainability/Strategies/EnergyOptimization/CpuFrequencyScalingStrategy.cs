@@ -284,7 +284,9 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Use defaults
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -321,7 +323,9 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Monitoring failed, continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -354,7 +358,9 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Failed to set power plan
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return false;

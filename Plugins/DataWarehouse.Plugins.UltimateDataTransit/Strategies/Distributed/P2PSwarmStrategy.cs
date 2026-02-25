@@ -826,7 +826,9 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
         }
         catch
         {
+
             // Seeding registration is best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

@@ -73,6 +73,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public DigitalOceanVaultStrategy()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            _httpClient.DefaultRequestHeaders.Remove("User-Agent");
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
         }
 
@@ -87,7 +88,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             // Set authorization header
             _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiToken}");
+            _httpClient.DefaultRequestHeaders.Remove("User-Agent");
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
 
             // Derive master secret from API token (for local key wrapping)
@@ -302,7 +305,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
             catch
             {
+
                 // Fail silently - key is still in local cache
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

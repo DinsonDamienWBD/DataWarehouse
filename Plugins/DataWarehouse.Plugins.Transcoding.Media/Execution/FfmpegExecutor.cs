@@ -253,7 +253,9 @@ public sealed class FfmpegExecutor
                 }
                 catch
                 {
+
                     // Process may have already exited
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
 
                 throw new TimeoutException(
@@ -282,7 +284,9 @@ public sealed class FfmpegExecutor
             }
             catch
             {
+
                 // Process may have already exited
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             throw;

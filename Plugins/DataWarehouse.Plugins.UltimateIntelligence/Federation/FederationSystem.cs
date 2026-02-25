@@ -632,6 +632,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
                 break;
 
             case InstanceAuthMethod.ApiKey:
+                client.DefaultRequestHeaders.Remove("X-API-Key");
                 client.DefaultRequestHeaders.Add("X-API-Key", config.AuthCredential);
                 break;
 
@@ -642,6 +643,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
         }
 
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Remove("X-Federation-Instance");
         client.DefaultRequestHeaders.Add("X-Federation-Instance", config.InstanceId);
 
         return client;
@@ -1075,7 +1077,7 @@ public sealed class FederationProtocol : IAsyncDisposable
         {
             Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
             // Log error
-            Console.Error.WriteLine($"Error handling incoming message: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Error handling incoming message: {ex.Message}");
         }
     }
 
@@ -2085,7 +2087,7 @@ public sealed class FederationManager : IAsyncDisposable
     private void OnInstanceStatusChanged(object? sender, InstanceStatusChangedEventArgs e)
     {
         // Log or handle status changes
-        Console.WriteLine($"Instance '{e.InstanceId}' status changed from {e.OldStatus} to {e.NewStatus}");
+        System.Diagnostics.Debug.WriteLine($"Instance '{e.InstanceId}' status changed from {e.OldStatus} to {e.NewStatus}");
     }
 
     /// <inheritdoc/>

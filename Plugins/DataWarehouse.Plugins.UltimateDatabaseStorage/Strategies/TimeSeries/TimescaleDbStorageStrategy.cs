@@ -115,7 +115,9 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
             }
             catch
             {
+
                 // Table might already be a hypertable
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

@@ -223,7 +223,9 @@ public sealed class ContentAddressableStorageLayer
             }
             catch
             {
+
                 // Bus unavailable — fall through to local computation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -397,7 +399,9 @@ public sealed class BlockLevelEncryptionManager
             }
             catch
             {
+
                 // Bus unavailable — fall through to local
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

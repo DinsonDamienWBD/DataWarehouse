@@ -174,9 +174,11 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 }
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+
             // Corrupted file -- start fresh. The file will be overwritten on next save.
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {

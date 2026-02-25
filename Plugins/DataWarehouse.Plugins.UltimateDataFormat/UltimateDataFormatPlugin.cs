@@ -141,7 +141,9 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
             }
             catch
             {
+
                 // Skip strategies that fail to instantiate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -225,7 +227,9 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
             }
             catch
             {
+
                 // Continue to next strategy
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

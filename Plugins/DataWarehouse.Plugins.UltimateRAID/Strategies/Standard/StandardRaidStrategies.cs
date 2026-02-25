@@ -302,9 +302,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -565,9 +567,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -956,9 +960,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -1344,9 +1350,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;

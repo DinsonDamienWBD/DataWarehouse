@@ -456,7 +456,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     }
                     catch
                     {
+
                         // Skip keys we can't read
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
 

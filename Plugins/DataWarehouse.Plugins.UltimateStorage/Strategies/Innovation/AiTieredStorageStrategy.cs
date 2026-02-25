@@ -148,9 +148,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty profiles
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -165,9 +167,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_accessProfiles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(profilePath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -600,9 +604,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Save updated profiles
                 await SaveAccessProfilesAsync(ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort migration
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -641,9 +647,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     _dataCache.TryRemove(key, out _);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Migration failure - object remains in current tier
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

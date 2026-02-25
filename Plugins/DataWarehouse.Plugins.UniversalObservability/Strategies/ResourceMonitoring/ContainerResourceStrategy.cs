@@ -171,7 +171,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Running outside container or cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return limits;
@@ -222,7 +224,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -307,7 +311,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -367,7 +373,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -420,7 +428,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Kubelet not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -451,7 +461,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Not in container
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Detect Kubernetes environment

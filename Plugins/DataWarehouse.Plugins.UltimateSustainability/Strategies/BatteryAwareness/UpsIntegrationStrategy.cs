@@ -40,7 +40,7 @@ public sealed class UpsIntegrationStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _pollTimer = new Timer(async _ => await PollUpsAsync(), null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+        _pollTimer = new Timer(async _ => { try { await PollUpsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
         return Task.CompletedTask;
     }
 

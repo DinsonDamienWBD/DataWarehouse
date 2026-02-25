@@ -27,9 +27,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Remediation-Based";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Load remediation workflows from configuration
             if (configuration.TryGetValue("Workflows", out var workflowsObj) && workflowsObj is List<RemediationWorkflow> workflows)
@@ -48,19 +48,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
             // Start monitoring timer
             _monitorTimer = new Timer(
-                async _ => await MonitorExecutionsAsync(cancellationToken),
+                async _ => { try { await MonitorExecutionsAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromMinutes(1),
                 TimeSpan.FromMinutes(1)
             );
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("remediation_workflows.check");
+            IncrementCounter("remediation_workflows.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -411,14 +410,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("remediation_workflows.initialized");
+            IncrementCounter("remediation_workflows.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("remediation_workflows.shutdown");
+            IncrementCounter("remediation_workflows.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

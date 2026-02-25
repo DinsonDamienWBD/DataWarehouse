@@ -161,9 +161,11 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             if (_logsBatch.Count > 0)
                 await FlushLogsAsync(cts.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Shutdown timeout exceeded, abandon remaining logs
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -494,6 +496,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             try
             {
                 var response = await _httpClient.GetAsync($"{_url}/_cluster/health", ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 var health = JsonSerializer.Deserialize<JsonElement>(content);
 
@@ -536,6 +539,8 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
+                _password = string.Empty;
         if (disposing)
         {
             _flushTimer?.Stop();

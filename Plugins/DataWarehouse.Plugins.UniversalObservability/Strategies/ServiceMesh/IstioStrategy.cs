@@ -135,7 +135,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Envoy admin not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -193,7 +195,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Unable to determine mTLS status
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return status;
@@ -250,7 +254,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Kiali not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return info;

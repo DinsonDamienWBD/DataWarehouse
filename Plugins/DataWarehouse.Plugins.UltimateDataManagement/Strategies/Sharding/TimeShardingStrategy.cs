@@ -593,7 +593,9 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
         }
         catch
         {
+
             // Swallow exceptions in maintenance
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

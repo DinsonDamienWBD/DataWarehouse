@@ -93,6 +93,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/services", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -101,6 +102,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
         var query = $"service={Uri.EscapeDataString(service)}&limit={limit}";
         if (!string.IsNullOrEmpty(operation)) query += $"&operation={Uri.EscapeDataString(operation)}";
         var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/traces?{query}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 

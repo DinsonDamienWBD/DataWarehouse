@@ -87,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
             };
 
+            _httpClient.DefaultRequestHeaders.Remove("Accept");
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
             if (!string.IsNullOrEmpty(_authToken))

@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("chile_data.check");
+            IncrementCounter("chile_data.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -47,14 +47,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("chile_data.initialized");
+            IncrementCounter("chile_data.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("chile_data.shutdown");
+            IncrementCounter("chile_data.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -107,6 +107,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Messages.json",
                 new FormUrlEncodedContent(formData), ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -140,6 +141,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Calls.json",
                 new FormUrlEncodedContent(formData), ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -167,6 +169,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (areaCode != null) url += $"&AreaCode={areaCode}";
 
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -203,6 +206,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (from != null) url += $"&From={Uri.EscapeDataString(from)}";
 
             var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
