@@ -20,7 +20,7 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class StrategyBase : IStrategy
     {
         private bool _disposed;
-        protected bool _initialized;
+        protected volatile bool _initialized;
         private readonly object _lifecycleLock = new();
         private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private readonly SemaphoreSlim _healthCacheLock = new(1, 1);
@@ -92,9 +92,17 @@ namespace DataWarehouse.SDK.Contracts
             lock (_lifecycleLock)
             {
                 if (_initialized) return;
+                _initialized = true;
             }
-            await InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-            _initialized = true;
+            try
+            {
+                await InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                lock (_lifecycleLock) { _initialized = false; }
+                throw;
+            }
         }
 
         /// <summary>

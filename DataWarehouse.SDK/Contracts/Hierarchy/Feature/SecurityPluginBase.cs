@@ -51,13 +51,13 @@ public abstract class SecurityPluginBase : FeaturePluginBase
         return keyStore.GetKeyNativeAsync(keyId, context, ct);
     }
 
-    /// <summary>AI hook: Evaluate access with intelligence.</summary>
+    /// <summary>AI hook: Evaluate access with intelligence. Defaults to deny (fail-closed).</summary>
     protected virtual Task<Dictionary<string, object>> EvaluateAccessWithIntelligenceAsync(Dictionary<string, object> request, CancellationToken ct = default)
-        => Task.FromResult(new Dictionary<string, object> { ["allowed"] = true });
+        => Task.FromResult(new Dictionary<string, object> { ["allowed"] = false, ["reason"] = "No intelligence provider configured" });
 
-    /// <summary>AI hook: Detect anomalous access patterns.</summary>
+    /// <summary>AI hook: Detect anomalous access patterns. Defaults to flagging as anomalous (fail-closed).</summary>
     protected virtual Task<bool> DetectAnomalousAccessAsync(Dictionary<string, object> context, CancellationToken ct = default)
-        => Task.FromResult(false);
+        => Task.FromResult(true);
 
     #region Typed Security Strategy Registry
 

@@ -432,7 +432,7 @@ namespace DataWarehouse.SDK.Contracts
         /// For production use, this should be backed by persistent storage to survive restarts.
         /// Key: Operation ID, Value: Current authorization status.
         /// </summary>
-        protected readonly Dictionary<string, AuthorizationStatus> _pendingOperations = new();
+        protected readonly System.Collections.Concurrent.ConcurrentDictionary<string, AuthorizationStatus> _pendingOperations = new();
 
         /// <summary>
         /// Stores operation details to persistent storage.
