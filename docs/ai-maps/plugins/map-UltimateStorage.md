@@ -3023,7 +3023,7 @@ public class NvmeOfStrategy : UltimateStorageStrategyBase
     public override StorageTier Tier;;
     public override StorageCapabilities Capabilities;;
     public NvmeOfStrategy();
-    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override async Task DeleteAsyncCore(string key, CancellationToken ct);
@@ -3887,8 +3887,8 @@ public class DatabricksImportStrategy : UltimateStorageStrategyBase
     public override bool IsProductionReady;;
     public override StorageTier Tier;;
     public override StorageCapabilities Capabilities;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);;
-    protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override Task DeleteAsyncCore(string key, CancellationToken ct);
     protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
@@ -3910,8 +3910,8 @@ public class MongoImportStrategy : UltimateStorageStrategyBase
     public override bool IsProductionReady;;
     public override StorageTier Tier;;
     public override StorageCapabilities Capabilities;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);;
-    protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override Task DeleteAsyncCore(string key, CancellationToken ct);
     protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
@@ -3933,8 +3933,8 @@ public class BigQueryImportStrategy : UltimateStorageStrategyBase
     public override bool IsProductionReady;;
     public override StorageTier Tier;;
     public override StorageCapabilities Capabilities;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);;
-    protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override Task DeleteAsyncCore(string key, CancellationToken ct);
     protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
@@ -3956,8 +3956,8 @@ public class CassandraImportStrategy : UltimateStorageStrategyBase
     public override bool IsProductionReady;;
     public override StorageTier Tier;;
     public override StorageCapabilities Capabilities;;
-    protected override Task InitializeCoreAsync(CancellationToken ct);;
-    protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override Task DeleteAsyncCore(string key, CancellationToken ct);
     protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
@@ -5612,8 +5612,8 @@ public class GrpcConnectorStrategy : UltimateStorageStrategyBase
     public override StorageCapabilities Capabilities;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async ValueTask DisposeCoreAsync();
-    protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
-    protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
+    protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override Task DeleteAsyncCore(string key, CancellationToken ct);
     protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct);

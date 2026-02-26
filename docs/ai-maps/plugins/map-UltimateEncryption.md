@@ -1555,8 +1555,8 @@ public sealed class Aegis128LStrategy : EncryptionStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public Aegis128LStrategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 ```csharp
@@ -1567,8 +1567,8 @@ public sealed class Aegis256Strategy : EncryptionStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public Aegis256Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 
