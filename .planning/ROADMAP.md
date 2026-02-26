@@ -2022,7 +2022,7 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
 ```
 
 #### Phase 87: VDE Scalable Internals
-**Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale.
+**Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale. Includes the 6-Level Adaptive Integrity Engine (L0 trailers → L1 hash-in-index-pointer → L2 epoch-batched Merkle → L3 learned scrubbing → L4 blockchain-anchored → L5 Merkle-CRDT [v7.0 interface only]).
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
 **Requirements**: VOPT-01 through VOPT-32
 **Success Criteria** (what must be TRUE):

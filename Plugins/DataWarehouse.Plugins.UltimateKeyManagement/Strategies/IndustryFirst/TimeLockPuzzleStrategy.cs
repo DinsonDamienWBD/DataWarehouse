@@ -570,14 +570,71 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             _activeSolvers[keyId] = solver;
 
-            // Continue solving (same logic as StartSolvingAsync)
-            // ... (abbreviated for space - same implementation)
+            // #3519: Implement modular squaring loop continuation from checkpoint.
+            // Read checkpoint (current_squarings, current_value), continue squaring until total reached.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var lastProgress = DateTime.UtcNow;
+            bool solveSuccess = false;
+            string? solveMessage = null;
+
+            try
+            {
+                while (solver.CompletedSquarings.CompareTo(solver.TotalSquarings) < 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    solver.Current = solver.Current.ModPow(BigInteger.Two, solver.Modulus);
+                    solver.CompletedSquarings = solver.CompletedSquarings.Add(BigInteger.One);
+
+                    if ((DateTime.UtcNow - lastProgress).TotalSeconds >= 5)
+                    {
+                        lastProgress = DateTime.UtcNow;
+                        await SaveCheckpointAsync(solver);
+                        progress?.Report(new PuzzleSolveProgress
+                        {
+                            KeyId = keyId,
+                            CompletedSquarings = solver.CompletedSquarings,
+                            TotalSquarings = solver.TotalSquarings,
+                            PercentComplete = solver.CompletedSquarings
+                                .Multiply(BigInteger.ValueOf(100))
+                                .Divide(solver.TotalSquarings).IntValue,
+                            ElapsedTime = sw.Elapsed,
+                            EstimatedRemaining = EstimateRemainingTime(solver, sw.Elapsed)
+                        });
+                    }
+                }
+
+                // Verify result hash
+                var resultBytes = solver.Current.ToByteArrayUnsigned();
+                var resultHash = SHA256.HashData(resultBytes);
+                var resultHashHex = Convert.ToHexString(resultHash);
+
+                if (keyData.ExpectedResultHash != null && keyData.ExpectedResultHash.Length > 0 &&
+                    !(resultHash.Length == keyData.ExpectedResultHash.Length &&
+                      CryptographicOperations.FixedTimeEquals(resultHash, keyData.ExpectedResultHash)))
+                {
+                    solveMessage = "Puzzle result hash mismatch. Key integrity compromised.";
+                }
+                else
+                {
+                    solveSuccess = true;
+                    solveMessage = $"Resumed from checkpoint ({checkpoint.PercentComplete}%) and completed.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                await SaveCheckpointAsync(solver);
+                solveMessage = "Solving cancelled and checkpoint saved.";
+            }
+            finally
+            {
+                _activeSolvers.Remove(keyId);
+            }
 
             return new PuzzleSolveResult
             {
-                Success = true,
+                Success = solveSuccess,
                 KeyId = keyId,
-                Message = $"Resumed from checkpoint at {checkpoint.PercentComplete}% complete."
+                Message = solveMessage ?? "Resumed from checkpoint."
             };
         }
 

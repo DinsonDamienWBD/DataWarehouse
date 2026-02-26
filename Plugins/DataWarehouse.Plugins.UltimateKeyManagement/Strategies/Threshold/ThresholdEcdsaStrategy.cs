@@ -466,14 +466,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 // For simplicity, we compute partial sigma directly
                 var sigmaI = state.Ki.Multiply(state.GammaI).Mod(DomainParams.N);
 
-                // Add MtA contributions (simplified - real impl uses Paillier MtA)
-                foreach (var msg in round1Messages)
+                // #3584: MtA (Multiplicative-to-Additive) protocol requires Paillier
+                // homomorphic encryption, which cannot be replaced with random values.
+                // The placeholder random values produce incorrect sigma_i and will fail.
+                if (round1Messages.Any(m => m.PartyIndex != _config.PartyIndex))
                 {
-                    if (msg.PartyIndex == _config.PartyIndex) continue;
-
-                    // In real GG20, this uses Paillier homomorphic properties
-                    var partialMtA = GenerateRandomScalar(); // Placeholder for MtA result
-                    sigmaI = sigmaI.Add(partialMtA).Mod(DomainParams.N);
+                    throw new NotSupportedException(
+                        "MtA (Multiplicative-to-Additive) protocol requires Paillier homomorphic " +
+                        "encryption library. Configure via EcdsaOptions.PaillierProvider.");
                 }
 
                 state.SigmaI = sigmaI;

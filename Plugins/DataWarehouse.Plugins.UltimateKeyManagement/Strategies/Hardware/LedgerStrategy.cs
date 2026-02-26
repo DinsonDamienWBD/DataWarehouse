@@ -708,9 +708,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 Directory.CreateDirectory(dir);
             }
 
+            // #3479: Only persist DerivationPath and KeyIndex — never the raw DerivedKey.
+            // The derived key must be re-derived from the Ledger device on load.
             var toStore = _derivedKeys.ToDictionary(
                 kvp => kvp.Key,
-                kvp => LedgerKeyDerivationDto.FromDerivation(kvp.Value));
+                kvp => LedgerKeyDerivationDto.FromDerivationSafe(kvp.Value));
 
             var json = JsonSerializer.Serialize(toStore, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(path, json);
@@ -798,24 +800,35 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         public string KeyId { get; set; } = string.Empty;
         public string DerivationPath { get; set; } = string.Empty;
         public string PublicKey { get; set; } = string.Empty;
-        public string DerivedKey { get; set; } = string.Empty;
+        // #3479: DerivedKey is intentionally NOT persisted to disk.
+        // It is re-derived from the Ledger device on each load.
         public DateTime CreatedAt { get; set; }
 
-        public static LedgerKeyDerivationDto FromDerivation(LedgerKeyDerivation d) => new()
+        /// <summary>
+        /// Safe serialization: omits raw DerivedKey. Only persists derivation metadata.
+        /// </summary>
+        public static LedgerKeyDerivationDto FromDerivationSafe(LedgerKeyDerivation d) => new()
         {
             KeyId = d.KeyId,
             DerivationPath = d.DerivationPath,
             PublicKey = Convert.ToBase64String(d.PublicKey),
-            DerivedKey = Convert.ToBase64String(d.DerivedKey),
+            // DerivedKey deliberately excluded
             CreatedAt = d.CreatedAt
         };
+
+        /// <summary>
+        /// Legacy full serialization (kept for backward compatibility reading old persisted data).
+        /// Do NOT use for writing — use FromDerivationSafe instead.
+        /// </summary>
+        public static LedgerKeyDerivationDto FromDerivation(LedgerKeyDerivation d) => FromDerivationSafe(d);
 
         public LedgerKeyDerivation ToDerivation() => new()
         {
             KeyId = KeyId,
             DerivationPath = DerivationPath,
             PublicKey = Convert.FromBase64String(PublicKey),
-            DerivedKey = Convert.FromBase64String(DerivedKey),
+            // DerivedKey starts empty; caller must re-derive from device
+            DerivedKey = Array.Empty<byte>(),
             CreatedAt = CreatedAt
         };
     }

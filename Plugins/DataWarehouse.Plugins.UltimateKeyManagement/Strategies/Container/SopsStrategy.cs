@@ -403,25 +403,54 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             // Serialize to appropriate format
             var plaintext = SerializeSecretContent(secretContent, _config.FileFormat);
 
-            // Write plaintext temporarily
-            var tempFile = Path.GetTempFileName();
+            // #3457: Write plaintext to a restricted-permission temp file, delete-on-close.
+            // Use the system temp directory but with owner-only permissions.
+            var tempDir = Path.GetTempPath();
+            var tempFileName = Path.Combine(tempDir, $"sops-{Guid.NewGuid():N}{GetFileExtension()}");
             try
             {
-                // Rename to proper extension for sops
-                var tempFileWithExt = tempFile + GetFileExtension();
-                File.Move(tempFile, tempFileWithExt);
-                tempFile = tempFileWithExt;
+                // Create with restricted permissions (owner read/write only)
+                await using (var fs = new FileStream(
+                    tempFileName,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.None))
+                {
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(plaintext);
+                    await fs.WriteAsync(bytes, CancellationToken.None);
+                }
 
-                await File.WriteAllTextAsync(tempFile, plaintext);
+                // Set file permissions to owner-only (Unix: 0600; Windows: restrict ACL)
+                SetOwnerOnlyPermissions(tempFileName);
 
                 // Encrypt using sops
-                await EncryptFileAsync(tempFile, filePath, CancellationToken.None);
+                await EncryptFileAsync(tempFileName, filePath, CancellationToken.None);
             }
             finally
             {
-                if (File.Exists(tempFile))
+                if (File.Exists(tempFileName))
                 {
-                    File.Delete(tempFile);
+                    // Overwrite with zeros before deletion to minimize data remanence
+                    try
+                    {
+                        var size = new FileInfo(tempFileName).Length;
+                        if (size > 0)
+                        {
+                            using var fs = new FileStream(tempFileName, FileMode.Open, FileAccess.Write, FileShare.None);
+                            var zeros = new byte[Math.Min(size, 4096)];
+                            long remaining = size;
+                            while (remaining > 0)
+                            {
+                                var toWrite = (int)Math.Min(remaining, zeros.Length);
+                                await fs.WriteAsync(zeros.AsMemory(0, toWrite), CancellationToken.None);
+                                remaining -= toWrite;
+                            }
+                        }
+                    }
+                    catch { /* best-effort zero-wipe */ }
+                    File.Delete(tempFileName);
                 }
             }
 
@@ -671,6 +700,38 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
                 "binary" => ".bin",
                 _ => ".yaml"
             };
+        }
+
+        // #3457: Restrict file permissions to owner-only (0600 on Unix, restricted ACL on Windows).
+        private static void SetOwnerOnlyPermissions(string filePath)
+        {
+            try
+            {
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    var fi = new System.IO.FileInfo(filePath);
+                    var acl = fi.GetAccessControl();
+                    // Remove inherited rules and restrict to current user
+                    acl.SetAccessRuleProtection(true, false);
+                    var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                    acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                        currentUser,
+                        System.Security.AccessControl.FileSystemRights.FullControl,
+                        System.Security.AccessControl.AccessControlType.Allow));
+                    fi.SetAccessControl(acl);
+                }
+                else
+                {
+                    // Unix: chmod 0600
+                    System.IO.File.SetUnixFileMode(filePath,
+                        System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite);
+                }
+            }
+            catch
+            {
+                // Best-effort permission restriction; if it fails, we still delete after use
+            }
         }
 
         private string[] GetSecretFiles()

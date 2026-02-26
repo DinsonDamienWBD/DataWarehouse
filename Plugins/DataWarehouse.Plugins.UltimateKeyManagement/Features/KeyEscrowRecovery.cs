@@ -662,6 +662,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
         /// Splits a key into shares using Shamir's Secret Sharing.
         /// This is a simplified implementation - production should use BouncyCastle's full implementation.
         /// </summary>
+        // #3431: Use GF(257) - smallest prime > 256 - so all byte values (0-255) are valid field elements.
+        private const int GfPrime = 257;
+
         private List<byte[]> SplitKeyIntoShares(byte[] key, int threshold, int totalShares)
         {
             var shares = new List<byte[]>();
@@ -674,23 +677,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 shareArrays[s][0] = (byte)(s + 1); // Share index (1-based)
             }
 
-            // Generate random coefficients and compute shares
+            // Generate random coefficients and compute shares in GF(257)
             using var rng = RandomNumberGenerator.Create();
-            var coefficients = new byte[threshold];
+            var coefficients = new int[threshold];
 
             for (int byteIndex = 0; byteIndex < key.Length; byteIndex++)
             {
                 coefficients[0] = key[byteIndex]; // Secret is coefficient[0]
 
-                // Generate random coefficients
+                // Generate random coefficients in GF(257): values 0..256
                 for (int c = 1; c < threshold; c++)
                 {
-                    var randomByte = new byte[1];
-                    rng.GetBytes(randomByte);
-                    coefficients[c] = randomByte[0];
+                    var randomBytes = new byte[2];
+                    int val;
+                    do
+                    {
+                        rng.GetBytes(randomBytes);
+                        val = (BitConverter.ToUInt16(randomBytes, 0) & 0x1FF) % GfPrime; // 0..256
+                    } while (val >= GfPrime);
+                    coefficients[c] = val;
                 }
 
-                // Evaluate polynomial at each share point
+                // Evaluate polynomial at each share point in GF(257)
                 for (int s = 0; s < totalShares; s++)
                 {
                     int x = s + 1;
@@ -699,10 +707,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 
                     for (int c = 0; c < threshold; c++)
                     {
-                        y = (y + coefficients[c] * xPower) % 256;
-                        xPower = (xPower * x) % 256;
+                        y = (y + coefficients[c] * xPower) % GfPrime;
+                        xPower = (xPower * x) % GfPrime;
                     }
 
+                    // Store as 2 bytes since values can be 0..256 (won't fit in 1 byte for value=256)
                     shareArrays[s][byteIndex + 1] = (byte)y;
                 }
             }
@@ -711,7 +720,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
         }
 
         /// <summary>
-        /// Reconstructs the key from shares using Lagrange interpolation.
+        /// Reconstructs the key from shares using Lagrange interpolation in GF(257).
         /// </summary>
         private byte[] ReconstructKeyFromShares(List<(int Index, byte[] Share)> shares, int keySize)
         {
@@ -720,7 +729,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             // For each byte position in the key
             for (int byteIndex = 0; byteIndex < keySize; byteIndex++)
             {
-                // Lagrange interpolation at x=0
+                // Lagrange interpolation at x=0 in GF(257)
                 int secret = 0;
 
                 for (int i = 0; i < shares.Count; i++)
@@ -728,7 +737,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                     int xi = shares[i].Index;
                     int yi = shares[i].Share[byteIndex + 1]; // +1 to skip index byte
 
-                    // Calculate Lagrange basis polynomial at x=0
+                    // Calculate Lagrange basis polynomial at x=0 in GF(257)
                     int numerator = 1;
                     int denominator = 1;
 
@@ -737,36 +746,40 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                         if (i == j) continue;
                         int xj = shares[j].Index;
 
-                        numerator = (numerator * (0 - xj)) % 256;
-                        denominator = (denominator * (xi - xj)) % 256;
+                        numerator = (numerator * ((0 - xj + GfPrime) % GfPrime)) % GfPrime;
+                        denominator = (denominator * (((xi - xj) % GfPrime + GfPrime) % GfPrime)) % GfPrime;
                     }
 
-                    // Handle negative modulo
-                    numerator = ((numerator % 256) + 256) % 256;
-                    denominator = ((denominator % 256) + 256) % 256;
+                    // Modular inverse of denominator in GF(257) using extended Euclidean algorithm
+                    int denominatorInverse = ModInverse(denominator, GfPrime);
 
-                    // Modular inverse of denominator
-                    int denominatorInverse = ModInverse(denominator, 256);
-
-                    int lagrangeCoeff = (numerator * denominatorInverse) % 256;
-                    secret = (secret + yi * lagrangeCoeff) % 256;
+                    int lagrangeCoeff = (int)((long)numerator * denominatorInverse % GfPrime);
+                    secret = (int)((secret + (long)yi * lagrangeCoeff) % GfPrime);
                 }
 
-                result[byteIndex] = (byte)(((secret % 256) + 256) % 256);
+                result[byteIndex] = (byte)(secret % 256);
             }
 
             return result;
         }
 
+        // #3431: Extended Euclidean algorithm for modular inverse in GF(prime).
+        // Works correctly for all field elements including even values.
         private int ModInverse(int a, int m)
         {
             a = ((a % m) + m) % m;
-            for (int x = 1; x < m; x++)
+            if (a == 0)
+                throw new CryptographicException("Cannot compute modular inverse of zero.");
+            int g = m, x = 0, y = 1;
+            while (a > 0)
             {
-                if ((a * x) % m == 1)
-                    return x;
+                int q = g / a;
+                (g, a) = (a, g - q * a);
+                (x, y) = (y, x - q * y);
             }
-            return 1;
+            if (g != 1)
+                throw new CryptographicException("Modular inverse does not exist (inputs not coprime).");
+            return (x % m + m) % m;
         }
 
         #endregion

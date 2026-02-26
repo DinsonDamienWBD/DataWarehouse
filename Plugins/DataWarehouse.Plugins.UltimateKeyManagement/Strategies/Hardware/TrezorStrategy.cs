@@ -455,18 +455,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private byte[] EncodeMessage(ushort msgType, byte[] payload)
         {
-            // Trezor message format: ## + type (2 bytes) + length (4 bytes) + payload
-            var message = new byte[6 + payload.Length];
+            // #3482: Fixed Trezor message format: ## (2) + msgType (2) + length (4) + payload
+            // Handle empty payloads correctly — allocate minimum 8 bytes.
+            var messageLength = 8 + payload.Length;
+            var message = new byte[messageLength];
+
             message[0] = (byte)'#';
             message[1] = (byte)'#';
             message[2] = (byte)(msgType >> 8);
             message[3] = (byte)(msgType & 0xFF);
-            message[4] = (byte)(payload.Length >> 24);
-            message[5] = (byte)(payload.Length >> 16);
-            message[6 - 2] = (byte)(payload.Length >> 8);
-            message[7 - 2] = (byte)(payload.Length & 0xFF);
-
-            // Fix: proper length encoding
             message[4] = (byte)((payload.Length >> 24) & 0xFF);
             message[5] = (byte)((payload.Length >> 16) & 0xFF);
             message[6] = (byte)((payload.Length >> 8) & 0xFF);
@@ -474,21 +471,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             if (payload.Length > 0)
             {
-                // Resize array properly
-                var fullMessage = new byte[8 + payload.Length];
-                fullMessage[0] = (byte)'#';
-                fullMessage[1] = (byte)'#';
-                fullMessage[2] = (byte)(msgType >> 8);
-                fullMessage[3] = (byte)(msgType & 0xFF);
-                fullMessage[4] = (byte)((payload.Length >> 24) & 0xFF);
-                fullMessage[5] = (byte)((payload.Length >> 16) & 0xFF);
-                fullMessage[6] = (byte)((payload.Length >> 8) & 0xFF);
-                fullMessage[7] = (byte)(payload.Length & 0xFF);
-                payload.CopyTo(fullMessage, 8);
-                return fullMessage;
+                payload.CopyTo(message, 8);
             }
 
-            return message[..8];
+            return message;
         }
 
         private void SendMessage(byte[] message)

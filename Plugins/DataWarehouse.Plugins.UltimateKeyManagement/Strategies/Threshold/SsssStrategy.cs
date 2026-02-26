@@ -91,6 +91,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 _config.MaxRecoveryAttempts = max;
             if (Configuration.TryGetValue("RequireIdentityVerification", out var v) && v is bool verify)
                 _config.RequireIdentityVerification = verify;
+            if (Configuration.TryGetValue("VerificationSecret", out var vs) && vs is string verifySecret)
+                _config.VerificationSecret = verifySecret;
 
             ValidateConfiguration();
             await LoadFromStorage();
@@ -850,20 +852,43 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private bool VerifyGuardianIdentity(Guardian guardian, string? verificationCode)
         {
-            // In real implementation, this would:
-            // - Send OTP via email/SMS
-            // - Verify biometric
-            // - Check hardware token
-            // For now, simple code check
             if (string.IsNullOrEmpty(verificationCode))
                 return false;
 
-            // Simple hash-based verification (placeholder)
-            var expected = Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(guardian.GuardianId + DateTime.UtcNow.Date.ToString("yyyyMMdd")))
-            )[..6].ToUpper();
+            // #3585: Use HMAC-SHA256(guardianId + date, server_secret) for verification codes.
+            // The server_secret must come from configuration — it must NOT be derivable from
+            // public information (guardian ID + date is public, so SHA256 of that is insecure).
+            var secret = _config.VerificationSecret;
+            if (string.IsNullOrEmpty(secret))
+                throw new InvalidOperationException(
+                    "Guardian verification requires SsssConfig.VerificationSecret to be configured. " +
+                    "Generate a random 32+ byte secret and set it in configuration.");
 
-            return verificationCode.ToUpper() == expected;
+            byte[] secretBytes;
+            try { secretBytes = Convert.FromBase64String(secret); }
+            catch { secretBytes = Encoding.UTF8.GetBytes(secret); }
+
+            if (secretBytes.Length < 16)
+                throw new InvalidOperationException(
+                    "SsssConfig.VerificationSecret must be at least 16 bytes (128 bits).");
+
+            // Compute: HMAC-SHA256(key=server_secret, data=guardianId + "|" + date)
+            var date = DateTime.UtcNow.Date.ToString("yyyyMMdd");
+            var data = Encoding.UTF8.GetBytes(guardian.GuardianId + "|" + date);
+            using var hmac = new HMACSHA256(secretBytes);
+            var mac = hmac.ComputeHash(data);
+
+            // Truncate to 6 hex chars (24 bits) for human-usable codes
+            var expected = Convert.ToHexString(mac)[..6].ToUpper();
+
+            // Use constant-time comparison to prevent timing oracle
+            var expectedBytes = Encoding.UTF8.GetBytes(expected);
+            var submittedBytes = Encoding.UTF8.GetBytes(verificationCode.Trim().ToUpper()[..Math.Min(6, verificationCode.Length)]);
+
+            if (expectedBytes.Length != submittedBytes.Length)
+                return false;
+
+            return CryptographicOperations.FixedTimeEquals(expectedBytes, submittedBytes);
         }
 
         private static byte[] ConcatBytes(params byte[][] arrays)
@@ -1006,6 +1031,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         public int MaxRecoveryAttempts { get; set; } = 3;
         public bool RequireIdentityVerification { get; set; } = true;
         public string? StoragePath { get; set; }
+        /// <summary>
+        /// Server-side secret (32+ bytes, base64) used for HMAC-based guardian verification codes.
+        /// Must be configured; must NOT be derivable from public information.
+        /// Required when RequireIdentityVerification = true.
+        /// </summary>
+        public string? VerificationSecret { get; set; }
     }
 
     internal class SsssKeyData

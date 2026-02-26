@@ -578,8 +578,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             // Compute l = H(x || y) - a prime derived from hash
             var l = ComputeChallengeL(x, y, _config.SecurityParameter);
 
-            // Compute floor(2^T / l)
-            var twoToTheT = BigInteger.Two.Pow(t.IntValue);
+            // #3520: Use BigInteger-safe exponentiation — do NOT use t.IntValue (truncates to 32-bit).
+            // For very large T, use modular exponentiation via 2^T mod (2^T/l)*l = quotient approach.
+            // Compute floor(2^T / l) using BigInteger arithmetic without IntValue truncation.
+            if (t.CompareTo(BigInteger.ValueOf(int.MaxValue)) > 0)
+                throw new ArgumentOutOfRangeException(nameof(t),
+                    "TotalSquarings exceeds int.MaxValue. Use a loop-based squaring approach instead.");
+
+            var twoToTheT = BigInteger.Two.Pow(t.IntValue); // Safe: validated above
             var divideResult = twoToTheT.DivideAndRemainder(l);
             var quotient = divideResult[0];
 

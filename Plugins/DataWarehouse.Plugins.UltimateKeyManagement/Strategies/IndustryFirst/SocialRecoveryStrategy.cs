@@ -417,8 +417,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     }
                 }
 
-                // Verify share is valid (matches stored encrypted share)
-                if (!share.SequenceEqual(guardian.EncryptedShare))
+                // #3518: Use constant-time comparison to prevent timing side-channel attacks.
+                if (!CryptographicOperations.FixedTimeEquals(share, guardian.EncryptedShare))
                 {
                     keyData.AuditLog.Add(new RecoveryAuditEntry
                     {

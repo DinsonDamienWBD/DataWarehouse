@@ -590,8 +590,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             try
             {
-                var json = await File.ReadAllTextAsync(path);
-                var mappings = JsonSerializer.Deserialize<Dictionary<string, OnlyKeySlotMapping>>(json);
+                var persistedText = await File.ReadAllTextAsync(path);
+                // #3480: Verify HMAC-SHA256 integrity before trusting the mappings.
+                var hmacKey = DeriveMappingHmacKey();
+                if (!VerifyMappingIntegrity(persistedText, hmacKey))
+                    throw new CryptographicException("OnlyKey slot mapping integrity check failed. File may have been tampered.");
+
+                // Strip the HMAC suffix (last line is "hmac:<hex>")
+                var separatorIdx = persistedText.LastIndexOf("\nhmac:", StringComparison.Ordinal);
+                var jsonPart = separatorIdx >= 0 ? persistedText[..separatorIdx] : persistedText;
+
+                var mappings = JsonSerializer.Deserialize<Dictionary<string, OnlyKeySlotMapping>>(jsonPart);
 
                 if (mappings != null)
                 {
@@ -601,11 +610,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 }
             }
+            catch (CryptographicException)
+            {
+                throw; // Propagate integrity failures
+            }
             catch
             {
-
-                // Ignore errors loading mappings
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Ignore other errors loading mappings
             }
         }
 
@@ -619,8 +630,44 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 Directory.CreateDirectory(dir);
             }
 
+            // #3480: Add HMAC-SHA256 integrity protection to the persisted JSON.
             var json = JsonSerializer.Serialize(_slotMappings, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(path, json);
+            var hmacKey = DeriveMappingHmacKey();
+            using var hmac = new HMACSHA256(hmacKey);
+            var hmacBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(json));
+            var content = json + "\nhmac:" + Convert.ToHexString(hmacBytes);
+            await File.WriteAllTextAsync(path, content);
+        }
+
+        private bool VerifyMappingIntegrity(string content, byte[] hmacKey)
+        {
+            var separatorIdx = content.LastIndexOf("\nhmac:", StringComparison.Ordinal);
+            if (separatorIdx < 0)
+                return false; // Old format without HMAC — reject for security
+
+            var jsonPart = content[..separatorIdx];
+            var storedHmacHex = content[(separatorIdx + 6)..].Trim();
+
+            byte[] storedHmac;
+            try { storedHmac = Convert.FromHexString(storedHmacHex); }
+            catch { return false; }
+
+            using var hmac = new HMACSHA256(hmacKey);
+            var computed = hmac.ComputeHash(Encoding.UTF8.GetBytes(jsonPart));
+            return CryptographicOperations.FixedTimeEquals(computed, storedHmac);
+        }
+
+        private byte[] DeriveMappingHmacKey()
+        {
+            // Derive a machine-bound HMAC key from stable machine attributes.
+            var entropy = string.Join("|", Environment.MachineName, Environment.UserName,
+                "DataWarehouse.OnlyKey.MappingIntegrity.v1");
+            return HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                Encoding.UTF8.GetBytes(entropy),
+                32,
+                salt: null,
+                info: Encoding.UTF8.GetBytes("OnlyKey.SlotMapping.HmacKey"));
         }
 
         private string GetMappingStoragePath()

@@ -34,10 +34,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private readonly Dictionary<string, GeoLockedKeyData> _keys = new();
         private string _currentKeyId = "default";
         private readonly SemaphoreSlim _lock = new(1, 1);
-        private HttpClient? _httpClient;
+        // #3511: Use a non-static, instance-owned HttpClient to avoid disposing a shared static.
+        private readonly HttpClient _ownedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         private bool _disposed;
-
-        private static readonly HttpClient SharedHttpClient = new HttpClient();
 
         // Earth's radius in kilometers for Haversine calculation
         private const double EarthRadiusKm = 6371.0;
@@ -97,7 +96,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             if (Configuration.TryGetValue("TimeWindows", out var twObj) && twObj is TimeWindow[] windows)
                 _config.AllowedTimeWindows = windows.ToList();
 
-            _httpClient = SharedHttpClient;
             await LoadKeysFromStorage();
         }
 
@@ -239,7 +237,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
 
             // Fallback to IP geolocation if allowed
-            if (_config.AllowIpGeolocation && _httpClient != null)
+            if (_config.AllowIpGeolocation)
             {
                 return await GetLocationFromIp(context);
             }
@@ -262,12 +260,37 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 if (string.IsNullOrEmpty(ipAddress))
                     return null;
 
-                // Use ip-api.com (free tier) or configurable service
-                var url = string.IsNullOrEmpty(_config.IpGeolocationApiKey)
-                    ? $"http://ip-api.com/json/{ipAddress}"
-                    : $"https://api.ipgeolocation.io/ipgeo?apiKey={_config.IpGeolocationApiKey}&ip={ipAddress}";
+                // #3512: Use HTTPS for geolocation to prevent MITM attacks.
+                // ip-api.com free tier does not support HTTPS; use the configurable endpoint or ipgeolocation.io.
+                string url;
+                if (!string.IsNullOrEmpty(_config.IpGeolocationEndpoint))
+                {
+                    // Caller-configured endpoint (must be HTTPS)
+                    url = _config.IpGeolocationEndpoint.Replace("{ip}", ipAddress);
+                    if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        IncrementCounter("geolocked.http_geolocation_warning");
+                        System.Diagnostics.Trace.TraceWarning(
+                            "[GeoLockedKeyStrategy] Geolocation endpoint uses plain HTTP — vulnerable to MITM attacks. " +
+                            "Switch to HTTPS.");
+                    }
+                }
+                else if (!string.IsNullOrEmpty(_config.IpGeolocationApiKey))
+                {
+                    url = $"https://api.ipgeolocation.io/ipgeo?apiKey={_config.IpGeolocationApiKey}&ip={ipAddress}";
+                }
+                else
+                {
+                    // ip-api.com Pro supports HTTPS; free tier does not.
+                    // Use the HTTPS endpoint and log a warning if it fails due to plan restriction.
+                    url = $"https://pro.ip-api.com/json/{ipAddress}";
+                    IncrementCounter("geolocked.http_geolocation_warning");
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[GeoLockedKeyStrategy] Using HTTPS geolocation endpoint (ip-api.com Pro). " +
+                        "Configure IpGeolocationApiKey or IpGeolocationEndpoint for reliable access.");
+                }
 
-                var response = await _httpClient!.GetAsync(url);
+                var response = await _ownedHttpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                     return null;
 
@@ -697,7 +720,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         {
             if (_disposed) return;
             _disposed = true;
-            _httpClient?.Dispose();
+            _ownedHttpClient.Dispose(); // #3511: Dispose instance-owned client, not shared static
             _lock.Dispose();
             base.Dispose();
         }
@@ -744,6 +767,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         /// API key for IP geolocation service.
         /// </summary>
         public string? IpGeolocationApiKey { get; set; }
+
+        /// <summary>
+        /// Custom HTTPS geolocation endpoint URL template. Use {ip} as placeholder.
+        /// Example: "https://api.example.com/geoip/{ip}"
+        /// Must use HTTPS to prevent MITM attacks.
+        /// </summary>
+        public string? IpGeolocationEndpoint { get; set; }
 
         /// <summary>
         /// Allowed time windows for key access.

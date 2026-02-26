@@ -912,12 +912,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
                 }
             }
 
-            // Extract length from A
+            // #3432: Validate ICV - first 4 bytes must be 0xA6595960 (RFC 5649 AIV)
+            if (aBytes[0] != 0xA6 || aBytes[1] != 0x59 || aBytes[2] != 0x59 || aBytes[3] != 0x60)
+                throw new CryptographicException("AES-KWP integrity check failed: invalid AIV prefix. Wrapped key may be corrupt or tampered.");
+
+            // Extract length from A (bytes 4-7)
             var lenBytes = new byte[4];
             Buffer.BlockCopy(aBytes, 4, lenBytes, 0, 4);
             if (BitConverter.IsLittleEndian)
                 Array.Reverse(lenBytes);
             var dataLength = BitConverter.ToInt32(lenBytes, 0);
+
+            // Validate: dataLength must be consistent with wrapped key size
+            // RFC 5649: ceil(dataLength / 8) * 8 == n * 8
+            if (dataLength < 1 || ((dataLength + 7) / 8) * 8 != n * 8)
+                throw new CryptographicException("AES-KWP integrity check failed: plaintext length field is inconsistent with ciphertext length.");
 
             var unwrapped = new byte[dataLength];
             var offset = 0;
@@ -926,6 +935,23 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
                 var copyLen = Math.Min(8, dataLength - offset);
                 Buffer.BlockCopy(r[i], 0, unwrapped, offset, copyLen);
                 offset += copyLen;
+            }
+
+            // Validate padding bytes are zero (RFC 5649)
+            var totalPadded = n * 8;
+            var paddingStart = dataLength;
+            for (int i = 0; i < n; i++)
+            {
+                var blockStart = i * 8;
+                for (int k = 0; k < 8; k++)
+                {
+                    var globalIdx = blockStart + k;
+                    if (globalIdx >= paddingStart && globalIdx < totalPadded)
+                    {
+                        if (r[i][k] != 0x00)
+                            throw new CryptographicException("AES-KWP integrity check failed: padding bytes must be zero.");
+                    }
+                }
             }
 
             IncrementCounter("keywrap.unwrap");

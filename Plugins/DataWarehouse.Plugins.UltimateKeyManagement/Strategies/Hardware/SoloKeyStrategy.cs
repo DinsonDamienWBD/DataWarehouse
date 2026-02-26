@@ -166,33 +166,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         }
 
         /// <summary>
-        /// Creates a credential for key derivation.
-        /// In a real FIDO2 implementation, this would communicate with the device.
+        /// Creates a credential for key derivation via the SoloKey FIDO2 device.
         /// </summary>
         private Fido2Credential CreateCredential(string keyId)
         {
-            // Create user identifier from keyId
-            var userId = SHA256.HashData(Encoding.UTF8.GetBytes(keyId));
-
-            // Generate a unique credential ID
-            // In production, this would come from the FIDO2 device via authenticatorMakeCredential
-            var credentialId = new byte[32];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(credentialId);
-
-            // Generate public key (simulated)
-            // In production, the device generates this internally
-            var publicKey = GeneratePublicKey();
-
-            return new Fido2Credential
-            {
-                CredentialId = credentialId,
-                PublicKey = publicKey,
-                UserId = userId,
-                KeyId = keyId,
-                CreatedAt = DateTime.UtcNow,
-                SignCount = 0
-            };
+            // #3481: Hardware FIDO2 credential creation requires an actual SoloKey device.
+            throw new PlatformNotSupportedException(
+                "Requires SoloKey FIDO2 device. Install SoloKey SDK, connect the device, " +
+                "and configure via SoloKeyOptions.");
         }
 
         /// <summary>

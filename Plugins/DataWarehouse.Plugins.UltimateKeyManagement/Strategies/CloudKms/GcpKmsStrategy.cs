@@ -136,42 +136,65 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            // GCP KMS doesn't store keys externally - it generates data keys on demand
-            // This method generates a new data key for the given key ID
+            // #3453: Check if encrypted key file exists at storage path. If exists, decrypt via KMS.
+            // If not, generate new key, encrypt with KMS, persist, then return.
             await EnsureAuthenticatedAsync(CancellationToken.None);
 
-            var keyResourceName = string.IsNullOrEmpty(keyId) || keyId == GetKeyResourceName()
-                ? GetKeyResourceName()
-                : keyId;
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set GcpKmsConfig.StoragePath to enable key persistence.");
 
-            var request = CreateAuthenticatedRequest(
+            var keyFilePath = GetGcpKeyFilePath(storagePath, keyId);
+            var keyResourceName = GetKeyResourceName();
+
+            if (File.Exists(keyFilePath))
+            {
+                // Load existing encrypted key and decrypt via KMS
+                var encryptedKeyBase64 = await File.ReadAllTextAsync(keyFilePath);
+                var decryptRequest = CreateAuthenticatedRequest(
+                    HttpMethod.Post,
+                    $"https://cloudkms.googleapis.com/v1/{keyResourceName}:decrypt",
+                    new { ciphertext = encryptedKeyBase64.Trim() });
+
+                var decryptResponse = await _httpClient.SendAsync(decryptRequest);
+                decryptResponse.EnsureSuccessStatusCode();
+
+                var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
+                using var decryptDoc = JsonDocument.Parse(decryptJson);
+                var plaintext = decryptDoc.RootElement.GetProperty("plaintext").GetString();
+                return Convert.FromBase64String(plaintext!);
+            }
+
+            // Key does not exist: generate, encrypt, persist, return
+            var newKey = RandomNumberGenerator.GetBytes(32);
+            var newKeyBase64 = Convert.ToBase64String(newKey);
+
+            var encryptRequest = CreateAuthenticatedRequest(
                 HttpMethod.Post,
                 $"https://cloudkms.googleapis.com/v1/{keyResourceName}:encrypt",
-                new
-                {
-                    plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-                });
+                new { plaintext = newKeyBase64 });
 
-            using var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            using var encryptResponse = await _httpClient.SendAsync(encryptRequest);
+            encryptResponse.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
+            var encryptJson = await encryptResponse.Content.ReadAsStringAsync();
+            using var encryptDoc = JsonDocument.Parse(encryptJson);
+            var ciphertext = encryptDoc.RootElement.GetProperty("ciphertext").GetString();
 
-            // Decrypt to get the data key
-            var decryptRequest = CreateAuthenticatedRequest(
-                HttpMethod.Post,
-                $"https://cloudkms.googleapis.com/v1/{keyResourceName}:decrypt",
-                new { ciphertext = ciphertext });
+            // Persist the KMS-encrypted key to storage
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+            await File.WriteAllTextAsync(keyFilePath, ciphertext!);
 
-            var decryptResponse = await _httpClient.SendAsync(decryptRequest);
-            decryptResponse.EnsureSuccessStatusCode();
+            return newKey;
+        }
 
-            var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
-            using var decryptDoc = JsonDocument.Parse(decryptJson);
-            var plaintext = decryptDoc.RootElement.GetProperty("plaintext").GetString();
-            return Convert.FromBase64String(plaintext!);
+        private static string GetGcpKeyFilePath(string storagePath, string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"gcp-key-{safeId[..16]}.enc");
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
@@ -481,5 +504,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public string KeyRing { get; set; } = string.Empty;
         public string KeyName { get; set; } = string.Empty;
         public string ServiceAccountJson { get; set; } = string.Empty;
+        /// <summary>
+        /// Local directory for persisting KMS-encrypted data keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
     }
 }

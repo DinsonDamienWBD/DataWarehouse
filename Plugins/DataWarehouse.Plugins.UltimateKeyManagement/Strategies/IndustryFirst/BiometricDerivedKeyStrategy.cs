@@ -483,15 +483,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private byte[] ComputeBchParity(byte[] message)
         {
-            // Simplified parity computation
-            // Real implementation would use the BCH generator polynomial
-            var parity = new byte[(BchCodeLength - BchDataLength + 7) / 8];
-
-            using var sha = SHA256.Create();
-            var hash = sha.ComputeHash(message);
-            Array.Copy(hash, parity, Math.Min(hash.Length, parity.Length));
-
-            return parity;
+            // #3507: BCH parity computation requires the actual BCH generator polynomial,
+            // not a SHA-256 hash. SHA-256 does not implement BCH error correction.
+            throw new NotSupportedException(
+                "BCH error correction requires native BCH library. " +
+                "Configure via BiometricOptions.BchProvider.");
         }
 
         private byte[] ComputeBchSyndrome(byte[] codeword)
@@ -528,29 +524,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private int[]? FindErrorLocations(byte[] syndrome)
         {
-            // Simplified error location finding
-            // Real implementation uses Berlekamp-Massey + Chien search
-            var locations = new List<int>();
-
-            // For small number of errors, use simple search
-            for (int i = 0; i < BchCodeLength && locations.Count < _config.ErrorTolerance; i++)
-            {
-                // Check if position i is an error location
-                // This is a simplified check - real impl uses error locator polynomial
-                if (IsErrorLocation(syndrome, i))
-                {
-                    locations.Add(i);
-                }
-            }
-
-            return locations.ToArray();
-        }
-
-        private bool IsErrorLocation(byte[] syndrome, int position)
-        {
-            // Simplified error location check
-            // Real implementation evaluates error locator polynomial
-            return syndrome.Length > 0 && (syndrome[0] & (1 << (position % 8))) != 0;
+            // #3508: BCH error location requires Berlekamp-Massey algorithm + Chien search.
+            // The simplified scan used here is incorrect and must not be deployed.
+            throw new NotSupportedException(
+                "BCH error location requires Berlekamp-Massey algorithm. " +
+                "Configure via BiometricOptions.BchProvider.");
         }
 
         private byte GfPow(int alpha, int power)

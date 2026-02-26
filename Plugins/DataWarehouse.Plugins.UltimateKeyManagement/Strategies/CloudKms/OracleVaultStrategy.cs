@@ -93,6 +93,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 _config.Fingerprint = fp;
             if (Configuration.TryGetValue("PrivateKey", out var pkObj) && pkObj is string pk)
                 _config.PrivateKey = pk;
+            if (Configuration.TryGetValue("StoragePath", out var storagePathObj) && storagePathObj is string storagePath)
+                _config.StoragePath = storagePath;
 
             // Validate required configuration
             if (string.IsNullOrEmpty(_config.Region))
@@ -146,24 +148,69 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            // OCI Vault doesn't store keys externally - it generates data keys on demand
-            // Generate a new data key and wrap it
+            // #3455: Persist encrypted ciphertext to storage path. Load and decrypt on restart.
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set OracleVaultConfig.StoragePath to enable key persistence.");
+
+            var keyFilePath = GetOciKeyFilePath(storagePath, keyId);
+            var ociKeyId = string.IsNullOrEmpty(keyId) || keyId == _config.KeyOcid
+                ? _config.KeyOcid
+                : keyId;
+
+            if (File.Exists(keyFilePath))
+            {
+                // Load persisted ciphertext and decrypt via OCI KMS
+                var ciphertextBase64 = await File.ReadAllTextAsync(keyFilePath);
+                var decryptUrl = $"https://kms.{_config.Region}.oraclecloud.com/20180608/decrypt";
+                var decryptPayload = new
+                {
+                    keyId = ociKeyId,
+                    ciphertext = ciphertextBase64.Trim()
+                };
+
+                var decryptRequest = CreateSignedRequest(HttpMethod.Post, decryptUrl, decryptPayload);
+                using var decryptResponse = await _httpClient.SendAsync(decryptRequest);
+                decryptResponse.EnsureSuccessStatusCode();
+
+                var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
+                using var decryptDoc = JsonDocument.Parse(decryptJson);
+                var plaintext = decryptDoc.RootElement.GetProperty("plaintext").GetString();
+                return Convert.FromBase64String(plaintext!);
+            }
+
+            // Generate new key and encrypt with OCI vault
             var plainKey = RandomNumberGenerator.GetBytes(32);
 
-            // Encrypt the key using the vault key
-            var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/encrypt";
-            var payload = new
+            var encryptUrl = $"https://kms.{_config.Region}.oraclecloud.com/20180608/encrypt";
+            var encryptPayload = new
             {
-                keyId = string.IsNullOrEmpty(keyId) || keyId == _config.KeyOcid ? _config.KeyOcid : keyId,
+                keyId = ociKeyId,
                 plaintext = Convert.ToBase64String(plainKey)
             };
 
-            var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            using var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            var encryptRequest = CreateSignedRequest(HttpMethod.Post, encryptUrl, encryptPayload);
+            using var encryptResponse = await _httpClient.SendAsync(encryptRequest);
+            encryptResponse.EnsureSuccessStatusCode();
 
-            // Return the plain key (in a real scenario, you'd store the ciphertext and decrypt when needed)
+            var encryptJson = await encryptResponse.Content.ReadAsStringAsync();
+            using var encryptDoc = JsonDocument.Parse(encryptJson);
+            var ciphertext = encryptDoc.RootElement.GetProperty("ciphertext").GetString();
+
+            // Persist the ciphertext for future restarts
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+            await File.WriteAllTextAsync(keyFilePath, ciphertext!);
+
             return plainKey;
+        }
+
+        private static string GetOciKeyFilePath(string storagePath, string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"oci-key-{safeId[..16]}.enc");
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
@@ -424,5 +471,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public string UserOcid { get; set; } = string.Empty;
         public string Fingerprint { get; set; } = string.Empty;
         public string PrivateKey { get; set; } = string.Empty;
+        /// <summary>
+        /// Local directory path for persisting KMS-encrypted data keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
     }
 }

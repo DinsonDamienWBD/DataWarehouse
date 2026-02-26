@@ -34,8 +34,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         private readonly HttpClient _httpClient;
         private DigitalOceanVaultConfig _config = new();
         private string? _currentKeyId;
-        private readonly Dictionary<string, byte[]> _keyCache = new();
+        // #3433: Replace plain Dictionary with ConcurrentDictionary for thread safety
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _keyCache = new();
         private byte[] _masterSecret = Array.Empty<byte>();
+        // #3434: Stable salt for master secret derivation (persisted alongside keys)
+        private byte[] _masterSalt = Array.Empty<byte>();
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -85,6 +88,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 _config.ApiToken = apiToken;
             if (Configuration.TryGetValue("DataCenter", out var dataCenterObj) && dataCenterObj is string dataCenter)
                 _config.DataCenter = dataCenter;
+            if (Configuration.TryGetValue("StoragePath", out var storagePathObj) && storagePathObj is string storagePath)
+                _config.StoragePath = storagePath;
+            if (Configuration.TryGetValue("MasterSecret", out var masterSecretObj) && masterSecretObj is string masterSecretBase64)
+                _config.MasterSecret = Convert.FromBase64String(masterSecretBase64);
 
             // Set authorization header
             _httpClient.DefaultRequestHeaders.Clear();
@@ -93,8 +100,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             _httpClient.DefaultRequestHeaders.Remove("User-Agent");
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
 
-            // Derive master secret from API token (for local key wrapping)
-            _masterSecret = DeriveKeyFromToken(_config.ApiToken);
+            // #3434: Derive master secret from configurable secret (NOT the bearer token).
+            // Load or generate a stable random salt.
+            _masterSalt = LoadOrCreateMasterSalt();
+            _masterSecret = DeriveKeyFromConfiguredSecret(_masterSalt);
 
             // Validate connection
             var isHealthy = await HealthCheckAsync(cancellationToken);
@@ -105,8 +114,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             // Initialize with a default key ID
             _currentKeyId = "default-vault-key";
-
-            await Task.CompletedTask;
         }
 
         public override Task<string> GetCurrentKeyIdAsync()
@@ -237,7 +244,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
 
             // Remove from local cache
-            _keyCache.Remove(keyId);
+            if (_keyCache.TryRemove(keyId, out var removedKey))
+                CryptographicOperations.ZeroMemory(removedKey);
 
             // In a real implementation, delete from DigitalOcean metadata
             // For now, this is a no-op as we'd need project-specific deletion logic
@@ -280,14 +288,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
         }
 
+        // #3430: Implement key persistence using local storage path.
+        // DigitalOcean API tags have size limits; store encrypted keys in a local directory
+        // configured via StoragePath. The keys are AES-GCM wrapped before writing.
         private async Task<Dictionary<string, string>?> GetProjectMetadataAsync(string keyId)
         {
             try
             {
-                // In a real implementation, fetch from DigitalOcean projects API
-                // For now, return null (not found)
-                await Task.CompletedTask;
-                return null;
+                var path = GetKeyFilePath(keyId);
+                if (!File.Exists(path))
+                    return null;
+
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(json);
             }
             catch
             {
@@ -297,28 +310,78 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private async Task SetProjectMetadataAsync(string keyId, Dictionary<string, string> metadata)
         {
-            try
-            {
-                // In a real implementation, store in DigitalOcean project metadata or tags
-                // This would require creating a project or updating tags
-                await Task.CompletedTask;
-            }
-            catch
-            {
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set DigitalOceanVaultConfig.StoragePath before using this strategy.");
 
-                // Fail silently - key is still in local cache
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
-            }
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+
+            var path = GetKeyFilePath(keyId);
+            var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(path, json);
         }
 
-        private byte[] DeriveKeyFromToken(string token)
+        private string GetKeyFilePath(string keyId)
         {
-            return Rfc2898DeriveBytes.Pbkdf2(
-                token,
-                Encoding.UTF8.GetBytes("DataWarehouse.DigitalOcean.Salt"),
-                100000,
-                HashAlgorithmName.SHA256,
-                32);
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set DigitalOceanVaultConfig.StoragePath.");
+
+            var safeKeyId = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"dov-{safeKeyId[..16]}.json");
+        }
+
+        private string GetSaltFilePath()
+        {
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+            {
+                var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                storagePath = Path.Combine(baseDir, "DataWarehouse", "DigitalOceanVault");
+            }
+            return Path.Combine(storagePath, ".master-salt");
+        }
+
+        // #3434: Load or create a stable random salt (NOT derived from the bearer token).
+        private byte[] LoadOrCreateMasterSalt()
+        {
+            var saltPath = GetSaltFilePath();
+            var saltDir = Path.GetDirectoryName(saltPath);
+            if (!string.IsNullOrEmpty(saltDir) && !Directory.Exists(saltDir))
+                Directory.CreateDirectory(saltDir);
+
+            if (File.Exists(saltPath))
+            {
+                var saltBytes = File.ReadAllBytes(saltPath);
+                if (saltBytes.Length == 32)
+                    return saltBytes;
+            }
+
+            // Generate new random salt and persist it
+            var newSalt = new byte[32];
+            RandomNumberGenerator.Fill(newSalt);
+            File.WriteAllBytes(saltPath, newSalt);
+            return newSalt;
+        }
+
+        // #3434: Derive from configurable master secret, not the bearer token.
+        private byte[] DeriveKeyFromConfiguredSecret(byte[] salt)
+        {
+            // Use configured master secret if provided; otherwise fall back to machine-bound secret
+            var ikm = _config.MasterSecret != null && _config.MasterSecret.Length >= 16
+                ? _config.MasterSecret
+                : Encoding.UTF8.GetBytes(Environment.MachineName + "|DataWarehouse.DigitalOcean.v1");
+
+            return HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                ikm,
+                32,
+                salt,
+                Encoding.UTF8.GetBytes("DataWarehouse.DigitalOceanVault.MasterKey.v1"));
         }
 
         private byte[] WrapKeyLocally(byte[] key)
@@ -364,6 +427,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         {
             _httpClient?.Dispose();
             CryptographicOperations.ZeroMemory(_masterSecret);
+            CryptographicOperations.ZeroMemory(_masterSalt);
             foreach (var key in _keyCache.Values)
             {
                 CryptographicOperations.ZeroMemory(key);
@@ -380,5 +444,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     {
         public string ApiToken { get; set; } = string.Empty;
         public string? DataCenter { get; set; }
+        /// <summary>
+        /// Directory path for persisting encrypted wrapped keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
+        /// <summary>
+        /// Configurable master secret (32+ bytes) used for local key wrapping.
+        /// If not set, a machine-bound secret is used. NEVER use the bearer token.
+        /// </summary>
+        public byte[]? MasterSecret { get; set; }
     }
 }

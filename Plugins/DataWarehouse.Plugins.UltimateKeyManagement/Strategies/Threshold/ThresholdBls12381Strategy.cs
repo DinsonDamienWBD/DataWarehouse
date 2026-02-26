@@ -398,13 +398,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 if (keyData.AggregatedPublicKey == null)
                     throw new InvalidOperationException("Key does not have aggregated public key.");
 
-                // Verify pairing equation: e(sigma, g1) == e(H(m), pk)
-                // This is a simplified verification - full impl needs pairing library
-                var messagePoint = HashToG2(message);
-
-                // For now, verify structure and return true if well-formed
-                // Real implementation would use a pairing library (e.g., BLST)
-                return signature.Length == 96 && keyData.AggregatedPublicKey.Length == 48;
+                // #3581: BLS12-381 signature verification requires native pairing library.
+                // The pairing equation e(sigma, g1) == e(H(m), pk) cannot be computed without it.
+                throw new NotSupportedException(
+                    "BLS12-381 signature verification requires native pairing library (e.g., mcl, blst). " +
+                    "Configure via Bls12381Options.PairingProvider.");
             }
             finally
             {
@@ -451,74 +449,39 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         /// <summary>
         /// Scalar multiplication on G1: result = scalar * G1
-        /// Simplified implementation - real impl would use optimized curve arithmetic.
+        /// Requires native BLS12-381 curve library.
         /// </summary>
         private byte[] ScalarMultiplyG1(BigInteger scalar)
         {
-            // BLS12-381 G1 point is 48 bytes compressed, 96 bytes uncompressed
-            // This is a simplified representation using the scalar as seed
-            var result = new byte[48];
-
-            // Use HKDF to derive a deterministic point from scalar
-            var scalarBytes = scalar.ToByteArrayUnsigned();
-            var expanded = HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                scalarBytes,
-                48,
-                G1GeneratorX,
-                Encoding.UTF8.GetBytes("BLS12381G1_SCALAR_MULT"));
-
-            // Set the compression flag (most significant bit)
-            expanded[0] |= 0x80;
-
-            return expanded;
+            // #3582: BLS12-381 G1 scalar multiplication requires native pairing library.
+            throw new NotSupportedException(
+                "BLS12-381 G1 scalar multiplication requires native pairing library (e.g., mcl, blst). " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         /// <summary>
-        /// Scalar multiplication on G2: result = scalar * point
+        /// Scalar multiplication on G2: result = scalar * point.
+        /// Requires native BLS12-381 curve library.
         /// </summary>
         private byte[] ScalarMultiplyG2(byte[] point, BigInteger scalar)
         {
-            // G2 points are 96 bytes compressed, 192 bytes uncompressed
-            var result = new byte[96];
-
-            // Deterministic derivation based on point and scalar
-            using var ms = new MemoryStream(4096);
-            ms.Write(point);
-            ms.Write(scalar.ToByteArrayUnsigned());
-
-            var expanded = HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                ms.ToArray(),
-                96,
-                Encoding.UTF8.GetBytes("BLS12381G2_SCALAR_MULT"),
-                Encoding.UTF8.GetBytes("G2_MULT"));
-
-            expanded[0] |= 0x80; // Compression flag
-
-            return expanded;
+            // #3582: BLS12-381 G2 scalar multiplication requires native pairing library.
+            throw new NotSupportedException(
+                "BLS12-381 G2 scalar multiplication requires native pairing library (e.g., mcl, blst). " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         /// <summary>
         /// Hash to G2 curve point using hash-to-curve (RFC 9380).
+        /// Requires native BLS12-381 curve library.
         /// </summary>
         private byte[] HashToG2(byte[] message)
         {
-            // Simplified hash-to-curve implementation
-            // Real implementation would follow RFC 9380 for BLS12-381 G2
-
-            var dst = Encoding.UTF8.GetBytes(_config.DomainSeparationTag ?? HashToCurveDst);
-
-            // expand_message_xmd with SHA-256
-            var expandedLen = 256; // L = ceil((ceil(log2(p)) + k) / 8) for BLS12-381
-            var expanded = ExpandMessageXmd(message, dst, expandedLen);
-
-            // Map to curve (simplified - real impl uses SSWU map)
-            var result = new byte[96];
-            Array.Copy(expanded, 0, result, 0, 96);
-            result[0] |= 0x80; // Compression flag
-
-            return result;
+            // #3582: Hash-to-G2 requires the SSWU map defined in RFC 9380 for BLS12-381,
+            // which depends on native field arithmetic. SHA-256 output is not a curve point.
+            throw new NotSupportedException(
+                "BLS12-381 hash-to-G2 requires native pairing library (e.g., mcl, blst). " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         /// <summary>
@@ -576,16 +539,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         /// </summary>
         private byte[] AddG1Points(byte[] p1, byte[] p2)
         {
-            // Simplified point addition - concatenate and hash
-            var combined = ConcatBytes(p1, p2);
-            var result = HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                combined,
-                48,
-                Encoding.UTF8.GetBytes("BLS12381G1_ADD"),
-                null);
-            result[0] |= 0x80;
-            return result;
+            // #3582: BLS12-381 G1 point addition requires native pairing library.
+            throw new NotSupportedException(
+                "BLS12-381 G1 point addition requires native pairing library (e.g., mcl, blst). " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         /// <summary>
@@ -593,16 +550,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         /// </summary>
         private byte[] AddG2Points(byte[] p1, byte[] p2)
         {
-            // Simplified point addition
-            var combined = ConcatBytes(p1, p2);
-            var result = HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                combined,
-                96,
-                Encoding.UTF8.GetBytes("BLS12381G2_ADD"),
-                null);
-            result[0] |= 0x80;
-            return result;
+            // #3582: BLS12-381 G2 point addition requires native pairing library.
+            throw new NotSupportedException(
+                "BLS12-381 G2 point addition requires native pairing library (e.g., mcl, blst). " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         #endregion
@@ -631,13 +582,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private bool VerifyFeldmanShare(BigInteger share, int partyIndex, byte[][] commitments)
         {
-            // g^share should equal product of C_i^(j^i) for i = 0 to t-1
-            // Simplified verification
-            var expected = ScalarMultiplyG1(share);
-
-            // In a real implementation, we would verify against the commitments
-            // using EC point arithmetic
-            return expected.Length == 48;
+            // #3583: Feldman VSS verification requires BLS12-381 pairing to check
+            // that g^share equals the product of C_i^(j^i) mod curve order.
+            throw new NotSupportedException(
+                "Feldman VSS verification requires native BLS pairing. " +
+                "Configure via Bls12381Options.PairingProvider.");
         }
 
         private BigInteger ComputeLagrangeCoefficient(int i, int[] signerIndices)

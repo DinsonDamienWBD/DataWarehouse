@@ -85,6 +85,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 _config.ApiKey = apiKey;
             if (Configuration.TryGetValue("DefaultKeyId", out var keyIdObj) && keyIdObj is string keyId)
                 _config.DefaultKeyId = keyId;
+            if (Configuration.TryGetValue("StoragePath", out var storagePathObj) && storagePathObj is string storagePath)
+                _config.StoragePath = storagePath;
 
             // Authenticate and get access token
             await RefreshAccessTokenAsync(cancellationToken);
@@ -128,13 +130,72 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            // IBM Key Protect doesn't expose key material - generate a new data key
-            // This uses the wrap endpoint with a locally generated key
-            var dataKey = new byte[32]; // 256-bit key
+            // #3454: Load persisted wrapped key or generate a new one and persist it.
+            await EnsureValidTokenAsync();
+
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set IbmKeyProtectConfig.StoragePath to enable key persistence.");
+
+            var keyFilePath = GetIbmKeyFilePath(storagePath, keyId);
+            var kekId = string.IsNullOrEmpty(_config.DefaultKeyId) ? _currentKeyId : _config.DefaultKeyId;
+
+            if (File.Exists(keyFilePath))
+            {
+                // Load wrapped key and unwrap via IBM Key Protect
+                var wrappedKeyBase64 = await File.ReadAllTextAsync(keyFilePath);
+                var wrappedKey = Convert.FromBase64String(wrappedKeyBase64.Trim());
+
+                var unwrapPayload = new { ciphertext = Convert.ToBase64String(wrappedKey) };
+                var unwrapRequest = new HttpRequestMessage(HttpMethod.Post,
+                    $"https://{_config.Region}.kms.cloud.ibm.com/api/v2/keys/{kekId}/actions/unwrap");
+                unwrapRequest.Headers.Add("Authorization", $"Bearer {_accessToken}");
+                unwrapRequest.Headers.Add("Bluemix-Instance", _config.InstanceId);
+                unwrapRequest.Content = new StringContent(
+                    JsonSerializer.Serialize(unwrapPayload), Encoding.UTF8, "application/json");
+
+                using var unwrapResponse = await _httpClient.SendAsync(unwrapRequest);
+                unwrapResponse.EnsureSuccessStatusCode();
+
+                var unwrapJson = await unwrapResponse.Content.ReadAsStringAsync();
+                using var unwrapDoc = JsonDocument.Parse(unwrapJson);
+                var plaintext = unwrapDoc.RootElement.GetProperty("plaintext").GetString();
+                return Convert.FromBase64String(plaintext!);
+            }
+
+            // Generate new data key and wrap it
+            var dataKey = new byte[32];
             RandomNumberGenerator.Fill(dataKey);
 
-            // Store wrapped version internally (in practice, this would be persisted)
+            var wrapPayload = new { plaintext = Convert.ToBase64String(dataKey) };
+            var wrapRequest = new HttpRequestMessage(HttpMethod.Post,
+                $"https://{_config.Region}.kms.cloud.ibm.com/api/v2/keys/{kekId}/actions/wrap");
+            wrapRequest.Headers.Add("Authorization", $"Bearer {_accessToken}");
+            wrapRequest.Headers.Add("Bluemix-Instance", _config.InstanceId);
+            wrapRequest.Content = new StringContent(
+                JsonSerializer.Serialize(wrapPayload), Encoding.UTF8, "application/json");
+
+            using var wrapResponse = await _httpClient.SendAsync(wrapRequest);
+            wrapResponse.EnsureSuccessStatusCode();
+
+            var wrapJson = await wrapResponse.Content.ReadAsStringAsync();
+            using var wrapDoc = JsonDocument.Parse(wrapJson);
+            var ciphertext = wrapDoc.RootElement.GetProperty("ciphertext").GetString();
+
+            // Persist wrapped key
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+            await File.WriteAllTextAsync(keyFilePath, ciphertext!);
+
             return dataKey;
+        }
+
+        private static string GetIbmKeyFilePath(string storagePath, string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"ibm-key-{safeId[..16]}.enc");
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
@@ -374,5 +435,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public string Region { get; set; } = "us-south";
         public string ApiKey { get; set; } = string.Empty;
         public string DefaultKeyId { get; set; } = string.Empty;
+        /// <summary>
+        /// Local directory path for persisting wrapped data keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
     }
 }

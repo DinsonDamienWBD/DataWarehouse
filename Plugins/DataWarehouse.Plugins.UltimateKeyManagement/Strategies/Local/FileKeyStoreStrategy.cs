@@ -320,36 +320,52 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
 
         private byte[] DeriveMachineKey()
         {
-            // Derive a machine-specific key using multiple entropy sources
-            var entropyParts = new List<string>
-            {
-                Environment.MachineName,
-                Environment.UserName,
-                Environment.OSVersion.ToString(),
-                _config.DpapiEntropy ?? "DataWarehouse.KeyStore.MachineKey.v1"
-            };
+            // #3522: Use a stable persisted random salt rather than volatile machine attributes.
+            // MachineName/UserName/OSVersion can change, making the key unrecoverable.
+            // On first run: generate 32-byte random salt and persist it.
+            // On subsequent runs: load the persisted salt.
+            var salt = LoadOrCreateMachineSalt();
 
-            // Add hardware info if available
-            try
-            {
-                entropyParts.Add(Environment.ProcessorCount.ToString());
-                entropyParts.Add(Environment.SystemDirectory);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.TraceWarning($"Failed to collect hardware entropy for key derivation: {ex.Message}");
-            }
-
-            var combinedEntropy = string.Join("|", entropyParts);
-            var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
-
-            // Use PBKDF2 to derive a strong key
-            return Rfc2898DeriveBytes.Pbkdf2(
-                entropyBytes,
-                SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.DPAPI.Salt.v1")),
-                100000,
+            // Use HKDF with the stable salt for deterministic key derivation.
+            // The context string prevents cross-purpose key reuse.
+            return HKDF.DeriveKey(
                 HashAlgorithmName.SHA256,
-                32); // 256-bit key
+                salt,
+                32,
+                salt: null,
+                info: Encoding.UTF8.GetBytes(_config.DpapiEntropy ?? "DataWarehouse.KeyStore.MachineKey.v1"));
+        }
+
+        private byte[] LoadOrCreateMachineSalt()
+        {
+            var saltPath = GetMachineSaltPath();
+            var saltDir = Path.GetDirectoryName(saltPath);
+            if (!string.IsNullOrEmpty(saltDir) && !Directory.Exists(saltDir))
+                Directory.CreateDirectory(saltDir);
+
+            if (File.Exists(saltPath))
+            {
+                var existing = File.ReadAllBytes(saltPath);
+                if (existing.Length == 32)
+                    return existing;
+            }
+
+            // Generate and persist a new stable random salt
+            var newSalt = new byte[32];
+            RandomNumberGenerator.Fill(newSalt);
+            File.WriteAllBytes(saltPath, newSalt);
+            return newSalt;
+        }
+
+        private string GetMachineSaltPath()
+        {
+            var storePath = _config.KeyStorePath;
+            if (string.IsNullOrEmpty(storePath))
+            {
+                var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                storePath = Path.Combine(baseDir, "DataWarehouse", "KeyStore");
+            }
+            return Path.Combine(storePath, ".machine-salt");
         }
     }
 

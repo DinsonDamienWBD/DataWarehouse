@@ -153,7 +153,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     break;
 
                 case LlmProvider.AzureOpenAI:
-                    client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://your-resource.openai.azure.com/");
+                    // #3521: Throw if URL is still the placeholder.
+                    var azureEndpoint = _config.ApiEndpoint;
+                    if (string.IsNullOrEmpty(azureEndpoint) ||
+                        azureEndpoint.Contains("your-resource", StringComparison.OrdinalIgnoreCase) ||
+                        azureEndpoint == "https://your-resource.openai.azure.com/")
+                    {
+                        throw new InvalidOperationException(
+                            "Azure OpenAI endpoint URL is not configured. " +
+                            "Set AiCustodianConfig.ApiEndpoint to your actual Azure OpenAI resource URL " +
+                            "(e.g., https://<resource-name>.openai.azure.com/).");
+                    }
+                    client.BaseAddress = new Uri(azureEndpoint);
                     client.DefaultRequestHeaders.Remove("api-key");
                     client.DefaultRequestHeaders.Add("api-key", _config.ApiKey);
                     break;

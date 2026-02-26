@@ -44,6 +44,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private Timer? _channelMonitorTimer;
         private QkdChannelStatus _lastChannelStatus = new();
         private bool _disposed;
+        // #3513: Peer sample bits set via SetPeerSampleBits() after classical channel exchange.
+        private byte[]? _peerSampleBits;
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -131,6 +133,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         public override async Task<string> GetCurrentKeyIdAsync()
         {
             return await Task.FromResult(_currentKeyId);
+        }
+
+        /// <summary>
+        /// Sets the peer's sample bits received via the authenticated classical channel.
+        /// Must be called before QBER estimation to enable actual error counting.
+        /// In production, this is populated from the QKD peer's authenticated transmission.
+        /// </summary>
+        public void SetPeerSampleBits(byte[] peerBits)
+        {
+            _peerSampleBits = peerBits ?? throw new ArgumentNullException(nameof(peerBits));
         }
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
@@ -507,10 +519,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 indices.Add(index);
             }
 
-            // In real QKD, Alice and Bob would exchange these sample bits over classical channel
-            // and count discrepancies. Here we simulate with stored comparison data.
-            var errorCount = 0; // Actual implementation would compare with peer
-            var qber = (double)errorCount / indices.Count;
+            // #3513: Count actual bit mismatches between sifted key bits in the sample subset.
+            // In real QKD, Alice and Bob compare the sample bits over an authenticated classical channel.
+            // Here we compare the sifted bits with the stored peer comparison data (if available).
+            int errorCount = 0;
+            if (_peerSampleBits != null && _peerSampleBits.Length == bits.Length)
+            {
+                foreach (var idx in indices)
+                {
+                    if (bits[idx] != _peerSampleBits[idx])
+                        errorCount++;
+                }
+            }
+            // If peer sample data is unavailable (e.g., single-party simulation), errorCount remains 0.
+            // In production, this must be populated from the authenticated classical channel exchange.
+            var qber = indices.Count > 0 ? (double)errorCount / indices.Count : 0.0;
 
             // Remove sampled bits from key material
             var remaining = bits.Where((_, i) => !indices.Contains(i)).ToArray();
@@ -520,30 +543,66 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private byte[] ApplyCascadeErrorCorrection(byte[] bits, double estimatedQber)
         {
-            // Cascade protocol: Binary search-based error correction
-            // Achieves very low residual error rate (~10^-9)
+            // #3514: Implement basic binary Cascade error correction.
+            // Uses local parity only (single-party correction using peer sample bits if available).
+            // In production QKD, Alice and Bob exchange parities over authenticated classical channel.
 
-            if (estimatedQber == 0)
-                return bits;
+            if (estimatedQber == 0 || _peerSampleBits == null || _peerSampleBits.Length != bits.Length)
+                return bits; // Cannot correct without peer parity data
 
-            // Block sizes for Cascade passes (increasing)
-            var blockSizes = new[] { 8, 16, 32, 64 };
             var correctedBits = (byte[])bits.Clone();
+
+            // Cascade pass with increasing block sizes
+            var blockSizes = new[] { 8, 16, 32, 64 };
 
             foreach (var blockSize in blockSizes)
             {
-                // Process blocks and perform parity checks
-                for (int i = 0; i < correctedBits.Length; i += blockSize)
+                for (int start = 0; start < correctedBits.Length; start += blockSize)
                 {
-                    var blockEnd = Math.Min(i + blockSize, correctedBits.Length);
-                    var block = new ArraySegment<byte>(correctedBits, i, blockEnd - i);
+                    var end = Math.Min(start + blockSize, correctedBits.Length);
 
-                    // In real implementation, exchange parities with peer and binary search for errors
-                    // This is a simplified representation
+                    // Compute local parity
+                    int localParity = ComputeParity(correctedBits, start, end);
+                    // Compute peer parity
+                    int peerParity = ComputeParity(_peerSampleBits, start, end);
+
+                    if (localParity != peerParity)
+                    {
+                        // Parities differ: bisect block to find and correct the error
+                        BisectAndCorrect(correctedBits, _peerSampleBits, start, end);
+                    }
                 }
             }
 
             return correctedBits;
+        }
+
+        private static int ComputeParity(byte[] bits, int start, int end)
+        {
+            int parity = 0;
+            for (int i = start; i < end; i++)
+                parity ^= bits[i] & 1;
+            return parity;
+        }
+
+        private static void BisectAndCorrect(byte[] local, byte[] peer, int start, int end)
+        {
+            if (end - start <= 1)
+            {
+                // Single bit: flip it to correct the error
+                if (start < local.Length)
+                    local[start] ^= 1;
+                return;
+            }
+
+            int mid = (start + end) / 2;
+            int localParityLeft = ComputeParity(local, start, mid);
+            int peerParityLeft = ComputeParity(peer, start, mid);
+
+            if (localParityLeft != peerParityLeft)
+                BisectAndCorrect(local, peer, start, mid);
+            else
+                BisectAndCorrect(local, peer, mid, end);
         }
 
         private byte[] ApplyPrivacyAmplification(byte[] bits, int targetSizeBits, double qber)

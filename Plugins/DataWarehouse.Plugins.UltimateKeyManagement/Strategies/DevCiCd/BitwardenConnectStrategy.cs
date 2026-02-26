@@ -347,16 +347,47 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             await _authLock.WaitAsync(cancellationToken);
             try
             {
-                // Parse the access token to extract credentials
-                // Bitwarden service account tokens are in the format: version.clientId.clientSecret
-                var tokenParts = _config.AccessToken?.Split('.') ?? Array.Empty<string>();
-                if (tokenParts.Length < 3)
+                // #3456: Parse the Bitwarden machine account token as a JWT (3 dot-separated parts).
+                // A JWT consists of: base64url(header) . base64url(payload) . base64url(signature)
+                // Split on '.' but only take the first 3 parts (payload may contain '=' padding).
+                var rawToken = _config.AccessToken ?? "";
+                var dotParts = rawToken.Split('.');
+                if (dotParts.Length < 3)
                 {
-                    throw new InvalidOperationException("Invalid Bitwarden access token format.");
+                    throw new InvalidOperationException(
+                        "Invalid Bitwarden access token format. Expected a JWT with 3 dot-separated parts (header.payload.signature).");
                 }
 
-                var clientId = $"service_account.{tokenParts[1]}";
-                var clientSecret = tokenParts[2];
+                // Decode the JWT payload (second part) to extract client_id and client_secret
+                // Add padding as needed for base64url decoding
+                var payloadBase64 = dotParts[1].Replace('-', '+').Replace('_', '/');
+                var padLen = (4 - payloadBase64.Length % 4) % 4;
+                payloadBase64 += new string('=', padLen);
+                var payloadBytes = Convert.FromBase64String(payloadBase64);
+                using var payloadDoc = JsonDocument.Parse(payloadBytes);
+                var payloadRoot = payloadDoc.RootElement;
+
+                string clientId;
+                string clientSecret;
+
+                // Try standard JWT claim names first, then Bitwarden-specific names
+                if (payloadRoot.TryGetProperty("client_id", out var cidProp) &&
+                    payloadRoot.TryGetProperty("client_secret", out var csProp))
+                {
+                    clientId = cidProp.GetString() ?? throw new InvalidOperationException("JWT payload missing client_id.");
+                    clientSecret = csProp.GetString() ?? throw new InvalidOperationException("JWT payload missing client_secret.");
+                }
+                else if (payloadRoot.TryGetProperty("sub", out var subProp))
+                {
+                    // Fall back: sub claim is the service account ID, token is used directly
+                    clientId = $"service_account.{subProp.GetString()}";
+                    clientSecret = dotParts[2]; // Signature part used as secret in some Bitwarden flows
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "Bitwarden JWT payload does not contain expected claims (client_id/client_secret or sub).");
+                }
 
                 // Request bearer token using client credentials
                 var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
