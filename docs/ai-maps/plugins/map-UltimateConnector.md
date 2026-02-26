@@ -856,6 +856,7 @@ public sealed class LdapConnectionInfo
     public int Port { get; set; }
     public string BaseDn { get; set; };
     public string BindDn { get; set; };
+    public string BindPassword { get; set; };
     public bool UseSsl { get; set; }
     public bool IsConnected { get; set; }
 }
@@ -4021,9 +4022,9 @@ public class DremioConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4042,9 +4043,9 @@ public class RedshiftConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4060,12 +4061,12 @@ public class MotherDuckConnectionStrategy : DatabaseConnectionStrategyBase
     public override ConnectionStrategyCapabilities Capabilities;;
     public MotherDuckConnectionStrategy(ILogger<MotherDuckConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4084,9 +4085,9 @@ public class DatabricksConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4105,9 +4106,9 @@ public class SnowflakeConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4126,9 +4127,9 @@ public class BigQueryConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4147,9 +4148,9 @@ public class GoogleAlloyDbConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4168,9 +4169,9 @@ public class FireboltConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4189,9 +4190,9 @@ public class AzureSynapseConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4210,9 +4211,9 @@ public class StarburstConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);;
 }
 ```
 
@@ -4362,9 +4363,9 @@ public class DnsConnectionStrategy : ConnectionStrategyBase
     public override string[] Tags;;
     public DnsConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
 }
 ```
 
@@ -5082,7 +5083,7 @@ public sealed class PgVectorConnectionStrategy : AiConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
+    public override Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
 ```
@@ -5603,7 +5604,7 @@ public sealed class PowerBiConnectionStrategy : DashboardConnectionStrategyBase
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
     public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);
-    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);
+    public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);;
 }
 ```
 
@@ -5662,8 +5663,8 @@ public sealed class AwsQuickSightConnectionStrategy : DashboardConnectionStrateg
     protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
-    public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);
-    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);
+    public override Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);;
+    public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);;
 }
 ```
 
@@ -6859,8 +6860,8 @@ public class GcpStorageConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
-    protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
 

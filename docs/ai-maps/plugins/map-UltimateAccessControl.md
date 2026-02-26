@@ -5172,7 +5172,7 @@ public sealed class PasswordHashingStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5187,7 +5187,7 @@ public sealed class SessionTokenStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5202,7 +5202,7 @@ public sealed class RocksDbIdentityStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5217,7 +5217,7 @@ public sealed class OfflineAuthenticationStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5277,7 +5277,7 @@ public sealed class IdentityMigrationStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5292,7 +5292,7 @@ public sealed class LiteDbIdentityStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6906,7 +6906,7 @@ public sealed class SshKeyAuthStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6921,7 +6921,7 @@ public sealed class AwsIamStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6936,7 +6936,7 @@ public sealed class SssdStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6951,7 +6951,7 @@ public sealed class EntraIdStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6966,7 +6966,7 @@ public sealed class WindowsIntegratedAuthStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6981,7 +6981,7 @@ public sealed class CaCertificateStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -6996,7 +6996,7 @@ public sealed class MacOsKeychainStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -7011,7 +7011,7 @@ public sealed class LinuxPamStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -7026,7 +7026,7 @@ public sealed class SystemdCredentialStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -7041,7 +7041,7 @@ public sealed class GcpIamStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
