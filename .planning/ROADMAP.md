@@ -2024,7 +2024,7 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
 #### Phase 87: VDE Scalable Internals
 **Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale. Includes the 6-Level Adaptive Integrity Engine (L0 trailers → L1 hash-in-index-pointer → L2 epoch-batched Merkle → L3 learned scrubbing → L4 blockchain-anchored → L5 Merkle-CRDT [v7.0 interface only]).
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
-**Requirements**: VOPT-01 through VOPT-87
+**Requirements**: VOPT-01 through VOPT-90
 **Success Criteria** (what must be TRUE):
   1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
   2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
@@ -2081,7 +2081,10 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
   53. All 53 format-bakeable features have registered ModuleId bits and FeatureFlags; FormatConstants.DefinedModules reflects full set
   54. InodeExtent expanded to 32B with ExpectedHash:16; old 24B extents read transparently; new writes always 32B
   55. ModuleManifest expanded to uint64; backward-compatible with uint32 VDEs (upper 32 bits default zero)
-**Plans**: 65 plans
+  56. VDE write pipeline: 7-stage write with all 33 modules active completes within 2x the latency of a raw IBlockDevice.WriteAsync for 4KB blocks; disabled modules add zero measurable latency
+  57. VDE read pipeline: 6-stage read with ARC cache hit returns within 10μs for metadata-only queries; cold read returns within 1.5x raw IBlockDevice latency
+  58. Full-stack E2E: write→read roundtrip with all 52 plugins and all 53 format features active produces byte-identical data with complete RichMetadata; background jobs do not interfere with foreground I/O (QoS enforced)
+**Plans**: 68 plans
 
 Plans:
 - [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
@@ -2149,6 +2152,9 @@ Plans:
 - [ ] 87-63-PLAN.md -- Fuse3LowLevelMountProvider (Linux/FreeBSD): P/Invoke to libfuse3 (fuse_lowlevel_ops struct), low-level inode-based API (lookup/getattr/readdir/open/read/write/release/unlink/mkdir/rmdir), fuse_session lifecycle, FUSE passthrough mode on kernel 6.9+, `dw mount /mnt/vde volume.dwvd` CLI (VOPT-85) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.Linux]
 - [ ] 87-64-PLAN.md -- MacFuseMountProvider (macOS): macFUSE 4.x via libfuse3 compatibility layer, F_NOCACHE for O_DIRECT equivalent, Spotlight metadata provider for indexed search, auto-eject on VDE close, `dw mount /Volumes/VDE volume.dwvd` CLI (VOPT-86) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.macOS]
 - [ ] 87-65-PLAN.md -- 53 Format-Bakeable Feature Module Registration: Expand ModuleId enum to bits 19-33 (CPSH through WLCK), expand ModuleManifest to uint64, register all new FeatureFlags (QOS_ACTIVE, ONLINE_OPS_ACTIVE, DR_ACTIVE, OBSERVABILITY_ENHANCED, plus 9 more), expand ExtentFlags to full 32-bit with IS_POISON/SPATIOTEMPORAL/DELTA/SHARED_COW/Dict_ID, update FormatConstants.DefinedModules (VOPT-87) [Home: SDK VirtualDiskEngine.Format]
+- [ ] 87-66-PLAN.md -- VDE I/O Pipeline Framework: IVdeWritePipeline and IVdeReadPipeline interfaces, IPipelineStage abstraction with ModuleManifest-gated execution, 7-stage write pipeline (InodeResolver → ModulePopulator → TagIndexer → DataTransformer → ExtentAllocator → IntegrityCalculator → WalBlockWriter), 6-stage read pipeline (InodeLookup → AccessControl → ExtentResolver → BlockReaderIntegrity → ModuleExtractor → PostReadUpdater), stage registration via DI container, pipeline metrics (per-stage latency, skip-rate), zero-overhead disabled modules (VOPT-88) [Home: SDK VirtualDiskEngine.Pipeline]
+- [ ] 87-67-PLAN.md -- Module Populator + Module Extractor stages: IModuleFieldWriter and IModuleFieldReader interfaces, per-module write/read handlers for all 33 modules (EKEY/QOS/REPL/CMPL/LNGE/VECQ/ANCR/MACR/WLCK/GOVN/QRST/COMP/RESL/IOTD/SRCH/STRM/XREF/AUDT/DQAL/WKFL/FDRN/MDTY/SCHM/PRIV/INTL/RLMT/HEAL/DPLY/MESH/CPSH/DELT/ZNSM/STEX), RichReadResult aggregate type, handler auto-discovery from ModuleManifest bits, batch module field serialization/deserialization (VOPT-89) [Home: SDK VirtualDiskEngine.Pipeline.Modules]
+- [ ] 87-68-PLAN.md -- Full-stack E2E pipeline integration: Kernel MessageBus phase orchestration (7 write phases, 5 read phases), plugin-to-pipeline-stage registration API, background job scheduler with 4-tier priority (Continuous/Periodic/Scheduled/LongRunning), background job coordination (prevent conflicting operations), pipeline health dashboard integration with UniversalObservability, E2E pipeline integration tests covering write→read→verify roundtrip with all 53 features active (VOPT-90) [Home: DataWarehouse.Kernel + SDK VirtualDiskEngine.Pipeline]
 
 Wave structure:
 ```
@@ -2171,6 +2177,8 @@ Wave 16: 87-51 (Format-native observability) + 87-52 (Format-native QoS) + 87-53
 Wave 17: 87-61 (Mount interface + adapter) -- foundational mount infra, no platform dependencies
 Wave 18: 87-62 (WinFsp) + 87-63 (FUSE3 Linux) + 87-64 (macFUSE) -- parallel, all depend on 87-61
 Wave 19: 87-65 (Module registration) -- depends on Wave 16 (format-native features must be spec'd before registration)
+Wave 20: 87-66 (Pipeline framework) + 87-67 (Module handlers) -- parallel, depends on Wave 19 (module registration must exist)
+Wave 21: 87-68 (E2E integration) -- depends on Wave 20 + all plugin implementations
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling
@@ -2427,7 +2435,7 @@ Plans:
 | 84. Deployment Topology & CLI Modes | 0/6 | Not started | - |
 | 85. Competitive Edge | 0/8 | Not started | - |
 | 86. Adaptive Index Engine | 0/16 | Not started | - |
-| 87. VDE Scalable Internals | 0/65 | Not started | - |
+| 87. VDE Scalable Internals | 0/68 | Not started | - |
 | 88. Dynamic Subsystem Scaling | 0/14 | Not started | - |
 | 89. Ecosystem Compatibility | 0/14 | Not started | - |
 | 90. Device Discovery & Physical Block Device | 0/6 | Not started | - |
@@ -2437,7 +2445,7 @@ Plans:
 | 94. Data Plugin Consolidation | 0/5 | Not started | - |
 | 95. Bare-Metal-to-User E2E Testing | 0/5 | Not started | - |
 
-**Total v6.0:** 0/234 plans complete
+**Total v6.0:** 0/237 plans complete
 
 ### Phase 65.1: Deep Semantic Audit & PluginBase Persistence (INSERTED)
 
