@@ -77,6 +77,12 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         private readonly List<IDisposable> _intelligenceSubscriptions = new();
 
         /// <summary>
+        /// Cancellation token source signalled on <see cref="StopAsync"/> / <see cref="Dispose(bool)"/>.
+        /// Used by message-bus handler wrappers so in-flight work is cancelled on shutdown.
+        /// </summary>
+        private readonly CancellationTokenSource _shutdownCts = new();
+
+        /// <summary>
         /// Lock for thread-safe state updates.
         /// </summary>
         private readonly object _stateLock = new();
@@ -93,6 +99,8 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 
         /// <summary>
         /// When the capability cache was last refreshed.
+        /// Written under <c>_stateLock</c>; reads must also acquire the lock
+        /// to avoid torn reads on 64-bit DateTimeOffset.
         /// </summary>
         private DateTimeOffset _capabilityCacheTime = DateTimeOffset.MinValue;
 
@@ -194,10 +202,18 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// </returns>
         public async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
-            // Check cache validity
-            if (_discoveryAttempted && DateTimeOffset.UtcNow - _capabilityCacheTime < CapabilityCacheTtl)
+            // Check cache validity — read _capabilityCacheTime under lock to avoid TOCTOU
+            if (_discoveryAttempted)
             {
-                return _isIntelligenceAvailable;
+                DateTimeOffset cachedAt;
+                lock (_stateLock)
+                {
+                    cachedAt = _capabilityCacheTime;
+                }
+                if (DateTimeOffset.UtcNow - cachedAt < CapabilityCacheTtl)
+                {
+                    return _isIntelligenceAvailable;
+                }
             }
 
             if (MessageBus == null)
@@ -323,6 +339,9 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// </summary>
         public virtual async Task StopAsync()
         {
+            // Signal shutdown to in-flight handler work
+            _shutdownCts.Cancel();
+
             // Unsubscribe from Intelligence topics
             foreach (var subscription in _intelligenceSubscriptions)
             {
@@ -1420,7 +1439,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                     TRequest? request = DeserializeFromMessage<TRequest>(msg);
                     if (request == null) return;
 
-                    var response = await handler(request, CancellationToken.None).ConfigureAwait(false);
+                    var response = await handler(request, _shutdownCts.Token).ConfigureAwait(false);
 
                     if (MessageBus != null && msg.CorrelationId != null)
                     {
@@ -1482,7 +1501,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                     TNotification? notification = DeserializeFromMessage<TNotification>(msg);
                     if (notification == null) return;
 
-                    await handler(notification, CancellationToken.None).ConfigureAwait(false);
+                    await handler(notification, _shutdownCts.Token).ConfigureAwait(false);
                 }
                 catch
                 {
@@ -1572,6 +1591,9 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         {
             if (disposing)
             {
+                _shutdownCts.Cancel();
+                _shutdownCts.Dispose();
+
                 foreach (var subscription in _intelligenceSubscriptions)
                 {
                     try { subscription.Dispose(); } catch { /* Best-effort cleanup */ }

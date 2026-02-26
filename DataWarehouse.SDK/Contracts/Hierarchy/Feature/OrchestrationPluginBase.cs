@@ -76,7 +76,15 @@ public abstract class OrchestrationPluginBase : FeaturePluginBase
         return ExecuteWithStrategyAsync<TStrategy, Dictionary<string, object>>(
             strategyId,
             identity,
-            _ => Task.FromResult(new Dictionary<string, object>(workflow)),
+            strategy =>
+            {
+                var result = new Dictionary<string, object>(workflow)
+                {
+                    ["_resolvedStrategy"] = strategy.StrategyId,
+                    ["_strategyName"] = strategy.Name
+                };
+                return Task.FromResult(result);
+            },
             ct);
     }
 
