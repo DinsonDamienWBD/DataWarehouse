@@ -30,8 +30,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Databricks healthy" : "Databricks unhealthy", TimeSpan.FromMilliseconds(12), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(12, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(12, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(12, ct); return new List<DataSchema> { new DataSchema("delta_table", new[] { new DataSchemaField("id", "BIGINT", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["format"] = "delta" }) }; }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Databricks query execution requires the Databricks.Sql NuGet package or the SQL Statement Execution REST API with a valid personal access token.");
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Databricks DML execution requires the Databricks.Sql NuGet package or the SQL Statement Execution REST API.");
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException("Databricks schema discovery requires the Databricks.Sql NuGet package or the Unity Catalog REST API.");
     }
 }

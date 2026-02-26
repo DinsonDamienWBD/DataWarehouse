@@ -23,11 +23,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             await Task.Delay(10, ct);
             return new DefaultConnectionHandle(database, new Dictionary<string, object> { ["database"] = database, ["token"] = _token ?? "none" });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { await Task.Delay(5, ct); return _token != null; }
+        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // _token != null only means we stored a token string locally, not that MotherDuck accepted it.
+            // A real probe requires DuckDB + MotherDuck extension; without the SDK we cannot verify.
+            return Task.FromResult(_token != null);
+        }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _token = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "MotherDuck healthy" : "MotherDuck unhealthy", TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(8, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(8, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(8, ct); return new List<DataSchema> { new DataSchema("table", new[] { new DataSchemaField("id", "BIGINT", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" }) }; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "MotherDuck token present (not verified)" : "MotherDuck token missing", sw.Elapsed, DateTimeOffset.UtcNow); }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("MotherDuck query execution requires the DuckDB.NET.Data NuGet package with the MotherDuck extension enabled via 'ATTACH md:' and a valid service token.");
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("MotherDuck DML execution requires the DuckDB.NET.Data NuGet package with the MotherDuck extension.");
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException("MotherDuck schema discovery requires the DuckDB.NET.Data NuGet package with the MotherDuck extension.");
     }
 }

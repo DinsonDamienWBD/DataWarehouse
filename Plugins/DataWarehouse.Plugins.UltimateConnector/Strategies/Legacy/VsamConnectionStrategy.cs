@@ -21,10 +21,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
+            if (string.IsNullOrWhiteSpace(config.ConnectionString))
+                throw new ArgumentException("ConnectionString must be in 'host' or 'host:port' format for VSAM.", nameof(config));
             var parts = config.ConnectionString.Split(':');
+            var host = parts[0];
+            if (string.IsNullOrWhiteSpace(host))
+                throw new ArgumentException("Host portion of ConnectionString is empty for VSAM.", nameof(config));
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 8000;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 8000, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "VSAM Bridge" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "VSAM Bridge", ["host"] = host, ["port"] = port });
         }
 
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);

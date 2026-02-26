@@ -110,15 +110,16 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
 
         private async Task<ClearanceValidationResult> ValidateClearanceAsync(string subjectId, CancellationToken cancellationToken)
         {
-            // Check if validation endpoint is configured
+            // Check if validation endpoint is configured — fail-closed if not
             if (!Configuration.TryGetValue("ValidationEndpoint", out var endpointObj) ||
                 endpointObj is not string endpoint)
             {
-                _logger.LogWarning("No validation endpoint configured, skipping external validation");
+                _logger.LogWarning("No validation endpoint configured, denying access (fail-closed)");
                 return new ClearanceValidationResult
                 {
-                    IsValid = true,
-                    ClearanceLevel = "UNVALIDATED",
+                    IsValid = false,
+                    ClearanceLevel = null,
+                    Reason = "Clearance validation endpoint not configured; access denied by default",
                     Source = "local"
                 };
             }

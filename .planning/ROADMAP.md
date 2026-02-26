@@ -2024,7 +2024,7 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
 #### Phase 87: VDE Scalable Internals
 **Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale. Includes the 6-Level Adaptive Integrity Engine (L0 trailers → L1 hash-in-index-pointer → L2 epoch-batched Merkle → L3 learned scrubbing → L4 blockchain-anchored → L5 Merkle-CRDT [v7.0 interface only]).
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
-**Requirements**: VOPT-01 through VOPT-32
+**Requirements**: VOPT-01 through VOPT-39
 **Success Criteria** (what must be TRUE):
   1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
   2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
@@ -2043,7 +2043,14 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
   15. WAL sharding: 256-thread concurrent write benchmark shows linear throughput scaling vs 2-WAL baseline.
   16. Vacuum: dead space ratio stays below 10% under sustained MVCC write load with concurrent readers.
   17. Metaslab: 1TB+ VDE allocation benchmark shows <5% fragmentation after 1M random-size allocations.
-**Plans**: 19 plans
+  18. Crypto-ephemerality: ephemeral-key file shredded in <1ms by key deletion regardless of data volume; volatile key ring survives process restart only via TPM-sealed backend, RAM-only backend loses keys on crash (by design).
+  19. ZNS symbiosis: VDE on ZNS NVMe shows zero SSD garbage collection; write latency <20μs sustained; conventional NVMe fallback identical to pre-ZNS behavior.
+  20. WAL streaming: 128 concurrent subscribers reading WAL shards via mmap with <100ns per-event latency; subscriber cursor survives VDE remount; unauthorized subscriber rejected by Policy Engine.
+  21. Delta extents: 10-byte modification on 4KB block produces <100B delta extent; read reconstruction <1μs with AVX-512; Background Vacuum compacts delta chain depth 8→1 within one vacuum cycle.
+  22. Smart Extents: WASM predicate on 50GB scan returns only matching rows; host-side io_uring filtered read saves ≥90% memory bandwidth vs full scan; computational NVMe path detected and used when available.
+  23. Polymorphic RAID: temp file (Standard) and financial ledger (EC_4_2) coexist on same NVMe; EC parity verified on read; degraded-mode reconstruction works with 1 missing shard for EC_4_2.
+  24. 4D extents: spatial bounding box query on 1M spatiotemporal extents returns results in <10ms; Hilbert curve ordering confirmed by sequential NVMe read pattern (≥80% sequential blocks for spatially adjacent queries).
+**Plans**: 26 plans
 
 Plans:
 - [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
@@ -2065,6 +2072,13 @@ Plans:
 - [ ] 87-17-PLAN.md -- Epoch-batched Merkle updates: background Merkle root computation at configurable interval (default 5s) decoupled from hot write path, WAL-replay recovery for crash window, configurable batch interval SLA (VOPT-30)
 - [ ] 87-18-PLAN.md -- Hierarchical metaslab allocator: single bitmap <128MB, flat allocation groups 128MB–1TB, hierarchical metaslab trees 1TB+ (Zones → Regions → AGs), lazy bitmap loading (active zones only), size-class segregated allocators (small/medium/large extents) (VOPT-31)
 - [ ] 87-19-PLAN.md -- Vacuum and epoch-based GC: MVCC dead version reclamation via epoch-based reader tracking, configurable SLA lease timeout (default 300s), EpochExpiredException for stale readers, long-running read snapshot materialization to temp VDE, WORM object exemption, vacuum metrics (dead space ratio, reclaim rate, oldest living epoch) (VOPT-32)
+- [ ] 87-20-PLAN.md -- Cryptographic Ephemerality: EKEY inode module (EphemeralKeyID:16, TTL_Epoch:8, KeyRingSlot:4, Flags:4), volatile key ring interface (IVolatileKeyRing with RAM-only and TPM-sealed backends), TTL reaper in Background Vacuum, O(1) crypto-shred by key deletion, VOLATILE_KEYRING_ACTIVE feature flag (VOPT-33)
+- [ ] 87-21-PLAN.md -- Epoch-to-ZNS hardware symbiosis: ZNSM region type (ZnsZoneMapRegion), Epoch→Zone 1:1 mapping, ZNS detection via NVMe Identify Namespace at mount, sequential-zone allocation mode, ZNS_ZONE_RESET on dead epochs, ZNS_AWARE feature flag, fallback to standard NVMe when ZNS unavailable (VOPT-34)
+- [ ] 87-22-PLAN.md -- WAL streaming (filesystem as Kafka): WALS region type (WalSubscriberCursorTable), SubscriberCursor format (32B: SubscriberID:8, LastEpoch:8, LastSequence:8, Flags:8), mmap/Span<T> zero-copy read interface, SUBSCRIBE flag on WAL region directory entry, per-subscriber ACLs via Policy Engine authority chain, WAL_STREAMING_ACTIVE feature flag (VOPT-35)
+- [ ] 87-23-PLAN.md -- Sub-block delta extents: DELT inode module (MaxDeltaDepth:2, CurrentDepth:2, CompactionPolicy:4), DELTA extent flag type, VCDIFF/bsdiff binary patch generation on <10% block modification, delta chain read reconstruction, Background Vacuum auto-compaction when CurrentDepth > MaxDeltaDepth, DELTA_EXTENTS_ACTIVE feature flag (VOPT-36)
+- [ ] 87-24-PLAN.md -- Smart Extents (WASM predicate pushdown): CPSH inode module (WasmPredicateOffset:8, PredicateLen:4, PredicateFlags:4, InlinePredicate:32), io_uring filtered read path with WASM execution after DMA, NVMe vendor command path for computational drives, COMPUTE_PUSHDOWN_ACTIVE feature flag, integration with existing ComputeCodeCache region (VOPT-37)
+- [ ] 87-25-PLAN.md -- Polymorphic RAID (per-inode erasure coding): 3-bit RAID topology in extent Flags field (Standard/Mirror/EC_2_1/EC_4_2/EC_8_3), extended RAID inode module (Scheme:1, DataShards:1, ParityShards:1, DeviceMap:29), AVX-512 Reed-Solomon parity calculation, per-extent reconstruction path, integration with UltimateRAID plugin strategies (VOPT-38)
+- [ ] 87-26-PLAN.md -- Spatiotemporal 4D extent addressing: STEX inode module (CoordinateSystem:2, Precision:2, HilbertOrder:2), SPATIOTEMPORAL extent flag, 6×32B → 3×64B extent reinterpretation [Geohash:16][TimeStart:8][TimeEnd:8][StartBlock:8][BlockCount:4][Flags:4][ExpectedHash:16], Hilbert curve spatial clustering, io_uring bounding box query path, SPATIOTEMPORAL_ACTIVE feature flag (VOPT-39)
 
 Wave structure:
 ```
@@ -2074,6 +2088,8 @@ Wave 3: 87-07 (MVCC GC+isolation) + 87-08 (SQL OLTP) + 87-09 (Columnar+zone maps
 Wave 4: 87-10 (SIMD+spill+pushdown) + 87-11 (Tag index) + 87-12 (Per-extent crypto) -- depends on Wave 3
 Wave 5: 87-13 (Checksums+Merkle) + 87-14 (CoW+replication) + 87-15 (Defrag) -- depends on Wave 4
 Wave 6: 87-16 (Sharded WAL) + 87-17 (Epoch Merkle) + 87-18 (Metaslab) + 87-19 (Vacuum GC) -- parallel, depends on Wave 5
+Wave 7: 87-20 (Crypto-Ephemerality) + 87-21 (ZNS Symbiosis) + 87-22 (WAL Streaming) + 87-23 (Delta Extents) -- parallel, depends on Wave 6 (WAL shards + Vacuum must exist first)
+Wave 8: 87-24 (Smart Extents/WASM pushdown) + 87-25 (Polymorphic RAID) + 87-26 (4D Extents) -- parallel, depends on Wave 7 + ComputeCodeCache region
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling

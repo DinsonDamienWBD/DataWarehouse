@@ -18,12 +18,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
     /// </summary>
     public class FtpSftpConnectionStrategy : LegacyConnectionStrategyBase
     {
-        private string _host = "";
-        private int _port = 21;
-        private string _username = "";
-        private string _password = "";
-        private bool _useSftp;
-        private bool _useFtps;
+        // No mutable instance fields — all connection state is stored in FtpConnectionInfo
+        // on the handle to avoid data races when the strategy is reused concurrently.
 
         public override string StrategyId => "ftp-sftp";
         public override string DisplayName => "FTP/SFTP";
@@ -35,42 +31,43 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
-            _port = GetConfiguration(config, "Port", 21);
-            _username = GetConfiguration<string>(config, "Username", "anonymous");
-            _password = GetConfiguration<string>(config, "Password", "");
-            _useSftp = GetConfiguration(config, "UseSftp", false);
-            _useFtps = GetConfiguration(config, "UseFtps", false);
+            var host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
+            var port = GetConfiguration(config, "Port", 21);
+            var username = GetConfiguration<string>(config, "Username", "anonymous");
+            var password = GetConfiguration<string>(config, "Password", "");
+            var useSftp = GetConfiguration(config, "UseSftp", false);
+            var useFtps = GetConfiguration(config, "UseFtps", false);
 
-            if (_useSftp) _port = _port == 21 ? 22 : _port;
+            if (useSftp) port = port == 21 ? 22 : port;
 
             // Test basic TCP connectivity
             using var testClient = new TcpClient();
-            await testClient.ConnectAsync(_host, _port, ct);
+            await testClient.ConnectAsync(host, port, ct);
 
             var connectionInfo = new FtpConnectionInfo
             {
-                Host = _host,
-                Port = _port,
-                Username = _username,
-                Password = _password,
-                Protocol = _useSftp ? "SFTP" : _useFtps ? "FTPS" : "FTP"
+                Host = host,
+                Port = port,
+                Username = username,
+                Password = password,
+                Protocol = useSftp ? "SFTP" : useFtps ? "FTPS" : "FTP"
             };
 
             return new DefaultConnectionHandle(connectionInfo, new Dictionary<string, object>
             {
                 ["protocol"] = connectionInfo.Protocol,
-                ["host"] = _host,
-                ["port"] = _port
+                ["host"] = host,
+                ["port"] = port
             });
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {
                 using var testClient = new TcpClient();
-                await testClient.ConnectAsync(_host, _port, ct);
+                await testClient.ConnectAsync(info.Host, info.Port, ct);
                 return true;
             }
             catch { return false; }
@@ -80,18 +77,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
             sw.Stop();
             return new ConnectionHealth(isHealthy,
-                isHealthy ? $"{(_useSftp ? "SFTP" : "FTP")} server reachable at {_host}:{_port}" : "FTP server unreachable",
+                isHealthy ? $"{info.Protocol} server reachable at {info.Host}:{info.Port}" : "FTP server unreachable",
                 sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
-            // Map FTP commands
-            return Task.FromResult($"{{\"command\":\"{protocolCommand}\",\"protocol\":\"{(_useSftp ? "SFTP" : "FTP")}\",\"status\":\"queued\"}}");
+            var info = handle.GetConnection<FtpConnectionInfo>();
+            return Task.FromResult($"{{\"command\":\"{protocolCommand}\",\"protocol\":\"{info.Protocol}\",\"status\":\"queued\"}}");
         }
 
         public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
@@ -119,15 +117,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public async Task<FtpListResult> ListDirectoryAsync(IConnectionHandle handle, string remotePath = "/",
             CancellationToken ct = default)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             var entries = new List<FtpEntry>();
 
             try
             {
 #pragma warning disable SYSLIB0014 // FtpWebRequest is obsolete but still functional for FTP
-                var request = (FtpWebRequest)WebRequest.Create($"ftp://{_host}:{_port}{remotePath}");
+                var request = (FtpWebRequest)WebRequest.Create($"ftp://{info.Host}:{info.Port}{remotePath}");
                 request.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
-                request.Credentials = new NetworkCredential(_username, _password);
-                request.EnableSsl = _useFtps;
+                request.Credentials = new NetworkCredential(info.Username, info.Password);
+                request.EnableSsl = info.Protocol == "FTPS";
                 request.Timeout = 30000;
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();
@@ -154,13 +153,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public async Task<FtpTransferResult> DownloadFileAsync(IConnectionHandle handle, string remotePath,
             string localPath, CancellationToken ct = default)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {
 #pragma warning disable SYSLIB0014
-                var request = (FtpWebRequest)WebRequest.Create($"ftp://{_host}:{_port}{remotePath}");
+                var request = (FtpWebRequest)WebRequest.Create($"ftp://{info.Host}:{info.Port}{remotePath}");
                 request.Method = WebRequestMethods.Ftp.DownloadFile;
-                request.Credentials = new NetworkCredential(_username, _password);
-                request.EnableSsl = _useFtps;
+                request.Credentials = new NetworkCredential(info.Username, info.Password);
+                request.EnableSsl = info.Protocol == "FTPS";
                 request.UseBinary = true;
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();
@@ -189,13 +189,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public async Task<FtpTransferResult> UploadFileAsync(IConnectionHandle handle, string localPath,
             string remotePath, CancellationToken ct = default)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {
 #pragma warning disable SYSLIB0014
-                var request = (FtpWebRequest)WebRequest.Create($"ftp://{_host}:{_port}{remotePath}");
+                var request = (FtpWebRequest)WebRequest.Create($"ftp://{info.Host}:{info.Port}{remotePath}");
                 request.Method = WebRequestMethods.Ftp.UploadFile;
-                request.Credentials = new NetworkCredential(_username, _password);
-                request.EnableSsl = _useFtps;
+                request.Credentials = new NetworkCredential(info.Username, info.Password);
+                request.EnableSsl = info.Protocol == "FTPS";
                 request.UseBinary = true;
 
                 var fileContent = await File.ReadAllBytesAsync(localPath, ct);
@@ -226,13 +227,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         /// </summary>
         public async Task<bool> DeleteFileAsync(IConnectionHandle handle, string remotePath, CancellationToken ct = default)
         {
+            var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {
 #pragma warning disable SYSLIB0014
-                var request = (FtpWebRequest)WebRequest.Create($"ftp://{_host}:{_port}{remotePath}");
+                var request = (FtpWebRequest)WebRequest.Create($"ftp://{info.Host}:{info.Port}{remotePath}");
                 request.Method = WebRequestMethods.Ftp.DeleteFile;
-                request.Credentials = new NetworkCredential(_username, _password);
-                request.EnableSsl = _useFtps;
+                request.Credentials = new NetworkCredential(info.Username, info.Password);
+                request.EnableSsl = info.Protocol == "FTPS";
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();
                 return response.StatusCode == FtpStatusCode.FileActionOK;

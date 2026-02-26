@@ -111,7 +111,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         {
             if (response.Length < 8) return null;
             var headerLength = System.Net.IPAddress.NetworkToHostOrder(BitConverter.ToInt32(response, 0));
-            if (headerLength + 4 < response.Length)
+            // Body starts at byte offset (4 + headerLength). Condition was inverted: we need
+            // 4 + headerLength < response.Length (i.e. at least one body byte exists).
+            if (headerLength >= 0 && 4 + headerLength < response.Length)
                 return response[(4 + headerLength)..];
             return null;
         }

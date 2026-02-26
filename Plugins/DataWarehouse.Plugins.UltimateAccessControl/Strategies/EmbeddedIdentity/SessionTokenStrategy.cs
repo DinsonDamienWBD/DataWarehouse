@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("session.token.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("session.token.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Session Token Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "session-token-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["token_type"] = "JWT",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "SessionTokenStrategy requires the Microsoft.IdentityModel.JsonWebTokens NuGet package for real JWT parsing, " +
+                "signature verification, claims extraction, and expiry validation. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

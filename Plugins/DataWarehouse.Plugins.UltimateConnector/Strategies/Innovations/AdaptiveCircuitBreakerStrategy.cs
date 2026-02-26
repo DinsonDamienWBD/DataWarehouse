@@ -97,8 +97,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 client.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", config.AuthCredential);
 
-            // Check breaker state before connecting
-            var connectionId = $"cb-{Guid.NewGuid():N}";
+            // Use a stable ID derived from the endpoint so all connections to the same
+            // endpoint share the same breaker state across reconnects.
+            var connectionId = $"cb-{endpoint.GetHashCode():X8}";
 
             if (_states.TryGetValue(connectionId, out var existingState) &&
                 existingState.Breaker.State == CircuitState.Open)
@@ -106,7 +107,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 var elapsed = DateTimeOffset.UtcNow - existingState.Breaker.OpenedAt;
                 if (elapsed.TotalSeconds < openDurationSec)
                     throw new InvalidOperationException(
-                        $"Circuit breaker is OPEN. Reset in {openDurationSec - elapsed.TotalSeconds:F0}s.");
+                        $"Circuit breaker is OPEN for {endpoint}. Reset in {openDurationSec - elapsed.TotalSeconds:F0}s.");
             }
 
             // Attempt connection

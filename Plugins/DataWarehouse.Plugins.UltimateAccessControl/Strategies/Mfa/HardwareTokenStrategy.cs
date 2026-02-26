@@ -425,26 +425,10 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             byte[] signature,
             byte[] publicKey)
         {
-            try
-            {
-                // Combine authenticator data and challenge hash
-                using var sha256 = SHA256.Create();
-                var clientDataHash = sha256.ComputeHash(challenge);
-
-                var signedData = new byte[authenticatorData.Length + clientDataHash.Length];
-                Buffer.BlockCopy(authenticatorData, 0, signedData, 0, authenticatorData.Length);
-                Buffer.BlockCopy(clientDataHash, 0, signedData, authenticatorData.Length, clientDataHash.Length);
-
-                // Verify ECDSA signature (simplified - real implementation would parse COSE key format)
-                using var ecdsa = ECDsa.Create();
-                // Import public key (would need proper COSE key parsing in production)
-                // For now, return true if signature structure is valid
-                return signature.Length >= 64; // Simplified validation
-            }
-            catch
-            {
-                return false;
-            }
+            throw new NotSupportedException(
+                "VerifyFido2Signature requires COSE key format parsing (RFC 8152) and FIDO2/WebAuthn-compliant " +
+                "ECDSA signature verification. Accepting any 64-byte array as a valid signature is a critical " +
+                "security vulnerability. Use the Fido2NetLib NuGet package for a compliant implementation.");
         }
 
         /// <summary>

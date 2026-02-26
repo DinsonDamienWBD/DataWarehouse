@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
@@ -85,19 +86,40 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             _logger.LogCritical("Duress detected for {SubjectId}, initiating key destruction", context.SubjectId);
 
             var keysDestroyed = new List<string>();
+            var keysRequested = new List<string>();
 
-            // Send key destruction command via message bus
+            // Send key destruction command via message bus (request-response for confirmed destruction)
             if (_messageBus != null && Configuration.TryGetValue("KeysToDestroy", out var keysObj) &&
                 keysObj is IEnumerable<string> keys)
             {
                 foreach (var keyId in keys)
                 {
+                    keysRequested.Add(keyId);
                     try
                     {
-                        // Send message bus request (placeholder for full integration)
-                        // In production: message bus request-response to encryption plugin
-                        _logger.LogWarning("Key destruction requested for {KeyId} (message bus integration pending)", keyId);
-                        keysDestroyed.Add(keyId);
+                        var message = new DataWarehouse.SDK.Utilities.PluginMessage
+                        {
+                            Type = "encryption.key.destroy",
+                            SourcePluginId = "access-control",
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["key_id"] = keyId,
+                                ["reason"] = "duress",
+                                ["subject_id"] = context.SubjectId,
+                                ["timestamp"] = DateTime.UtcNow.ToString("O")
+                            }
+                        };
+                        var response = await _messageBus.SendAsync("encryption.key.destroy", message, cancellationToken);
+                        if (response.Success &&
+                            response.Payload is bool destroyed && destroyed)
+                        {
+                            keysDestroyed.Add(keyId);
+                            _logger.LogWarning("Key {KeyId} destroyed and confirmed by encryption plugin", keyId);
+                        }
+                        else
+                        {
+                            _logger.LogError("Key {KeyId} destruction not confirmed: {Error}", keyId, response.ErrorMessage ?? "no confirmation from encryption plugin");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -106,14 +128,24 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                 }
             }
 
+            var allDestroyed = keysRequested.Count > 0 && keysDestroyed.Count == keysRequested.Count;
+            var reason = keysRequested.Count == 0
+                ? "Duress detected; no keys configured for destruction"
+                : allDestroyed
+                    ? $"Access granted under duress ({keysDestroyed.Count} keys destroyed)"
+                    : $"Duress detected; {keysDestroyed.Count} of {keysRequested.Count} keys confirmed destroyed";
+
             return new AccessDecision
             {
                 IsGranted = true,
-                Reason = "Access granted under duress (keys destroyed)",
+                Reason = reason,
                 Metadata = new Dictionary<string, object>
                 {
                     ["duress_detected"] = true,
+                    ["keys_requested"] = keysRequested,
                     ["keys_destroyed"] = keysDestroyed,
+                    ["keys_failed"] = keysRequested.Except(keysDestroyed).ToList(),
+                    ["all_keys_confirmed_destroyed"] = allDestroyed,
                     ["timestamp"] = DateTime.UtcNow
                 }
             };

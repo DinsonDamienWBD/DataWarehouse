@@ -22,8 +22,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
-            await client.GetAsync("/", ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Ceph S3" });
+            try
+            {
+                await client.GetAsync("/", ct);
+                return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Ceph S3" });
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable; }

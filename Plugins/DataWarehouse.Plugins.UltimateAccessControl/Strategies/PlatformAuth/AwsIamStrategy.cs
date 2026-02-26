@@ -49,24 +49,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("aws.iam.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("aws.iam.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "AWS IAM Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "aws-iam-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "AWS",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires AWS STS SDK (AWSSDK.SecurityToken NuGet package) for real STS AssumeRole/GetCallerIdentity " +
+                "verification. Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

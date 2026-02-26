@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("litedb.identity.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("litedb.identity.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "LiteDB Identity Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "litedb-identity-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["storage_engine"] = "LiteDB",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "LiteDbIdentityStrategy requires the LiteDB NuGet package, a configured database path, " +
+                "and real credential lookup/verification against stored identity records. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

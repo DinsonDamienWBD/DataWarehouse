@@ -49,24 +49,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("sssd.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("sssd.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "SSSD Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "sssd-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "Linux",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires SSSD D-Bus integration via P/Invoke or a D-Bus client library (Tmds.DBus NuGet package) " +
+                "to call the SSSD InfoPipe D-Bus API for real user identity and group membership lookups. " +
+                "This is only available on Linux with SSSD running. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

@@ -23,10 +23,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
+            if (string.IsNullOrWhiteSpace(config.ConnectionString))
+                throw new ArgumentException("ConnectionString must be in 'host' or 'host:port' format for TN5250.", nameof(config));
             var parts = config.ConnectionString.Split(':');
+            var host = parts[0];
+            if (string.IsNullOrWhiteSpace(host))
+                throw new ArgumentException("Host portion of ConnectionString is empty for TN5250.", nameof(config));
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 23;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 23, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "TN5250" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "TN5250", ["host"] = host, ["port"] = port });
         }
 
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);

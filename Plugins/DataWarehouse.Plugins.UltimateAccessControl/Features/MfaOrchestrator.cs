@@ -93,7 +93,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.FromResult(false);
             }
 
-            var isValid = challenge.Code.Equals(response, StringComparison.Ordinal);
+            var codeBytes = System.Text.Encoding.UTF8.GetBytes(challenge.Code);
+            var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
+            var isValid = codeBytes.Length == responseBytes.Length &&
+                          CryptographicOperations.FixedTimeEquals(codeBytes, responseBytes);
             challenge.Status = isValid ? ChallengeStatus.Verified : ChallengeStatus.Failed;
             challenge.VerifiedAt = DateTime.UtcNow;
 

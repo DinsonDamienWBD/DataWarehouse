@@ -91,7 +91,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
 
-            // OAuth 2.0 JWT Bearer flow or Refresh Token flow
+            // OAuth 2.0 Refresh Token flow
             var tokenRequestBody = new Dictionary<string, string>
             {
                 ["grant_type"] = "refresh_token",
@@ -100,31 +100,26 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ["refresh_token"] = _refreshToken
             };
 
-            try
+            using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "/services/oauth2/token")
             {
-                using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "/services/oauth2/token")
-                {
-                    Content = new FormUrlEncodedContent(tokenRequestBody)
-                };
-                using var response = await client.SendAsync(tokenRequest, ct);
+                Content = new FormUrlEncodedContent(tokenRequestBody)
+            };
+            using var response = await client.SendAsync(tokenRequest, ct);
 
-                if (response.IsSuccessStatusCode)
-                {
-                    var json = await response.Content.ReadAsStringAsync(ct);
-                    using var doc = JsonDocument.Parse(json);
-                    var accessToken = doc.RootElement.GetProperty("access_token").GetString() ?? "";
-                    // Salesforce tokens typically last 2 hours
-                    return (accessToken, DateTimeOffset.UtcNow.AddHours(2));
-                }
-            }
-            catch
+            if (!response.IsSuccessStatusCode)
             {
-
-                // Fallback for testing / dev environments
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException(
+                    $"Salesforce OAuth2 token request failed ({(int)response.StatusCode}): {errorBody}");
             }
 
-            return (Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(2));
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var accessToken = doc.RootElement.GetProperty("access_token").GetString()
+                ?? throw new InvalidOperationException("Salesforce token response did not contain 'access_token'.");
+
+            // Salesforce tokens typically last 2 hours
+            return (accessToken, DateTimeOffset.UtcNow.AddHours(2));
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(

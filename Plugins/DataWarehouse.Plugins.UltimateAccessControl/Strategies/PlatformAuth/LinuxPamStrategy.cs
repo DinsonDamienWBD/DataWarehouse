@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("linux.pam.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("linux.pam.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Linux PAM Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "linux-pam-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "Linux",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires PAM P/Invoke (libpam.so via DllImport) for real PAM conversation-based authentication. " +
+                "This is only available on Linux with libpam installed. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

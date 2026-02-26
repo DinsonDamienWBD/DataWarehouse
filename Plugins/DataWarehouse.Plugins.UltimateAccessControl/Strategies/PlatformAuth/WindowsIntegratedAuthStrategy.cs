@@ -49,24 +49,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("windows.integrated.auth.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("windows.integrated.auth.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Windows Integrated Auth Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "windows-integrated-auth-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "Windows",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires SSPI/Negotiate P/Invoke (secur32.dll) for real Kerberos/NTLM token acquisition and validation " +
+                "via the Windows Security Support Provider Interface. Use System.Security.Principal.WindowsIdentity or " +
+                "Microsoft.AspNetCore.Authentication.Negotiate for managed wrappers. " +
+                "This is only available on Windows. Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

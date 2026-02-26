@@ -123,23 +123,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
-        {
-            // In production, this would use the Google.Apis.Auth library to:
-            // 1. Load the service account credentials from the JSON file
-            // 2. Request an OAuth2 access token from https://oauth2.googleapis.com/token
-            // 3. Return the access token and its expiry time
-            //
-            // For now, return a placeholder token that expires in 1 hour
-            var token = Guid.NewGuid().ToString("N");
-            var expiry = DateTimeOffset.UtcNow.AddHours(1);
-
-            return Task.FromResult((token, expiry));
-        }
+            => throw new NotSupportedException(
+                "GCP Cloud Storage authentication is managed by the Google.Cloud.Storage.V1 SDK via " +
+                "Application Default Credentials or a service account key file. " +
+                "Configure GOOGLE_APPLICATION_CREDENTIALS or use Workload Identity Federation.");
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default)
-        {
-            // In production, this would refresh the OAuth2 token using the service account credentials
-            return AuthenticateAsync(handle, ct);
-        }
+            => AuthenticateAsync(handle, ct);
     }
 }

@@ -12,6 +12,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 {
     public class RedPandaConnectionStrategy : MessagingConnectionStrategyBase
     {
+        // Monotonically increasing correlation ID counter — safe for concurrent use.
+        private static int _correlationIdCounter;
+
         public override string StrategyId => "redpanda";
         public override string DisplayName => "RedPanda";
         public override ConnectorCategory Category => ConnectorCategory.Messaging;
@@ -34,19 +37,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             using var ms = new System.IO.MemoryStream();
             using var writer = new System.IO.BinaryWriter(ms);
             var clientId = "datawarehouse-redpanda";
-            var correlationId = Environment.TickCount;
-            writer.Write((short)0); // API Key: Produce
-            writer.Write((short)0); // API Version
-            writer.Write(correlationId);
+            var correlationId = Interlocked.Increment(ref _correlationIdCounter);
+            // Kafka wire protocol uses big-endian (network byte order) for all multi-byte integers.
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Key: Produce
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Version
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(correlationId));
             WriteKafkaString(writer, clientId);
-            writer.Write((short)-1); // Required Acks
-            writer.Write(1000); // Timeout ms
-            writer.Write(1); // Topic array count
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)-1));         // Required Acks
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1000));              // Timeout ms
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));                 // Topic array count
             WriteKafkaString(writer, topic);
-            writer.Write(1); // Partition array count
-            writer.Write(0); // Partition index
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));                 // Partition array count
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(0));                 // Partition index
             var messageSet = BuildKafkaMessageSet(message);
-            writer.Write(messageSet.Length);
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(messageSet.Length));
             writer.Write(messageSet);
             var payload = ms.ToArray();
             var lengthPrefix = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(payload.Length));
@@ -66,20 +70,21 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 using var ms = new System.IO.MemoryStream();
                 using var writer = new System.IO.BinaryWriter(ms);
                 var clientId = "datawarehouse-redpanda";
-                var correlationId = Environment.TickCount;
-                writer.Write((short)1); // API Key: Fetch
-                writer.Write((short)0); // API Version
-                writer.Write(correlationId);
+                var correlationId = Interlocked.Increment(ref _correlationIdCounter);
+                // Kafka wire protocol requires big-endian byte order throughout.
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)1)); // API Key: Fetch
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Version
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(correlationId));
                 WriteKafkaString(writer, clientId);
-                writer.Write(-1); // Replica ID
-                writer.Write(100); // Max wait ms
-                writer.Write(1); // Min bytes
-                writer.Write(1); // Topic count
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(-1));           // Replica ID
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(100));          // Max wait ms
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Min bytes
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Topic count
                 WriteKafkaString(writer, topic);
-                writer.Write(1); // Partition count
-                writer.Write(0); // Partition
-                writer.Write(0L); // Fetch offset
-                writer.Write(1024 * 1024); // Max bytes
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Partition count
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(0));            // Partition
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(0L));           // Fetch offset
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1024 * 1024)); // Max bytes
                 var payload = ms.ToArray();
                 var lengthPrefix = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(payload.Length));
                 await stream.WriteAsync(lengthPrefix, 0, 4, ct);

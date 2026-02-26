@@ -21,7 +21,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Wasabi is reachable" : "Wasabi is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
-        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default) => Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(1)));
-        protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default) => AuthenticateAsync(handle, ct);
+        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException(
+                "Wasabi authentication uses AWS Signature V4 (Access Key + Secret Key). " +
+                "Configure AccessKey and SecretKey via connection properties and use the " +
+                "AWSSDK.S3 NuGet package pointed at the Wasabi endpoint for production connectivity.");
+        protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default)
+            => AuthenticateAsync(handle, ct);
     }
 }

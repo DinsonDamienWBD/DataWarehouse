@@ -167,11 +167,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 
         private static byte[] ExtractMessageBody(byte[] payload)
         {
-            // Simplified extraction - real impl would parse full OpenWire format
-            if (payload.Length < 10) return payload;
-            // Skip header bytes and extract body
-            var bodyStart = Math.Min(20, payload.Length - 1);
-            return payload[bodyStart..];
+            // Full OpenWire frame parsing is not feasible without the ActiveMQ client library.
+            // The magic offset=20 approach silently returns garbage body bytes.
+            // Callers should use Apache.NMS.ActiveMQ (NuGet) for production message consumption.
+            throw new NotSupportedException(
+                "OpenWire binary frame parsing requires the Apache.NMS.ActiveMQ NuGet package. " +
+                "This raw TCP subscriber cannot reliably extract message body bytes without the full OpenWire codec.");
         }
     }
 }

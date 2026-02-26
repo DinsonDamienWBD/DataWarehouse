@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("gcp.iam.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("gcp.iam.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "GCP IAM Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "gcp-iam-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "GCP",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires GCP IAM SDK (Google.Apis.Iam.v1 NuGet package) for real service account token validation " +
+                "via the IAM credentials API and identity token verification. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

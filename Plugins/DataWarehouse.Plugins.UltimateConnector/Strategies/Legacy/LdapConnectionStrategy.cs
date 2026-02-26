@@ -16,12 +16,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
     /// </summary>
     public class LdapConnectionStrategy : LegacyConnectionStrategyBase
     {
-        private string _host = "";
-        private int _port = 389;
-        private string _baseDn = "";
-        private string _bindDn = "";
-        private string _bindPassword = "";
-        private bool _useSsl;
+        // No mutable instance fields — all connection state is stored in LdapConnectionInfo
+        // on the handle to avoid data races when the strategy is reused concurrently.
 
         public override string StrategyId => "ldap";
         public override string DisplayName => "LDAP";
@@ -33,42 +29,44 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
-            _port = GetConfiguration(config, "Port", 389);
-            _baseDn = GetConfiguration<string>(config, "BaseDN", "");
-            _bindDn = GetConfiguration<string>(config, "BindDN", "");
-            _bindPassword = GetConfiguration<string>(config, "BindPassword", "");
-            _useSsl = GetConfiguration(config, "UseSsl", _port == 636);
+            var host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
+            var port = GetConfiguration(config, "Port", 389);
+            var baseDn = GetConfiguration<string>(config, "BaseDN", "");
+            var bindDn = GetConfiguration<string>(config, "BindDN", "");
+            var bindPassword = GetConfiguration<string>(config, "BindPassword", "");
+            var useSsl = GetConfiguration(config, "UseSsl", port == 636);
 
             // Test TCP connectivity
             using var testClient = new TcpClient();
-            await testClient.ConnectAsync(_host, _port, ct);
+            await testClient.ConnectAsync(host, port, ct);
 
             var connectionInfo = new LdapConnectionInfo
             {
-                Host = _host,
-                Port = _port,
-                BaseDn = _baseDn,
-                BindDn = _bindDn,
-                UseSsl = _useSsl,
+                Host = host,
+                Port = port,
+                BaseDn = baseDn,
+                BindDn = bindDn,
+                BindPassword = bindPassword,
+                UseSsl = useSsl,
                 IsConnected = true
             };
 
             return new DefaultConnectionHandle(connectionInfo, new Dictionary<string, object>
             {
-                ["protocol"] = _useSsl ? "LDAPS" : "LDAP",
-                ["host"] = _host,
-                ["port"] = _port,
-                ["baseDn"] = _baseDn
+                ["protocol"] = useSsl ? "LDAPS" : "LDAP",
+                ["host"] = host,
+                ["port"] = port,
+                ["baseDn"] = baseDn
             });
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            var info = handle.GetConnection<LdapConnectionInfo>();
             try
             {
                 using var testClient = new TcpClient();
-                await testClient.ConnectAsync(_host, _port, ct);
+                await testClient.ConnectAsync(info.Host, info.Port, ct);
                 return true;
             }
             catch { return false; }
@@ -83,32 +81,34 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            var info = handle.GetConnection<LdapConnectionInfo>();
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
             sw.Stop();
             return new ConnectionHealth(isHealthy,
-                isHealthy ? $"LDAP server reachable at {_host}:{_port}" : "LDAP server unreachable",
+                isHealthy ? $"LDAP server reachable at {info.Host}:{info.Port}" : "LDAP server unreachable",
                 sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
-            // Map LDAP operations
-            return Task.FromResult($"{{\"command\":\"{protocolCommand}\",\"protocol\":\"LDAP\",\"baseDn\":\"{_baseDn}\"}}");
+            var info = handle.GetConnection<LdapConnectionInfo>();
+            return Task.FromResult($"{{\"command\":\"{protocolCommand}\",\"protocol\":\"LDAP\",\"baseDn\":\"{info.BaseDn}\"}}");
         }
 
         public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
         {
+            var info = handle.GetConnection<LdapConnectionInfo>();
             var parts = modernCommand.Split(' ', 2);
             var action = parts[0].ToUpperInvariant();
             var target = parts.Length > 1 ? parts[1] : "";
             var translated = action switch
             {
-                "SEARCH" or "FIND" => $"ldapsearch -b \"{_baseDn}\" \"{target}\"",
-                "ADD" => $"ldapadd -D \"{_bindDn}\" -f {target}",
-                "MODIFY" or "UPDATE" => $"ldapmodify -D \"{_bindDn}\" -f {target}",
-                "DELETE" => $"ldapdelete -D \"{_bindDn}\" \"{target}\"",
-                "BIND" => $"ldapwhoami -D \"{_bindDn}\"",
+                "SEARCH" or "FIND" => $"ldapsearch -b \"{info.BaseDn}\" \"{target}\"",
+                "ADD" => $"ldapadd -D \"{info.BindDn}\" -f {target}",
+                "MODIFY" or "UPDATE" => $"ldapmodify -D \"{info.BindDn}\" -f {target}",
+                "DELETE" => $"ldapdelete -D \"{info.BindDn}\" \"{target}\"",
+                "BIND" => $"ldapwhoami -D \"{info.BindDn}\"",
                 _ => modernCommand
             };
             return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"LDAP\"}}");
@@ -121,8 +121,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             string? searchBase = null, LdapSearchScope scope = LdapSearchScope.Subtree,
             string[]? attributes = null, int sizeLimit = 1000, CancellationToken ct = default)
         {
+            var info = handle.GetConnection<LdapConnectionInfo>();
             var filter = searchFilter ?? "(objectClass=*)";
-            var baseDn = searchBase ?? _baseDn;
+            var baseDn = searchBase ?? info.BaseDn;
 
             // Build the LDAP search request representation
             var request = new LdapSearchRequest
@@ -204,7 +205,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public Task<LdapBindResult> BindAsync(IConnectionHandle handle, string? bindDn = null,
             string? password = null, CancellationToken ct = default)
         {
-            var dn = bindDn ?? _bindDn;
+            var info = handle.GetConnection<LdapConnectionInfo>();
+            var dn = bindDn ?? info.BindDn;
 
             return Task.FromResult(new LdapBindResult
             {
@@ -221,6 +223,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public int Port { get; set; }
         public string BaseDn { get; set; } = "";
         public string BindDn { get; set; } = "";
+        public string BindPassword { get; set; } = "";
         public bool UseSsl { get; set; }
         public bool IsConnected { get; set; }
     }

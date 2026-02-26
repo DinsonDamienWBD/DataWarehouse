@@ -25,11 +25,23 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["account"] = config.ConnectionString, ["warehouse"] = "COMPUTE_WH" });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { await Task.Delay(15, ct); return _httpClient != null; }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var client = handle.GetConnection<HttpClient>();
+            try
+            {
+                using var response = await client.GetAsync("/", ct);
+                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+            }
+            catch { return false; }
+        }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Snowflake healthy" : "Snowflake unhealthy", TimeSpan.FromMilliseconds(15), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(15, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(15, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(15, ct); return new List<DataSchema> { new DataSchema("table", new[] { new DataSchemaField("id", "NUMBER", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" }) }; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Snowflake healthy" : "Snowflake unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Snowflake query execution requires the Snowflake.Data NuGet package and a SnowflakeDbConnection with valid account/user/password/role configuration.");
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Snowflake DML execution requires the Snowflake.Data NuGet package and a SnowflakeDbConnection with valid account/user/password/role configuration.");
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException("Snowflake schema discovery requires the Snowflake.Data NuGet package and a SnowflakeDbConnection.");
     }
 }

@@ -123,13 +123,15 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 {
                     var signedXml = new System.Security.Cryptography.Xml.SignedXml(doc);
                     var signatureNode = doc.GetElementsByTagName("Signature", "http://www.w3.org/2000/09/xmldsig#")[0];
-                    if (signatureNode != null)
+                    if (signatureNode == null)
                     {
-                        signedXml.LoadXml((XmlElement)signatureNode);
-                        if (!signedXml.CheckSignature(_certificate, true))
-                        {
-                            return new SamlValidationResult { IsValid = false, Error = "Invalid signature" };
-                        }
+                        // Certificate configured but assertion is unsigned — reject to prevent auth bypass
+                        return new SamlValidationResult { IsValid = false, Error = "SAML assertion is not signed; unsigned assertions are rejected when a verification certificate is configured" };
+                    }
+                    signedXml.LoadXml((XmlElement)signatureNode);
+                    if (!signedXml.CheckSignature(_certificate, true))
+                    {
+                        return new SamlValidationResult { IsValid = false, Error = "Invalid signature" };
                     }
                 }
 

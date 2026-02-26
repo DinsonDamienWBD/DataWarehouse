@@ -1069,12 +1069,16 @@ public sealed class ConfidentialComputingStrategy : AccessControlStrategyBase
 
     private string GenerateAttestationReport(ConfidentialContext context)
     {
+        // Do not include the encryption key or any derivative of it in the attestation report.
+        // Including a hash of the encryption key would allow correlation attacks or key oracle attacks.
+        // Use a non-reversible, non-key-derived context identifier instead.
+        var contextIdentifier = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(context.ContextId)));
         var reportData = new
         {
             context.ContextId,
             TeeType = context.TeeType.ToString(),
             Timestamp = DateTimeOffset.UtcNow.ToString("O"),
-            MeasurementHash = Convert.ToHexString(SHA256.HashData(context.EncryptionKey))
+            ContextFingerprint = contextIdentifier
         };
 
         return System.Text.Json.JsonSerializer.Serialize(reportData);

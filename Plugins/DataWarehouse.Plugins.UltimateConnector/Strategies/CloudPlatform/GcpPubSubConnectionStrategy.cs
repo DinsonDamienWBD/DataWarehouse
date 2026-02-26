@@ -84,15 +84,25 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
         try
         {
             var wrapper = handle.GetConnection<GcpPubSubWrapper>();
-            // Attempt to list topics to verify connectivity
+            // Enumerate at least one result to confirm the gRPC channel is live.
+            // ListTopics will throw on network failures or permission errors that
+            // prevent any communication (e.g. UNAVAILABLE, DEADLINE_EXCEEDED).
             var projectName = $"projects/{wrapper.ProjectId}";
-            wrapper.PublisherClient.ListTopics(projectName);
+            var page = wrapper.PublisherClient.ListTopics(projectName).ReadPage(1);
+            _ = page; // result consumed; connection is healthy
             return Task.FromResult(true);
+        }
+        catch (Grpc.Core.RpcException ex) when (
+            ex.StatusCode == Grpc.Core.StatusCode.PermissionDenied ||
+            ex.StatusCode == Grpc.Core.StatusCode.Unauthenticated)
+        {
+            // Authentication/authorisation errors mean the transport is reachable
+            // but credentials are wrong — report as unhealthy so callers know.
+            return Task.FromResult(false);
         }
         catch
         {
-            // Even auth errors mean the service is reachable
-            return Task.FromResult(true);
+            return Task.FromResult(false);
         }
     }
 
@@ -121,7 +131,10 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
 
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
         IConnectionHandle handle, CancellationToken ct = default)
-        => Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(1)));
+        => throw new NotSupportedException(
+            "GCP Pub/Sub authentication is handled by the Google.Cloud.PubSub.V1 SDK via " +
+            "Application Default Credentials or a service account key file. " +
+            "Configure GOOGLE_APPLICATION_CREDENTIALS or use Workload Identity.");
 
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
         IConnectionHandle handle, string currentToken, CancellationToken ct = default)

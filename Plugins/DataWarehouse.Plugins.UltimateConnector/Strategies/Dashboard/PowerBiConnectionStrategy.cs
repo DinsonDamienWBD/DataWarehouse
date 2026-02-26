@@ -12,5 +12,9 @@ public sealed class PowerBiConnectionStrategy : DashboardConnectionStrategyBase
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
     protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "Power BI configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
     public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default){var httpClient = handle.GetConnection<HttpClient>();var content = new StringContent(dashboardDefinition, Encoding.UTF8, "application/json");var response = await httpClient.PostAsync("/v1.0/myorg/dashboards", content, ct);response.EnsureSuccessStatusCode();var result = await response.Content.ReadAsStringAsync(ct);var json = JsonDocument.Parse(result);return json.RootElement.GetProperty("id").GetString() ?? "";}
-    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { rows = data });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync($"/v1.0/myorg/datasets/{datasetId}/tables/TABLE_NAME/rows", content, ct);response.EnsureSuccessStatusCode();}
+    public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default)
+        => throw new NotSupportedException(
+            "Power BI PushDataAsync requires a specific table name that cannot be hardcoded. " +
+            "Use the Power BI REST API directly: POST /v1.0/myorg/datasets/{datasetId}/tables/{tableName}/rows " +
+            "with a valid OAuth2 Bearer token obtained via MSAL (Microsoft.Identity.Client).");
 }
