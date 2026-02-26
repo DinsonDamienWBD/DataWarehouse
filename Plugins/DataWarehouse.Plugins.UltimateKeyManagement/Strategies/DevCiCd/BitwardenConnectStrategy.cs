@@ -367,7 +367,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                     ["scope"] = "api.secrets"
                 });
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_config.IdentityUrl}/connect/token",
                     tokenRequest,
                     cancellationToken);

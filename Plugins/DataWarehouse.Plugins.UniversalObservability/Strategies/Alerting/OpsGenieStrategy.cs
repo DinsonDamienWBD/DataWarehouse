@@ -59,7 +59,7 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(alert);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetBaseUrl()}/alerts", content, ct);
+        using var response = await _httpClient.PostAsync($"{GetBaseUrl()}/alerts", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -123,7 +123,7 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{GetBaseUrl()}/heartbeats", ct);
+            using var response = await _httpClient.GetAsync($"{GetBaseUrl()}/heartbeats", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "OpsGenie is healthy" : "OpsGenie unhealthy",
                 new Dictionary<string, object> { ["region"] = _region });

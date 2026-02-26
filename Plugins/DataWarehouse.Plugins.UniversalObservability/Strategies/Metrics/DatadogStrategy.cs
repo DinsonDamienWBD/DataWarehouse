@@ -91,7 +91,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         var payload = JsonSerializer.Serialize(new { series });
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"https://api.{_site}/api/v2/series",
             content,
             cancellationToken);
@@ -141,7 +141,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         var payload = JsonSerializer.Serialize(traces);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PutAsync(
+        using var response = await _httpClient.PutAsync(
             $"https://trace.agent.{_site}/v0.4/traces",
             content,
             cancellationToken);
@@ -197,7 +197,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         var payload = JsonSerializer.Serialize(logs);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"https://http-intake.logs.{_site}/api/v2/logs",
             content,
             cancellationToken);
@@ -220,7 +220,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"https://api.{_site}/api/v1/validate",
                 cancellationToken);
 

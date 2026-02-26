@@ -848,7 +848,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 null,
                 ct);
 
-            var json = JsonDocument.Parse(response);
+            using var json = JsonDocument.Parse(response);
             var root = json.RootElement;
 
             var totalCapacity = root.GetProperty("total_capacity_bytes").GetInt64();
@@ -892,7 +892,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 : $"/api/{_vmsApiVersion}/analytics/views/{Uri.EscapeDataString(_viewName ?? _bucketName)}";
 
             var response = await SendVmsRequestAsync(HttpMethod.Get, path, null, ct);
-            var json = JsonDocument.Parse(response);
+            using var json = JsonDocument.Parse(response);
             var root = json.RootElement;
 
             return new VastAnalytics
@@ -923,7 +923,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 null,
                 ct);
 
-            var json = JsonDocument.Parse(response);
+            using var json = JsonDocument.Parse(response);
             var root = json.RootElement;
 
             return new VastQuota

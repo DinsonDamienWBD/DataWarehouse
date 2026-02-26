@@ -114,7 +114,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             httpClient.BaseAddress = new Uri(targetEndpoint);
 
-            var response = await httpClient.GetAsync("/", ct);
+            using var response = await httpClient.GetAsync("/", ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -136,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
+            using var response = await client.GetAsync("/", ct);
             return response.IsSuccessStatusCode;
         }
 
@@ -183,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             try
             {
-                var response = await client.GetAsync(requestUrl, ct);
+                using var response = await client.GetAsync(requestUrl, ct);
                 if (!response.IsSuccessStatusCode)
                     return new BgpPathAnalysis([], []);
 
@@ -233,7 +233,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             try
             {
                 var url = $"https://stat.ripe.net/data/as-overview/data.json?resource=AS{asn.TrimStart('A', 'S', 'a', 's')}";
-                var response = await client.GetAsync(url, ct);
+                using var response = await client.GetAsync(url, ct);
                 if (!response.IsSuccessStatusCode) return string.Empty;
 
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);

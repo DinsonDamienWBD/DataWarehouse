@@ -378,7 +378,7 @@ public sealed class MetabaseStrategy : DashboardStrategyBase
             };
 
             using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
-            var response = await client.PostAsync(
+            using var response = await client.PostAsync(
                 "/api/session",
                 CreateJsonContent(loginPayload),
                 cancellationToken);

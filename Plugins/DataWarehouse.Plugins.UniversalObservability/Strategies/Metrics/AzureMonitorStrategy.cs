@@ -247,7 +247,7 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
         request.Headers.Add("time-generated-field", "TimeGenerated");
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 

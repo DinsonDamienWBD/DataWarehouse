@@ -576,7 +576,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             // Examples: Sony, Rimage, Primera, Microboards APIs
 
             using var client = new System.Net.Http.HttpClient();
-            var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/inventory", ct);
+            using var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/inventory", ct);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(ct);
@@ -699,14 +699,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/load", content, ct);
+            using var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/load", content, ct);
             response.EnsureSuccessStatusCode();
         }
 
         private async Task UnloadDiscViaApiAsync(CancellationToken ct)
         {
             using var client = new System.Net.Http.HttpClient();
-            var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/unload", null, ct);
+            using var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/unload", null, ct);
             response.EnsureSuccessStatusCode();
         }
 
@@ -982,7 +982,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     using var client = new System.Net.Http.HttpClient();
                     client.Timeout = TimeSpan.FromSeconds(5);
-                    var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/status", ct);
+                    using var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/status", ct);
                     return response.IsSuccessStatusCode;
                 }
                 else if (_useScsiPassthrough)

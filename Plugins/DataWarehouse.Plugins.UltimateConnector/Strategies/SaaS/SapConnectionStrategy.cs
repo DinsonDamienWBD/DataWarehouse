@@ -107,7 +107,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             using var request = new HttpRequestMessage(HttpMethod.Head, "/sap/opu/odata/sap/");
             request.Headers.Add("X-CSRF-Token", "Fetch");
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             if (response.Headers.TryGetValues("x-csrf-token", out var tokens))
             {
                 _csrfToken = tokens.FirstOrDefault() ?? "";
@@ -135,7 +135,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 queryParams.Add($"$skip={skip.Value}");
 
             var url = $"/sap/opu/odata/sap/{servicePath}/{entitySet}?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -188,7 +188,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Add("X-CSRF-Token", _csrfToken);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SapODataResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 : "";
 
             var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}&$format=json";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -237,7 +237,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Add("X-CSRF-Token", _csrfToken);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SapIdocResult
             {
                 Success = response.IsSuccessStatusCode,

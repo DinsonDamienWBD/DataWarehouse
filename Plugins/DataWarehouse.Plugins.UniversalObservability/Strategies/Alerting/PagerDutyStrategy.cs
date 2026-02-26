@@ -60,7 +60,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/enqueue", content, ct);
+        using var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/enqueue", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -127,7 +127,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/change/enqueue", content, ct);
+            using var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/change/enqueue", content, ct);
 
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "PagerDuty is healthy" : "PagerDuty unhealthy",

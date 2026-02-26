@@ -106,7 +106,7 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
         var content = new StringContent(lineProtocol.ToString(), Encoding.UTF8, "text/plain");
         var url = $"{_url}/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ms";
 
-        var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        using var response = await _httpClient.PostAsync(url, content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -124,7 +124,7 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
         _httpClient.DefaultRequestHeaders.Accept.Clear();
         _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
 
-        var response = await _httpClient.PostAsync(url, content, ct);
+        using var response = await _httpClient.PostAsync(url, content, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -194,7 +194,7 @@ from(bucket: ""{_bucket}"")
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 

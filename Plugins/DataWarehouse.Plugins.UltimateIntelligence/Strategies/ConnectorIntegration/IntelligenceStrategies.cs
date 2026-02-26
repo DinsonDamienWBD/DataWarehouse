@@ -350,7 +350,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
     {
         if (Uri.TryCreate(location, UriKind.Absolute, out var uri))
         {
-            var response = await _httpClient.GetAsync(uri, ct);
+            using var response = await _httpClient.GetAsync(uri, ct);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
@@ -2856,7 +2856,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
         {
             var url = $"{baseUrl.TrimEnd('/')}{path}";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             var body = await response.Content.ReadAsStringAsync(ct);
 
@@ -2930,7 +2930,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
             {
                 var url = $"{baseUrl.TrimEnd('/')}{path}?limit={size}&page_size={size}";
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.IsSuccessStatusCode)
                 {

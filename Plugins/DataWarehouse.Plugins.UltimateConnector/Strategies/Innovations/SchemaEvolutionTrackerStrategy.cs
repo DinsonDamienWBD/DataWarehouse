@@ -117,7 +117,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/schema/trackers", content, ct);
+            using var response = await client.PostAsync("/api/v1/schema/trackers", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -166,7 +166,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var trackerId = handle.ConnectionInfo["tracker_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/schema/trackers/{trackerId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/schema/trackers/{trackerId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -197,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var trackerId = handle.ConnectionInfo["tracker_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/schema/trackers/{trackerId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/schema/trackers/{trackerId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

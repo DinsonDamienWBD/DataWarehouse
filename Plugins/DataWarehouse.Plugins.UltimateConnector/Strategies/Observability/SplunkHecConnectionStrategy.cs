@@ -62,7 +62,7 @@ public sealed class SplunkHecConnectionStrategy : ObservabilityConnectionStrateg
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { @event = "metric", fields = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/services/collector", content, ct);
+        using var response = await httpClient.PostAsync("/services/collector", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -71,7 +71,7 @@ public sealed class SplunkHecConnectionStrategy : ObservabilityConnectionStrateg
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(logs.Select(log => new { @event = log }));
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/services/collector/event", content, ct);
+        using var response = await httpClient.PostAsync("/services/collector/event", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

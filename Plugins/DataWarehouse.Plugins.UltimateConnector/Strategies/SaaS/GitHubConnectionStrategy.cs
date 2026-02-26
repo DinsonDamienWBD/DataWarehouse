@@ -102,7 +102,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ? $"/orgs/{org}/repos?per_page={perPage}&page={page}"
                 : $"/user/repos?per_page={perPage}&page={page}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             UpdateRateLimits(response);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (assignees != null) payload["assignees"] = assignees;
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/issues", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/issues", content, ct);
             UpdateRateLimits(response);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
@@ -167,7 +167,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (body != null) payload["body"] = body;
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/pulls", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/pulls", content, ct);
             UpdateRateLimits(response);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/hooks", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/hooks", content, ct);
             UpdateRateLimits(response);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);

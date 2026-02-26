@@ -176,7 +176,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/api/v1/pqc/session-status", ct);
+            using var response = await client.GetAsync("/api/v1/pqc/session-status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -204,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/pqc/health", ct);
+            using var response = await client.GetAsync("/api/v1/pqc/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

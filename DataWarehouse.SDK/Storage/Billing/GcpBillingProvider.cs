@@ -439,7 +439,7 @@ public sealed class GcpBillingProvider : IBillingProvider
                 ["assertion"] = jwt
             });
 
-            var response = await _httpClient.PostAsync("https://oauth2.googleapis.com/token", content, ct).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync("https://oauth2.googleapis.com/token", content, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -506,7 +506,7 @@ public sealed class GcpBillingProvider : IBillingProvider
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

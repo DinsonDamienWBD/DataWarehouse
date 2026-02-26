@@ -102,7 +102,7 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
         };
 
         var content = new StringContent(JsonSerializer.Serialize(schema), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"/{fullTableName}/schema", content, ct);
+        using var response = await _httpClient.PutAsync($"/{fullTableName}/schema", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

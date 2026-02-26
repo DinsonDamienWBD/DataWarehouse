@@ -96,7 +96,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var contentLength = response.Content.Headers.ContentLength ?? 0;
@@ -129,7 +129,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var contentLength = response.Content.Headers.ContentLength ?? 0;
@@ -187,7 +187,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, cts.Token);
+        using var response = await _httpClient.SendAsync(request, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync(cts.Token);
@@ -219,7 +219,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
             var request = new HttpRequestMessage(HttpMethod.Head, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (HttpRequestException ex)
@@ -245,7 +245,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);

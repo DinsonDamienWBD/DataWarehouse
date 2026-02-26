@@ -214,7 +214,7 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://notify.bugsnag.com", content, ct);
+            using var response = await _httpClient.PostAsync("https://notify.bugsnag.com", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

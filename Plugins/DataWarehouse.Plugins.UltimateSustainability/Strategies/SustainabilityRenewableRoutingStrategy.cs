@@ -53,7 +53,7 @@ public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"https://api.electricitymap.org/v3/power-breakdown/latest?zone={zone}", ct);
 
             if (response.IsSuccessStatusCode)

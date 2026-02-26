@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 Timeout = config.Timeout
             };
 
-            var response = await _httpClient.GetAsync("/status", ct);
+            using var response = await _httpClient.GetAsync("/status", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/status", ct);
+                using var response = await _httpClient.GetAsync("/status", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                using var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
                 if (!response.IsSuccessStatusCode)
                     return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -108,7 +108,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                using var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/druid/v2/datasources", ct);
+                using var response = await _httpClient.GetAsync("/druid/v2/datasources", ct);
                 if (!response.IsSuccessStatusCode)
                     return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);

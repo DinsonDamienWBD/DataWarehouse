@@ -205,7 +205,7 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{_host}/api/v3/projects/{_projectId}/notices?key={_projectKey}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -224,7 +224,7 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{_host}/api/v5/projects/{_projectId}/routes-stats?key={_projectKey}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

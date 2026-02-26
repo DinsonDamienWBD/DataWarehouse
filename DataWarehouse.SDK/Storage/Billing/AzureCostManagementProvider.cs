@@ -152,7 +152,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
         var responseJson = await ExecuteWithRetryAsync(async () =>
         {
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             using var doc = JsonDocument.Parse(text);
@@ -336,7 +336,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                 ["scope"] = "https://management.azure.com/.default"
             });
 
-            var response = await _httpClient.PostAsync(tokenUrl, content, ct).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync(tokenUrl, content, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -374,7 +374,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -393,7 +393,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

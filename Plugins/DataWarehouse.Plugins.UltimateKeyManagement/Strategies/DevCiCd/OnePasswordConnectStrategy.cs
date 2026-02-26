@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_config.ConnectHost}/health", cancellationToken);
+                using var response = await _httpClient.GetAsync($"{_config.ConnectHost}/health", cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -205,7 +205,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         {
             ValidateSecurityContext(context);
 
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_config.ConnectHost}/v1/vaults/{_resolvedVaultId}/items",
                 cancellationToken);
 
@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             if (string.IsNullOrEmpty(itemId))
                 return;
 
-            var response = await _httpClient.DeleteAsync(
+            using var response = await _httpClient.DeleteAsync(
                 $"{_config.ConnectHost}/v1/vaults/{_resolvedVaultId}/items/{itemId}",
                 cancellationToken);
 
@@ -285,7 +285,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         private async Task VerifyConnectionAsync(CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync($"{_config.ConnectHost}/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_config.ConnectHost}/health", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 throw new InvalidOperationException(
@@ -309,7 +309,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 throw new InvalidOperationException("Either VaultId or VaultName must be configured.");
             }
 
-            var response = await _httpClient.GetAsync($"{_config.ConnectHost}/v1/vaults", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_config.ConnectHost}/v1/vaults", cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -412,7 +412,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"{_config.ConnectHost}/v1/vaults/{_resolvedVaultId}/items",
                 content,
                 cancellationToken);

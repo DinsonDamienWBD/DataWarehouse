@@ -62,7 +62,7 @@ public sealed class ElasticsearchLoggingConnectionStrategy : ObservabilityConnec
             bulkData.AppendLine(JsonSerializer.Serialize(log));
         }
         var content = new StringContent(bulkData.ToString(), Encoding.UTF8, "application/x-ndjson");
-        var response = await httpClient.PostAsync("/_bulk", content, ct);
+        using var response = await httpClient.PostAsync("/_bulk", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

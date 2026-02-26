@@ -508,7 +508,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(json);
+                    using var jsonDoc = JsonDocument.Parse(json);
 
                     var clusterName = jsonDoc.RootElement.TryGetProperty("name", out var nameElement)
                         ? nameElement.GetString() ?? "Unknown"
@@ -607,7 +607,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("data", out var dataElement) &&
                 dataElement.TryGetProperty("access_token", out var tokenElement))
@@ -633,7 +633,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("data", out var dataElement))
             {
@@ -681,7 +681,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var response = await SendWithRetryAsync(request, ct);
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("data", out var dataElement) &&
                 dataElement.TryGetProperty("uid", out var uidElement))
@@ -705,7 +705,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var snapshots = new List<WekaSnapshot>();
 
@@ -826,7 +826,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             return new WekaClusterInfo
             {

@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/BeyondTrust/api/public/v3/ManagedAccounts");
                 request.Headers.Add("Authorization", $"PS-Auth key={_config.ApiKey}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -124,11 +124,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/BeyondTrust/api/public/v3/Requests");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             // Extract credential from response
             var credential = doc.RootElement.GetProperty("Credentials")[0].GetProperty("Password").GetString();
@@ -149,13 +149,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             ValidateSecurityContext(context);
 
             var request = CreateRequest(HttpMethod.Get, "/BeyondTrust/api/public/v3/ManagedAccounts");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var accounts = new List<string>();
             foreach (var account in doc.RootElement.EnumerateArray())
@@ -190,13 +190,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = CreateRequest(HttpMethod.Get, $"/BeyondTrust/api/public/v3/ManagedAccounts/{keyId}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 var accountName = doc.RootElement.GetProperty("AccountName").GetString() ?? keyId;
                 var systemName = doc.RootElement.TryGetProperty("SystemName", out var sn) ? sn.GetString() : null;
@@ -227,7 +227,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/BeyondTrust/api/public/v3/ManagedAccounts");
                 request.Headers.Add("Authorization", $"PS-Auth key={_config.ApiKey}");
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch

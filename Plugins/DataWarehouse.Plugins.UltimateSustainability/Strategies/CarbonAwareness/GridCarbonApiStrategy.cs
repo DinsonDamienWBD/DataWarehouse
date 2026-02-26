@@ -257,7 +257,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("auth-token", ElectricityMapsApiKey);
 
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
                 return GetFallbackData();
 
@@ -289,7 +289,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         try
         {
             var url = "https://api.carbonintensity.org.uk/intensity";
-            var response = await _httpClient.GetAsync(url, ct);
+            using var response = await _httpClient.GetAsync(url, ct);
             if (!response.IsSuccessStatusCode)
                 return GetFallbackData();
 
@@ -336,7 +336,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("auth-token", ElectricityMapsApiKey);
 
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
                 return GenerateFallbackForecast(hours);
 
@@ -370,7 +370,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         try
         {
             var url = "https://api.carbonintensity.org.uk/intensity/date";
-            var response = await _httpClient.GetAsync(url, ct);
+            using var response = await _httpClient.GetAsync(url, ct);
             if (!response.IsSuccessStatusCode)
                 return GenerateFallbackForecast(hours);
 

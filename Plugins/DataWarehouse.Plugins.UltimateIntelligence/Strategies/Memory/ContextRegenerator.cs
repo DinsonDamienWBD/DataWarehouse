@@ -790,7 +790,7 @@ public sealed class JsonRegenerationStrategy : RegenerationStrategy
             try
             {
                 // Validate and format
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 return Task.FromResult(JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch { /* Parsing failure — try other formats */ }
@@ -805,7 +805,7 @@ public sealed class JsonRegenerationStrategy : RegenerationStrategy
             var json = context.Substring(start, end - start + 1);
             try
             {
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 return Task.FromResult(JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch { /* Parsing failure — try other formats */ }

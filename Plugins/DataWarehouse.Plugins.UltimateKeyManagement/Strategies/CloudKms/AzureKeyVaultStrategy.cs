@@ -107,7 +107,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 await EnsureTokenAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, "/keys?api-version=7.4");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -120,11 +120,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         {
             await EnsureTokenAsync();
             var request = CreateRequest(HttpMethod.Get, $"/secrets/{keyId}?api-version=7.4");
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var value = doc.RootElement.GetProperty("value").GetString();
             return Convert.FromBase64String(value!);
         }
@@ -138,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Put, $"/secrets/{keyId}?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -153,11 +153,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Post, $"/keys/{kekId}/wrapkey?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var wrapped = doc.RootElement.GetProperty("value").GetString();
             return Convert.FromBase64String(wrapped!);
         }
@@ -171,11 +171,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Post, $"/keys/{kekId}/unwrapkey?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var unwrapped = doc.RootElement.GetProperty("value").GetString();
             return Convert.FromBase64String(unwrapped!);
         }
@@ -186,13 +186,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             await EnsureTokenAsync(cancellationToken);
             var request = CreateRequest(HttpMethod.Get, "/secrets?api-version=7.4");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("value", out var value))
             {
@@ -217,7 +217,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             await EnsureTokenAsync(cancellationToken);
             var request = CreateRequest(HttpMethod.Delete, $"/secrets/{keyId}?api-version=7.4");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -229,13 +229,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 await EnsureTokenAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, $"/secrets/{keyId}?api-version=7.4");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var attributes = doc.RootElement.GetProperty("attributes");
 
                 var createdAt = attributes.TryGetProperty("created", out var created)
@@ -282,11 +282,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 ["grant_type"] = "client_credentials"
             });
 
-            var response = await _httpClient.PostAsync(tokenUrl, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(tokenUrl, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             _accessToken = doc.RootElement.GetProperty("access_token").GetString();
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
             _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);

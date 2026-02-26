@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var authBytes = System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "admin"}:{config.AuthCredential}");
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             }
-            var response = await _httpClient.GetAsync("/stats", ct);
+            using var response = await _httpClient.GetAsync("/stats", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 // Query is expected to be a stream name; fetch events from the stream
                 var streamName = query.Trim();
-                var response = await _httpClient.GetAsync($"/streams/{Uri.EscapeDataString(streamName)}?embed=body", ct);
+                using var response = await _httpClient.GetAsync($"/streams/{Uri.EscapeDataString(streamName)}?embed=body", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -75,7 +75,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var eventId = Guid.NewGuid().ToString();
                 var body = $"[{{\"eventId\":\"{eventId}\",\"eventType\":\"{eventType}\",\"data\":{eventData}}}]";
                 var content = new StringContent(body, System.Text.Encoding.UTF8, "application/vnd.eventstore.events+json");
-                var response = await _httpClient.PostAsync($"/streams/{Uri.EscapeDataString(streamName)}", content, ct);
+                using var response = await _httpClient.PostAsync($"/streams/{Uri.EscapeDataString(streamName)}", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -85,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/streams", ct);
+                using var response = await _httpClient.GetAsync("/streams", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

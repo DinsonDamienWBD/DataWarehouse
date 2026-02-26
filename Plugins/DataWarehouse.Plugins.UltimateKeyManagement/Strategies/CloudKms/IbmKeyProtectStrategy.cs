@@ -117,7 +117,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -167,11 +167,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var resources = doc.RootElement.GetProperty("resources");
             var newKeyId = resources[0].GetProperty("id").GetString();
 
@@ -194,11 +194,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
             return Convert.FromBase64String(ciphertext!);
         }
@@ -219,11 +219,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -238,13 +238,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("resources", out var resources))
             {
@@ -274,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -291,13 +291,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var resources = doc.RootElement.GetProperty("resources");
                 var keyMetadata = resources[0];
 
@@ -339,11 +339,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
             tokenRequest.Content = new FormUrlEncodedContent(formData);
 
-            var response = await _httpClient.SendAsync(tokenRequest, cancellationToken);
+            using var response = await _httpClient.SendAsync(tokenRequest, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             _accessToken = doc.RootElement.GetProperty("access_token").GetString();
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();

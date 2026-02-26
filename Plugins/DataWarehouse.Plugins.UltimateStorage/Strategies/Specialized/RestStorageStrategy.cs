@@ -827,7 +827,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// </summary>
         private async Task<Stream> ParseJsonRetrieveResponse(string jsonContent, CancellationToken ct)
         {
-            var doc = JsonDocument.Parse(jsonContent);
+            using var doc = JsonDocument.Parse(jsonContent);
             var root = doc.RootElement;
 
             if (root.TryGetProperty(_jsonDataPath, out var dataElement))
@@ -861,7 +861,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
             try
             {
-                var doc = JsonDocument.Parse(content);
+                using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
 
                 // Try to extract items array
@@ -950,7 +950,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         {
             try
             {
-                var doc = JsonDocument.Parse(content);
+                using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
 
                 var size = root.TryGetProperty("size", out var sizeProp) ? sizeProp.GetInt64() : 0;

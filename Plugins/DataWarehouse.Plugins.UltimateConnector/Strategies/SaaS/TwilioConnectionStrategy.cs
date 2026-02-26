@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (statusCallbackUrl != null)
                 formData["StatusCallback"] = statusCallbackUrl;
 
-            var response = await client.PostAsync(
+            using var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Messages.json",
                 new FormUrlEncodedContent(formData), ct);
             response.EnsureSuccessStatusCode();
@@ -138,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (statusCallbackUrl != null)
                 formData["StatusCallback"] = statusCallbackUrl;
 
-            var response = await client.PostAsync(
+            using var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Calls.json",
                 new FormUrlEncodedContent(formData), ct);
             response.EnsureSuccessStatusCode();
@@ -168,7 +168,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                       $"?SmsEnabled={smsEnabled}&VoiceEnabled={voiceEnabled}";
             if (areaCode != null) url += $"&AreaCode={areaCode}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -205,7 +205,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (to != null) url += $"&To={Uri.EscapeDataString(to)}";
             if (from != null) url += $"&From={Uri.EscapeDataString(from)}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 

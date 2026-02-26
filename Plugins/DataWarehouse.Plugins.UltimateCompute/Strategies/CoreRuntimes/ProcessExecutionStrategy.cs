@@ -191,7 +191,7 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
         if (task.Metadata?.TryGetValue("function_key", out var key) == true)
             request.Headers.Add("x-functions-key", key?.ToString());
 
-        var response = await httpClient.SendAsync(request, ct);
+        using var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
 
         var output = await response.Content.ReadAsByteArrayAsync(ct);

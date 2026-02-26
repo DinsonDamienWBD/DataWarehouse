@@ -271,7 +271,7 @@ Provide insights on possible causes and patterns.";
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 var isAnomaly = doc.RootElement.TryGetProperty("is_anomaly", out var a) && a.GetBoolean();
                 var confidence = doc.RootElement.TryGetProperty("confidence", out var c) ? c.GetSingle() : 0.5f;

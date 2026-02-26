@@ -147,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
                 request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_apiKey}");
             }
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 

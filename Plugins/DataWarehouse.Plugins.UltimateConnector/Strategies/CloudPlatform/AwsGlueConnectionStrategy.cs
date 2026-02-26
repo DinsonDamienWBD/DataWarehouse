@@ -49,7 +49,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var httpClient = handle.GetConnection<HttpClient>();
             try
             {
-                var response = await httpClient.PostAsync("/", new StringContent("{}", System.Text.Encoding.UTF8, "application/x-amz-json-1.1"), ct);
+                using var response = await httpClient.PostAsync("/", new StringContent("{}", System.Text.Encoding.UTF8, "application/x-amz-json-1.1"), ct);
                 return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
             }
             catch

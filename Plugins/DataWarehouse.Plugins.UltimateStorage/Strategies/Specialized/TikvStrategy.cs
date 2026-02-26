@@ -553,7 +553,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 // Test connectivity with PD health endpoint
                 var healthUrl = $"{_currentPdLeader}/pd/health";
-                var response = await _httpClient.GetAsync(healthUrl, ct);
+                using var response = await _httpClient.GetAsync(healthUrl, ct);
 
                 sw.Stop();
 

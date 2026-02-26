@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             };
 
             // Test connection by querying volumes endpoint
-            var response = await httpClient.GetAsync("/v1/volumes", ct);
+            using var response = await httpClient.GetAsync("/v1/volumes", ct);
             response.EnsureSuccessStatusCode();
 
             var connectionInfo = new Dictionary<string, object>
@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var response = await httpClient.GetAsync("/v1/volumes", ct);
+                using var response = await httpClient.GetAsync("/v1/volumes", ct);
                 return response.IsSuccessStatusCode;
             }
             catch

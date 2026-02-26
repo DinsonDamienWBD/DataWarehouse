@@ -597,7 +597,7 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
             requestBody["scope"] = string.Join(" ", Config.OAuth2Scopes);
         }
 
-        var response = await SharedHttpClient.PostAsync(
+        using var response = await SharedHttpClient.PostAsync(
             Config.OAuth2TokenEndpoint,
             new FormUrlEncodedContent(requestBody),
             cancellationToken);

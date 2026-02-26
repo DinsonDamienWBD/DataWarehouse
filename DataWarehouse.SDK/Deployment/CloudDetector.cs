@@ -110,7 +110,7 @@ public sealed class CloudDetector : IDeploymentDetector
                 return null;
 
             // Parse JSON response
-            var json = JsonDocument.Parse(response);
+            using var json = JsonDocument.Parse(response);
             var compute = json.RootElement.GetProperty("compute");
 
             var vmId = compute.GetProperty("vmId").GetString() ?? "unknown";

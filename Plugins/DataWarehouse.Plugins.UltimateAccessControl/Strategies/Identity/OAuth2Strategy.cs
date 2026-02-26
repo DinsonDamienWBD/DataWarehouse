@@ -120,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             try
             {
-                var response = await _httpClient.GetAsync(_introspectionEndpoint, cancellationToken);
+                using var response = await _httpClient.GetAsync(_introspectionEndpoint, cancellationToken);
                 return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed;
             }
             catch
@@ -183,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
                 }
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -496,7 +496,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (_jwksCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
                 return cached.Jwks;
 
-            var response = await _httpClient.GetAsync(_jwksUri, cancellationToken);
+            using var response = await _httpClient.GetAsync(_jwksUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

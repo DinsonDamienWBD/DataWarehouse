@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 // FaunaDB uses FQL queries sent as POST to /
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -85,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 // Query for collections using FQL
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = "Paginate(Collections())" });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

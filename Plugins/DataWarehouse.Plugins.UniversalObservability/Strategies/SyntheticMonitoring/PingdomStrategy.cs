@@ -106,7 +106,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.pingdom.com/api/3.1/checks", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.pingdom.com/api/3.1/checks", content, ct);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(ct);
@@ -138,7 +138,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"https://api.pingdom.com/api/3.1/checks/{checkId}", ct);
+            using var response = await _httpClient.GetAsync($"https://api.pingdom.com/api/3.1/checks/{checkId}", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -158,7 +158,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", ct);
+            using var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -189,7 +189,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", cancellationToken);
+            using var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

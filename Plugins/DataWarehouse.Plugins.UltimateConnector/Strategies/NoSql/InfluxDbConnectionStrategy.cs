@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (config.AuthMethod == "bearer" && !string.IsNullOrEmpty(config.AuthCredential))
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Token", config.AuthCredential);
 
-            var response = await _httpClient.GetAsync("/ping", ct);
+            using var response = await _httpClient.GetAsync("/ping", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -62,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/ping", ct);
+                using var response = await _httpClient.GetAsync("/ping", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
@@ -105,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             {
                 var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
                 var content = new StringContent(query, System.Text.Encoding.UTF8, "application/vnd.flux");
-                var response = await _httpClient.PostAsync($"/api/v2/query?org={org}", content, ct);
+                using var response = await _httpClient.PostAsync($"/api/v2/query?org={org}", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -182,7 +182,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
 
                 var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
-                var response = await _httpClient.PostAsync($"/api/v2/write?bucket={bucket}&org={org}", content, ct);
+                using var response = await _httpClient.PostAsync($"/api/v2/write?bucket={bucket}&org={org}", content, ct);
 
                 return response.IsSuccessStatusCode ? 1 : -1;
             }
@@ -202,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v2/buckets", ct);
+                using var response = await _httpClient.GetAsync("/api/v2/buckets", ct);
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<DataSchema>();
 

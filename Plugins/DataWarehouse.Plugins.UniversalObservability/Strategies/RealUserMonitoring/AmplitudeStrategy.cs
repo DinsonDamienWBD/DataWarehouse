@@ -146,7 +146,7 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api2.amplitude.com/identify", content, ct);
+            using var response = await _httpClient.PostAsync("https://api2.amplitude.com/identify", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -170,7 +170,7 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api2.amplitude.com/2/httpapi", content, ct);
+            using var response = await _httpClient.PostAsync("https://api2.amplitude.com/2/httpapi", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

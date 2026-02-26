@@ -96,7 +96,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync(
+                using var response = await _httpClient.GetAsync(
                     $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
                     cancellationToken);
 
@@ -183,7 +183,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 var payload = new { timeSeries = batch };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
                     content, ct);
                 response.EnsureSuccessStatusCode();
@@ -211,7 +211,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             var payload = new { entries = batch };
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://logging.googleapis.com/v2/entries:write",
                 content, ct);
             response.EnsureSuccessStatusCode();
@@ -394,7 +394,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"https://cloudtrace.googleapis.com/v2/projects/{_projectId}/traces:batchWrite",
             content,
             cancellationToken);
@@ -457,7 +457,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync(
+                using var response = await _httpClient.GetAsync(
                     $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
                     ct);
 

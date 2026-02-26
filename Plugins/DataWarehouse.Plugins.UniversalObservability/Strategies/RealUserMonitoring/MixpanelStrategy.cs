@@ -159,7 +159,7 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
                 new KeyValuePair<string, string>("data", base64)
             });
 
-            var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -203,7 +203,7 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
                 new KeyValuePair<string, string>("data", base64)
             });
 
-            var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.mixpanel.com/engage", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -226,7 +226,7 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
                 new KeyValuePair<string, string>("data", base64)
             });
 
-            var response = await _httpClient.PostAsync("https://api.mixpanel.com/track", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.mixpanel.com/track", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

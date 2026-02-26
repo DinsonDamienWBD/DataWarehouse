@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/_cluster/health", ct);
+            using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/_cluster/health", ct);
+                using var response = await _httpClient.GetAsync("/_cluster/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
@@ -110,7 +110,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             {
                 var index = parameters?.GetValueOrDefault("index")?.ToString() ?? "_all";
                 var content = new StringContent(query, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync($"/{index}/_search", content, ct);
+                using var response = await _httpClient.PostAsync($"/{index}/_search", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -191,7 +191,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             {
                 var index = parameters?.GetValueOrDefault("index")?.ToString() ?? "default";
                 var content = new StringContent(command, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync($"/{index}/_doc", content, ct);
+                using var response = await _httpClient.PostAsync($"/{index}/_doc", content, ct);
 
                 return response.IsSuccessStatusCode ? 1 : -1;
             }
@@ -211,7 +211,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
             try
             {
-                var response = await _httpClient.GetAsync("/_mapping", ct);
+                using var response = await _httpClient.GetAsync("/_mapping", ct);
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<DataSchema>();
 

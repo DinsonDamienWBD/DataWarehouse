@@ -116,7 +116,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
             content.Headers.Add("X-Sumo-Name", _sourceName);
             content.Headers.Add("X-Sumo-Host", _sourceHost);
 
-            var response = await _httpClient.PostAsync(_collectorUrl, content, ct);
+            using var response = await _httpClient.PostAsync(_collectorUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -181,7 +181,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
             content.Headers.Add("X-Sumo-Name", _sourceName);
             content.Headers.Add("X-Sumo-Host", _sourceHost);
 
-            var response = await _httpClient.PostAsync(_collectorUrl, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(_collectorUrl, content, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

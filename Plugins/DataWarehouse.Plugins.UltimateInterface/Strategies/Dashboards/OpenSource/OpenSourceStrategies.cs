@@ -205,7 +205,7 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 
         using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
         var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
-        var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
+        using var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
         _accessToken = result.GetProperty("access_token").GetString();

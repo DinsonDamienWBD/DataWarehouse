@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/twin/sessions", content, ct);
+            using var response = await client.PostAsync("/api/v1/twin/sessions", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -176,7 +176,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var twinId = handle.ConnectionInfo["twin_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/twin/{twinId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/twin/{twinId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -218,7 +218,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var twinId = handle.ConnectionInfo["twin_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/twin/{twinId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/twin/{twinId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

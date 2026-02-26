@@ -140,7 +140,7 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
         try
         {
             var url = $"{_endpoint}/{profileType}";
-            var response = await _httpClient.GetAsync(url, ct);
+            using var response = await _httpClient.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
 
             var profileData = await response.Content.ReadAsByteArrayAsync(ct);
@@ -171,7 +171,7 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_endpoint}/", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_endpoint}/", cancellationToken);
 
             var directoryExists = Directory.Exists(_outputDirectory);
 

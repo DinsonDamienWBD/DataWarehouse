@@ -209,7 +209,7 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
             var content = new StringContent(envelope, Encoding.UTF8, "application/x-sentry-envelope");
             content.Headers.Add("X-Sentry-Auth", BuildAuthHeader(dsnUri));
 
-            var response = await _httpClient.PostAsync(sentryUrl, content, ct);
+            using var response = await _httpClient.PostAsync(sentryUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

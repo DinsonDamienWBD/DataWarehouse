@@ -113,7 +113,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 queryParams.Add($"sysparm_fields={string.Join(",", fields)}");
 
             var url = $"/api/now/table/{tableName}?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var json = JsonSerializer.Serialize(fields);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync($"/api/now/table/{tableName}", content, ct);
+            using var response = await client.PostAsync($"/api/now/table/{tableName}", content, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -185,7 +185,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new ServiceNowRecordResult
             {
                 Success = response.IsSuccessStatusCode,

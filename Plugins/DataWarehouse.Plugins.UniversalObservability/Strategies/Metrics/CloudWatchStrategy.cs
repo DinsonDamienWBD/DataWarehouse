@@ -276,7 +276,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
         request.Headers.Add("Authorization", authorizationHeader);
         request.Content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 

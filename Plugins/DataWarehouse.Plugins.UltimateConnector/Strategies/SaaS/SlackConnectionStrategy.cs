@@ -96,7 +96,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/api/chat.postMessage", content, ct);
+            using var response = await client.PostAsync("/api/chat.postMessage", content, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var url = $"/api/conversations.list?limit={limit}&exclude_archived={excludeArchived}";
             if (cursor != null) url += $"&cursor={cursor}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (title != null) form.Add(new StringContent(title), "title");
             form.Add(new ByteArrayContent(fileContent), "file", filename);
 
-            var response = await client.PostAsync("/api/files.upload", form, ct);
+            using var response = await client.PostAsync("/api/files.upload", form, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);

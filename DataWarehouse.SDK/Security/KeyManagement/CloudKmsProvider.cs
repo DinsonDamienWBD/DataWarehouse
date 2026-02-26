@@ -330,7 +330,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                 using var request = new HttpRequestMessage(HttpMethod.Get, MetadataUrl);
                 request.Headers.Add("Metadata-Flavor", "Google");
 
-                var response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -414,7 +414,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
                 new KeyValuePair<string, string>("assertion", jwt)
             });
 
-            var response = await client.PostAsync(TokenUrl, formContent, ct).ConfigureAwait(false);
+            using var response = await client.PostAsync(TokenUrl, formContent, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -432,7 +432,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
             using var request = new HttpRequestMessage(HttpMethod.Get, MetadataUrl);
             request.Headers.Add("Metadata-Flavor", "Google");
 
-            var response = await client.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

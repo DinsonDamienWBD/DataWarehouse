@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 8080);
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.GetAsync("/api/1.0/", ct);
+            using var response = await _httpClient.GetAsync("/api/1.0/", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }

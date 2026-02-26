@@ -150,7 +150,7 @@ Return JSON with predicted files:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("predictions", out var arr))
                 {
                     foreach (var item in arr.EnumerateArray())
@@ -325,7 +325,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("overall_health_score", out var h))
                     healthScore = h.GetSingle();

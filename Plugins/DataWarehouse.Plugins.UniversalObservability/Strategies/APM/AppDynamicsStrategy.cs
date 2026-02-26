@@ -53,7 +53,7 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
         };
 
         var content = new FormUrlEncodedContent(tokenRequest);
-        var response = await _httpClient.PostAsync($"{_controllerUrl}/controller/api/oauth/access_token", content, ct);
+        using var response = await _httpClient.PostAsync($"{_controllerUrl}/controller/api/oauth/access_token", content, ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -125,7 +125,7 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
         try
         {
             await EnsureAuthenticatedAsync(ct);
-            var response = await _httpClient.GetAsync($"{_controllerUrl}/controller/rest/applications", ct);
+            using var response = await _httpClient.GetAsync($"{_controllerUrl}/controller/rest/applications", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "AppDynamics is healthy" : "AppDynamics unhealthy",
                 new Dictionary<string, object> { ["controllerUrl"] = _controllerUrl, ["application"] = _applicationName });

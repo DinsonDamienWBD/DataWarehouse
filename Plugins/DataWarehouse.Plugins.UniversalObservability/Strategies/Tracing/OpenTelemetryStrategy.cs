@@ -90,7 +90,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpMetrics);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/metrics", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/metrics", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -134,7 +134,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpTraces);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/traces", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/traces", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -169,7 +169,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpLogs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/logs", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/logs", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

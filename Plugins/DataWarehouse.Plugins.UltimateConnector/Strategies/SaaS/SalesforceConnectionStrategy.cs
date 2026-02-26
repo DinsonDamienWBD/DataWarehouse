@@ -65,7 +65,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 var token = await EnsureValidTokenAsync(handle, ct);
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"/services/data/{ApiVersion}/");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                var response = await client.SendAsync(request, ct);
+                using var response = await client.SendAsync(request, ct);
                 return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
             }
             catch { return false; }
@@ -106,7 +106,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 {
                     Content = new FormUrlEncodedContent(tokenRequestBody)
                 };
-                var response = await client.SendAsync(tokenRequest, ct);
+                using var response = await client.SendAsync(tokenRequest, ct);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -144,7 +144,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 $"/services/data/{ApiVersion}/query/?q={encodedQuery}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -206,7 +206,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -240,7 +240,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SObjectResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -262,7 +262,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 $"/services/data/{ApiVersion}/sobjects/{objectType}/{objectId}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SObjectResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -341,7 +341,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 $"/services/data/{ApiVersion}/sobjects/{objectType}/describe/");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(ct);

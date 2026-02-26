@@ -73,7 +73,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/stats?format=json", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/stats?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -153,7 +153,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/certs", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/certs", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -213,7 +213,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_kialiUrl}/api/namespaces/{_namespace}/services/{_serviceName}/graph?duration=60s", ct);
 
             if (response.IsSuccessStatusCode)

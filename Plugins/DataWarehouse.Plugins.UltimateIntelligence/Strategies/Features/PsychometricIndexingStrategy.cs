@@ -319,7 +319,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("sentiment", out var sent))
                 {
@@ -389,7 +389,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 return new BigFiveScores
                 {

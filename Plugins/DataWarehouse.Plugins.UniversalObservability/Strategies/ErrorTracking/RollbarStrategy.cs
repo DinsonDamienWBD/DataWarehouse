@@ -220,7 +220,7 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api.rollbar.com/api/1/item/", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.rollbar.com/api/1/item/", content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

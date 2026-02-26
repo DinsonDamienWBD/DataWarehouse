@@ -360,7 +360,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     yield break;
 
                 var json = await response.Content.ReadAsStringAsync(ct);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (!doc.RootElement.TryGetProperty("data", out var data) ||
                     !data.TryGetProperty("__schema", out var schema) ||

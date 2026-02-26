@@ -100,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     formData[$"metadata[{key}]"] = value;
             }
 
-            var response = await client.PostAsync("/v1/customers", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/customers", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -125,7 +125,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     formData[$"metadata[{key}]"] = value;
             }
 
-            var response = await client.PostAsync("/v1/payment_intents", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/payment_intents", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -143,7 +143,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ["payment_behavior"] = paymentBehavior ?? "default_incomplete"
             };
 
-            var response = await client.PostAsync("/v1/subscriptions", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/subscriptions", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -159,7 +159,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (startingAfter != null) queryParams.Add($"starting_after={startingAfter}");
 
             var url = $"/v1/charges?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 

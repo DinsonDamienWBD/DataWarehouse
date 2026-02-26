@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             {
                 await EnsureAuthenticatedAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, "/sys/v1/health");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -187,7 +187,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 var request = CreateRequest(HttpMethod.Post, $"/crypto/v1/keys/{sobject.Kid}/export");
                 request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
@@ -236,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -278,7 +278,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -338,7 +338,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -359,7 +359,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
 
             var request = CreateRequest(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -426,7 +426,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
 
             var request = CreateRequest(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
                 return null;
@@ -440,7 +440,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         private async Task DeleteSecurityObjectAsync(string kid)
         {
             var request = CreateRequest(HttpMethod.Delete, $"/crypto/v1/keys/{kid}");
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -467,7 +467,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.AppUuid}:{_config.AppSecret}"));
                 authRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
 
-                var response = await _httpClient.SendAsync(authRequest, cancellationToken);
+                using var response = await _httpClient.SendAsync(authRequest, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);

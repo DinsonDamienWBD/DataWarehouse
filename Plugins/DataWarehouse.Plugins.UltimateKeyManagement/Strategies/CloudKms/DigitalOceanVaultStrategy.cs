@@ -120,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 // Check account access
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://api.digitalocean.com/v2/account");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -186,13 +186,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 // List projects and extract key metadata from tags
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://api.digitalocean.com/v2/projects");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<string>();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 var keyIds = new List<string>();
 

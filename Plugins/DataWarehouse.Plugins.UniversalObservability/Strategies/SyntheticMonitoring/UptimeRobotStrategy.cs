@@ -105,7 +105,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/newMonitor", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/newMonitor", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -144,7 +144,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getMonitors", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getMonitors", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -179,7 +179,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getAccountDetails", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getAccountDetails", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -216,7 +216,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/deleteMonitor", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/deleteMonitor", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);

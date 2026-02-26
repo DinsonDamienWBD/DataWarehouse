@@ -142,7 +142,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_apiUrl}/v1/actions/process-check-result";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -175,7 +175,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         try
         {
             // Query Icinga status
-            var response = await _httpClient.GetAsync($"{_apiUrl}/v1/status", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_apiUrl}/v1/status", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

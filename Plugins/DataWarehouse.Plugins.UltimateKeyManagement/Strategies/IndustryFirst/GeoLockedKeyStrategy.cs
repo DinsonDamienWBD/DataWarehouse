@@ -272,7 +272,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync();
-                var result = JsonDocument.Parse(json);
+                using var result = JsonDocument.Parse(json);
 
                 double lat, lon;
                 if (string.IsNullOrEmpty(_config.IpGeolocationApiKey))

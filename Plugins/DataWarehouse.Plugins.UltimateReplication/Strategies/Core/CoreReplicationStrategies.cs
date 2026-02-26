@@ -78,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
 
         public static PNCounterCrdt FromJson(string json)
         {
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var crdt = new PNCounterCrdt();
             var p = GCounterCrdt.FromJson(doc.RootElement.GetProperty("P").GetString() ?? "{}");
             var n = GCounterCrdt.FromJson(doc.RootElement.GetProperty("N").GetString() ?? "{}");

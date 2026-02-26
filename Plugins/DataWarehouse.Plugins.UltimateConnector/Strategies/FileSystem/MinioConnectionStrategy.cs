@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             var authHeader = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{accessKey}:{secretKey}"));
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authHeader);
 
-            var response = await httpClient.SendAsync(request, ct);
+            using var response = await httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
             var connectionInfo = new Dictionary<string, object>
@@ -88,7 +88,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var response = await httpClient.GetAsync("/minio/health/live", ct);
+                using var response = await httpClient.GetAsync("/minio/health/live", ct);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -116,7 +116,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             {
                 var httpClient = handle.GetConnection<HttpClient>();
                 var start = DateTimeOffset.UtcNow;
-                var response = await httpClient.GetAsync("/minio/health/live", ct);
+                using var response = await httpClient.GetAsync("/minio/health/live", ct);
                 var latency = DateTimeOffset.UtcNow - start;
 
                 return new ConnectionHealth(

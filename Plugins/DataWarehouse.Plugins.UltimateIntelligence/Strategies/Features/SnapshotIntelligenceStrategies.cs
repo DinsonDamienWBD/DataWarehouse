@@ -293,7 +293,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("optimal_snapshot_time", out var timeElem))
                 {
@@ -775,7 +775,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("recommended_snapshot", out var snapElem))
                 {

@@ -62,7 +62,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         };
 
         var content = new FormUrlEncodedContent(formData);
-        var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
+        using var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -82,7 +82,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         };
 
         var content = new FormUrlEncodedContent(formData);
-        var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
+        using var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -131,7 +131,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_nagiosUrl}/cgi-bin/statusjson.cgi?query=host&hostname={_hostname}", ct);
+            using var response = await _httpClient.GetAsync($"{_nagiosUrl}/cgi-bin/statusjson.cgi?query=host&hostname={_hostname}", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Nagios is accessible" : "Nagios inaccessible",
                 new Dictionary<string, object> { ["url"] = _nagiosUrl, ["hostname"] = _hostname });

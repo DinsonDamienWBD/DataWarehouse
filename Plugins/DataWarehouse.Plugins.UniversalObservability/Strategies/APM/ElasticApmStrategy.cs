@@ -179,7 +179,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
             var content = new StringContent(sb.ToString(), Encoding.UTF8, "application/x-ndjson");
             var url = $"{_serverUrl}/intake/v2/events";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException)
@@ -197,7 +197,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_serverUrl}/", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_serverUrl}/", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

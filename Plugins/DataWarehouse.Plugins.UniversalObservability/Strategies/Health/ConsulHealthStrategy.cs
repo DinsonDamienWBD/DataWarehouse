@@ -64,7 +64,7 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(service);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_consulUrl}/v1/agent/service/register", content, ct);
+        using var response = await _httpClient.PutAsync($"{_consulUrl}/v1/agent/service/register", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -116,7 +116,7 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     {
         var url = $"{_consulUrl}/v1/health/service/{serviceName}";
         if (passingOnly) url += "?passing=true";
-        var response = await _httpClient.GetAsync(url, ct);
+        using var response = await _httpClient.GetAsync(url, ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -126,7 +126,7 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     /// </summary>
     public async Task<string> GetHealthChecksByStateAsync(string state = "any", CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_consulUrl}/v1/health/state/{state}", ct);
+        using var response = await _httpClient.GetAsync($"{_consulUrl}/v1/health/state/{state}", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -165,7 +165,7 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_consulUrl}/v1/agent/self", ct);
+            using var response = await _httpClient.GetAsync($"{_consulUrl}/v1/agent/self", ct);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<JsonElement>(content);

@@ -63,7 +63,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(metricPayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("metric")}/metric/v1", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{GetEndpoint("metric")}/metric/v1", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -93,7 +93,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(tracePayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("trace")}/trace/v1", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{GetEndpoint("trace")}/trace/v1", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -121,7 +121,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(logPayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("log")}/log/v1", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{GetEndpoint("log")}/log/v1", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

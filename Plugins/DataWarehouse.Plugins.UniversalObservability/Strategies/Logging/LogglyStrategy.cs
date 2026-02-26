@@ -92,7 +92,7 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{_endpoint}/bulk/{_token}/tag/{_tag}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -139,7 +139,7 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -168,7 +168,7 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_endpoint}/inputs/{_token}/tag/{_tag}";
 
-            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(url, content, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

@@ -125,7 +125,7 @@ public sealed class BareMetalDetector : IDeploymentDetector
             // Quick check for cloud metadata endpoint (169.254.169.254)
             // If this responds, we're in a cloud VM, not bare metal
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(100) };
-            var response = await httpClient.GetAsync("http://169.254.169.254/", ct);
+            using var response = await httpClient.GetAsync("http://169.254.169.254/", ct);
             return response.IsSuccessStatusCode;
         }
         catch

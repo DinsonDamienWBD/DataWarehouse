@@ -63,7 +63,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { series = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/api/v1/series", content, ct);
+        using var response = await httpClient.PostAsync("/api/v1/series", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -72,7 +72,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(logs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/input", content, ct);
+        using var response = await httpClient.PostAsync("/v1/input", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -81,7 +81,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(traces);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v0.3/traces", content, ct);
+        using var response = await httpClient.PostAsync("/v0.3/traces", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

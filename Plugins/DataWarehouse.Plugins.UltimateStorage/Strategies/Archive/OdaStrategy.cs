@@ -518,7 +518,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 content.Add(new StringContent(metadataJson), "metadata");
             }
 
-            var response = await _httpClient.PostAsync("/api/v1/objects/store", content, ct);
+            using var response = await _httpClient.PostAsync("/api/v1/objects/store", content, ct);
             response.EnsureSuccessStatusCode();
 
             var storeResponse = await response.Content.ReadFromJsonAsync<StoreResponse>(ct);
@@ -543,7 +543,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
-            var response = await _httpClient.GetAsync($"/api/v1/objects/retrieve?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
+            using var response = await _httpClient.GetAsync($"/api/v1/objects/retrieve?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
             response.EnsureSuccessStatusCode();
 
             // Read into memory for proper stream management
@@ -560,7 +560,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
-            var response = await _httpClient.DeleteAsync($"/api/v1/objects/delete?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
+            using var response = await _httpClient.DeleteAsync($"/api/v1/objects/delete?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
             response.EnsureSuccessStatusCode();
         }
 
@@ -665,7 +665,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v1/library/inventory", ct);
+                using var response = await _httpClient.GetAsync("/api/v1/library/inventory", ct);
                 response.EnsureSuccessStatusCode();
 
                 var inventory = await response.Content.ReadFromJsonAsync<List<CartridgeInventoryItem>>(ct);
@@ -814,7 +814,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v1/system/health", ct);
+                using var response = await _httpClient.GetAsync("/api/v1/system/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)

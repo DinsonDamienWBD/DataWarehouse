@@ -111,7 +111,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/rest/api/3/search", content, ct);
+            using var response = await client.PostAsync("/rest/api/3/search", content, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -179,7 +179,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var body = JsonSerializer.Serialize(new { fields });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/rest/api/3/issue", content, ct);
+            using var response = await client.PostAsync("/rest/api/3/issue", content, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
             };
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new JiraIssueResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -227,7 +227,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var body = JsonSerializer.Serialize(new { transition = new { id = transitionId } });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync($"/rest/api/3/issue/{issueKeyOrId}/transitions", content, ct);
+            using var response = await client.PostAsync($"/rest/api/3/issue/{issueKeyOrId}/transitions", content, ct);
             return new JiraIssueResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -243,7 +243,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             CancellationToken ct = default)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync($"/rest/agile/1.0/board/{boardId}/sprint?state=active", ct);
+            using var response = await client.GetAsync($"/rest/agile/1.0/board/{boardId}/sprint?state=active", ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -288,7 +288,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync("/rest/webhooks/1.0/webhook", content, ct);
+            using var response = await client.PostAsync("/rest/webhooks/1.0/webhook", content, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 

@@ -483,7 +483,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(ct);
-                var jsonDoc = JsonDocument.Parse(json);
+                using var jsonDoc = JsonDocument.Parse(json);
 
                 if (jsonDoc.RootElement.TryGetProperty("items", out var items))
                 {
@@ -542,7 +542,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items))
             {
@@ -582,7 +582,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("Contents", out var contents))
             {
@@ -639,7 +639,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
             {
@@ -731,7 +731,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(json);
+                    using var jsonDoc = JsonDocument.Parse(json);
 
                     string arrayName = "Unknown";
                     if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
@@ -809,7 +809,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
             {
@@ -855,7 +855,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var response = await SendWithRetryAsync(request, ct);
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
             {
@@ -880,7 +880,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var snapshots = new List<PureSnapshotInfo>();
 
@@ -929,7 +929,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
             {
@@ -1073,7 +1073,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
             {

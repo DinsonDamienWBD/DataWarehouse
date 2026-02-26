@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             _httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             if (!string.IsNullOrEmpty(config.AuthCredential))
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
-            var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct);
+            using var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["workspace_url"] = config.ConnectionString });
         }

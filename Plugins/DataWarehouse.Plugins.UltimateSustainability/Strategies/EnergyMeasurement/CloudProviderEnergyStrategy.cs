@@ -248,7 +248,7 @@ public sealed class CloudProviderEnergyStrategy : SustainabilityStrategyBase
             // Get instance type with token
             var request = new HttpRequestMessage(HttpMethod.Get, "http://169.254.169.254/latest/meta-data/instance-type");
             request.Headers.Add("X-aws-ec2-metadata-token", token);
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
  response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
@@ -266,7 +266,7 @@ public sealed class CloudProviderEnergyStrategy : SustainabilityStrategyBase
             var request = new HttpRequestMessage(HttpMethod.Get,
                 "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-02-01&format=text");
             request.Headers.Add("Metadata", "true");
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
  response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
@@ -284,7 +284,7 @@ public sealed class CloudProviderEnergyStrategy : SustainabilityStrategyBase
             var request = new HttpRequestMessage(HttpMethod.Get,
                 "http://metadata.google.internal/computeMetadata/v1/instance/machine-type");
             request.Headers.Add("Metadata-Flavor", "Google");
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             var fullType = await response.Content.ReadAsStringAsync(ct);
             // Returns format: projects/PROJECT_NUM/zones/ZONE/machineTypes/TYPE

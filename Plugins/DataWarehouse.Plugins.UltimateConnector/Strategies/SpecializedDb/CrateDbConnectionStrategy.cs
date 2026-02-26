@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 4200);
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct);
+            using var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return 0;
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = "SELECT table_schema, table_name, column_name, data_type FROM information_schema.columns" });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

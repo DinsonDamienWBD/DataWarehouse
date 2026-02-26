@@ -125,7 +125,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             };
 
             var url = $"https://intake.profile.{_site}/v1/input";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -144,7 +144,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"https://intake.profile.{_site}/v1/input";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -177,7 +177,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var testContent = new StringContent("{}", Encoding.UTF8, "application/json");
             var url = $"https://api.{_site}/api/v1/validate";
 
-            var response = await _httpClient.PostAsync(url, testContent, cancellationToken);
+            using var response = await _httpClient.PostAsync(url, testContent, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

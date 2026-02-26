@@ -58,7 +58,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(lines.ToString(), Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/metrics/ingest", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/metrics/ingest", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -105,7 +105,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(traceData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/otlp/v1/traces", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/otlp/v1/traces", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -133,7 +133,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(logs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/logs/ingest", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/logs/ingest", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -141,7 +141,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_environmentUrl}/api/v2/activeGates", ct);
+            using var response = await _httpClient.GetAsync($"{_environmentUrl}/api/v2/activeGates", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Dynatrace is healthy" : "Dynatrace unhealthy",
                 new Dictionary<string, object> { ["environmentUrl"] = _environmentUrl });

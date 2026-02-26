@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 9000);
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.GetAsync("/exec?query=SELECT%201", ct);
+            using var response = await _httpClient.GetAsync("/exec?query=SELECT%201", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }

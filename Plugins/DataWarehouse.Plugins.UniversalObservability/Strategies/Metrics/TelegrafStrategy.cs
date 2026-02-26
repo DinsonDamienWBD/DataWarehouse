@@ -81,7 +81,7 @@ public sealed class TelegrafStrategy : ObservabilityStrategyBase
         var contentType = _format == OutputFormat.Json ? "application/json" : "text/plain";
         var httpContent = new StringContent(content, Encoding.UTF8, contentType);
 
-        var response = await _httpClient.PostAsync(_url, httpContent, cancellationToken);
+        using var response = await _httpClient.PostAsync(_url, httpContent, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

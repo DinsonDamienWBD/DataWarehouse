@@ -131,7 +131,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         // Test cluster health endpoint
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/_cluster/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/_cluster/health", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 throw new InvalidOperationException($"Elasticsearch cluster health check failed with status {response.StatusCode}");
@@ -208,7 +208,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
                     }
 
                     var content = new StringContent(bulkBody.ToString(), Encoding.UTF8, "application/x-ndjson");
-                    var response = await _httpClient.PostAsync($"{_url}/_bulk", content, ct);
+                    using var response = await _httpClient.PostAsync($"{_url}/_bulk", content, ct);
                     response.EnsureSuccessStatusCode();
 
                     // Check for partial failures in bulk response
@@ -355,7 +355,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         });
 
         var content = new StringContent(searchBody, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -426,7 +426,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         });
 
         var content = new StringContent(aggBody, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -472,7 +472,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         };
 
         var content = new StringContent(JsonSerializer.Serialize(template), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_url}/_index_template/{_indexPrefix}-template", content, ct);
+        using var response = await _httpClient.PutAsync($"{_url}/_index_template/{_indexPrefix}-template", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -495,7 +495,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_url}/_cluster/health", ct);
+                using var response = await _httpClient.GetAsync($"{_url}/_cluster/health", ct);
                 response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 var health = JsonSerializer.Deserialize<JsonElement>(content);

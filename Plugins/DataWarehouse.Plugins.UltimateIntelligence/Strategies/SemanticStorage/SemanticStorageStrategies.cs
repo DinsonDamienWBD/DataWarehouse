@@ -2310,7 +2310,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             // Try to parse as JSON first
             try
             {
-                var jsonDoc = JsonDocument.Parse(content);
+                using var jsonDoc = JsonDocument.Parse(content);
                 var jsonLd = $"{{\n  {context},\n  \"@type\": \"Thing\",\n  {content.Trim().TrimStart('{').TrimEnd('}')}}}";
                 return Task.FromResult(jsonLd);
             }
@@ -2387,7 +2387,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         // Try JSON extraction
         try
         {
-            var jsonDoc = JsonDocument.Parse(content);
+            using var jsonDoc = JsonDocument.Parse(content);
             foreach (var property in jsonDoc.RootElement.EnumerateObject())
             {
                 fields[property.Name] = property.Value.ToString();

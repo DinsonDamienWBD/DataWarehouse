@@ -85,7 +85,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection with admin ping
-        var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
+        using var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -117,7 +117,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         var queryString = string.Join("&", queryParams.Select(p =>
             $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
 
-        var response = await _httpClient.GetAsync($"/{_collection}/select?{queryString}", ct);
+        using var response = await _httpClient.GetAsync($"/{_collection}/select?{queryString}", ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -171,7 +171,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Parse command as JSON for updates
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/{_collection}/update?commit=true", content, ct);
+        using var response = await _httpClient.PostAsync($"/{_collection}/update?commit=true", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -207,7 +207,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
+            using var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -294,7 +294,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection
-        var response = await _httpClient.GetAsync("/health", ct);
+        using var response = await _httpClient.GetAsync("/health", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -372,7 +372,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Assume command is JSON for document operations
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/indexes/{_index}/documents", content, ct);
+        using var response = await _httpClient.PostAsync($"/indexes/{_index}/documents", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -408,7 +408,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -489,7 +489,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         _httpClient.DefaultRequestHeaders.Add("X-TYPESENSE-API-KEY", parameters.Password ?? "");
 
         // Verify connection
-        var response = await _httpClient.GetAsync("/health", ct);
+        using var response = await _httpClient.GetAsync("/health", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -520,7 +520,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         var queryString = string.Join("&", searchParams.Select(p =>
             $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
 
-        var response = await _httpClient.GetAsync($"/collections/{_collection}/documents/search?{queryString}", ct);
+        using var response = await _httpClient.GetAsync($"/collections/{_collection}/documents/search?{queryString}", ct);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -573,7 +573,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
             throw new InvalidOperationException("Not connected");
 
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/collections/{_collection}/documents", content, ct);
+        using var response = await _httpClient.PostAsync($"/collections/{_collection}/documents", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -609,7 +609,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch

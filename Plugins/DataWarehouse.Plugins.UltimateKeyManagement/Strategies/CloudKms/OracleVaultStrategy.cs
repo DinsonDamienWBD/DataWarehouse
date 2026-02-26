@@ -135,7 +135,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys/{_config.KeyOcid}";
                 var request = CreateSignedRequest(HttpMethod.Get, url, null);
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -159,7 +159,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             // Return the plain key (in a real scenario, you'd store the ciphertext and decrypt when needed)
@@ -183,11 +183,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var newKeyId = doc.RootElement.GetProperty("id").GetString();
 
             _currentKeyId = newKeyId ?? keyId;
@@ -206,11 +206,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
             return Convert.FromBase64String(ciphertext!);
         }
@@ -228,11 +228,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -243,13 +243,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys?compartmentId={_config.CompartmentOcid}";
             var request = CreateSignedRequest(HttpMethod.Get, url, null);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.ValueKind == JsonValueKind.Array)
             {
@@ -281,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -294,13 +294,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 var keyOcid = string.IsNullOrEmpty(keyId) || keyId == _config.KeyOcid ? _config.KeyOcid : keyId;
                 var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys/{keyOcid}";
                 var request = CreateSignedRequest(HttpMethod.Get, url, null);
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 var createdAt = doc.RootElement.TryGetProperty("timeCreated", out var created)
                     ? DateTime.Parse(created.GetString()!)

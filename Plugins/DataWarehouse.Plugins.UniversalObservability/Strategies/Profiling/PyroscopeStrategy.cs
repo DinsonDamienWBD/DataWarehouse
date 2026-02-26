@@ -105,7 +105,7 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
                       $"&spyName=dotnet" +
                       $"&sampleRate=100";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -128,7 +128,7 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
                       $"&from={DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds()}" +
                       $"&until={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -144,7 +144,7 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_serverUrl}/healthz", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_serverUrl}/healthz", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

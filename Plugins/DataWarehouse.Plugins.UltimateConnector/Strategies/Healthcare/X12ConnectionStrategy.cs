@@ -78,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             var url = string.IsNullOrEmpty(query) ? $"/x12/{resourceType}" : $"/x12/{resourceType}?{query}";
             try
             {
-                var response = await client.GetAsync(url, ct);
+                using var response = await client.GetAsync(url, ct);
  response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync(ct);
             }

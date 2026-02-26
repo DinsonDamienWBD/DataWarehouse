@@ -146,7 +146,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/compression/negotiate", content, ct);
+            using var response = await client.PostAsync("/api/v1/compression/negotiate", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -183,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/compression/sessions/{sessionId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/compression/sessions/{sessionId}/status", ct);
             return response.IsSuccessStatusCode;
         }
 
@@ -211,7 +211,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/compression/sessions/{sessionId}/stats", ct);
+            using var response = await client.GetAsync($"/api/v1/compression/sessions/{sessionId}/stats", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

@@ -232,7 +232,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
             var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
 
-            var response = await _httpClient.SendAsync(request, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
             var loginResponse = await response.Content.ReadFromJsonAsync<WattTimeLoginResponse>(cancellationToken: ct);
@@ -262,7 +262,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
                     $"{ApiEndpoint}/signal-index?region={Uri.EscapeDataString(balancingAuthority)}&signal_type=co2_moer");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.StatusCode == HttpStatusCode.Unauthorized)
                 {
@@ -333,7 +333,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
                     $"{ApiEndpoint}/forecast?region={Uri.EscapeDataString(balancingAuthority)}");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxRetries)
                 {

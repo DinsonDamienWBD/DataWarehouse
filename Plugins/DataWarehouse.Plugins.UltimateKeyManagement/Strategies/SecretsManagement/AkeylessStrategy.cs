@@ -126,7 +126,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/get-secret-value");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -151,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/create-secret");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -172,7 +172,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/encrypt");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -197,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/decrypt");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -223,7 +223,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var request = CreateRequest(HttpMethod.Post, "/list-items");
                 request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<string>();
@@ -277,7 +277,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/delete-item");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var request = CreateRequest(HttpMethod.Post, "/describe-item");
                 request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -358,7 +358,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.GatewayUrl}/auth");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -371,7 +371,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.GatewayUrl}/status");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch

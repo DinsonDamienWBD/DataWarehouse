@@ -172,7 +172,7 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
 
             if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput))
             {
-                var json = JsonDocument.Parse(result.StandardOutput);
+                using var json = JsonDocument.Parse(result.StandardOutput);
                 if (json.RootElement.TryGetProperty("data", out var data) &&
                     data.ValueKind == JsonValueKind.Array)
                 {

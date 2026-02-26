@@ -360,7 +360,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 profile.WorkloadType = doc.RootElement.TryGetProperty("workload_type", out var wt) ? wt.GetString() ?? "MIXED" : "MIXED";
                 profile.ApplicationSignature = doc.RootElement.TryGetProperty("application_signature", out var ap) ? ap.GetString() ?? "general" : "general";
@@ -404,7 +404,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("predicted_iops", out var iops))
                     prediction.PredictedIops = iops.EnumerateArray().Select(e => e.GetDouble()).ToList();
@@ -659,7 +659,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("recommended_tier", out var tier))
                     recommendation.RecommendedTier = tier.GetString() ?? fallbackTier;
@@ -699,7 +699,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("daily_probabilities", out var probs))
                     prediction.DailyAccessProbabilities = probs.EnumerateArray().Select(e => e.GetDouble()).ToList();

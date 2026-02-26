@@ -239,7 +239,7 @@ Return your classification as JSON with format:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("classifications", out var arr))
                 {

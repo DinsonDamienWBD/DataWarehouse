@@ -65,7 +65,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/stats?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/stats?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -109,7 +109,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/clusters?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/clusters?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -220,7 +220,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/listeners?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/listeners?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -268,7 +268,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/server_info", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/server_info", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -303,7 +303,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.PostAsync($"{_adminUrl}/drain_listeners", null, ct);
+            using var response = await _httpClient.PostAsync($"{_adminUrl}/drain_listeners", null, ct);
             return response.IsSuccessStatusCode;
         }
         catch

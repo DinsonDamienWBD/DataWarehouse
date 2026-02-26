@@ -213,7 +213,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             connState.TotalRequests++;
             try
             {
-                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
+                using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
 
                 // Parse rate limit info from every response
                 var rateLimitInfo = ParseRateLimitHeaders(response);

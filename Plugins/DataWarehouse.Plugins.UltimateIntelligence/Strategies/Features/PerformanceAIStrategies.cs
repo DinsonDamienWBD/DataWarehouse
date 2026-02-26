@@ -374,7 +374,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("recommended_batch_size", out var bs))
                     optimization.RecommendedBatchSize = bs.GetInt32();
@@ -732,7 +732,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("pattern_detected", out var pat))
                     update.DetectedPattern = pat.GetString() ?? "unknown";
@@ -770,7 +770,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("prefetch_candidates", out var candidates))
                     prediction.PrefetchCandidates = candidates.EnumerateArray().Select(e => e.GetInt64()).ToList();
@@ -913,7 +913,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("bottleneck", out var bn))
                     optimization.IdentifiedBottleneck = bn.GetString();

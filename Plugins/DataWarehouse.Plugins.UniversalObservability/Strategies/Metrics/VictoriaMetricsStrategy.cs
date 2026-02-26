@@ -85,7 +85,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(sb.ToString(), Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"{_url}/api/v1/import/prometheus", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/api/v1/import/prometheus", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -110,7 +110,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(sb.ToString(), Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"{_url}/write", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/write", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -129,7 +129,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
             queryParams += $"&time={time.Value.ToUnixTimeSeconds()}";
         }
 
-        var response = await _httpClient.GetAsync($"{_url}/api/v1/query?{queryParams}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v1/query?{queryParams}", ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -152,7 +152,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
                          $"&end={end.ToUnixTimeSeconds()}" +
                          $"&step={step.TotalSeconds}s";
 
-        var response = await _httpClient.GetAsync($"{_url}/api/v1/query_range?{queryParams}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v1/query_range?{queryParams}", ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -165,7 +165,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
     /// <returns>List of metric names.</returns>
     public async Task<string[]> GetMetricNamesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v1/label/__name__/values", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v1/label/__name__/values", ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -217,7 +217,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

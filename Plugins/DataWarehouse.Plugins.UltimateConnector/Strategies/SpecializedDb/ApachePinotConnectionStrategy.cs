@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 9000);
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
@@ -62,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { sql = query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/query/sql", content, ct);
+                using var response = await _httpClient.PostAsync("/query/sql", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -96,7 +96,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { sql = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/query/sql", content, ct);
+                using var response = await _httpClient.PostAsync("/query/sql", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -107,7 +107,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/tables", ct);
+                using var response = await _httpClient.GetAsync("/tables", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

@@ -161,7 +161,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 using var httpClient = new System.Net.Http.HttpClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-                var response = await httpClient.GetAsync($"{registryEndpoint}/health", ct);
+                using var response = await httpClient.GetAsync($"{registryEndpoint}/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch

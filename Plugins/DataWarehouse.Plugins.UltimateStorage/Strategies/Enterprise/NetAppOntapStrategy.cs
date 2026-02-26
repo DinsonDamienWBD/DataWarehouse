@@ -498,7 +498,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("records", out var records))
             {
@@ -538,7 +538,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("Contents", out var contents))
             {
@@ -594,7 +594,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var size = jsonDoc.RootElement.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
             var modified = jsonDoc.RootElement.TryGetProperty("modified_time", out var modElement)
@@ -677,7 +677,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(json);
+                    using var jsonDoc = JsonDocument.Parse(json);
 
                     var clusterName = jsonDoc.RootElement.TryGetProperty("name", out var nameElement)
                         ? nameElement.GetString() ?? "Unknown"
@@ -750,7 +750,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var response = await SendWithRetryAsync(request, ct);
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("records", out var records) && records.GetArrayLength() > 0)
             {
@@ -774,7 +774,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("space", out var spaceElement))
             {
@@ -807,7 +807,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var response = await SendWithRetryAsync(request, ct);
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("uuid", out var uuidElement))
             {
@@ -829,7 +829,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var snapshots = new List<SnapshotInfo>();
 
@@ -877,7 +877,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("records", out var records) && records.GetArrayLength() > 0)
             {

@@ -127,7 +127,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
         request.Headers.Add("Authorization", authorization);
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 

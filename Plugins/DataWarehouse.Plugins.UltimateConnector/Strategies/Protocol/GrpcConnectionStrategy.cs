@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             try
             {
-                var response = await client.SendAsync(healthRequest, ct);
+                using var response = await client.SendAsync(healthRequest, ct);
                 // For gRPC, we expect HTTP 200 with grpc-status header, or at least HTTP/2 connection success
                 // Even if the health endpoint isn't implemented, HTTP/2 connection success is sufficient
                 if (response.Version.Major < 2)
@@ -112,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             try
             {
-                var response = await client.SendAsync(healthRequest, ct);
+                using var response = await client.SendAsync(healthRequest, ct);
                 return response.Version.Major >= 2;
             }
             catch

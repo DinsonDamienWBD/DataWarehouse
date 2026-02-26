@@ -67,7 +67,7 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
     {
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json-rpc");
-        var response = await _httpClient.PostAsync(_apiUrl, content, ct);
+        using var response = await _httpClient.PostAsync(_apiUrl, content, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }

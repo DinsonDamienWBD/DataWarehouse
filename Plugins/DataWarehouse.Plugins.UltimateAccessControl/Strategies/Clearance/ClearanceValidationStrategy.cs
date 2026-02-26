@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
                     "application/json"
                 );
 
-                var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+                using var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var responseData = await response.Content.ReadAsStringAsync(cancellationToken);

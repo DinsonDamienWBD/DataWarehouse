@@ -131,7 +131,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_agentEndpoint}{endpoint}";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -147,7 +147,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_agentEndpoint}/", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_agentEndpoint}/", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 8080);
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.GetAsync("/ignite?cmd=version", ct);
+            using var response = await _httpClient.GetAsync("/ignite?cmd=version", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedQuery = Uri.EscapeDataString(query);
-                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&pageSize=1000&qry={encodedQuery}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&pageSize=1000&qry={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedCmd = Uri.EscapeDataString(command);
-                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -69,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/ignite?cmd=top&attr=true", ct);
+                using var response = await _httpClient.GetAsync("/ignite?cmd=top&attr=true", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

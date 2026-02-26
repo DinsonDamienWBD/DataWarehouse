@@ -378,7 +378,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private async Task<QkdChannelStatus> GetIdQuantiqueStatus(CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"/api/v1/keys/{_config.SaeId}/status",
                 cancellationToken);
 
@@ -404,7 +404,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private async Task<QkdChannelStatus> GetToshibaStatus(CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"/qkd/v1/channels/{_config.QuantumChannelId}/status",
                 cancellationToken);
 

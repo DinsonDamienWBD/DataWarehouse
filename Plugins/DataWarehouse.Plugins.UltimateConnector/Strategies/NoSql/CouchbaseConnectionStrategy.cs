@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/pools", ct);
+            using var response = await _httpClient.GetAsync("/pools", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/pools", ct);
+                using var response = await _httpClient.GetAsync("/pools", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
@@ -117,7 +117,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/query/service", content, ct);
+                using var response = await _httpClient.PostAsync("/query/service", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/query/service", content, ct);
+                using var response = await _httpClient.PostAsync("/query/service", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                     return -1;
@@ -227,7 +227,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
             try
             {
-                var response = await _httpClient.GetAsync("/pools/default/buckets", ct);
+                using var response = await _httpClient.GetAsync("/pools/default/buckets", ct);
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<DataSchema>();
 

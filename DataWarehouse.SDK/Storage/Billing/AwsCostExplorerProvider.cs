@@ -349,7 +349,7 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
             var authorization = $"AWS4-HMAC-SHA256 Credential={_accessKeyId}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
             request.Headers.TryAddWithoutValidation("Authorization", authorization);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

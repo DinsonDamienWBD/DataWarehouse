@@ -49,7 +49,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var httpClient = handle.GetConnection<HttpClient>();
             try
             {
-                var response = await httpClient.GetAsync("/2015-03-31/functions", ct);
+                using var response = await httpClient.GetAsync("/2015-03-31/functions", ct);
                 return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
             }
             catch

@@ -141,7 +141,7 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
         {
             var content = new StringContent(metricsText, Encoding.UTF8, "text/plain");
             var url = $"{_pushGatewayUrl}/metrics/job/{_jobName}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }, ct);
     }
@@ -240,7 +240,7 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_pushGatewayUrl}/-/ready", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_pushGatewayUrl}/-/ready", cancellationToken);
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
                 Description: response.IsSuccessStatusCode ? "Prometheus PushGateway is healthy" : "PushGateway unhealthy",

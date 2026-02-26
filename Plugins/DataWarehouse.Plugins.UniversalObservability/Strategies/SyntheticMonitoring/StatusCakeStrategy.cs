@@ -109,7 +109,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api.statuscake.com/v1/uptime", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.statuscake.com/v1/uptime", content, ct);
             response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync(ct);
@@ -140,7 +140,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.statuscake.com/v1/uptime", ct);
+            using var response = await _httpClient.GetAsync("https://api.statuscake.com/v1/uptime", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -168,7 +168,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"https://api.statuscake.com/v1/uptime/{testId}/history", ct);
+            using var response = await _httpClient.GetAsync($"https://api.statuscake.com/v1/uptime/{testId}/history", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -205,7 +205,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api.statuscake.com/v1/pagespeed", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.statuscake.com/v1/pagespeed", content, ct);
             response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync(ct);
@@ -237,7 +237,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"https://api.statuscake.com/v1/uptime/{testId}", ct);
+            using var response = await _httpClient.DeleteAsync($"https://api.statuscake.com/v1/uptime/{testId}", ct);
             return response.IsSuccessStatusCode;
         }
         catch (HttpRequestException)
@@ -251,7 +251,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.statuscake.com/v1/uptime", cancellationToken);
+            using var response = await _httpClient.GetAsync("https://api.statuscake.com/v1/uptime", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

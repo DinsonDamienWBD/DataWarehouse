@@ -162,7 +162,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/zt/verify-session", ct);
+            using var response = await client.GetAsync("/api/v1/zt/verify-session", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -192,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/zt/session-health", ct);
+            using var response = await client.GetAsync("/api/v1/zt/session-health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)
@@ -271,7 +271,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 try
                 {
-                    var response = await client.PostAsync("/api/v1/zt/reauthenticate", null);
+                    using var response = await client.PostAsync("/api/v1/zt/reauthenticate", null);
                     if (response.IsSuccessStatusCode)
                     {
                         var result = await response.Content.ReadFromJsonAsync<JsonElement>();

@@ -108,7 +108,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
         var payload = JsonSerializer.Serialize(new { streams = lokiStreams });
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync($"{_url}/loki/api/v1/push", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_url}/loki/api/v1/push", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -129,7 +129,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
                          $"&end={end.ToUnixTimeMilliseconds() * 1_000_000}" +
                          $"&limit={limit}";
 
-        var response = await _httpClient.GetAsync($"{_url}/loki/api/v1/query_range?{queryParams}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/loki/api/v1/query_range?{queryParams}", ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -162,7 +162,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
     /// <returns>List of label names.</returns>
     public async Task<string[]> GetLabelNamesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/loki/api/v1/labels", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/loki/api/v1/labels", ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -243,7 +243,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/ready", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/ready", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

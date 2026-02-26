@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
+            using var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -67,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
+                using var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { /* Connection test failed - return false */ return false; }
@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedQuery = Uri.EscapeDataString(query + " FORMAT JSONEachRow");
-                var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
+                using var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 var results = new List<Dictionary<string, object?>>();
@@ -119,7 +119,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { /* Non-query execution failed - return 0 */ return 0; }
@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var query = Uri.EscapeDataString("SELECT database, table, name, type FROM system.columns FORMAT JSONEachRow");
-                var response = await _httpClient.GetAsync($"/?query={query}", ct);
+                using var response = await _httpClient.GetAsync($"/?query={query}", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 var tableColumns = new Dictionary<string, List<DataSchemaField>>();

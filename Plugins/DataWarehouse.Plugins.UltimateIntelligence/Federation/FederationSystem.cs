@@ -508,7 +508,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
 
         try
         {
-            var response = await httpClient.GetAsync("/health", ct);
+            using var response = await httpClient.GetAsync("/health", ct);
             sw.Stop();
 
             if (response.IsSuccessStatusCode)
@@ -939,7 +939,7 @@ public sealed class FederationProtocol : IAsyncDisposable
                 instance.TotalRequests++;
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync("/federation/message", content, ct);
+                using var response = await httpClient.PostAsync("/federation/message", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {

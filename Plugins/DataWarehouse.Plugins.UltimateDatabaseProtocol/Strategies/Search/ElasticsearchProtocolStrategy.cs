@@ -116,11 +116,11 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection and get cluster info
-        var response = await _httpClient.GetAsync("/", ct);
+        using var response = await _httpClient.GetAsync("/", ct);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(ct);
-        var info = JsonDocument.Parse(content);
+        using var info = JsonDocument.Parse(content);
 
         if (info.RootElement.TryGetProperty("cluster_name", out var clusterName))
             _clusterName = clusterName.GetString() ?? "";
@@ -434,7 +434,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var doc = JsonDocument.Parse(responseBody);
+            using var doc = JsonDocument.Parse(responseBody);
             var root = doc.RootElement;
 
             switch (operationType)
@@ -649,7 +649,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync("/_cluster/health", ct);
+            using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -772,11 +772,11 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
                 new AuthenticationHeaderValue("Basic", credentials);
         }
 
-        var response = await _httpClient.GetAsync("/", ct);
+        using var response = await _httpClient.GetAsync("/", ct);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(ct);
-        var info = JsonDocument.Parse(content);
+        using var info = JsonDocument.Parse(content);
 
         if (info.RootElement.TryGetProperty("version", out var version) &&
             version.TryGetProperty("number", out var number))
@@ -855,7 +855,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var doc = JsonDocument.Parse(responseBody);
+            using var doc = JsonDocument.Parse(responseBody);
 
             if (doc.RootElement.TryGetProperty("hits", out var hits))
             {
@@ -942,7 +942,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync("/_cluster/health", ct);
+            using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch

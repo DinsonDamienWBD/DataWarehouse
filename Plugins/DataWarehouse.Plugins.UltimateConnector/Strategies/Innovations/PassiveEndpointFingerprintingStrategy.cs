@@ -96,7 +96,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             // Initial probe to establish baseline
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
             response.EnsureSuccessStatusCode();
 
@@ -149,7 +149,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             try
             {
                 var sw = Stopwatch.StartNew();
-                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
+                using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
                 sw.Stop();
 
                 if (_states.TryGetValue(handle.ConnectionId, out var state))
@@ -249,7 +249,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                         // Measure TTFB and RTT via lightweight probe
                         var sw = Stopwatch.StartNew();
                         using var request = new HttpRequestMessage(HttpMethod.Head, "/");
-                        var response = await client.SendAsync(request, token);
+                        using var response = await client.SendAsync(request, token);
                         sw.Stop();
 
                         var latencyMs = sw.Elapsed.TotalMilliseconds;

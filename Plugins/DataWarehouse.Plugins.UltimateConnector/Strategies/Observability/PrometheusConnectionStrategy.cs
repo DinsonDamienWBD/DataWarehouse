@@ -76,7 +76,7 @@ public sealed class PrometheusConnectionStrategy : ObservabilityConnectionStrate
         var httpClient = handle.GetConnection<HttpClient>();
         try
         {
-            var response = await httpClient.GetAsync("/-/healthy", ct);
+            using var response = await httpClient.GetAsync("/-/healthy", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -105,7 +105,7 @@ public sealed class PrometheusConnectionStrategy : ObservabilityConnectionStrate
 
         try
         {
-            var response = await httpClient.GetAsync("/-/ready", ct);
+            using var response = await httpClient.GetAsync("/-/ready", ct);
             sw.Stop();
 
             return new ConnectionHealth(
@@ -135,7 +135,7 @@ public sealed class PrometheusConnectionStrategy : ObservabilityConnectionStrate
         var json = JsonSerializer.Serialize(new { series = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync("/api/v1/write", content, ct);
+        using var response = await httpClient.PostAsync("/api/v1/write", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

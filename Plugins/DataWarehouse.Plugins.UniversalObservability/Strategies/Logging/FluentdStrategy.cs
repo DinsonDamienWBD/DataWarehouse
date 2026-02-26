@@ -67,7 +67,7 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(records);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -81,7 +81,7 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/api/plugins.json", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/api/plugins.json", cancellationToken);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Fluentd is healthy" : "Fluentd unhealthy",
                 new Dictionary<string, object> { ["url"] = _url, ["tag"] = _tag });

@@ -46,7 +46,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var requestBody = new { messages = new[] { new { data = base64Data, attributes = headers ?? new Dictionary<string, string>() } } };
             var json = JsonSerializer.Serialize(requestBody);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(publishUrl, content, ct);
+            using var response = await httpClient.PostAsync(publishUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
 
@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                     var requestBody = new { maxMessages = 10 };
                     var json = JsonSerializer.Serialize(requestBody);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await httpClient.PostAsync(pullUrl, content, ct);
+                    using var response = await httpClient.PostAsync(pullUrl, content, ct);
                     if (response.IsSuccessStatusCode)
                     {
                         var responseJson = await response.Content.ReadAsStringAsync(ct);

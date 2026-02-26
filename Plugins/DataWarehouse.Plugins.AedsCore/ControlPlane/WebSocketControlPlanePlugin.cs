@@ -357,7 +357,7 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
                 return;
             }
 
-            var jsonDoc = JsonDocument.Parse(messageText);
+            using var jsonDoc = JsonDocument.Parse(messageText);
             var root = jsonDoc.RootElement;
 
             // NET-07: Validate origin field in message envelope if present

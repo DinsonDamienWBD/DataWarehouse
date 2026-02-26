@@ -94,7 +94,7 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
     {
         var json = JsonSerializer.Serialize(gelfMessage);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(_gelfHttpUrl, content, ct);
+        using var response = await _httpClient.PostAsync(_gelfHttpUrl, content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -119,7 +119,7 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
             if (_useUdp) return new HealthCheckResult(true, "Graylog UDP configured",
                 new Dictionary<string, object> { ["host"] = _host, ["port"] = _udpPort });
 
-            var response = await _httpClient.GetAsync(_gelfHttpUrl.Replace("/gelf", "/api/system/lbstatus"), ct);
+            using var response = await _httpClient.GetAsync(_gelfHttpUrl.Replace("/gelf", "/api/system/lbstatus"), ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Graylog is healthy" : "Graylog unhealthy",
                 new Dictionary<string, object> { ["url"] = _gelfHttpUrl });

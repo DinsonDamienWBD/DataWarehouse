@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             client.DefaultRequestHeaders.Remove("X-Battery-Percent");
             client.DefaultRequestHeaders.Add("X-Battery-Percent", powerState.ChargePercent.ToString());
 
-            var response = await client.PostAsync("/api/v1/handshake/negotiate", content, ct);
+            using var response = await client.PostAsync("/api/v1/handshake/negotiate", content, ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -155,7 +155,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/api/v1/handshake/ping", ct);
+            using var response = await client.GetAsync("/api/v1/handshake/ping", ct);
             return response.IsSuccessStatusCode;
         }
 

@@ -95,7 +95,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             {
                 var introspectionQuery = @"{""query"":""{__schema { queryType { name } }}""}";
                 var content = new StringContent(introspectionQuery, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync("", content, ct);
+                using var response = await client.PostAsync("", content, ct);
                 response.EnsureSuccessStatusCode();
             }
             else
@@ -103,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 // Use __typename as a lightweight connectivity test (does not expose schema)
                 var healthQuery = @"{""query"":""{__typename}""}";
                 var content = new StringContent(healthQuery, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync("", content, ct);
+                using var response = await client.PostAsync("", content, ct);
                 response.EnsureSuccessStatusCode();
             }
 
@@ -260,7 +260,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             // Use __typename for health check (safe even with introspection disabled)
             var query = @"{""query"":""{__typename}""}";
             var content = new StringContent(query, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("", content, ct);
+            using var response = await client.PostAsync("", content, ct);
             return response.IsSuccessStatusCode;
         }
 

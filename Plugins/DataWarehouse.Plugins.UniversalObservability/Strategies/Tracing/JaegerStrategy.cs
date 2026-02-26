@@ -79,7 +79,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(batch);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_collectorUrl}/api/traces", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_collectorUrl}/api/traces", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -92,7 +92,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/services", ct);
+        using var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/services", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -101,7 +101,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     {
         var query = $"service={Uri.EscapeDataString(service)}&limit={limit}";
         if (!string.IsNullOrEmpty(operation)) query += $"&operation={Uri.EscapeDataString(operation)}";
-        var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/traces?{query}", ct);
+        using var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/traces?{query}", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -116,7 +116,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_collectorUrl}/", ct);
+            using var response = await _httpClient.GetAsync($"{_collectorUrl}/", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Jaeger collector is healthy" : "Jaeger unhealthy",
                 new Dictionary<string, object> { ["collectorUrl"] = _collectorUrl, ["serviceName"] = _serviceName });

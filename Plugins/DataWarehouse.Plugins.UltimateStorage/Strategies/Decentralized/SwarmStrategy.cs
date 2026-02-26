@@ -509,7 +509,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(responseBody);
+            using var jsonDoc = JsonDocument.Parse(responseBody);
             var reference = jsonDoc.RootElement.GetProperty("reference").GetString();
 
             return reference ?? throw new InvalidOperationException("Failed to get reference from Swarm upload response");
@@ -578,7 +578,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(responseBody);
+            using var jsonDoc = JsonDocument.Parse(responseBody);
             var uid = jsonDoc.RootElement.GetProperty("uid").GetInt32();
 
             return uid.ToString();
@@ -602,7 +602,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
 
                 var responseBody = await response.Content.ReadAsStringAsync(ct);
-                var jsonDoc = JsonDocument.Parse(responseBody);
+                using var jsonDoc = JsonDocument.Parse(responseBody);
 
                 var total = jsonDoc.RootElement.GetProperty("total").GetInt32();
                 var synced = jsonDoc.RootElement.GetProperty("synced").GetInt32();
@@ -650,7 +650,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
 
                 var responseBody = await response.Content.ReadAsStringAsync(ct);
-                var jsonDoc = JsonDocument.Parse(responseBody);
+                using var jsonDoc = JsonDocument.Parse(responseBody);
                 var reference = jsonDoc.RootElement.GetProperty("reference").GetString();
 
                 return reference;
@@ -696,7 +696,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 if (response.IsSuccessStatusCode)
                 {
                     var responseBody = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(responseBody);
+                    using var jsonDoc = JsonDocument.Parse(responseBody);
 
                     if (jsonDoc.RootElement.TryGetProperty("stamps", out var stamps) && stamps.GetArrayLength() > 0)
                     {
@@ -733,7 +733,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 if (response.IsSuccessStatusCode)
                 {
                     var responseBody = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(responseBody);
+                    using var jsonDoc = JsonDocument.Parse(responseBody);
                     var status = jsonDoc.RootElement.GetProperty("status").GetString();
 
                     return new StorageHealthInfo

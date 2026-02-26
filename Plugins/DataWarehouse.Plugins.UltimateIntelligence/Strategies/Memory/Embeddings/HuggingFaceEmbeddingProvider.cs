@@ -226,7 +226,7 @@ public sealed class HuggingFaceEmbeddingProvider : EmbeddingProviderBase
             {
                 try
                 {
-                    var errorJson = JsonDocument.Parse(errorContent);
+                    using var errorJson = JsonDocument.Parse(errorContent);
                     if (errorJson.RootElement.TryGetProperty("error", out var errorProp))
                     {
                         var errorMsg = errorProp.GetString() ?? "";

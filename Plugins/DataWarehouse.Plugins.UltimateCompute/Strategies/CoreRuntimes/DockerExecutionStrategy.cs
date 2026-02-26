@@ -46,7 +46,7 @@ internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
         // Verify Docker daemon is accessible
         try
         {
-            var response = await _httpClient.GetAsync($"{DefaultDockerSocket}/v1.43/version", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{DefaultDockerSocket}/v1.43/version", cancellationToken);
             response.EnsureSuccessStatusCode();
         }
         catch

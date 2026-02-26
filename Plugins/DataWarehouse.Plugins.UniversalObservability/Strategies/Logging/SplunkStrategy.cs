@@ -97,7 +97,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(events.ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -131,7 +131,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(metricEvents.ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -143,7 +143,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     public async Task SendRawAsync(string rawData, CancellationToken ct = default)
     {
         var content = new StringContent(rawData, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"{_hecUrl}/services/collector/raw?index={_index}&source={_source}&sourcetype={_sourcetype}",
             content, ct);
         response.EnsureSuccessStatusCode();
@@ -156,7 +156,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     /// <returns>Health status as JSON.</returns>
     public async Task<string> GetHecHealthAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", ct);
+        using var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -172,7 +172,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", cancellationToken);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 

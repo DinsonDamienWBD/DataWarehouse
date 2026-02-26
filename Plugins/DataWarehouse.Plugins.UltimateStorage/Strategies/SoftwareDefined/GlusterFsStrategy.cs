@@ -968,7 +968,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             try
             {
                 // Query glusterd2 REST API: GET /v1/volumes/{volume-name}
-                var response = await _httpClient.GetAsync($"/v1/volumes/{_volumeName}", ct);
+                using var response = await _httpClient.GetAsync($"/v1/volumes/{_volumeName}", ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);

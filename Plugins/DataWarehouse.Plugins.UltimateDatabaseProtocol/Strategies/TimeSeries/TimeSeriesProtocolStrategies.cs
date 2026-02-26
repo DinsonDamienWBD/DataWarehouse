@@ -76,7 +76,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
         // InfluxDB uses Flux query language
         var requestBody = new StringContent(query, Encoding.UTF8, "application/vnd.flux");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"/api/v2/query?org={Uri.EscapeDataString(_org)}",
             requestBody, ct);
 
@@ -154,7 +154,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
         // Line protocol write
         var content = new StringContent(command, Encoding.UTF8, "text/plain");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ns",
             content, ct);
 
@@ -176,7 +176,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
         if (_httpClient == null) return false;
-        var response = await _httpClient.GetAsync("/ping", ct);
+        using var response = await _httpClient.GetAsync("/ping", ct);
         return response.IsSuccessStatusCode;
     }
 
@@ -417,7 +417,7 @@ public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
         var content = new StringContent(command, Encoding.UTF8, "application/json");
         content.Headers.Add("Content-Encoding", "snappy"); // Would need actual Snappy compression
 
-        var response = await _httpClient.PostAsync(_remoteWriteUrl, content, ct);
+        using var response = await _httpClient.PostAsync(_remoteWriteUrl, content, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -440,7 +440,7 @@ public sealed class PrometheusRemoteWriteStrategy : DatabaseProtocolStrategyBase
         try
         {
             var baseUri = new Uri(_remoteWriteUrl).GetLeftPart(UriPartial.Authority);
-            var response = await _httpClient.GetAsync($"{baseUri}/-/healthy", ct);
+            using var response = await _httpClient.GetAsync($"{baseUri}/-/healthy", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -526,7 +526,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
             throw new InvalidOperationException("Not connected");
 
         // VictoriaMetrics supports PromQL queries
-        var response = await _httpClient.GetAsync(
+        using var response = await _httpClient.GetAsync(
             $"/api/v1/query?query={Uri.EscapeDataString(query)}", ct);
 
         response.EnsureSuccessStatusCode();
@@ -543,7 +543,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
         }
 
         // Parse Prometheus-style JSON response
-        var json = JsonDocument.Parse(content);
+        using var json = JsonDocument.Parse(content);
         var rows = ParsePrometheusResponse(json);
 
         return new QueryResult
@@ -597,7 +597,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
 
         // Line protocol import
         var content = new StringContent(command, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync("/api/v1/import/prometheus", content, ct);
+        using var response = await _httpClient.PostAsync("/api/v1/import/prometheus", content, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -617,7 +617,7 @@ public sealed class VictoriaMetricsProtocolStrategy : DatabaseProtocolStrategyBa
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
         if (_httpClient == null) return false;
-        var response = await _httpClient.GetAsync("/health", ct);
+        using var response = await _httpClient.GetAsync("/health", ct);
         return response.IsSuccessStatusCode;
     }
 

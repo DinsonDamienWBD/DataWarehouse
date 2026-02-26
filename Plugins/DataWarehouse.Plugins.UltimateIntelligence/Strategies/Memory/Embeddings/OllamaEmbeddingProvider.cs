@@ -287,7 +287,7 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
             // Parse progress updates (optional logging)
             try
             {
-                var progress = JsonDocument.Parse(line);
+                using var progress = JsonDocument.Parse(line);
                 if (progress.RootElement.TryGetProperty("status", out var status))
                 {
                     var statusStr = status.GetString();

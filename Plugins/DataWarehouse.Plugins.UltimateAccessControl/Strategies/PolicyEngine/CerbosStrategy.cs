@@ -139,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 // Send check request to Cerbos
-                var response = await _httpClient.PostAsync($"{_cerbosEndpoint}/api/check", content, cancellationToken);
+                using var response = await _httpClient.PostAsync($"{_cerbosEndpoint}/api/check", content, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -255,7 +255,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"{_cerbosEndpoint}/api/check", content, cancellationToken);
+                using var response = await _httpClient.PostAsync($"{_cerbosEndpoint}/api/check", content, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {

@@ -147,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/discovery/resolve", content, ct);
+            using var response = await client.PostAsync("/api/v1/discovery/resolve", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var resolutionId = handle.ConnectionInfo["resolution_id"]?.ToString();
 
-            var response = await client.GetAsync(
+            using var response = await client.GetAsync(
                 $"/api/v1/discovery/resolutions/{resolutionId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
@@ -226,7 +226,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var resolutionId = handle.ConnectionInfo["resolution_id"]?.ToString();
 
-            var response = await client.GetAsync(
+            using var response = await client.GetAsync(
                 $"/api/v1/discovery/resolutions/{resolutionId}/health", ct);
             sw.Stop();
 

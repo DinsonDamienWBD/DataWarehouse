@@ -172,7 +172,7 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
 
-                var response = await _httpClient.PostAsync(url, content, ct);
+                using var response = await _httpClient.PostAsync(url, content, ct);
                 response.EnsureSuccessStatusCode();
             }
         }
@@ -205,7 +205,7 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_apiUrl}/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_apiUrl}/health", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

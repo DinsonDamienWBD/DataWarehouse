@@ -104,7 +104,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
         };
 
         var content = new StringContent(JsonSerializer.Serialize(schema), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("/collections", content, ct);
+        using var response = await _httpClient.PostAsync("/collections", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

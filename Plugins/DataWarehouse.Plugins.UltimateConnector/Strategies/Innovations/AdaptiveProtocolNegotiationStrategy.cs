@@ -161,7 +161,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
+            using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
             return response.IsSuccessStatusCode;
         }
 

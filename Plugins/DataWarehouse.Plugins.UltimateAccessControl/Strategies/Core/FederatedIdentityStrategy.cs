@@ -505,7 +505,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         private async Task<OidcDiscoveryDocument> FetchOidcDiscoveryAsync(string metadataUrl, CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(metadataUrl, cancellationToken);
+            using var response = await _httpClient.GetAsync(metadataUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             return JsonSerializer.Deserialize<OidcDiscoveryDocument>(content) ?? new OidcDiscoveryDocument();
@@ -528,7 +528,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 ["client_secret"] = idp.ClientSecret ?? ""
             });
 
-            var response = await _httpClient.PostAsync(idp.TokenIntrospectionEndpoint, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(idp.TokenIntrospectionEndpoint, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

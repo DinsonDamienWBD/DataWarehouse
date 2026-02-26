@@ -170,7 +170,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                     "application/json"
                 );
 
-                var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+                using var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 _logger.LogInformation("HTTP alert sent to {Endpoint}", endpoint);

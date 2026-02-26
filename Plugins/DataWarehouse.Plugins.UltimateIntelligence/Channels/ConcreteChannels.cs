@@ -701,7 +701,7 @@ public sealed class RESTChannel : IntelligenceChannelBase
                 Content = JsonContent.Create(request)
             };
 
-            var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);

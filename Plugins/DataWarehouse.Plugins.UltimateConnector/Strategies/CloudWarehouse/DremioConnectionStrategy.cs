@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 var authBytes = System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "admin"}:{config.AuthCredential}");
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             }
-            var response = await _httpClient.GetAsync("/apiv2/server_status", ct);
+            using var response = await _httpClient.GetAsync("/apiv2/server_status", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }

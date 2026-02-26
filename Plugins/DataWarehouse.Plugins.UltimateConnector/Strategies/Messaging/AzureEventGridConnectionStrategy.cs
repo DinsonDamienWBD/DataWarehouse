@@ -58,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             };
             var json = JsonSerializer.Serialize(events);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync("/api/events", content, ct);
+            using var response = await httpClient.PostAsync("/api/events", content, ct);
             response.EnsureSuccessStatusCode();
         }
 

@@ -206,7 +206,7 @@ public sealed class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         // Parse command as a JSON document to upsert
         var container = client.GetContainer(databaseId, containerId);
-        var doc = JsonDocument.Parse(command);
+        using var doc = JsonDocument.Parse(command);
 
         string partitionKey;
         if (parameters?.GetValueOrDefault("partitionKey") is string pk)

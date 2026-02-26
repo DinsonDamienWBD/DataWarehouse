@@ -58,7 +58,7 @@ public sealed class ZipkinConnectionStrategy : ObservabilityConnectionStrategyBa
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(traces);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/api/v2/spans", content, ct);
+        using var response = await httpClient.PostAsync("/api/v2/spans", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

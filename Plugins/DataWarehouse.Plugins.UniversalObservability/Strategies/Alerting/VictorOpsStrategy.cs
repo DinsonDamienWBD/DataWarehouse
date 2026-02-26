@@ -172,7 +172,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
                 var json = JsonSerializer.Serialize(alert);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync(_restEndpoint, content, ct);
+                using var response = await _httpClient.PostAsync(_restEndpoint, content, ct);
                 response.EnsureSuccessStatusCode();
             }
         }
@@ -201,7 +201,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(testAlert);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_restEndpoint, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(_restEndpoint, content, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

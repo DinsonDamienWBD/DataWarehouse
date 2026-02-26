@@ -63,20 +63,20 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(zipkinSpans);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/api/v2/spans", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_url}/api/v2/spans", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/services", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/services", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetTraceAsync(string traceId, CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/trace/{traceId}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/trace/{traceId}", ct);
  response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -91,7 +91,7 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/health", ct);
+            using var response = await _httpClient.GetAsync($"{_url}/health", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Zipkin is healthy" : "Zipkin unhealthy",
                 new Dictionary<string, object> { ["url"] = _url, ["serviceName"] = _serviceName });

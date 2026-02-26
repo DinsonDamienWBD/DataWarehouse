@@ -182,7 +182,7 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null)
             throw new InvalidOperationException("Not connected");
 
-        var response = await _httpClient.PutAsync($"/_db/{_database}/_api/transaction/{transactionId}", null, ct);
+        using var response = await _httpClient.PutAsync($"/_db/{_database}/_api/transaction/{transactionId}", null, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -192,7 +192,7 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null)
             throw new InvalidOperationException("Not connected");
 
-        var response = await _httpClient.DeleteAsync($"/_db/{_database}/_api/transaction/{transactionId}", ct);
+        using var response = await _httpClient.DeleteAsync($"/_db/{_database}/_api/transaction/{transactionId}", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -208,7 +208,7 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/_api/version", ct);
+            using var response = await _httpClient.GetAsync("/_api/version", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -497,7 +497,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
                 new KeyValuePair<string, string>("secret", parameters.Password ?? "")
             ]);
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"/requesttoken?graph={_graphName}", tokenRequest, ct);
             response.EnsureSuccessStatusCode();
 
@@ -532,7 +532,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
             url += $"?{queryParams}";
         }
 
-        var response = await _httpClient.GetAsync(url, ct);
+        using var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -590,7 +590,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
 
         // POST GSQL command
         var content = new StringContent(command, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync("/gsqlserver/gsql/file", content, ct);
+        using var response = await _httpClient.PostAsync("/gsqlserver/gsql/file", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -626,7 +626,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/version", ct);
+            using var response = await _httpClient.GetAsync("/version", ct);
             return response.IsSuccessStatusCode;
         }
         catch

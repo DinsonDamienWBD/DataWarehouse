@@ -192,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var routeId = handle.ConnectionInfo["route_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -234,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var routeId = handle.ConnectionInfo["route_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

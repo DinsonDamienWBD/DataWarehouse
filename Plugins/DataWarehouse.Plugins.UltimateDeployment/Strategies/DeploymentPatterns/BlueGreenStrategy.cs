@@ -241,7 +241,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
                     try
                     {
                         var sw = System.Diagnostics.Stopwatch.StartNew();
-                        var response = await httpClient.GetAsync(instanceUrl, ct);
+                        using var response = await httpClient.GetAsync(instanceUrl, ct);
                         sw.Stop();
 
                         results.Add(new HealthCheckResult

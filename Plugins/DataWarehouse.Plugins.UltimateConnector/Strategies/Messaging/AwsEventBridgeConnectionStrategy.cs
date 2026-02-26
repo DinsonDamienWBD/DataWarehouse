@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var json = JsonSerializer.Serialize(requestBody);
             var content = new StringContent(json, Encoding.UTF8, "application/x-amz-json-1.1");
             content.Headers.Add("X-Amz-Target", "AWSEvents.PutEvents");
-            var response = await httpClient.PostAsync("/", content, ct);
+            using var response = await httpClient.PostAsync("/", content, ct);
             response.EnsureSuccessStatusCode();
         }
 

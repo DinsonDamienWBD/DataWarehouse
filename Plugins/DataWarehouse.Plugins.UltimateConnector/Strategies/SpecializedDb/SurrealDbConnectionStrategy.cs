@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
             if (!string.IsNullOrEmpty(config.AuthCredential))
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }

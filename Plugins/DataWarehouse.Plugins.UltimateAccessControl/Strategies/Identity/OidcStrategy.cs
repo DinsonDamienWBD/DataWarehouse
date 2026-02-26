@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 return cached.Discovery;
 
             var discoveryUrl = _issuer.TrimEnd('/') + "/.well-known/openid-configuration";
-            var response = await _httpClient.GetAsync(discoveryUrl, cancellationToken);
+            using var response = await _httpClient.GetAsync(discoveryUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -274,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (_jwksCache.TryGetValue(jwksUri, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
                 return cached.Jwks;
 
-            var response = await _httpClient.GetAsync(jwksUri, cancellationToken);
+            using var response = await _httpClient.GetAsync(jwksUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

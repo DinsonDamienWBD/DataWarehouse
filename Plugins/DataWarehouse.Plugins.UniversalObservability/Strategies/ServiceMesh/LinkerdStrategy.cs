@@ -71,7 +71,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         try
         {
             // Get metrics from local proxy admin endpoint (Prometheus format)
-            var response = await _httpClient.GetAsync($"http://localhost:{_proxyAdminPort}/metrics", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_proxyAdminPort}/metrics", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -100,7 +100,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/stat?resource_type=deployment&resource_name={_serviceName}&namespace={_namespace}&time_window=1m", ct);
 
             if (response.IsSuccessStatusCode)
@@ -157,7 +157,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/trafficsplits?namespace={_namespace}", ct);
 
             if (response.IsSuccessStatusCode)
@@ -210,7 +210,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/edges?resource_type=deployment&namespace={_namespace}", ct);
 
             if (response.IsSuccessStatusCode)

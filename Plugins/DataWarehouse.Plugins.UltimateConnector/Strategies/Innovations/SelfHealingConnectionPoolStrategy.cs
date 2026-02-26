@@ -105,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 .Select(async i =>
                 {
                     var sw = Stopwatch.StartNew();
-                    var response = await client.GetAsync("/health", ct);
+                    using var response = await client.GetAsync("/health", ct);
                     sw.Stop();
                     return (Index: i, Latency: sw.Elapsed, Success: response.IsSuccessStatusCode);
                 });
@@ -171,7 +171,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             }
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
 
             if (metrics != null)
@@ -267,7 +267,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 try
                 {
                     var sw = Stopwatch.StartNew();
-                    var response = await client.GetAsync("/health");
+                    using var response = await client.GetAsync("/health");
                     sw.Stop();
 
                     if (_poolMetrics.TryGetValue(connectionId, out var metrics))

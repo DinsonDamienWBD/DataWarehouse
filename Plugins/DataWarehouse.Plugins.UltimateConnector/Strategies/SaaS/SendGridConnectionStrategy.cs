@@ -108,7 +108,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -151,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -185,7 +185,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -202,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             string generations = "dynamic", CancellationToken ct = default)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync($"/v3/templates?generations={generations}&page_size=50", ct);
+            using var response = await client.GetAsync($"/v3/templates?generations={generations}&page_size=50", ct);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 

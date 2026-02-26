@@ -97,7 +97,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     new AuthenticationHeaderValue("Bearer", config.AuthCredential);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
             response.EnsureSuccessStatusCode();
 
@@ -159,7 +159,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             try
             {
                 var sw = Stopwatch.StartNew();
-                var response = await client.GetAsync("/health", ct);
+                using var response = await client.GetAsync("/health", ct);
                 sw.Stop();
 
                 if (_states.TryGetValue(handle.ConnectionId, out var state))
@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     {
                         var sw = Stopwatch.StartNew();
                         using var request = new HttpRequestMessage(HttpMethod.Head, "/");
-                        var response = await client.SendAsync(request, token);
+                        using var response = await client.SendAsync(request, token);
                         sw.Stop();
 
                         var latencyMs = sw.Elapsed.TotalMilliseconds;

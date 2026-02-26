@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.Address}/v1/sys/health");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -116,11 +116,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
             var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{keyId}");
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var keyBase64 = doc.RootElement.GetProperty("data").GetProperty("data").GetProperty("key").GetString();
             return Convert.FromBase64String(keyBase64!);
         }
@@ -133,7 +133,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/v1/{_config.MountPath}/data/{keyId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -147,11 +147,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/v1/transit/encrypt/{kekId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("data").GetProperty("ciphertext").GetString();
             return Encoding.UTF8.GetBytes(ciphertext!);
         }
@@ -165,11 +165,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/v1/transit/decrypt/{kekId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("data").GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -179,13 +179,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             ValidateSecurityContext(context);
 
             var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/metadata?list=true");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("data", out var data) &&
                 data.TryGetProperty("keys", out var keys))
@@ -206,7 +206,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
 
             var request = CreateRequest(HttpMethod.Delete, $"/v1/{_config.MountPath}/metadata/{keyId}");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -217,13 +217,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/metadata/{keyId}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var data = doc.RootElement.GetProperty("data");
 
                 var createdTime = data.TryGetProperty("created_time", out var ct)
@@ -258,7 +258,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.Address}/v1/sys/health");
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch

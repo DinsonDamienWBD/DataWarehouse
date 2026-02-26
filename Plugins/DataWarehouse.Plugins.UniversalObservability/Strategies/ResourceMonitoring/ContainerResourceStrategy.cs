@@ -387,7 +387,7 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_kubeletUrl}/stats/summary", ct);
 
             if (response.IsSuccessStatusCode)

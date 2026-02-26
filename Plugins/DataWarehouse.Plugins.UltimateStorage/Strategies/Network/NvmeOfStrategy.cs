@@ -227,7 +227,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/connect",
                     jsonContent,
                     ct);
@@ -286,7 +286,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 try
                 {
-                    var response = await _httpClient.PostAsync(
+                    using var response = await _httpClient.PostAsync(
                         $"{_managementApiUrl}/nvme/disconnect",
                         jsonContent,
                         ct);
@@ -345,7 +345,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         Encoding.UTF8,
                         "application/json");
 
-                    var response = await _httpClient.PostAsync(
+                    using var response = await _httpClient.PostAsync(
                         $"{_managementApiUrl}/nvme/keepalive",
                         jsonContent,
                         ct);
@@ -402,7 +402,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/discover",
                     jsonContent,
                     ct);
@@ -678,7 +678,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/health",
                     jsonContent,
                     ct);
@@ -748,7 +748,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/capacity",
                     jsonContent,
                     ct);
@@ -813,7 +813,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"{_managementApiUrl}/nvme/write",
                 jsonContent,
                 ct);
@@ -855,7 +855,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"{_managementApiUrl}/nvme/read",
                 jsonContent,
                 ct);
