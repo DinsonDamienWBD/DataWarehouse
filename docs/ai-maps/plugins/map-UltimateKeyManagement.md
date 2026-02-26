@@ -3635,6 +3635,7 @@ public class GeoLockConfig
     public bool RequireLocationAttestation { get; set; }
     public byte[]? AttestationPublicKey { get; set; }
     public string? IpGeolocationApiKey { get; set; }
+    public string? IpGeolocationEndpoint { get; set; }
     public List<TimeWindow> AllowedTimeWindows { get; set; };
     public string? StoragePath { get; set; }
 }
@@ -3750,6 +3751,7 @@ public sealed class QuantumKeyDistributionStrategy : KeyStoreStrategyBase
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override async Task InitializeStorage(CancellationToken cancellationToken);
     public override async Task<string> GetCurrentKeyIdAsync();
+    public void SetPeerSampleBits(byte[] peerBits);
     public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default);
     protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context);
     protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context);
@@ -5394,8 +5396,8 @@ internal class LedgerKeyDerivationDto
     public string KeyId { get; set; };
     public string DerivationPath { get; set; };
     public string PublicKey { get; set; };
-    public string DerivedKey { get; set; };
     public DateTime CreatedAt { get; set; }
+    public static LedgerKeyDerivationDto FromDerivationSafe(LedgerKeyDerivation d);;
     public static LedgerKeyDerivationDto FromDerivation(LedgerKeyDerivation d);;
     public LedgerKeyDerivation ToDerivation();;
 }
@@ -5967,6 +5969,7 @@ public class SsssConfig
     public int MaxRecoveryAttempts { get; set; };
     public bool RequireIdentityVerification { get; set; };
     public string? StoragePath { get; set; }
+    public string? VerificationSecret { get; set; }
 }
 ```
 ```csharp
@@ -6980,6 +6983,7 @@ public class GcpKmsConfig
     public string KeyRing { get; set; };
     public string KeyName { get; set; };
     public string ServiceAccountJson { get; set; };
+    public string? StoragePath { get; set; }
 }
 ```
 
@@ -7018,6 +7022,7 @@ public class OracleVaultConfig
     public string UserOcid { get; set; };
     public string Fingerprint { get; set; };
     public string PrivateKey { get; set; };
+    public string? StoragePath { get; set; }
 }
 ```
 
@@ -7155,6 +7160,7 @@ public class IbmKeyProtectConfig
     public string Region { get; set; };
     public string ApiKey { get; set; };
     public string DefaultKeyId { get; set; };
+    public string? StoragePath { get; set; }
 }
 ```
 
@@ -7183,6 +7189,8 @@ public class DigitalOceanVaultConfig
 }
     public string ApiToken { get; set; };
     public string? DataCenter { get; set; }
+    public string? StoragePath { get; set; }
+    public byte[]? MasterSecret { get; set; }
 }
 ```
 
