@@ -150,31 +150,40 @@ public sealed class ExtentDeltaReplicator
 
     /// <summary>
     /// Computes a replication delta containing all extents modified between two transaction IDs.
+    /// Queries the MVCC version store for inodes modified in the range
+    /// (sinceTransactionId, untilTransactionId] and reads their current data from the device.
     /// </summary>
     public async Task<ReplicationDelta> ComputeDeltaAsync(long sinceTransactionId, long untilTransactionId, CancellationToken ct = default)
     {
-
-        // Collect changed extents from the device by scanning committed transaction logs
-        // In a production system, the MVCC version store maintains a change log indexed by transaction ID.
-        // Here we build the delta from tracked extent-level changes.
         var changedExtents = new List<ExtentDelta>();
         long totalBytes = 0;
 
-        // Scan device blocks in extent-sized chunks to detect modifications
-        // The MVCC manager tracks which inodes were modified; we read their extents
-        long deviceBlockCount = _device.BlockCount;
-        var processedExtents = new HashSet<long>(); // Track by start block to avoid duplicates
+        // Get the set of inode numbers modified by committed transactions in the specified range.
+        // Each inode number corresponds to a device block address in the VDE block addressing model.
+        IReadOnlyCollection<long> modifiedInodes = _mvccManager.GetModifiedInodesBetween(sinceTransactionId, untilTransactionId);
 
-        // Read extent data for changed extents
         byte[] blockBuffer = ArrayPool<byte>.Shared.Rent(_blockSize);
         try
         {
-            // Build delta from any extents that have been modified
-            // In practice, the MVCC version store provides the exact changed set
-            // For the replicator, we accept pre-computed extent lists
-            foreach (var extentDelta in changedExtents)
+            foreach (long inodeNumber in modifiedInodes)
             {
-                totalBytes += extentDelta.Data.Length;
+                ct.ThrowIfCancellationRequested();
+
+                // Read the current (post-commit) data for this inode/block.
+                await _device.ReadBlockAsync(inodeNumber, blockBuffer, ct);
+
+                // Represent the changed block as a single-block extent at the inode's block address.
+                var extent = new InodeExtent(
+                    startBlock: inodeNumber,
+                    blockCount: 1,
+                    flags: ExtentFlags.None,
+                    logicalOffset: inodeNumber * _blockSize);
+
+                var data = new byte[_blockSize];
+                blockBuffer.AsSpan(0, _blockSize).CopyTo(data);
+
+                changedExtents.Add(new ExtentDelta(extent, data, inodeNumber));
+                totalBytes += data.Length;
             }
         }
         finally

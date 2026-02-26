@@ -50,9 +50,12 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         _agentEndpoint = endpoint;
         _agentKey = agentKey;
-        _httpClient.DefaultRequestHeaders.Remove("X-Instana-Key");
-        _httpClient.DefaultRequestHeaders.Add("X-Instana-Key", agentKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Instana agent key to the request headers (per-request, thread-safe).</summary>
+    private void AddAgentKey(HttpRequestMessage request) =>
+        request.Headers.Add("X-Instana-Key", _agentKey);
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -131,7 +134,9 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_agentEndpoint}{endpoint}";
 
-            using var response = await _httpClient.PostAsync(url, content, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+            AddAgentKey(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -147,7 +152,9 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         try
         {
-            using var response = await _httpClient.GetAsync($"{_agentEndpoint}/", cancellationToken);
+            using var hcRequest = new HttpRequestMessage(HttpMethod.Get, $"{_agentEndpoint}/");
+            AddAgentKey(hcRequest);
+            using var response = await _httpClient.SendAsync(hcRequest, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

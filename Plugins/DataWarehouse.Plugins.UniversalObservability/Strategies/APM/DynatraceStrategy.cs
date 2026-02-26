@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Observability;
@@ -32,10 +33,12 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
         _environmentUrl = environmentUrl.TrimEnd('/');
         _apiToken = apiToken;
         _entityId = entityId;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Remove("Authorization");
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Api-Token {_apiToken}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Dynatrace API token to the request headers (per-request, thread-safe).</summary>
+    private void AddApiToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Api-Token {_apiToken}");
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
@@ -58,7 +61,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(lines.ToString(), Encoding.UTF8, "text/plain");
-        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/metrics/ingest", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/metrics/ingest") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -105,7 +110,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(traceData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/otlp/v1/traces", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/otlp/v1/traces") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -133,7 +140,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(logs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/logs/ingest", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/logs/ingest") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -141,7 +150,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     {
         try
         {
-            using var response = await _httpClient.GetAsync($"{_environmentUrl}/api/v2/activeGates", ct);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_environmentUrl}/api/v2/activeGates");
+            AddApiToken(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Dynatrace is healthy" : "Dynatrace unhealthy",
                 new Dictionary<string, object> { ["environmentUrl"] = _environmentUrl });

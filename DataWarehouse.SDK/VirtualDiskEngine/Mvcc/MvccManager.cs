@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -258,6 +259,30 @@ public sealed class MvccManager
         // otherwise the version store provides historical data.
 
         return currentBuffer;
+    }
+
+    /// <summary>
+    /// Returns the set of inode numbers that were modified by committed transactions
+    /// whose transaction IDs fall in the range (sinceTransactionId, untilTransactionId].
+    /// Used by <see cref="DataWarehouse.SDK.VirtualDiskEngine.Replication.ExtentDeltaReplicator"/>
+    /// to compute replication deltas from the MVCC change log.
+    /// </summary>
+    /// <param name="sinceTransactionId">Exclusive lower bound (changes strictly after this ID).</param>
+    /// <param name="untilTransactionId">Inclusive upper bound.</param>
+    /// <returns>A deduplicated set of inode numbers modified in the specified range.</returns>
+    public IReadOnlyCollection<long> GetModifiedInodesBetween(long sinceTransactionId, long untilTransactionId)
+    {
+        var result = new HashSet<long>();
+        foreach (var kvp in _committedWriteSets)
+        {
+            long txId = kvp.Key;
+            if (txId > sinceTransactionId && txId <= untilTransactionId)
+            {
+                foreach (long inodeNumber in kvp.Value)
+                    result.Add(inodeNumber);
+            }
+        }
+        return result;
     }
 
     /// <summary>

@@ -97,11 +97,26 @@
     {
         public LogReplicator(object plugin) { }
 
-        public long GetLastLogIndex() => 0;
-        public long GetLastLogTerm() => 0;
-        public Task CompactLogAsync(int threshold) => Task.CompletedTask;
-        public Task<bool> AppendAndReplicateAsync(object entry) => Task.FromResult(true);
-        public Task<bool> ReplicateToNodeAsync(string nodeId, long targetIndex) => Task.FromResult(true);
+        public long GetLastLogIndex() =>
+            throw new NotSupportedException(
+                "LogReplicator.GetLastLogIndex requires a concrete consensus engine implementation " +
+                "(e.g. Raft plugin). Wire up a real IConsensusEngine via the plugin configuration.");
+
+        public long GetLastLogTerm() =>
+            throw new NotSupportedException(
+                "LogReplicator.GetLastLogTerm requires a concrete consensus engine implementation.");
+
+        public Task CompactLogAsync(int threshold) =>
+            throw new NotSupportedException(
+                "LogReplicator.CompactLogAsync requires a concrete consensus engine implementation.");
+
+        public Task<bool> AppendAndReplicateAsync(object entry) =>
+            throw new NotSupportedException(
+                "LogReplicator.AppendAndReplicateAsync requires a concrete consensus engine implementation.");
+
+        public Task<bool> ReplicateToNodeAsync(string nodeId, long targetIndex) =>
+            throw new NotSupportedException(
+                "LogReplicator.ReplicateToNodeAsync requires a concrete consensus engine implementation.");
     }
 
     public class SessionState
@@ -112,7 +127,10 @@
 
     public class HierarchicalConsensusManager
     {
-        public HierarchicalConsensusManager(object plugin) { }
+        public HierarchicalConsensusManager(object plugin) =>
+            throw new NotSupportedException(
+                "HierarchicalConsensusManager requires a concrete consensus engine implementation " +
+                "(e.g. hierarchical Raft plugin). Wire up a real IConsensusEngine via plugin configuration.");
     }
 
     public class JointConsensusState
@@ -127,10 +145,16 @@
 
     public class SnapshotManager
     {
-        public SnapshotManager(object plugin) { }
+        public SnapshotManager(object plugin) =>
+            throw new NotSupportedException(
+                "SnapshotManager requires a concrete consensus engine implementation. " +
+                "Wire up a real IConsensusEngine via plugin configuration.");
 
         public long LastSnapshotIndex { get; set; }
-        public Task CreateSnapshotAsync(long index) => Task.CompletedTask;
+
+        public Task CreateSnapshotAsync(long index) =>
+            throw new NotSupportedException(
+                "SnapshotManager.CreateSnapshotAsync requires a concrete consensus engine implementation.");
     }
 
     public class SpeculativeExecution

@@ -51,10 +51,13 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
         _apiKey = apiKey;
         _releaseStage = releaseStage;
         _appVersion = appVersion;
-
-        _httpClient.DefaultRequestHeaders.Remove("Bugsnag-Api-Key");
-        _httpClient.DefaultRequestHeaders.Add("Bugsnag-Api-Key", apiKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid duplicate header accumulation
+        // and thread-safety issues when Configure is called multiple times or concurrently.
     }
+
+    /// <summary>Adds the Bugsnag API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("Bugsnag-Api-Key", _apiKey);
 
     /// <inheritdoc/>
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -214,7 +217,9 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.PostAsync("https://notify.bugsnag.com", content, ct);
+            using var bugsnagRequest = new HttpRequestMessage(HttpMethod.Post, "https://notify.bugsnag.com") { Content = content };
+            AddApiKey(bugsnagRequest);
+            using var response = await _httpClient.SendAsync(bugsnagRequest, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)

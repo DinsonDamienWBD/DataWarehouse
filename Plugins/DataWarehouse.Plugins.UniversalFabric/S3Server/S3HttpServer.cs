@@ -510,10 +510,15 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (string.IsNullOrEmpty(_options.PresignSecret))
+            throw new InvalidOperationException(
+                "S3 presigned URL generation requires a configured PresignSecret. " +
+                "Set S3ServerOptions.PresignSecret to a strong, randomly-generated secret.");
+
         var expiry = DateTimeOffset.UtcNow.Add(request.Expiration).ToUnixTimeSeconds();
         var stringToSign = $"{request.Method}:{request.BucketName}:{request.Key}:{expiry}";
         var signatureBytes = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes("DataWarehousePresignSecret"),
+            Encoding.UTF8.GetBytes(_options.PresignSecret),
             Encoding.UTF8.GetBytes(stringToSign));
         var signature = Convert.ToHexStringLower(signatureBytes);
 
@@ -852,15 +857,19 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
     private void EnsureBucketExists(string bucketName)
     {
-        // For a more lenient server, we auto-create buckets on write operations.
-        // For read-only operations, we check the registry.
-        // Here we use a soft check -- the bucket registry is advisory.
+        if (!_bucketRegistry.ContainsKey(bucketName))
+            throw new KeyNotFoundException(
+                $"NoSuchBucket: The specified bucket '{bucketName}' does not exist. " +
+                "Create the bucket with CreateBucketAsync before accessing it.");
     }
 
     private static string ComputeETag(byte[] data)
     {
-        var hash = MD5.HashData(data);
-        return Convert.ToHexStringLower(hash);
+        // Use SHA-256 instead of MD5: MD5 is cryptographically broken and unsuitable
+        // for integrity verification. Truncate to 128 bits (16 bytes) to keep ETags compact
+        // while maintaining collision resistance appropriate for object identity.
+        var hash = SHA256.HashData(data);
+        return Convert.ToHexStringLower(hash.AsSpan(0, 16));
     }
 
     private static string? ExtractQueryParam(string queryString, string paramName)

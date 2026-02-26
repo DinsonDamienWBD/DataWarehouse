@@ -16,7 +16,8 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Health;
 /// </remarks>
 public sealed class IcingaStrategy : ObservabilityStrategyBase
 {
-    private readonly HttpClient _httpClient;
+    // Not readonly: rebuilt by Configure() to apply the correct SSL verification policy.
+    private HttpClient _httpClient;
     private string _apiUrl = "https://localhost:5665";
     private string _username = "root";
     private string _password = "";
@@ -39,18 +40,15 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         SupportsAlerting: true,
         SupportedExporters: new[] { "Icinga", "Graphite", "InfluxDB" }))
     {
-        var handler = new HttpClientHandler();
-        // SECURITY: TLS certificate validation is enabled by default.
-        // Only bypass when explicitly configured to false.
-        if (!_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+        // Build a default client (SSL verification enabled, no auth yet).
+        // The actual handler is rebuilt in Configure() once verifySsl and credentials are known.
+        _httpClient = new HttpClient(new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(30) };
     }
 
     /// <summary>
     /// Configures the Icinga API connection.
+    /// Creates a new <see cref="HttpClient"/> with the correct SSL verification policy
+    /// so the policy takes effect rather than being dead code in the constructor.
     /// </summary>
     /// <param name="apiUrl">Icinga API URL.</param>
     /// <param name="username">API username.</param>
@@ -62,6 +60,17 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         _username = username;
         _password = password;
         _verifySsl = verifySsl;
+
+        // Dispose the old client and rebuild with the correct SSL policy.
+        _httpClient.Dispose();
+        var handler = new HttpClientHandler();
+        // SECURITY: TLS certificate validation is enabled by default.
+        // Only bypass when explicitly configured to false.
+        if (!_verifySsl)
+        {
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        }
+        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
 
         var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);

@@ -48,11 +48,11 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     // ---- Configuration ----
     private volatile ScalingLimits _currentLimits;
     private volatile FabricTopology _currentTopology;
-    private bool _autoSwitchEnabled;
-    private int _heartbeatIntervalMs;
-    private int _missedHeartbeatsThreshold;
-    private int _starToMeshThreshold;
-    private int _meshToFederatedThreshold;
+    private volatile bool _autoSwitchEnabled;
+    private volatile int _heartbeatIntervalMs;
+    private volatile int _missedHeartbeatsThreshold;
+    private volatile int _starToMeshThreshold;
+    private volatile int _meshToFederatedThreshold;
 
     // ---- Topology MaxNodes cache ----
     private readonly BoundedCache<string, int> _topologyMaxNodes;
@@ -71,7 +71,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     private long _heartbeatsSent;
     private long _heartbeatsMissed;
     private long _topologySwitches;
-    private int _activeNodeCount;
+    private long _activeNodeCount;
 
     // ---- Backpressure ----
     private volatile BackpressureState _backpressureState = BackpressureState.Normal;
@@ -172,7 +172,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
         {
             ["topology.current"] = _currentTopology.ToString(),
             ["topology.maxNodes"] = maxNodesForTopology,
-            ["topology.activeNodes"] = _activeNodeCount,
+            ["topology.activeNodes"] = Interlocked.Read(ref _activeNodeCount),
             ["topology.switches"] = Interlocked.Read(ref _topologySwitches),
             ["topology.autoSwitch"] = _autoSwitchEnabled,
             ["nodes.added"] = Interlocked.Read(ref _nodesAdded),
@@ -187,7 +187,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
             ["config.meshMaxNodes"] = GetMaxNodesForTopology(FabricTopology.Mesh),
             ["config.federatedMaxNodes"] = GetMaxNodesForTopology(FabricTopology.Federated),
             ["backpressure.state"] = _backpressureState.ToString(),
-            ["backpressure.queueDepth"] = _activeNodeCount
+            ["backpressure.queueDepth"] = Interlocked.Read(ref _activeNodeCount)
         };
         return metrics;
     }
@@ -281,19 +281,23 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     /// <param name="targetTopology">The target topology to switch to.</param>
     public void SwitchTopology(FabricTopology targetTopology)
     {
-        var previous = _currentTopology;
-        _currentTopology = targetTopology;
-        Interlocked.Increment(ref _topologySwitches);
-
-        var recommendation = new TopologySwitchRecommendation
+        TopologySwitchRecommendation recommendation;
+        lock (_nodeLock)
         {
-            FromTopology = previous,
-            ToTopology = targetTopology,
-            Reason = "Manual topology switch",
-            NodeCount = _activeNodeCount,
-            TimestampUtc = DateTime.UtcNow,
-            WasAutomatic = false
-        };
+            var previous = _currentTopology;
+            _currentTopology = targetTopology;
+            Interlocked.Increment(ref _topologySwitches);
+
+            recommendation = new TopologySwitchRecommendation
+            {
+                FromTopology = previous,
+                ToTopology = targetTopology,
+                Reason = "Manual topology switch",
+                NodeCount = (int)Interlocked.Read(ref _activeNodeCount),
+                TimestampUtc = DateTime.UtcNow,
+                WasAutomatic = false
+            };
+        }
         _switchRecommendations.Put($"switch-{DateTime.UtcNow.Ticks}", recommendation);
     }
 
@@ -353,7 +357,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Gets the current count of active (healthy) nodes.
     /// </summary>
-    public int ActiveNodeCount => _activeNodeCount;
+    public int ActiveNodeCount => (int)Interlocked.Read(ref _activeNodeCount);
 
     /// <summary>
     /// Configures the heartbeat monitoring parameters.
@@ -438,7 +442,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     /// </summary>
     private void EvaluateTopologySwitch()
     {
-        var nodeCount = _activeNodeCount;
+        var nodeCount = (int)Interlocked.Read(ref _activeNodeCount);
         FabricTopology? targetTopology = null;
         string? reason = null;
 
@@ -498,7 +502,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     private void UpdateBackpressureState()
     {
         var maxNodes = GetMaxNodesForTopology(_currentTopology);
-        var nodeCount = _activeNodeCount;
+        var nodeCount = (int)Interlocked.Read(ref _activeNodeCount);
 
         if (maxNodes <= 0)
         {

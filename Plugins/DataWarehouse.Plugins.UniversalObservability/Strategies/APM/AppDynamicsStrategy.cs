@@ -13,6 +13,7 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.APM;
 public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
+    private readonly object _tokenLock = new();
     private string _controllerUrl = "";
     private string _accountName = "";
     private string _apiClientName = "";
@@ -41,9 +42,18 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
         _applicationName = applicationName;
     }
 
-    private async Task EnsureAuthenticatedAsync(CancellationToken ct)
+    /// <summary>
+    /// Ensures a valid OAuth access token is cached and returns it.
+    /// Thread-safe: locks around token reads and writes to prevent races on DefaultRequestHeaders.
+    /// Token is injected per-request rather than on DefaultRequestHeaders to avoid data races.
+    /// </summary>
+    private async Task<string> EnsureAuthenticatedAsync(CancellationToken ct)
     {
-        if (_accessToken != null && DateTime.UtcNow < _tokenExpiry) return;
+        lock (_tokenLock)
+        {
+            if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
+                return _accessToken;
+        }
 
         var tokenRequest = new Dictionary<string, string>
         {
@@ -58,16 +68,34 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
         var json = await response.Content.ReadAsStringAsync(ct);
         var result = JsonSerializer.Deserialize<JsonElement>(json);
-        _accessToken = result.GetProperty("access_token").GetString();
-        _tokenExpiry = DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32() - 60);
+        var newToken = result.GetProperty("access_token").GetString()
+            ?? throw new InvalidOperationException("AppDynamics OAuth response did not include an access_token.");
+        var expiresIn = result.GetProperty("expires_in").GetInt32();
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        lock (_tokenLock)
+        {
+            _accessToken = newToken;
+            _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+        }
+
+        return newToken;
+    }
+
+    /// <summary>
+    /// Creates an HttpRequestMessage with the Bearer token injected per-request (thread-safe).
+    /// </summary>
+    private async Task<HttpRequestMessage> CreateAuthenticatedRequestAsync(
+        HttpMethod method, string url, HttpContent? content, CancellationToken ct)
+    {
+        var token = await EnsureAuthenticatedAsync(ct);
+        var request = new HttpRequestMessage(method, url) { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return request;
     }
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
         IncrementCounter("app_dynamics.metrics_sent");
-        await EnsureAuthenticatedAsync(cancellationToken);
 
         foreach (var metric in metrics)
         {
@@ -80,16 +108,17 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
             var json = JsonSerializer.Serialize(new[] { metricData });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            await _httpClient.PostAsync(
+            using var request = await CreateAuthenticatedRequestAsync(
+                HttpMethod.Post,
                 $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
                 content, cancellationToken);
+            using var resp = await _httpClient.SendAsync(request, cancellationToken);
         }
     }
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
         IncrementCounter("app_dynamics.traces_sent");
-        await EnsureAuthenticatedAsync(cancellationToken);
 
         // AppDynamics uses its own agent for tracing, but we can report custom events
         foreach (var span in spans)
@@ -111,9 +140,11 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
             var json = JsonSerializer.Serialize(eventData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            await _httpClient.PostAsync(
+            using var request = await CreateAuthenticatedRequestAsync(
+                HttpMethod.Post,
                 $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
                 content, cancellationToken);
+            using var resp = await _httpClient.SendAsync(request, cancellationToken);
         }
     }
 
@@ -124,8 +155,11 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
     {
         try
         {
-            await EnsureAuthenticatedAsync(ct);
-            using var response = await _httpClient.GetAsync($"{_controllerUrl}/controller/rest/applications", ct);
+            using var request = await CreateAuthenticatedRequestAsync(
+                HttpMethod.Get,
+                $"{_controllerUrl}/controller/rest/applications",
+                null, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "AppDynamics is healthy" : "AppDynamics unhealthy",
                 new Dictionary<string, object> { ["controllerUrl"] = _controllerUrl, ["application"] = _applicationName });

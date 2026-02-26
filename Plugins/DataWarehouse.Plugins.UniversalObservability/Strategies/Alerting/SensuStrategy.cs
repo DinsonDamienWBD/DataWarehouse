@@ -52,11 +52,14 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
         _apiKey = apiKey;
         _namespace = sensuNamespace;
 
-        if (!string.IsNullOrEmpty(apiKey))
-        {
-            _httpClient.DefaultRequestHeaders.Remove("Authorization");
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Key {apiKey}");
-        }
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
+    }
+
+    /// <summary>Adds the Sensu API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(_apiKey))
+            request.Headers.Add("Authorization", $"Key {_apiKey}");
     }
 
     /// <inheritdoc/>
@@ -172,7 +175,9 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
 
-                using var response = await _httpClient.PostAsync(url, content, ct);
+                using var sensuRequest = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+                AddApiKey(sensuRequest);
+                using var response = await _httpClient.SendAsync(sensuRequest, ct);
                 response.EnsureSuccessStatusCode();
             }
         }
@@ -205,7 +210,9 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
     {
         try
         {
-            using var response = await _httpClient.GetAsync($"{_apiUrl}/health", cancellationToken);
+            using var healthRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiUrl}/health");
+            AddApiKey(healthRequest);
+            using var response = await _httpClient.SendAsync(healthRequest, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,

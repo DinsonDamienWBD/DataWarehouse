@@ -370,9 +370,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
             // Try to verify the signature using the key store
             if (_keyStore == null || _securityContext == null)
             {
-                findings.Add("L2: No key store available for signature verification — signature present but unverified");
-                // Signature exists but we can't verify it — pass Level 2 with a note
-                return true;
+                findings.Add("L2: No key store configured — signature verification failed (fail-closed)");
+                // Fail-closed: a signature that cannot be verified is not trusted.
+                return false;
             }
 
             try

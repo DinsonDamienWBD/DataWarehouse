@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO.Hashing;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -128,7 +129,11 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
                         SpanKind.Consumer => "queue",
                         _ => "custom"
                     },
-                    start = span.StartTime.ToUnixTimeMilliseconds() * 1_000_000,
+                    // Compute start time in nanoseconds safely to avoid long overflow.
+                    // ToUnixTimeMilliseconds() * 1_000_000 overflows for current timestamps (~1.7T ms * 1M = overflow).
+                    // Correct approach: seconds * 1_000_000_000L + (sub-second ms) * 1_000_000L
+                    start = span.StartTime.ToUnixTimeSeconds() * 1_000_000_000L
+                          + (span.StartTime.ToUnixTimeMilliseconds() % 1000L) * 1_000_000L,
                     duration = (long)span.Duration.TotalNanoseconds,
                     error = span.Status == SpanStatus.Error ? 1 : 0,
                     meta = span.Attributes?.ToDictionary(a => a.Key, a => a.Value?.ToString() ?? "")
@@ -211,8 +216,12 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         if (ulong.TryParse(id, System.Globalization.NumberStyles.HexNumber, null, out var result))
             return result;
 
-        // Fallback: hash the string
-        return (ulong)id.GetHashCode() & 0x7FFFFFFFFFFFFFFF;
+        // Fallback: use XxHash64 for a deterministic, cross-process-stable hash.
+        // string.GetHashCode() is non-deterministic across processes (randomized per-run),
+        // which would produce inconsistent trace IDs when spans are reported by multiple processes.
+        var bytes = Encoding.UTF8.GetBytes(id);
+        var hash = XxHash64.HashToUInt64(bytes);
+        return hash & 0x7FFFFFFFFFFFFFFF; // Clear sign bit for positive ulong interpretation
     }
 
     /// <inheritdoc/>

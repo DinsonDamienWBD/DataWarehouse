@@ -128,16 +128,10 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// and periodic notifications from server. Full implementation is deferred.
         /// Returns a no-op IDisposable for now.
         /// </remarks>
-        public Task<IDisposable> ObserveAsync(string resourceUri, Action<CoApResponse> onNotification, CancellationToken ct = default)
-        {
-            // Full Observe implementation requires:
-            // 1. Send GET request with Observe option (option 6, value 0)
-            // 2. Store observation in _observations dictionary
-            // 3. Server sends periodic notifications with incremented Observe option value
-            // 4. Return IDisposable that sends Observe=1 (deregister) on disposal
-
-            return Task.FromResult<IDisposable>(new NoOpDisposable());
-        }
+        public Task<IDisposable> ObserveAsync(string resourceUri, Action<CoApResponse> onNotification, CancellationToken ct = default) =>
+            throw new PlatformNotSupportedException(
+                "CoAP Observe (RFC 7641) requires a CoAP server endpoint that supports the Observe option. " +
+                "Configure the CoAP server endpoint via CoApOptions.");
 
         /// <summary>
         /// Convenience method for GET requests.

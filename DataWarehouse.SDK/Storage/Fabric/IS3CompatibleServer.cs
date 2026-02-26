@@ -154,4 +154,11 @@ public record S3ServerOptions
     /// When null, the server operates in anonymous/open mode.
     /// </summary>
     public IS3AuthProvider? AuthProvider { get; init; }
+
+    /// <summary>
+    /// Secret key used to sign presigned URLs (HMAC-SHA256).
+    /// Must be set to a strong, randomly-generated secret before enabling presigned URL generation.
+    /// Throws <see cref="InvalidOperationException"/> at URL generation time if not configured.
+    /// </summary>
+    public string? PresignSecret { get; init; }
 }

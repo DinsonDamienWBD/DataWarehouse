@@ -47,8 +47,20 @@ public sealed class WriteAheadLog : IWriteAheadLog, IAsyncDisposable
     {
         get
         {
-            long head = Interlocked.Read(ref _headBlock);
-            long tail = Interlocked.Read(ref _tailBlock);
+            // Read head and tail atomically under the append lock to prevent a torn pair.
+            // Both values must be observed consistently to compute a meaningful utilization ratio.
+            long head, tail;
+            _appendLock.Wait();
+            try
+            {
+                head = _headBlock;
+                tail = _tailBlock;
+            }
+            finally
+            {
+                _appendLock.Release();
+            }
+
             long dataBlocks = _walBlockCount - 1; // Exclude header block
 
             if (head >= tail)
@@ -307,8 +319,9 @@ public sealed class WriteAheadLog : IWriteAheadLog, IAsyncDisposable
                 // Read current block (may have existing data)
                 await _device.ReadBlockAsync(absoluteBlock, blockBuffer, ct);
 
-                // Calculate how much we can write to this block
-                int blockOffset = (int)(_headBlock == 1 ? 0 : 0); // Simplified: start at block beginning
+                // Each WAL data block is written from the beginning (offset 0).
+                // Entries that span multiple blocks are written across consecutive whole blocks.
+                const int blockOffset = 0;
                 int available = _device.BlockSize - blockOffset;
                 int toWrite = Math.Min(available, entryData.Length - offset);
 

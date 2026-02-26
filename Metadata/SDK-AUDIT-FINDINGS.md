@@ -131,7 +131,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 63 | 1 | P0 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:193-667` | All 9 database execution methods are non-functional stubs — `_ = node; _ = key; return null/true/CompletedTask`. Entire Jepsen harness produces fabricated history. | [ ]
+| 63 | 1 | P0 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:193-667` | All 9 database execution methods are non-functional stubs — `_ = node; _ = key; return null/true/CompletedTask`. Entire Jepsen harness produces fabricated history. | [X]
 | 64 | 10 | P1 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:154-167` | Timeout catch always records `Type = OperationType.Read` regardless of actual operation — corrupts linearizability checker input. | [ ]
 | 65 | 13 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:70-627` | `List<byte>` + `AddRange` for binary serialization in every `ToBytes()` method — 3 copies per message. | [ ]
 | 66 | 14 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:93,245,373` | Unbounded count allocation from untrusted input in `FromBytes()` — deserialization DoS. | [ ]
@@ -190,7 +190,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 100 | 1 | P0 | `Contracts/IConsensusEngine.cs:96-134` | LogReplicator, HierarchicalConsensusManager, SnapshotManager are pure stubs — hardcoded returns (0, true, CompletedTask), untyped `object plugin` constructors. | [ ]
+| 100 | 1 | P0 | `Contracts/IConsensusEngine.cs:96-134` | LogReplicator, HierarchicalConsensusManager, SnapshotManager are pure stubs — hardcoded returns (0, true, CompletedTask), untyped `object plugin` constructors. | [X]
 | 101 | 15 | P1 | `Contracts/Hierarchy/Feature/OrchestrationPluginBase.cs:68-81` | `OrchestrateWithStrategyAsync` discards resolved strategy — lambda `_ => Task.FromResult(new Dict(workflow))` just copies input dict. | [X]
 | 102 | 15 | P1 | `Contracts/Hierarchy/Feature/PlatformPluginBase.cs:68-81` | `ExecutePlatformOpWithStrategyAsync` identical defect — strategy resolved but never called, operation dict returned as-is. | [X]
 | 103 | 4 | P1 | `Contracts/Hierarchy/Feature/SecurityPluginBase.cs:55-60` | `EvaluateAccessWithIntelligenceAsync` defaults to `allowed=true`, `DetectAnomalousAccessAsync` defaults to `false` — fail-open security on base class. | [X]
@@ -540,8 +540,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 285 | 1 | P0 | `Edge/Mesh/BleMesh.cs:7-52`, `ZigbeeMesh.cs:7-52`, `LoRaMesh.cs:7-98` | All three mesh implementations self-identify as "Stub implementation demonstrating API contract." Loopback simulation inverts source/destination. `DiscoverTopologyAsync` returns empty lists. Rule 13 violation. | [ ]
-| 286 | 1 | P0 | `Edge/Protocols/CoApClient.cs:131-139` | `ObserveAsync` returns no-op `IDisposable`, never registers callback, never sends Observe option. Callers believe they have live subscription but receive nothing. Silent stub. | [ ]
+| 285 | 1 | P0 | `Edge/Mesh/BleMesh.cs:7-52`, `ZigbeeMesh.cs:7-52`, `LoRaMesh.cs:7-98` | All three mesh implementations self-identify as "Stub implementation demonstrating API contract." Loopback simulation inverts source/destination. `DiscoverTopologyAsync` returns empty lists. Rule 13 violation. | [X]
+| 286 | 1 | P0 | `Edge/Protocols/CoApClient.cs:131-139` | `ObserveAsync` returns no-op `IDisposable`, never registers callback, never sends Observe option. Callers believe they have live subscription but receive nothing. Silent stub. | [X]
 | 287 | 1 | P1 | `Edge/Protocols/CoApClient.cs:63-66` | DTLS flag silently ignored — `UseDtls=true` and `coaps://` URIs use plain `UdpClient`. Security-sensitive IoT payloads travel in cleartext. | [ ]
 | 288 | 2 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:61-106` | Session cache check-then-act (`TryGetValue→build→evict→assign`) not atomic. Concurrent loads orphan native ONNX Runtime handles. | [ ]
 | 289 | 2 | P1 | `Edge/Protocols/CoApClient.cs:76-77` | `_nextMessageId++` on plain `ushort` is not atomic — concurrent sends produce duplicate message IDs, causing response mismatch or permanent hangs. | [ ]
@@ -663,7 +663,7 @@
 | 361 | 6 | P1 | `Hardware/DriverLoader.cs:393-394` | `async void` FileSystemWatcher event handlers — unhandled exceptions crash the process. | [ ]
 | 362 | 7 | P1 | `Hardware/DriverLoader.cs:72,355-373` | Use-after-dispose race: `_loadLock` disposed while `UnloadAsync` still holds/releases it — `ObjectDisposedException` in finally block. | [ ]
 | 363 | 1 | P1 | `Hardware/Accelerators/Pkcs11Wrapper.cs:188-203` | `CK_FUNCTION_LIST` struct has only 6 of 70+ PKCS#11 function pointers — `[StructLayout(Sequential)]` maps wrong offsets for `C_OpenSession`/`C_Login`. | [ ]
-| 364 | 4 | P0 | `Hardware/Accelerators/Pkcs11Wrapper.cs:189-203` | P/Invoke struct layout mismatch — HSM `C_Login` with PIN may invoke arbitrary function pointer. Memory safety and security defect. | [ ]
+| 364 | 4 | P0 | `Hardware/Accelerators/Pkcs11Wrapper.cs:189-203` | P/Invoke struct layout mismatch — HSM `C_Login` with PIN may invoke arbitrary function pointer. Memory safety and security defect. | [X]
 | 365 | 15 | P1 | `MetalInterop.cs:207` + 5 others | `IsCpuFallback => _isAvailable` — semantically inverted in all 6 accelerators (returns true when hardware IS available). | [ ]
 | 366 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:344-348` | Silent CPU fallback on unavailable backend — no log, no event, no signal to caller of >10x performance degradation. | [ ]
 | 367 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:446-458` | `MapBackendToProvider` silently maps ROCm/CoreML/NNAPI/OpenCL/CANN to CPU — hardware detected but never used. | [ ]
@@ -1052,7 +1052,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 588 | 4 | P0 | `Security/SupplyChain/SlsaVerifier.cs:371-375` | Signature verification silently bypassed when key store absent — returns `VerificationResult.Success` instead of failing closed, allowing unverified artifacts through. | [ ]
+| 588 | 4 | P0 | `Security/SupplyChain/SlsaVerifier.cs:371-375` | Signature verification silently bypassed when key store absent — returns `VerificationResult.Success` instead of failing closed, allowing unverified artifacts through. | [X]
 | 589 | 2 | P1 | `Security/NativeKeyHandle.cs:116-119` | Non-atomic dispose: `_isDisposed` set true before `NativeMemory.Clear`+`Free` — concurrent thread sees disposed but key material still in memory, or accesses freed memory. | [ ]
 | 590 | 4 | P1 | `Security/SupplyChain/SlsaProvenanceGenerator.cs:490-495` | Crypto fallback silently degrades RSA-PSS to HMAC-SHA256 when signing key unavailable — no log, no warning, weaker algorithm used. | [ ]
 | 591 | 4 | P1 | `Security/SupplyChain/SlsaVerifier.cs:432-463` | Verifier imports private key for HMAC verification path — private key should never be needed for verification. HMAC fallback makes signatures forgeable by anyone with the "verification" key. | [ ]
@@ -1494,8 +1494,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 842 | 2/9 | P0 | `VDE/Journal/WriteAheadLog.cs:46-64` | `_headBlock` and `_tailBlock` read with separate `Interlocked.Read` calls — torn pair between reads allows `WalUtilization` and `GetAvailableBlocks` to return inconsistent values. `EnsureSpaceAsync` uses torn utilization to decide checkpointing, risking writes into a full WAL. | [ ]
-| 843 | 9/1 | P0 | `VDE/Journal/WriteAheadLog.cs:311` | `blockOffset = (_headBlock == 1 ? 0 : 0)` — trivially constant expression means every entry starts at byte 0 of its block. Entries smaller than a block each consume a full block, exhausting WAL 100x faster than expected for small entries. Comment says "Simplified: start at block beginning". | [ ]
+| 842 | 2/9 | P0 | `VDE/Journal/WriteAheadLog.cs:46-64` | `_headBlock` and `_tailBlock` read with separate `Interlocked.Read` calls — torn pair between reads allows `WalUtilization` and `GetAvailableBlocks` to return inconsistent values. `EnsureSpaceAsync` uses torn utilization to decide checkpointing, risking writes into a full WAL. | [X]
+| 843 | 9/1 | P0 | `VDE/Journal/WriteAheadLog.cs:311` | `blockOffset = (_headBlock == 1 ? 0 : 0)` — trivially constant expression means every entry starts at byte 0 of its block. Entries smaller than a block each consume a full block, exhausting WAL 100x faster than expected for small entries. Comment says "Simplified: start at block beginning". | [X]
 | 844 | 9 | P1 | `VDE/Journal/WriteAheadLog.cs:486` | `DisposeAsync` does `await Task.CompletedTask` — no `FlushAsync` or `WriteHeaderAsync` call. Un-flushed entries and stale header on disk cause `ReplayAsync` to miss or double-replay entries after restart. | [ ]
 | 845 | 15/1 | P1 | `VDE/Integrity/HierarchicalChecksumTree.cs:320-324` | `Level3Ok = computedRoot.Length == HashSize` — always true for SHA-256. No comparison against a stored Merkle root. The three-level integrity guarantee is only two levels; Level 3 silently passes for corrupt objects. | [ ]
 | 846 | 11 | P1 | `VDE/Lakehouse/DeltaIcebergTransactionLog.cs:295-301` | `CommitMultiTableAsync` catch block documents rollback but only rethrows — partial commits left in `_tables`. Breaks atomicity guarantee (`IsAtomic = true` flag is a lie for failed multi-table commits). | [ ]
@@ -1593,7 +1593,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 897 | 1 | P0 | `VDE/Replication/ExtentDeltaReplicator.cs:155-193` | `ComputeDeltaAsync(sinceTransactionId, untilTransactionId)` initializes `changedExtents` as empty list then iterates it — always returns empty delta regardless of actual modifications. Replication never ships any data. | [ ]
+| 897 | 1 | P0 | `VDE/Replication/ExtentDeltaReplicator.cs:155-193` | `ComputeDeltaAsync(sinceTransactionId, untilTransactionId)` initializes `changedExtents` as empty list then iterates it — always returns empty delta regardless of actual modifications. Replication never ships any data. | [X]
 | 898 | 2 | P1 | `VDE/Regions/ReplicationStateRegion.cs:209-343` | All mutating methods (`SetVector`, `IncrementVector`, `SetWatermark`, `MarkDirty`, `ClearDirty`) operate on shared arrays with no synchronization — `_dirtyBitmap[byteIndex] |= ...` is a non-atomic read-modify-write causing silent data races. | [ ]
 | 899 | 1 | P1 | `VDE/Sql/PredicatePushdownPlanner.cs:380-434` | Three helpers hardcode `valueWidth = 4` for all column types — Int64/Float64/Bool/DateTime columns read wrong bytes. Comment: "assume int32 = 4 bytes as default". | [ ]
 | 900 | 1 | P1 | `VDE/Sql/ParquetVdeIntegration.cs:183` | Extent start block hardcoded as `100 + rowGroupIndex * batch.ColumnCount` — magic number unrelated to actual block allocation. Zone maps point to wrong physical addresses. | [ ]
@@ -1683,7 +1683,7 @@
 |---|-----|-----|-----------|-------------|
 | 940 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~64` | `.Result` on Task in hot pipeline path — blocks thread pool thread and risks deadlock under synchronization context. | [ ]
 | 941 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~93` | `.GetAwaiter().GetResult()` on hot pipeline path — same sync-over-async deadlock risk as #940, compounds under load. | [ ]
-| 942 | 1 | P0 | `PipelineMigrationEngine.cs:~480-502` | `ReverseStageAsync` is a self-described placeholder that returns unmodified data — pipeline migration rollback is non-functional. | [ ]
+| 942 | 1 | P0 | `PipelineMigrationEngine.cs:~480-502` | `ReverseStageAsync` is a self-described placeholder that returns unmodified data — pipeline migration rollback is non-functional. | [X]
 | 943 | 6 | P1 | `MemoryPressureMonitor.cs:~56` | GC notification registration task is fire-and-forget — exceptions from GC monitoring silently lost, no fault observation. | [X]
 | 944 | 6 | P1 | `DataWarehouseKernel.cs:~930` | Shutdown audit-log task discarded with `_ =` pattern — if audit logging fails during shutdown, no error is ever surfaced. | [ ]
 | 945 | 6 | P1 | `DataWarehouseKernel.cs:~270` | Plugin-load audit-log task discarded with `_ =` pattern — failed audit during plugin load invisible to operators. | [ ]
@@ -6683,10 +6683,10 @@
 
 ### Chunk 148 — UniversalFabric (AddressRouter, BackendRegistry, Migration, Placement, Resilience, S3Server start)
 
-#4527 | Cat 4 | P0 | S3HttpServer.cs:511-513 | **Hardcoded secret**: `HMACSHA256.HashData(Encoding.UTF8.GetBytes("DataWarehousePresignSecret"), ...)` embeds literal signing secret. Anyone with source can forge presigned URLs. [ ]
-#4528 | Cat 4 | P0 | S3HttpServer.cs:849-854 | **Authorization bypass**: `EnsureBucketExists` is empty no-op. All read/delete operations skip bucket authorization — attacker can access objects from unregistered buckets. [ ]
+#4527 | Cat 4 | P0 | S3HttpServer.cs:511-513 | **Hardcoded secret**: `HMACSHA256.HashData(Encoding.UTF8.GetBytes("DataWarehousePresignSecret"), ...)` embeds literal signing secret. Anyone with source can forge presigned URLs. [X]
+#4528 | Cat 4 | P0 | S3HttpServer.cs:849-854 | **Authorization bypass**: `EnsureBucketExists` is empty no-op. All read/delete operations skip bucket authorization — attacker can access objects from unregistered buckets. [X]
 #4529 | Cat 4 | P0 | S3CredentialStore.cs:218-220 | **Crypto weakness**: `randomBytes[i] % Base62Chars.Length` has modulo bias (256 not divisible by 62). Reduces effective entropy below claimed ~238 bits for credential generation. [X]
-#4530 | Cat 4 | P0 | S3HttpServer.cs:856-860 | **MD5 usage**: `MD5.HashData(data)` for ETag computation. MD5 cryptographically broken, prohibited under FIPS 140-2 and PCI DSS. [ ]
+#4530 | Cat 4 | P0 | S3HttpServer.cs:856-860 | **MD5 usage**: `MD5.HashData(data)` for ETag computation. MD5 cryptographically broken, prohibited under FIPS 140-2 and PCI DSS. [X]
 #4531 | Cat 6 | P1 | LiveMigrationEngine.cs:54 | **Fire-and-forget**: `_ = Task.Run(() => ExecuteMigrationAsync(...))` — no reference kept, unhandled exceptions before outer try silently lost. [X]
 #4532 | Cat 2 | P1 | MigrationJob.cs:141-143 | **Thread safety**: `Status`, `StartedAt`, `CompletedAt` are plain property assignments without memory barriers. Read from different threads via `GetProgress`. Progress counters use Interlocked but state transitions don't. [ ]
 #4533 | Cat 7 | P1 | BackendAbstractionLayer.cs:130-178 | **Resource leak**: `IAsyncEnumerator` obtained at line 139 has no `using` guard. Consumer abandoning enumeration mid-stream leaks the enumerator. [ ]
@@ -6715,10 +6715,10 @@
 
 ### Chunk 149 — UniversalFabric (S3Server end, Scaling, Plugin) + UniversalObservability (APM, Alerting start)
 
-#4555 | Cat 4 | P0 | AppDynamicsStrategy.cs:62 | **Security race**: OAuth token written to shared `HttpClient.DefaultRequestHeaders` on every refresh. No lock — concurrent calls race on `_accessToken` and `_tokenExpiry`. Token leak between requests. [ ]
-#4556 | Cat 4 | P0 | DynatraceStrategy.cs:36 | **Security**: API token written to `DefaultRequestHeaders` — not thread-safe for concurrent modification. Same in NewRelicStrategy.cs:38, OpsGenieStrategy.cs:34, SensuStrategy.cs:57, InstanaStrategy.cs:53. [ ]
-#4557 | Cat 2 | P0 | FabricScalingManager.cs:49-55 | **Thread safety**: `_autoSwitchEnabled`, `_heartbeatIntervalMs` and other config fields are plain non-volatile fields mutated by public methods and read by timer callback concurrently. [ ]
-#4558 | Cat 2 | P0 | FabricScalingManager.cs:74+284-285 | **Thread safety**: `_activeNodeCount` read as plain field (not `Interlocked.Read`). `SwitchTopology()` does non-atomic read-then-write without lock — concurrent callers can lose topology switches. [ ]
+#4555 | Cat 4 | P0 | AppDynamicsStrategy.cs:62 | **Security race**: OAuth token written to shared `HttpClient.DefaultRequestHeaders` on every refresh. No lock — concurrent calls race on `_accessToken` and `_tokenExpiry`. Token leak between requests. [X]
+#4556 | Cat 4 | P0 | DynatraceStrategy.cs:36 | **Security**: API token written to `DefaultRequestHeaders` — not thread-safe for concurrent modification. Same in NewRelicStrategy.cs:38, OpsGenieStrategy.cs:34, SensuStrategy.cs:57, InstanaStrategy.cs:53. [X]
+#4557 | Cat 2 | P0 | FabricScalingManager.cs:49-55 | **Thread safety**: `_autoSwitchEnabled`, `_heartbeatIntervalMs` and other config fields are plain non-volatile fields mutated by public methods and read by timer callback concurrently. [X]
+#4558 | Cat 2 | P0 | FabricScalingManager.cs:74+284-285 | **Thread safety**: `_activeNodeCount` read as plain field (not `Interlocked.Read`). `SwitchTopology()` does non-atomic read-then-write without lock — concurrent callers can lose topology switches. [X]
 #4559 | Cat 5 | P1 | UniversalFabricPlugin.cs:134-137 | **Silent catch**: Bare catch silences all backend discovery errors. Fabric starts with zero backends, no diagnostic info. [X]
 #4560 | Cat 5 | P1 | UniversalFabricPlugin.cs:288-291 | **Silent catch**: `GetFabricHealthAsync` bare catch discards exception. Callers cannot distinguish timeout from programming error. [X]
 #4561 | Cat 5 | P1 | UniversalFabricPlugin.cs:479-482 | **Silent catch**: `ListAsync` catch covers initialization only, not iteration. Strategy throwing during enumeration propagates past catch. [X]
@@ -6752,8 +6752,8 @@
 
 ### Chunk 150 — UniversalObservability (ErrorTracking, Health, Logging start)
 
-#4588 | Cat 4 | P0 | BugsnagStrategy.cs:55 | **Security**: API key added to `DefaultRequestHeaders` without clearing first. Each `Configure()` call appends duplicate `Bugsnag-Api-Key` header. [ ]
-#4589 | Cat 4 | P0 | IcingaStrategy.cs:43-49 | **Security dead code**: SSL bypass check runs in constructor before `Configure()` sets `_verifySsl`. Handler already built — bypass never applies. [ ]
+#4588 | Cat 4 | P0 | BugsnagStrategy.cs:55 | **Security**: API key added to `DefaultRequestHeaders` without clearing first. Each `Configure()` call appends duplicate `Bugsnag-Api-Key` header. [X]
+#4589 | Cat 4 | P0 | IcingaStrategy.cs:43-49 | **Security dead code**: SSL bypass check runs in constructor before `Configure()` sets `_verifySsl`. Handler already built — bypass never applies. [X]
 #4590 | Cat 4 | P0 | ZabbixStrategy.cs:57-63 | **Stale auth token**: `EnsureAuthenticatedAsync` caches token but `Configure()` never clears it. New credentials use old token. [X]
 #4591 | Cat 5 | P1 | AirbrakeStrategy.cs:211-214 | **Silent catch**: `HttpRequestException` swallowed in `SendNoticeAsync`. Error tracker silently drops errors. [X]
 #4592 | Cat 5 | P1 | BugsnagStrategy.cs:219-222 | **Silent catch**: Same pattern — `SendToBugsnagAsync` silently drops on HTTP failure. [X]
@@ -6787,7 +6787,7 @@
 
 ### Chunk 151 — UniversalObservability (Logging end, Metrics, Profiling)
 
-#4619 | Cat 4 | P0 | DatadogStrategy.cs:215 | **GetHashCode persistence**: `string.GetHashCode()` used for trace ID conversion. Non-deterministic across restarts — Datadog sees same trace as unrelated across runs. [ ]
+#4619 | Cat 4 | P0 | DatadogStrategy.cs:215 | **GetHashCode persistence**: `string.GetHashCode()` used for trace ID conversion. Non-deterministic across restarts — Datadog sees same trace as unrelated across runs. [X]
 #4620 | Cat 4 | P0 | CloudWatchStrategy.cs:62 | **Credential exposure**: AWS `secretAccessKey` stored as plain `string` field for object lifetime. No zeroing on disposal. Same in StackdriverStrategy.cs:21 (`_accessToken`) and SplunkStrategy.cs:20 (`_hecToken`). [X]
 #4621 | Cat 5 | P1 | SumoLogicStrategy.cs:122-125 | **Silent catch**: `SendToSumoLogicAsync` silently swallows `HttpRequestException`. No counter, no retry, no circuit breaker. [X]
 #4622 | Cat 5 | P1 | DatadogProfilerStrategy.cs:130-133 | **Silent catch**: `UploadPprofAsync` swallows `HttpRequestException`. Same at line 147-150 for `UploadProfilesAsync`. [X]
@@ -6813,7 +6813,7 @@
 #4642 | Cat 13 | P2 | TelegrafStrategy.cs:128-137 | **Performance**: `FormatAsGraphite` uses `string +=` concatenation in loop — O(n^2) for metrics with many labels. [ ]
 #4643 | Cat 14 | P2 | PprofStrategy.cs:46-55 | **Path traversal**: `Configure()` passes user-supplied `outputDirectory` to `Directory.CreateDirectory()` without sanitization. [ ]
 #4644 | Cat 12 | P2 | StackdriverStrategy.cs:310-311 | **Logic bug**: Counter metric `startTime` hardcoded as `Timestamp.AddMinutes(-1)`. Fabricated interval causes API validation errors. [ ]
-#4645 | Cat 12 | P0 | DatadogStrategy.cs:131 | **Arithmetic overflow**: `span.StartTime.ToUnixTimeMilliseconds() * 1_000_000` overflows `long` for 2026+ timestamps. Span timestamps silently wrap to negative values. [ ]
+#4645 | Cat 12 | P0 | DatadogStrategy.cs:131 | **Arithmetic overflow**: `span.StartTime.ToUnixTimeMilliseconds() * 1_000_000` overflows `long` for 2026+ timestamps. Span timestamps silently wrap to negative values. [X]
 #4646 | Cat 15 | LOW | SplunkStrategy.cs:34-43 | `new HttpClient()` per strategy instance — socket exhaustion. Same in 11 other strategy files. [ ]
 #4647 | Cat 15 | LOW | SumoLogicStrategy.cs:21 | `_sourceHost = Environment.MachineName` at field init — stale if container renamed. [ ]
 #4648 | Cat 9 | LOW | Multiple files | Duplicate `/// <inheritdoc/>` in 10+ strategy files. [ ]

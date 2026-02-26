@@ -1971,7 +1971,7 @@ Wave 3: 85-08 (ML pipeline + lakehouse) -- depends on Phase 71 VDE regions
 #### Phase 86: Adaptive Index Engine
 **Goal**: Build a living, self-morphing index that transparently transitions across a continuous spectrum of data structures — from direct pointers (1 object) through ART, Bε-trees, learned indexes, and distributed probabilistic routing (trillions of objects). The index morphs BOTH directions: forward as data grows, backward as data shrinks. The index itself is parallelized via striping, mirroring, sharding, and tiering — like RAID for indexes. Native io_uring and CUDA HNSW provide maximum hardware utilization.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 85 (Competitive Edge — variable-width addressing must exist)
-**Requirements**: AIE-01 through AIE-27
+**Requirements**: AIE-01 through AIE-28
 **Success Criteria** (what must be TRUE):
   1. A new VDE starts at Level 0 (direct pointer). Inserting 100 objects auto-morphs to Level 1 (sorted array). Inserting 10K auto-morphs to Level 2 (ART). Each transition is invisible to the caller — zero API changes, zero downtime.
   2. Bε-tree (Level 3) write benchmark shows ≥10x fewer I/Os than current B-tree on sequential insert of 10M keys.
@@ -1989,7 +1989,8 @@ Wave 3: 85-08 (ML pipeline + lakehouse) -- depends on Phase 71 VDE regions
   14. Extendible hashing inode table grows from 1K to 1B+ inodes without rebuild; O(1) amortized lookup.
   15. Every morph transition is WAL-journaled, copy-on-write, background, cancellable, and crash-safe.
   16. Legacy B-tree v1.0 VDEs open correctly; `dw migrate` upgrades to Bε-tree.
-**Plans**: 16 plans
+  17. CRUSH↔Federation: CRUSH placement resolves shard location in O(1) for ≥95% of routing decisions; hierarchical catalog correctly overrides CRUSH for sovereignty-pinned objects.
+**Plans**: 17 plans
 
 Plans:
 - [ ] 86-01-PLAN.md -- Morphing spectrum Levels 0-2: Direct Pointer Array, Sorted Array, ART (Node4/16/48/256, SIMD Node16, path compression); IAdaptiveIndex interface; Level selection logic
@@ -2008,6 +2009,7 @@ Plans:
 - [ ] 86-14-PLAN.md -- Hilbert curve engine + trained Zstd dictionaries: Hilbert SFC implementation (3-11x over Z-order), ZstdNet dictionary trainer, Compression Dictionary Region storage, auto-retrain
 - [ ] 86-15-PLAN.md -- SIMD acceleration: Vector256/Avx2 bloom probe, ART Node16 search, cosine/dot-product/euclidean, XxHash, bitmap scanning; runtime `Avx2.IsSupported` detection with scalar fallback; persistent extent tree checkpointing
 - [ ] 86-16-PLAN.md -- AIE integration tests + legacy compatibility: full morph spectrum test (insert → Level 6 → delete → Level 0), Index RAID tests, backward morph tests, v1.0 B-tree migration, performance benchmarks (each level vs current B-tree)
+- [ ] 86-17-PLAN.md -- CRUSH↔Federation integration: CRUSH placement algorithm at AIE Level 6 integrates with VdeFederationRouter for masterless O(1) shard routing; CRUSH is the hot path, hierarchical catalog is fallback for sovereignty overrides and pinned objects (AIE-28)
 
 Wave structure:
 ```
@@ -2016,12 +2018,13 @@ Wave 2: 86-03 (Level 4 Learned) + 86-04 (Level 5 Forest) + 86-10 (Disruptor) + 8
 Wave 3: 86-05 (Level 6 Distributed) + 86-06 (MorphAdvisor) + 86-07 (Bidirectional morph) + 86-08 (Index RAID) -- parallel, depends on Waves 1-2
 Wave 4: 86-12 (io_uring) + 86-13 (HNSW+PQ+GPU) + 86-14 (Hilbert+Zstd) + 86-15 (SIMD+extent tree) -- parallel, depends on Wave 1
 Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
+Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Distributed) + Phase 92 interface contracts
 ```
 
 #### Phase 87: VDE Scalable Internals
 **Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
-**Requirements**: VOPT-01 through VOPT-28
+**Requirements**: VOPT-01 through VOPT-32
 **Success Criteria** (what must be TRUE):
   1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
   2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
@@ -2037,7 +2040,10 @@ Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
   12. Hierarchical checksums: corruption in one block of a 1GB file detected and localized via Merkle tree binary search in ≤20 I/O operations.
   13. Extent-aware CoW snapshots: snapshot of 1TB VDE with 1M files creates ≤10MB of snapshot metadata (vs ~4GB with per-block tracking).
   14. Online defragmentation: background defrag compacts fragmented allocation groups while VDE serves normal read/write operations without downtime.
-**Plans**: 15 plans
+  15. WAL sharding: 256-thread concurrent write benchmark shows linear throughput scaling vs 2-WAL baseline.
+  16. Vacuum: dead space ratio stays below 10% under sustained MVCC write load with concurrent readers.
+  17. Metaslab: 1TB+ VDE allocation benchmark shows <5% fragmentation after 1M random-size allocations.
+**Plans**: 19 plans
 
 Plans:
 - [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
@@ -2055,6 +2061,10 @@ Plans:
 - [ ] 87-13-PLAN.md -- Hierarchical checksums: HierarchicalChecksumTree (XxHash64 + CRC32C + Merkle root), MerkleIntegrityVerifier with binary-search corruption localization (VOPT-25)
 - [ ] 87-14-PLAN.md -- Extent-aware CoW + replication delta: ExtentAwareCowManager (extent-level refcounting), ExtentDeltaReplicator (extent-granularity delta shipping) (VOPT-26, VOPT-27)
 - [ ] 87-15-PLAN.md -- Online defragmentation: DefragmentationPolicy, OnlineDefragmenter with I/O budgeting, WAL-journaled crash safety, free extent merging (VOPT-28)
+- [ ] 87-16-PLAN.md -- Thread-affinity sharded WAL: N WAL shards for N CPU cores, per-core lock-free ring buffer mapped 1:1 to io_uring submission queues, parallel shard flush, Shard 0 commit barrier referencing all shard LSNs, multi-shard recovery replay with barrier reconciliation (VOPT-29)
+- [ ] 87-17-PLAN.md -- Epoch-batched Merkle updates: background Merkle root computation at configurable interval (default 5s) decoupled from hot write path, WAL-replay recovery for crash window, configurable batch interval SLA (VOPT-30)
+- [ ] 87-18-PLAN.md -- Hierarchical metaslab allocator: single bitmap <128MB, flat allocation groups 128MB–1TB, hierarchical metaslab trees 1TB+ (Zones → Regions → AGs), lazy bitmap loading (active zones only), size-class segregated allocators (small/medium/large extents) (VOPT-31)
+- [ ] 87-19-PLAN.md -- Vacuum and epoch-based GC: MVCC dead version reclamation via epoch-based reader tracking, configurable SLA lease timeout (default 300s), EpochExpiredException for stale readers, long-running read snapshot materialization to temp VDE, WORM object exemption, vacuum metrics (dead space ratio, reclaim rate, oldest living epoch) (VOPT-32)
 
 Wave structure:
 ```
@@ -2063,6 +2073,7 @@ Wave 2: 87-04 (Extent tree) + 87-05 (Sub-block packing) + 87-06 (MVCC core) -- d
 Wave 3: 87-07 (MVCC GC+isolation) + 87-08 (SQL OLTP) + 87-09 (Columnar+zone maps) -- depends on Wave 2
 Wave 4: 87-10 (SIMD+spill+pushdown) + 87-11 (Tag index) + 87-12 (Per-extent crypto) -- depends on Wave 3
 Wave 5: 87-13 (Checksums+Merkle) + 87-14 (CoW+replication) + 87-15 (Defrag) -- depends on Wave 4
+Wave 6: 87-16 (Sharded WAL) + 87-17 (Epoch Merkle) + 87-18 (Metaslab) + 87-19 (Vacuum GC) -- parallel, depends on Wave 5
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling
