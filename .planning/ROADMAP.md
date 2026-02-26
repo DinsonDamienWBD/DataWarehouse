@@ -2024,7 +2024,7 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
 #### Phase 87: VDE Scalable Internals
 **Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale. Includes the 6-Level Adaptive Integrity Engine (L0 trailers → L1 hash-in-index-pointer → L2 epoch-batched Merkle → L3 learned scrubbing → L4 blockchain-anchored → L5 Merkle-CRDT [v7.0 interface only]).
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
-**Requirements**: VOPT-01 through VOPT-82
+**Requirements**: VOPT-01 through VOPT-87
 **Success Criteria** (what must be TRUE):
   1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
   2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
@@ -2076,7 +2076,12 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
   48. Recovery Point Markers enable full VDE reconstruction from a backup manifest + WAL replay to within 1 epoch of failure point
   49. DirectFileBlockDevice achieves equivalent throughput to current file I/O path; BlockDeviceFactory selects correct implementation on Linux, Windows, macOS, FreeBSD without configuration
   50. WindowsOverlappedBlockDevice: IOCP-based I/O achieves ≥2x throughput vs synchronous FileStream on Windows 10; IoRingBlockDevice achieves additional ≥20% improvement on Windows 11+
-**Plans**: 60 plans
+  51. VDE mounts as native drive on Windows (WinFsp), Linux (FUSE3), macOS (macFUSE), FreeBSD (fusefs): read/write/readdir/stat operations match VDE inode semantics
+  52. Mounted VDE read throughput ≥80% of direct IBlockDevice throughput for sequential 1MB reads (FUSE passthrough mode on Linux 6.9+)
+  53. All 53 format-bakeable features have registered ModuleId bits and FeatureFlags; FormatConstants.DefinedModules reflects full set
+  54. InodeExtent expanded to 32B with ExpectedHash:16; old 24B extents read transparently; new writes always 32B
+  55. ModuleManifest expanded to uint64; backward-compatible with uint32 VDEs (upper 32 bits default zero)
+**Plans**: 65 plans
 
 Plans:
 - [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
@@ -2139,6 +2144,11 @@ Plans:
 - [ ] 87-58-PLAN.md -- KqueueBlockDevice for macOS + FreeBSD (P1): KqueueBlockDevice implementing IBatchBlockDevice via kqueue + kevent (EVFILT_AIO), aio_read/aio_write POSIX AIO submission, completion via kevent batch poll, F_NOCACHE fcntl for O_DIRECT equivalent on macOS, aligned buffer requirement (4KB), fallback to DirectFileBlockDevice when kqueue unavailable, tested on macOS 14+ and FreeBSD 14+, latency target ≤5μs for 4KB reads on NVMe (VOPT-81) [Home: SDK VirtualDiskEngine.IO.Unix]
 - [ ] 87-59-PLAN.md -- SpdkBlockDevice integration (P2 — bare metal): SpdkBlockDevice implementing IBlockDevice + IBatchBlockDevice via P/Invoke to libspdk (spdk_nvme_ns_cmd_read/write, spdk_nvme_qpair), vfio-pci NVMe controller handoff sequence, SpdkDmaAllocator for 4KiB-aligned DMA buffers (spdk_dma_malloc/free), NvmeIdentifyNamespace probe at open for ZNS support and optimal sector size, SpdkBlockDeviceFactory integration (highest priority in BlockDeviceFactory cascade after bare-metal detection), zero-copy path from SPDK DMA buffer directly to caller's aligned buffer, integration tests require actual NVMe or QEMU NVMe emulation (VOPT-63, refined) [Home: SDK VirtualDiskEngine.IO.Spdk + UltimateStorage plugin]
 - [ ] 87-60-PLAN.md -- RawPartitionBlockDevice + AlignedMemoryAllocator (P2 — all platforms): RawPartitionBlockDevice for direct partition I/O bypassing filesystem entirely (Linux: open /dev/nvme0n1p1 with O_DIRECT, Windows: \\.\PhysicalDrive0 with IOCTL_DISK_GET_DRIVE_GEOMETRY, macOS: /dev/rdiskN), partition geometry detection (sector size, partition size, alignment), AlignedMemoryAllocator (native alloc with alignment guarantee: posix_memalign on Linux/macOS, _aligned_malloc on Windows), IMemoryAllocator interface for DI injection, AlignedMemoryPool for reuse of fixed-size buffers, raw partition safety: partition must contain DWVD magic before read/write proceeds (fail-closed), `dw volume mount --raw-partition /dev/nvme0n1p2` CLI (VOPT-82) [Home: SDK VirtualDiskEngine.IO + DataWarehouse.CLI]
+- [ ] 87-61-PLAN.md -- VDE Mount Provider Interface + VdeFilesystemAdapter: IVdeMountProvider interface (MountAsync/UnmountAsync/ListMounts), VdeFilesystemAdapter translating FUSE/WinFsp callbacks to VDE inode operations (Lookup→InodeTable B-tree, Read→extent resolver + IBlockDevice.ReadAsync, Write→allocator + WAL, Getattr→inode metadata, Readdir→directory extent scan), ARC cache integration for hot inodes, concurrent FUSE thread safety via IBlockDevice concurrency (VOPT-83) [Home: SDK VirtualDiskEngine.Mount]
+- [ ] 87-62-PLAN.md -- WinFspMountProvider (Windows): WinFsp.Net managed bindings integration, IFileSystemHost callbacks (Open/Close/Read/Write/GetFileInfo/SetFileInfo/ReadDirectory/Cleanup/SetDelete), drive letter + UNC path mounting, WinFsp service lifecycle, `dw mount W: volume.dwvd` CLI, auto-unmount on VDE close (VOPT-84) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.Windows]
+- [ ] 87-63-PLAN.md -- Fuse3LowLevelMountProvider (Linux/FreeBSD): P/Invoke to libfuse3 (fuse_lowlevel_ops struct), low-level inode-based API (lookup/getattr/readdir/open/read/write/release/unlink/mkdir/rmdir), fuse_session lifecycle, FUSE passthrough mode on kernel 6.9+, `dw mount /mnt/vde volume.dwvd` CLI (VOPT-85) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.Linux]
+- [ ] 87-64-PLAN.md -- MacFuseMountProvider (macOS): macFUSE 4.x via libfuse3 compatibility layer, F_NOCACHE for O_DIRECT equivalent, Spotlight metadata provider for indexed search, auto-eject on VDE close, `dw mount /Volumes/VDE volume.dwvd` CLI (VOPT-86) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.macOS]
+- [ ] 87-65-PLAN.md -- 53 Format-Bakeable Feature Module Registration: Expand ModuleId enum to bits 19-33 (CPSH through WLCK), expand ModuleManifest to uint64, register all new FeatureFlags (QOS_ACTIVE, ONLINE_OPS_ACTIVE, DR_ACTIVE, OBSERVABILITY_ENHANCED, plus 9 more), expand ExtentFlags to full 32-bit with IS_POISON/SPATIOTEMPORAL/DELTA/SHARED_COW/Dict_ID, update FormatConstants.DefinedModules (VOPT-87) [Home: SDK VirtualDiskEngine.Format]
 
 Wave structure:
 ```
@@ -2158,6 +2168,9 @@ Wave 13: 87-41 (Portable Export) + 87-42 (Progressive Feature A/B Testing) -- pa
 Wave 14: 87-43 (TPM Hardware Binding) + 87-44 (Ransomware Circuit Breaker) -- parallel, depends on Wave 9
 Wave 15: 87-45 (Preamble spec + detection) + 87-46 (SPDK SpdkBlockDevice) + 87-47 (Linux kernel build) + 87-48 (NativeAOT packaging) + 87-49 (Composition flags) + 87-50 (Preamble integrity) -- parallel, no intra-phase dependencies; 87-48 depends on 87-47 artifact
 Wave 16: 87-51 (Format-native observability) + 87-52 (Format-native QoS) + 87-53 (OPJR region + online resize + RAID migration) + 87-54 (Online encryption + defrag + tier migration) + 87-55 (Format-native DR) + 87-56 (DirectFileBlockDevice + BlockDeviceFactory) + 87-57 (WindowsOverlappedBlockDevice + IoRingBlockDevice) + 87-58 (KqueueBlockDevice) + 87-59 (SpdkBlockDevice refined) + 87-60 (RawPartitionBlockDevice + AlignedMemoryAllocator) -- parallel; 87-51/52/53/54/55 depend on Wave 6 (sharded WAL) + Wave 5 (Merkle checksums); 87-56 must land before 87-57/87-58/87-59/87-60 (factory cascade); 87-57/87-58/87-59/87-60 parallel after 87-56
+Wave 17: 87-61 (Mount interface + adapter) -- foundational mount infra, no platform dependencies
+Wave 18: 87-62 (WinFsp) + 87-63 (FUSE3 Linux) + 87-64 (macFUSE) -- parallel, all depend on 87-61
+Wave 19: 87-65 (Module registration) -- depends on Wave 16 (format-native features must be spec'd before registration)
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling
@@ -2414,7 +2427,7 @@ Plans:
 | 84. Deployment Topology & CLI Modes | 0/6 | Not started | - |
 | 85. Competitive Edge | 0/8 | Not started | - |
 | 86. Adaptive Index Engine | 0/16 | Not started | - |
-| 87. VDE Scalable Internals | 0/14 | Not started | - |
+| 87. VDE Scalable Internals | 0/65 | Not started | - |
 | 88. Dynamic Subsystem Scaling | 0/14 | Not started | - |
 | 89. Ecosystem Compatibility | 0/14 | Not started | - |
 | 90. Device Discovery & Physical Block Device | 0/6 | Not started | - |
@@ -2424,7 +2437,7 @@ Plans:
 | 94. Data Plugin Consolidation | 0/5 | Not started | - |
 | 95. Bare-Metal-to-User E2E Testing | 0/5 | Not started | - |
 
-**Total v6.0:** 0/180 plans complete
+**Total v6.0:** 0/234 plans complete
 
 ### Phase 65.1: Deep Semantic Audit & PluginBase Persistence (INSERTED)
 
