@@ -104,142 +104,55 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             _channelLock?.Dispose();
         }
 
-        protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        protected override Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-            ValidateStream(data);
-
-            // Key format: grpc://service/method
-            var (serviceName, methodName) = ParseGrpcKey(key);
-
-            // Read message data
-            using var ms = new MemoryStream(65536);
-            await data.CopyToAsync(ms, ct);
-            var messageBytes = ms.ToArray();
-
-            IncrementBytesStored(messageBytes.Length);
-            IncrementOperationCounter(StorageOperationType.Store);
-
-            // Note: Actual gRPC call would require generated stubs
-            // This is a generic implementation that stores the intent
-            return new StorageObjectMetadata
-            {
-                Key = key,
-                Size = messageBytes.Length,
-                Created = DateTime.UtcNow,
-                Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(key, messageBytes.Length):x}\"",
-                ContentType = "application/grpc",
-                CustomMetadata = new Dictionary<string, string>
-                {
-                    ["ServiceName"] = serviceName,
-                    ["MethodName"] = methodName,
-                    ["ServerUrl"] = _serverUrl
-                },
-                Tier = Tier
-            };
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific store/retrieve methods against the real gRPC endpoint.");
         }
 
-        protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
+        protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
-            var (serviceName, methodName) = ParseGrpcKey(key);
-
-            // Simulated gRPC unary call response
-            var responseData = JsonSerializer.Serialize(new
-            {
-                service = serviceName,
-                method = methodName,
-                timestamp = DateTime.UtcNow,
-                status = "OK"
-            });
-
-            var stream = new MemoryStream(Encoding.UTF8.GetBytes(responseData));
-
-            IncrementBytesRetrieved(stream.Length);
-            IncrementOperationCounter(StorageOperationType.Retrieve);
-
-            return stream;
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific store/retrieve methods against the real gRPC endpoint.");
         }
 
         protected override Task DeleteAsyncCore(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
-            // gRPC delete would call a delete method on the service
-            IncrementOperationCounter(StorageOperationType.Delete);
-
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific delete methods against the real gRPC endpoint.");
         }
 
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
-            IncrementOperationCounter(StorageOperationType.Exists);
-
-            // Check if service/method exists
-            return Task.FromResult(true);
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific exists methods against the real gRPC endpoint.");
         }
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
-            EnsureInitialized();
-            IncrementOperationCounter(StorageOperationType.List);
-
-            // List available gRPC services/methods (would use reflection)
-            var services = new[] { "DataService", "QueryService", "StreamService" };
-
-            foreach (var service in services)
-            {
-                if (!string.IsNullOrEmpty(prefix) && !service.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                yield return new StorageObjectMetadata
-                {
-                    Key = $"grpc://{service}/List",
-                    Size = 0,
-                    Created = DateTime.MinValue,
-                    Modified = DateTime.UtcNow,
-                    ETag = $"\"{HashCode.Combine(service):x}\"",
-                    ContentType = "application/grpc",
-                    Tier = Tier
-                };
-
-                await Task.Yield();
-            }
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific list methods against the real gRPC endpoint.");
+#pragma warning disable CS0162 // Unreachable code detected
+            yield break;
+#pragma warning restore CS0162
         }
 
         protected override Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
         {
-            EnsureInitialized();
-            ValidateKey(key);
-
-            var (serviceName, methodName) = ParseGrpcKey(key);
-
-            IncrementOperationCounter(StorageOperationType.GetMetadata);
-
-            return Task.FromResult(new StorageObjectMetadata
-            {
-                Key = key,
-                Size = 0,
-                Created = DateTime.MinValue,
-                Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(key):x}\"",
-                ContentType = "application/grpc",
-                CustomMetadata = new Dictionary<string, string>
-                {
-                    ["ServiceName"] = serviceName,
-                    ["MethodName"] = methodName,
-                    ["ServerUrl"] = _serverUrl
-                },
-                Tier = Tier
-            });
+            throw new NotSupportedException(
+                "Requires gRPC channel configuration with generated Protobuf stubs. " +
+                "Add a reference to a generated gRPC client (e.g. via Grpc.Tools) and implement " +
+                "service-specific metadata retrieval against the real gRPC endpoint.");
         }
 
         protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct)

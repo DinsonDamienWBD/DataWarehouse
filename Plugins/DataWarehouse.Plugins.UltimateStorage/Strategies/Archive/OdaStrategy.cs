@@ -505,8 +505,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
+            // Buffer the stream so we can (a) compute a content-based checksum and (b) upload the bytes.
+            using var buffer = new System.IO.MemoryStream();
+            await data.CopyToAsync(buffer, ct);
+            var contentBytes = buffer.ToArray();
+
             using var content = new MultipartFormDataContent();
-            var streamContent = new StreamContent(data);
+            var streamContent = new StreamContent(new System.IO.MemoryStream(contentBytes));
             streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             content.Add(streamContent, "file", key);
             content.Add(new StringContent(cartridge.Barcode), "cartridgeBarcode");
@@ -529,7 +534,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Size = dataLength,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = storeResponse?.Checksum ?? GenerateChecksum(cartridge.Barcode, key),
+                ETag = storeResponse?.Checksum ?? GenerateChecksum(cartridge.Barcode, key, contentBytes),
                 ContentType = GetContentType(key),
                 CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
@@ -597,12 +602,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 await File.WriteAllTextAsync(metaPath, metaJson, ct);
             }
 
-            // Calculate checksum if error correction enabled
-            string? checksum = null;
-            if (_enableErrorCorrection)
-            {
-                checksum = await CalculateFileChecksumAsync(filePath, ct);
-            }
+            // Always compute a content-based checksum from the written file so the ETag reflects
+            // actual content, not just metadata. When error correction is disabled, a lightweight
+            // SHA256 pass is still needed to produce a correct ETag.
+            var checksum = await CalculateFileChecksumAsync(filePath, ct);
 
             return new StorageObjectMetadata
             {
@@ -610,7 +613,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Size = dataLength,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = checksum ?? GenerateChecksum(cartridge.Barcode, key),
+                ETag = checksum,
                 ContentType = GetContentType(key),
                 CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
@@ -839,19 +842,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             };
         }
 
-        private string GenerateChecksum(string cartridgeBarcode, string key)
+        private static string GenerateChecksum(string cartridgeBarcode, string key, byte[] contentBytes)
         {
-            var input = $"{cartridgeBarcode}:{key}";
-            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input));
+            // Hash barcode + key + actual content to produce a content-dependent checksum.
+            var prefix = System.Text.Encoding.UTF8.GetBytes($"{cartridgeBarcode}:{key}:");
+            var combined = new byte[prefix.Length + contentBytes.Length];
+            prefix.CopyTo(combined, 0);
+            contentBytes.CopyTo(combined, prefix.Length);
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(combined);
             return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
         }
 
-        private async Task<string> CalculateFileChecksumAsync(string filePath, CancellationToken ct)
+        private static async Task<string> CalculateFileChecksumAsync(string filePath, CancellationToken ct)
         {
-            using var md5 = System.Security.Cryptography.MD5.Create();
             await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.SequentialScan | FileOptions.Asynchronous);
-            var hashBytes = await md5.ComputeHashAsync(stream, ct);
-            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+            var hashBytes = await System.Security.Cryptography.SHA256.HashDataAsync(stream, ct);
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
         private string? GetContentType(string key)

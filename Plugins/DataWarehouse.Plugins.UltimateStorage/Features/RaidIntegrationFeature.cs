@@ -310,9 +310,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 ["spareBackendId"] = spareBackendId
             });
 
-            // Simulate rebuild operation
-            // Real implementation would reconstruct data from parity and copy to spare
-            await Task.Delay(100, ct); // Simulate rebuild time
+            // RAID 5/6 rebuild requires reading surviving stripe data and recomputing XOR parity
+            // to reconstruct the failed drive's contents. This requires full XOR parity engine
+            // which is not implemented. For RAID 6 dual-parity reconstruction, Reed-Solomon
+            // galois-field arithmetic is required.
+            if (array.RaidLevel == RaidLevel.RAID5 || array.RaidLevel == RaidLevel.RAID6)
+            {
+                throw new NotSupportedException(
+                    $"RAID {(array.RaidLevel == RaidLevel.RAID5 ? 5 : 6)} rebuild requires XOR parity reconstruction (RAID 5) or " +
+                    "Reed-Solomon dual-parity reconstruction (RAID 6), neither of which is implemented. " +
+                    "Use RAID 1 or RAID 10 for supported rebuild operations.");
+            }
 
             // Replace failed backend with spare
             if (array.FailedBackends.Any())
@@ -395,45 +403,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             await Task.WhenAll(tasks);
         }
 
-        private async Task WriteRaid5Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
+        private Task WriteRaid5Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
         {
-            // RAID 5: Stripe with distributed parity
-            // Simplified implementation - real RAID 5 would calculate XOR parity
-            var backendCount = array.BackendIds.Count;
-            var stripeCount = (data.Length + array.StripeSize - 1) / array.StripeSize;
-
-            for (int i = 0; i < stripeCount; i++)
-            {
-                var offset = i * array.StripeSize;
-                var length = Math.Min(array.StripeSize, data.Length - offset);
-                var stripe = new byte[length];
-                Array.Copy(data, offset, stripe, 0, length);
-
-                var dataBackendIndex = i % (backendCount - 1);
-                var parityBackendIndex = (i / (backendCount - 1)) % backendCount;
-
-                // Write data stripe
-                var dataBackendId = array.BackendIds[dataBackendIndex];
-                var backend = _registry.Get(dataBackendId);
-                if (backend != null)
-                {
-                    await backend.StoreAsync($"{objectKey}.stripe{i}", new System.IO.MemoryStream(stripe), null, ct);
-                }
-
-                // Write parity stripe (simplified - would be XOR of all data stripes)
-                var parityBackendId = array.BackendIds[parityBackendIndex];
-                var parityBackend = _registry.Get(parityBackendId);
-                if (parityBackend != null)
-                {
-                    await parityBackend.StoreAsync($"{objectKey}.parity{i}", new System.IO.MemoryStream(stripe), null, ct);
-                }
-            }
+            // RAID 5 requires XOR parity computation across all data stripes in each stripe row.
+            // The parity block P = D0 XOR D1 XOR ... XOR D(n-2) must be stored on rotating parity
+            // drives. Copying the data stripe as parity (which the old implementation did) provides
+            // zero fault tolerance and is functionally incorrect.
+            throw new NotSupportedException(
+                "RAID 5 XOR parity is not implemented. Writing data bytes as the parity block provides " +
+                "no fault tolerance and is unsafe. Implement a full XOR parity engine or use RAID 1/RAID 10.");
         }
 
         private Task WriteRaid6Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
         {
-            // RAID 6: Stripe with dual parity (similar to RAID 5 but with 2 parity blocks)
-            return WriteRaid5Async(array, objectKey, data, ct); // Simplified
+            // RAID 6 requires two independent parity computations: P (XOR) and Q (Reed-Solomon over GF(2^8)).
+            // Delegating to RAID 5 provides only one parity block and gives incorrect fault tolerance.
+            throw new NotSupportedException(
+                "RAID 6 dual-parity (P+Q) is not implemented. RAID 6 requires Reed-Solomon encoding over " +
+                "GF(2^8) for the Q parity block in addition to the XOR P parity block. " +
+                "Implement a full RS erasure-coding engine or use RAID 1/RAID 10.");
         }
 
         private async Task WriteRaid10Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)

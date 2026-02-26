@@ -590,16 +590,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private static uint ComputeHash(string input)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(input));
+            // Use SHA256 for the consistent hash ring to avoid MD5 collision weaknesses.
+            // We take the first 4 bytes of the SHA256 digest as the ring position.
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
             return BitConverter.ToUInt32(hash, 0);
         }
 
         private static string GenerateProviderId(string path)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(path));
-            return BitConverter.ToString(hash).Replace("-", "").Substring(0, 16).ToLowerInvariant();
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(path));
+            return Convert.ToHexString(hash)[..16].ToLowerInvariant();
         }
 
         #endregion

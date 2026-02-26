@@ -31,12 +31,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     /// </summary>
     public class KafkaConnectorStrategy : UltimateStorageStrategyBase
     {
+        // Fields reserved for when Confluent.Kafka package is added.
+        // All operations throw NotSupportedException until then.
+#pragma warning disable CS0414 // assigned but never used
         private string _bootstrapServers = string.Empty;
-        private string _groupId = "datawarehouse-group";
         private string _topic = string.Empty;
         private readonly ConcurrentQueue<KafkaMessage> _messageQueue = new();
-        private bool _autoCommit = true;
         private int _maxQueueSize = 10000;
+#pragma warning restore CS0414
 
         public override string StrategyId => "kafka-connector";
         public override string Name => "Apache Kafka Connector";
@@ -60,20 +62,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         protected override Task InitializeCoreAsync(CancellationToken ct)
         {
-            _bootstrapServers = GetConfiguration<string>("BootstrapServers")
-                ?? throw new InvalidOperationException("Kafka BootstrapServers is required");
-
-            _topic = GetConfiguration<string>("Topic")
-                ?? throw new InvalidOperationException("Kafka Topic is required");
-
-            _groupId = GetConfiguration("GroupId", "datawarehouse-group");
-            _autoCommit = GetConfiguration("AutoCommit", true);
-            _maxQueueSize = GetConfiguration("MaxQueueSize", 10000);
-
-            // Note: Actual Kafka consumer initialization would happen here
-            // using Confluent.Kafka.ConsumerBuilder
-
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                "Requires Confluent.Kafka NuGet package. Add a reference to Confluent.Kafka and " +
+                "implement a real IConsumer<string,string> / IProducer<string,string> using " +
+                "ConsumerBuilder<TKey,TValue> and ProducerBuilder<TKey,TValue>.");
         }
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)

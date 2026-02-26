@@ -69,8 +69,14 @@ public sealed class QuorumConsistencyManager
         if (divergent.Count > 0)
         {
             Interlocked.Increment(ref _readRepairs);
-            // Read-repair: propagate latest version to stale replicas
-            // (In production, this would write back to stale replicas)
+            // Read-repair write-back to stale replicas is not implemented.
+            // A production implementation must identify the stale replica nodes from
+            // `selectedReplicas`, locate the corresponding write delegate, and asynchronously
+            // propagate the latest version back to those replicas (fire-and-forget with retry).
+            throw new NotSupportedException(
+                "Read-repair write-back not implemented. Divergent replicas were detected but " +
+                "the stale-replica write-back path is missing. Implement async propagation of " +
+                "the latest version back to the divergent replicas identified during quorum read.");
         }
 
         return new QuorumReadResult
@@ -548,11 +554,26 @@ public sealed class ErasureCodingRepairManager
 
     private byte[] ReconstructShard(List<byte[]> availableShards)
     {
+        // XOR-based reconstruction only works when exactly (k-1) data shards are available and
+        // there is exactly one parity shard, i.e., a 2-of-n scheme (like RAID 5 with one failure).
+        // For Reed-Solomon erasure codes with multiple parity shards (_parityShards > 1), shard
+        // reconstruction requires solving a Vandermonde-based system of linear equations over
+        // GF(2^8), which XOR cannot provide.
+        if (_parityShards > 1)
+        {
+            throw new NotSupportedException(
+                $"Multi-parity shard reconstruction (parityShards={_parityShards}) requires Reed-Solomon " +
+                "erasure coding over GF(2^8) (Vandermonde matrix inversion). XOR-only reconstruction " +
+                "is invalid for configurations with more than one parity shard. " +
+                "Implement a full RS codec (e.g. BackBlaze JavaReedSolomon port or ISA-L bindings).");
+        }
+
         if (availableShards.Count == 0) return [];
         var shardSize = availableShards[0].Length;
         var result = new byte[shardSize];
 
-        // Simplified reconstruction via XOR (full RS would use Vandermonde inverse)
+        // Single-parity XOR reconstruction: P = D0 XOR D1 XOR ... XOR D(k-1).
+        // Valid only when exactly one shard is missing and parityShards == 1.
         foreach (var shard in availableShards)
             for (int i = 0; i < shardSize && i < shard.Length; i++)
                 result[i] ^= shard[i];

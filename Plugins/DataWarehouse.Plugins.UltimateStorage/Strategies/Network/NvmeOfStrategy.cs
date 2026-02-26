@@ -112,7 +112,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        protected override async Task InitializeCoreAsync(CancellationToken ct)
+        protected override Task InitializeCoreAsync(CancellationToken ct)
+        {
+            // NVMe-oF requires a kernel driver (nvme-fabrics) and low-level block I/O.
+            // Simulating NVMe-oF block commands over a REST management API does not provide
+            // the latency characteristics, queue depth, or protocol semantics of a real
+            // NVMe-oF fabric. This implementation cannot replace a proper kernel-driver integration.
+            throw new NotSupportedException(
+                "Requires NVMe-oF kernel driver (nvme-fabrics module on Linux, or NVMe-oF host driver on Windows). " +
+                "Implement using nvme-cli subprocess invocation, P/Invoke to the OS NVMe driver IOCTLs, " +
+                "or a managed NVMe-oF library. REST-based simulation does not provide NVMe-oF semantics.");
+        }
+
+        private async Task InitializeCoreAsyncImpl(CancellationToken ct)
         {
             // Load required configuration
             _targetAddress = GetConfiguration<string>("TargetAddress", string.Empty);

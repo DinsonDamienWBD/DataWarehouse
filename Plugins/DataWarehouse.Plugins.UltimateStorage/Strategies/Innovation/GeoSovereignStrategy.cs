@@ -38,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, StorageRegion> _regions = new BoundedDictionary<string, StorageRegion>(1000);
         private readonly BoundedDictionary<string, DataResidencyRecord> _residencyRecords = new BoundedDictionary<string, DataResidencyRecord>(1000);
         private readonly BoundedDictionary<string, List<ComplianceAuditEntry>> _auditLog = new BoundedDictionary<string, List<ComplianceAuditEntry>>(1000);
+        private readonly object _auditLogLock = new object();
 
         public override string StrategyId => "geo-sovereign-storage";
         public override string Name => "Geo-Sovereign Compliance Storage";
@@ -657,18 +658,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private void AddAuditEntry(string key, ComplianceAuditEntry entry)
         {
-            if (!_auditLog.TryGetValue(key, out var entries))
+            // _auditLog values are List<T> instances that may be mutated by concurrent callers.
+            // Lock around all read-check-write operations on both the dictionary and the list.
+            lock (_auditLogLock)
             {
-                entries = new List<ComplianceAuditEntry>();
-                _auditLog[key] = entries;
-            }
+                if (!_auditLog.TryGetValue(key, out var entries))
+                {
+                    entries = new List<ComplianceAuditEntry>();
+                    _auditLog[key] = entries;
+                }
 
-            entries.Add(entry);
+                entries.Add(entry);
 
-            // Keep only last 1000 entries per key
-            if (entries.Count > 1000)
-            {
-                entries.RemoveAt(0);
+                // Keep only last 1000 entries per key
+                if (entries.Count > 1000)
+                {
+                    entries.RemoveAt(0);
+                }
             }
         }
 

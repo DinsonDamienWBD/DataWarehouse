@@ -27,11 +27,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     /// </summary>
     public class NatsConnectorStrategy : UltimateStorageStrategyBase
     {
+        // Fields reserved for when NATS.Client package is added.
+        // All operations throw NotSupportedException until then.
+#pragma warning disable CS0169, CS0414
         private string _serverUrl = string.Empty;
         private string _subject = string.Empty;
         private string? _queueGroup;
         private readonly ConcurrentQueue<NatsMessage> _messageQueue = new();
         private int _maxQueueSize = 10000;
+#pragma warning restore CS0169, CS0414
 
         public override string StrategyId => "nats-connector";
         public override string Name => "NATS Connector";
@@ -55,16 +59,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         protected override Task InitializeCoreAsync(CancellationToken ct)
         {
-            _serverUrl = GetConfiguration<string>("ServerUrl")
-                ?? throw new InvalidOperationException("NATS ServerUrl is required");
-
-            _subject = GetConfiguration<string>("Subject")
-                ?? throw new InvalidOperationException("NATS Subject is required");
-
-            _queueGroup = GetConfiguration<string?>("QueueGroup", null);
-            _maxQueueSize = GetConfiguration("MaxQueueSize", 10000);
-
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                "Requires NATS.Client NuGet package. Add a reference to NATS.Client (or NATS.Net for .NET 6+) " +
+                "and implement a real IConnection / INatsConnection using ConnectionFactory or NatsClient.");
         }
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)

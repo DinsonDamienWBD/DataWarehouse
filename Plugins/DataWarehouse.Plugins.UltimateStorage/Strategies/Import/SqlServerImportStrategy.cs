@@ -83,21 +83,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
-            var stream = new MemoryStream(4096);
-            IncrementOperationCounter(StorageOperationType.Retrieve);
-            return Task.FromResult<Stream>(stream);
+            // SQL Server is a write target for bulk import, not a byte-stream blob store.
+            // Retrieving arbitrary rows as a byte stream requires a table schema, column mapping,
+            // and serialization format (CSV, JSON, Parquet) that is not defined here.
+            throw new NotSupportedException(
+                "SqlServerImportStrategy does not support read-back. SQL Server is a write-only " +
+                "bulk import target. To retrieve data, use SqlServerExportStrategy with a " +
+                "SELECT query and explicit column-to-stream serialization.");
         }
 
         protected override Task DeleteAsyncCore(string key, CancellationToken ct)
         {
-            IncrementOperationCounter(StorageOperationType.Delete);
-            return Task.CompletedTask;
+            // Deleting rows requires knowing the table name, primary key columns, and key values.
+            // The key string alone is not sufficient to construct a safe DELETE statement.
+            throw new NotSupportedException(
+                "SqlServerImportStrategy does not support delete. To remove rows from SQL Server, " +
+                "execute a DELETE statement via SqlCommand with proper parameterization against " +
+                "the target table and primary key.");
         }
 
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
-            IncrementOperationCounter(StorageOperationType.Exists);
-            return Task.FromResult(true);
+            // Existence check requires querying the target table by primary key, which requires
+            // knowing the table schema. Always returning true is incorrect and misleading.
+            throw new NotSupportedException(
+                "SqlServerImportStrategy does not support existence checks. To check row existence, " +
+                "execute a SELECT COUNT(*) or EXISTS query via SqlCommand against the target table.");
         }
 
         protected override IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, CancellationToken ct)

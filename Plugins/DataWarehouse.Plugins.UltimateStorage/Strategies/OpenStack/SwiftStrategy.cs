@@ -171,9 +171,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 }
             }
 
-            // Compute ETag (MD5)
-            var md5Hash = MD5.HashData(content);
-            var etag = BitConverter.ToString(md5Hash).Replace("-", "").ToLowerInvariant();
+            // Compute ETag (SHA256) — MD5 is cryptographically broken and must not be used.
+            var md5Hash = SHA256.HashData(content);
+            var etag = Convert.ToHexString(md5Hash).ToLowerInvariant();
             request.Headers.TryAddWithoutValidation("ETag", etag);
 
             var response = await _httpClient!.SendAsync(request, ct);
@@ -231,9 +231,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
                 request.Content.Headers.ContentLength = segmentData.Length;
                 request.Headers.TryAddWithoutValidation("X-Auth-Token", _authToken);
 
-                // Compute segment ETag
-                var md5Hash = MD5.HashData(segmentData);
-                var etag = BitConverter.ToString(md5Hash).Replace("-", "").ToLowerInvariant();
+                // Compute segment ETag (SHA256) — MD5 is cryptographically broken.
+                var md5Hash = SHA256.HashData(segmentData);
+                var etag = Convert.ToHexString(md5Hash).ToLowerInvariant();
 
                 var response = await _httpClient!.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
