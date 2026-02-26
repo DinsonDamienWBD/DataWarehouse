@@ -247,8 +247,13 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(classicalSecret, 0, combinedInput, 0, classicalSecret.Length);
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
-        var salt = new byte[48]; // 384 bits
         var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.NTRU-677");
+        // Use SHA-384 of the protocol info label as a fixed, meaningful domain-separation
+        // salt rather than all-zero bytes. An all-zero salt of the same length as the hash
+        // is equivalent to HKDF's documented default (RFC 5869 §2.2), providing no domain
+        // separation. The hash of the info label creates a non-trivial, deterministic, and
+        // publicly known salt appropriate for a hybrid KEM context.
+        var salt = System.Security.Cryptography.SHA384.HashData(info);
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA384, combinedInput, AesKeySize, salt, info);
 
@@ -497,8 +502,10 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(classicalSecret, 0, combinedInput, 0, classicalSecret.Length);
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
-        var salt = new byte[48];
         var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.NTRU-677.ChaCha20");
+        // Use SHA-384 of the info label as a non-trivial domain-separation salt instead of
+        // all-zero bytes (finding #2938). All-zero salt provides no domain separation benefit.
+        var salt = System.Security.Cryptography.SHA384.HashData(info);
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA384, combinedInput, KeySize, salt, info);
 
@@ -732,8 +739,10 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(classicalSecret, 0, combinedInput, 0, classicalSecret.Length);
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
-        var salt = new byte[32];
         var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.X25519.NTRU-677");
+        // Use SHA-256 of the info label as a non-trivial domain-separation salt instead of
+        // all-zero bytes (finding #2938). All-zero salt provides no domain separation benefit.
+        var salt = System.Security.Cryptography.SHA256.HashData(info);
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, combinedInput, KeySize, salt, info);
 

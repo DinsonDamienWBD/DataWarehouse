@@ -55,12 +55,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. NTRU and ML-KEM use
+                // different lattice constructions with incompatible key formats. FipsReference
+                // removed to avoid false compliance claims.
                 ["KemAlgorithm"] = "NTRU-HPS-2048-509",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 1,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-512",
-                ["Note"] = "ML-KEM-512 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-2048-509 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -86,7 +88,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         }
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (NIST Level 1, via ml-kem-512)";
 
         /// <summary>
         /// Initializes a new instance of the NTRU-based encryption strategy.
@@ -265,12 +267,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. FipsReference removed.
                 ["KemAlgorithm"] = "NTRU-HPS-2048-677",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 3,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-768",
-                ["Note"] = "ML-KEM-768 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-2048-677 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -278,7 +280,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-768";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (ML-KEM-768, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (NIST Level 3, via ml-kem-768)";
 
         public MlKem768Strategy()
         {
@@ -442,12 +444,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. FipsReference removed.
                 ["KemAlgorithm"] = "NTRU-HPS-4096-821",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 5,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-1024",
-                ["Note"] = "ML-KEM-1024 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-4096-821 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -455,7 +457,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-1024";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (ML-KEM-1024, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (NIST Level 5, via ml-kem-1024)";
 
         public MlKem1024Strategy()
         {

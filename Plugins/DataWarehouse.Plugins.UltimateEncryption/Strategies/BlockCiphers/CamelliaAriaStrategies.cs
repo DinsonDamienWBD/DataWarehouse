@@ -497,41 +497,16 @@ public sealed class KuznyechikStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        var nonce = GenerateIv();
-        // Note: Gost3412_2015Engine may not be available in BouncyCastle, using Gost28147Engine as fallback
-        var cipher = new SicBlockCipher(new Gost28147Engine());
-        var parameters = new ParametersWithIV(new KeyParameter(key), nonce);
-
-        cipher.Init(true, parameters);
-
-        var ciphertext = new byte[plaintext.Length];
-        // SicBlockCipher requires block-by-block processing
-        for (int i = 0; i < plaintext.Length; i += 8)
-        {
-            var blockSize = Math.Min(8, plaintext.Length - i);
-            if (blockSize == 8)
-            {
-                cipher.ProcessBlock(plaintext, i, ciphertext, i);
-            }
-            else
-            {
-                // Handle partial block
-                var tempIn = new byte[8];
-                var tempOut = new byte[8];
-                Buffer.BlockCopy(plaintext, i, tempIn, 0, blockSize);
-                cipher.ProcessBlock(tempIn, 0, tempOut, 0);
-                Buffer.BlockCopy(tempOut, 0, ciphertext, i, blockSize);
-            }
-        }
-
-        // Compute HMAC
-        var macKey = SHA256.HashData(key);
-        var dataToMac = new byte[nonce.Length + ciphertext.Length];
-        Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
-        Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
-        var tag = HMACSHA256.HashData(macKey, dataToMac);
-
-        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+        // Kuznyechik (GOST R 34.12-2015) requires a 128-bit block cipher engine. The prior
+        // implementation incorrectly used Gost28147Engine (Magma, a 64-bit block cipher defined
+        // by GOST 28147-89) as a fallback, producing a completely different and incompatible
+        // cipher. BouncyCastle 2.6.2 does not include a Gost3412_2015 (Kuznyechik/Grasshopper)
+        // engine. Per Rule 13, throw NotSupportedException rather than silently execute the
+        // wrong algorithm.
+        throw new NotSupportedException(
+            "Kuznyechik (GOST R 34.12-2015) is not supported by the current BouncyCastle " +
+            "version. A library that implements Gost3412_2015 (Grasshopper/Kuznyechik) with " +
+            "a 128-bit block size is required.");
     }
 
     /// <inheritdoc/>
@@ -541,43 +516,10 @@ public sealed class KuznyechikStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
-
-        // Verify HMAC
-        var macKey = SHA256.HashData(key);
-        var dataToMac = new byte[nonce.Length + encryptedData.Length];
-        Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
-        Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);
-        var expectedTag = HMACSHA256.HashData(macKey, dataToMac);
-
-        if (!CryptographicOperations.FixedTimeEquals(expectedTag, tag!))
-            throw new CryptographicException("MAC verification failed");
-
-        var cipher = new SicBlockCipher(new Gost28147Engine());
-        var parameters = new ParametersWithIV(new KeyParameter(key), nonce);
-
-        cipher.Init(false, parameters);
-
-        var plaintext = new byte[encryptedData.Length];
-        // SicBlockCipher requires block-by-block processing
-        for (int i = 0; i < encryptedData.Length; i += 8)
-        {
-            var blockSize = Math.Min(8, encryptedData.Length - i);
-            if (blockSize == 8)
-            {
-                cipher.ProcessBlock(encryptedData, i, plaintext, i);
-            }
-            else
-            {
-                var tempIn = new byte[8];
-                var tempOut = new byte[8];
-                Buffer.BlockCopy(encryptedData, i, tempIn, 0, blockSize);
-                cipher.ProcessBlock(tempIn, 0, tempOut, 0);
-                Buffer.BlockCopy(tempOut, 0, plaintext, i, blockSize);
-            }
-        }
-
-        return Task.FromResult(plaintext);
+        throw new NotSupportedException(
+            "Kuznyechik (GOST R 34.12-2015) is not supported by the current BouncyCastle " +
+            "version. A library that implements Gost3412_2015 (Grasshopper/Kuznyechik) with " +
+            "a 128-bit block size is required.");
     }
 }
 

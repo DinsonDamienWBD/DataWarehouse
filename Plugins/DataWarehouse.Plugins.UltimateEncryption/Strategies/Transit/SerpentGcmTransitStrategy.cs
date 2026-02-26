@@ -55,15 +55,11 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
         var nonce = new byte[NonceSize];
         RandomNumberGenerator.Fill(nonce);
 
-        // Serpent-256 in GCM mode
-        // Note: .NET does not have native Serpent support
-        // This implementation uses a software-based Serpent cipher
-        // Production code would use BouncyCastle or similar library
-
+        // Serpent-256 in GCM mode via BouncyCastle SerpentEngine + GcmBlockCipher.
+        // .NET has no native Serpent support; BouncyCastle provides the software implementation.
         var ciphertext = new byte[plaintext.Length];
         var tag = new byte[TagSize];
 
-        // Encrypt using Serpent-GCM (simplified - would use proper Serpent implementation)
         EncryptSerpentGcm(plaintext, key, nonce, aad, ciphertext, tag);
 
         // Combine nonce + ciphertext + tag

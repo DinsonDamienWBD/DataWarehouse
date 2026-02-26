@@ -82,9 +82,16 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
                 // Generate IV
                 var iv = GenerateIv();
 
-                // Split key: 448 bits for Blowfish, 256 bits for HMAC
+                // Validate key length before copying — insufficient length causes buffer overread
+                // (finding #2991: missing check allows short key to crash or use wrong bytes).
                 var encKey = new byte[KeySizeBits / 8];
                 var macKey = new byte[32];
+                if (key.Length < encKey.Length)
+                {
+                    throw new ArgumentException(
+                        $"Key too short: Blowfish-{KeySizeBits} requires {encKey.Length} bytes " +
+                        $"but received {key.Length} bytes.", nameof(key));
+                }
                 Buffer.BlockCopy(key, 0, encKey, 0, encKey.Length);
 
                 using var hmac = new HMACSHA256(key);
@@ -134,9 +141,16 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
             {
                 var (iv, encryptedData, tag) = SplitCiphertext(ciphertext);
 
-                // Split key: 448 bits for Blowfish, 256 bits for HMAC
+                // Validate key length before copying — insufficient length causes buffer overread
+                // (finding #2991: missing check allows short key to crash or use wrong bytes).
                 var encKey = new byte[KeySizeBits / 8];
                 var macKey = new byte[32];
+                if (key.Length < encKey.Length)
+                {
+                    throw new ArgumentException(
+                        $"Key too short: Blowfish-{KeySizeBits} requires {encKey.Length} bytes " +
+                        $"but received {key.Length} bytes.", nameof(key));
+                }
                 Buffer.BlockCopy(key, 0, encKey, 0, encKey.Length);
 
                 using var hmac = new HMACSHA256(key);

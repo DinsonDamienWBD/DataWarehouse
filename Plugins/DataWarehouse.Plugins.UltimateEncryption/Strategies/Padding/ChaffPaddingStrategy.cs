@@ -520,27 +520,27 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
                 break;
 
             case ChaffDistribution.RandomBurst:
-                // For random burst, we need to extract exactly originalLength bytes sequentially
-                // The pattern is reconstructed deterministically based on seed (not available)
-                // Fallback: extract first originalLength non-chaff bytes
-                // NOTE: This is a simplified approach - production would use stored pattern
-                Array.Copy(combined, 0, result, 0, Math.Min(originalLength, combined.Length));
-                break;
+                // RandomBurst places chaff at cryptographically random positions that are not
+                // stored in the output. The positions map cannot be reconstructed at decryption
+                // time, making this mode irreversible as currently designed (finding #2990).
+                // Per Rule 13, throw rather than silently corrupt the recovered ciphertext.
+                throw new NotSupportedException(
+                    "ChaffDistribution.RandomBurst cannot be reversed: the random burst " +
+                    "position map is not stored in the ciphertext. Use ChaffDistribution.Uniform " +
+                    "which uses a deterministic, reversible interleaving pattern.");
 
             case ChaffDistribution.HeaderHeavy:
             case ChaffDistribution.TailHeavy:
-                // For distribution-based strategies, extract based on pattern
-                // Simplified: take proportional bytes
-                var step = (double)combined.Length / originalLength;
-                for (int i = 0; i < originalLength; i++)
-                {
-                    var sourceIndex = (int)(i * step);
-                    if (sourceIndex < combined.Length)
-                    {
-                        result[i] = combined[sourceIndex];
-                    }
-                }
-                break;
+                // HeaderHeavy and TailHeavy use position-dependent interleaving rules
+                // (modular patterns that vary with result position) that cannot be reversed
+                // without replaying the exact same interleave logic on the combined buffer.
+                // The current reversal logic (proportional sampling) produces wrong output
+                // for any non-trivial input (finding #2990). Per Rule 13, throw.
+                throw new NotSupportedException(
+                    $"ChaffDistribution.{distribution} cannot be reliably reversed with the " +
+                    "current implementation: the position-dependent interleaving is not " +
+                    "bijective. Use ChaffDistribution.Uniform which uses a deterministic, " +
+                    "reversible interleaving pattern.");
         }
 
         return result;

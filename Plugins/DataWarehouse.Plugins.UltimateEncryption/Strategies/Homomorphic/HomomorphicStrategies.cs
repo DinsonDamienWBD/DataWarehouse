@@ -31,6 +31,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
     public sealed class PaillierStrategy : EncryptionStrategyBase
     {
         private readonly int _keyBits;
+        // Lock protects all mutable key state. Concurrent callers would otherwise overwrite
+        // each other's parsed key material, causing silent use of the wrong key (finding #2936).
+        private readonly object _keyLock = new();
         private BigInteger? _n;
         private BigInteger? _nSquared;
         private BigInteger? _g;
@@ -105,26 +108,33 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         {
             return await Task.Run(() =>
             {
-                // Parse public key from byte array
-                ParsePublicKey(key);
+                BigInteger n, nSquared, g;
+                lock (_keyLock)
+                {
+                    // Parse public key into local copies under lock to avoid concurrent overwrite.
+                    ParsePublicKey(key);
+                    n = _n!.Value;
+                    nSquared = _nSquared!.Value;
+                    g = _g!.Value;
+                }
 
                 // Convert plaintext to BigInteger
                 var m = new BigInteger(plaintext, isUnsigned: true, isBigEndian: true);
 
                 // Ensure m < n
-                if (m >= _n!.Value)
+                if (m >= n)
                 {
                     throw new CryptographicException(
-                        $"Plaintext too large. Max value is {_n.Value - 1}");
+                        $"Plaintext too large. Max value is {n - 1}");
                 }
 
                 // Generate random r in Z*_n
-                var r = GenerateRandomCoprime(_n!.Value);
+                var r = GenerateRandomCoprime(n);
 
                 // c = g^m * r^n mod n^2
-                var gm = BigInteger.ModPow(_g!.Value, m, _nSquared!.Value);
-                var rn = BigInteger.ModPow(r, _n!.Value, _nSquared!.Value);
-                var c = (gm * rn) % _nSquared!.Value;
+                var gm = BigInteger.ModPow(g, m, nSquared);
+                var rn = BigInteger.ModPow(r, n, nSquared);
+                var c = (gm * rn) % nSquared;
 
                 return c.ToByteArray(isUnsigned: true, isBigEndian: true);
             }, cancellationToken);
@@ -141,17 +151,25 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         {
             return await Task.Run(() =>
             {
-                // Parse private key from byte array
-                ParsePrivateKey(key);
+                BigInteger n, nSquared, lambda, mu;
+                lock (_keyLock)
+                {
+                    // Parse private key into local copies under lock to avoid concurrent overwrite.
+                    ParsePrivateKey(key);
+                    n = _n!.Value;
+                    nSquared = _nSquared!.Value;
+                    lambda = _lambda!.Value;
+                    mu = _mu!.Value;
+                }
 
                 // Convert ciphertext to BigInteger
                 var c = new BigInteger(ciphertext, isUnsigned: true, isBigEndian: true);
 
                 // m = L(c^lambda mod n^2) * mu mod n
                 // where L(u) = (u - 1) / n
-                var clambda = BigInteger.ModPow(c, _lambda!.Value, _nSquared!.Value);
-                var l = (clambda - 1) / _n!.Value;
-                var m = (l * _mu!.Value) % _n!.Value;
+                var clambda = BigInteger.ModPow(c, lambda, nSquared);
+                var l = (clambda - 1) / n;
+                var m = (l * mu) % n;
 
                 return m.ToByteArray(isUnsigned: true, isBigEndian: true);
             }, cancellationToken);
@@ -393,6 +411,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
     public sealed class ElGamalStrategy : EncryptionStrategyBase
     {
         private readonly int _keyBits;
+        // Lock protects all mutable key state. Concurrent callers would otherwise overwrite
+        // each other's parsed key material, causing silent use of the wrong key (finding #2936).
+        private readonly object _keyLock = new();
         private BigInteger? _p;
         private BigInteger? _g;
         private BigInteger? _y; // Public key
@@ -445,23 +466,31 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         {
             return await Task.Run(() =>
             {
-                ParsePublicKey(key);
+                BigInteger p, g, y;
+                lock (_keyLock)
+                {
+                    // Parse public key into local copies under lock to avoid concurrent overwrite.
+                    ParsePublicKey(key);
+                    p = _p!.Value;
+                    g = _g!.Value;
+                    y = _y!.Value;
+                }
 
                 var m = new BigInteger(plaintext, isUnsigned: true, isBigEndian: true);
-                if (m >= _p!.Value)
+                if (m >= p)
                 {
                     throw new CryptographicException("Plaintext too large");
                 }
 
                 // Generate random k
-                var k = GenerateRandomInRange(2, _p!.Value - 2);
+                var k = GenerateRandomInRange(2, p - 2);
 
                 // c1 = g^k mod p
-                var c1 = BigInteger.ModPow(_g!.Value, k, _p!.Value);
+                var c1 = BigInteger.ModPow(g, k, p);
 
                 // c2 = m * y^k mod p
-                var yk = BigInteger.ModPow(_y!.Value, k, _p!.Value);
-                var c2 = (m * yk) % _p!.Value;
+                var yk = BigInteger.ModPow(y, k, p);
+                var c2 = (m * yk) % p;
 
                 // Serialize (c1, c2)
                 using var ms = new System.IO.MemoryStream();
@@ -487,7 +516,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         {
             return await Task.Run(() =>
             {
-                ParsePrivateKey(key);
+                BigInteger p, x;
+                lock (_keyLock)
+                {
+                    // Parse private key into local copies under lock to avoid concurrent overwrite.
+                    ParsePrivateKey(key);
+                    p = _p!.Value;
+                    x = _x!.Value;
+                }
 
                 using var ms = new System.IO.MemoryStream(ciphertext);
                 using var reader = new System.IO.BinaryReader(ms);
@@ -501,9 +537,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
                 var c2 = new BigInteger(c2Bytes, isUnsigned: true, isBigEndian: true);
 
                 // m = c2 * (c1^x)^(-1) mod p
-                var c1x = BigInteger.ModPow(c1, _x!.Value, _p!.Value);
-                var c1xInv = BigInteger.ModPow(c1x, _p!.Value - 2, _p!.Value); // Fermat's little theorem
-                var m = (c2 * c1xInv) % _p!.Value;
+                var c1x = BigInteger.ModPow(c1, x, p);
+                var c1xInv = BigInteger.ModPow(c1x, p - 2, p); // Fermat's little theorem
+                var m = (c2 * c1xInv) % p;
 
                 return m.ToByteArray(isUnsigned: true, isBigEndian: true);
             }, cancellationToken);

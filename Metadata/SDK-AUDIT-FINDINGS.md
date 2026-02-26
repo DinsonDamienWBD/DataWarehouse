@@ -4611,11 +4611,11 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2934 | 1/12 | P0 | `UltimateEncryption/Strategies/Aead/AeadStrategies.cs:294-469,584-748` | AEGIS-128L and AEGIS-256 are cryptographically incorrect custom implementations — uses full AES encryption instead of AES round function, wrong keystream derivation, wrong finalization tag. Broken cipher masquerading as standardized. | [ ]
-| 2935 | 15 | P0 | `UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs:500-556` | KuznyechikStrategy uses `Gost28147Engine` (Magma, 64-bit block) instead of Kuznyechik (128-bit block) — completely wrong cipher. Incompatible with any real GOST R 34.12-2015 implementation. | [ ]
-| 2936 | 2 | P0 | `UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs:33-38,395-399` | Paillier and ElGamal store mutable key state (`_n`, `_lambda`, `_mu`, `_x`) in instance fields — concurrent callers overwrite each other's keys silently. Wrong key used for encrypt/decrypt. | [ ]
+| 2934 | 1/12 | P0 | `UltimateEncryption/Strategies/Aead/AeadStrategies.cs:294-469,584-748` | AEGIS-128L and AEGIS-256 are cryptographically incorrect custom implementations — uses full AES encryption instead of AES round function, wrong keystream derivation, wrong finalization tag. Broken cipher masquerading as standardized. | [X]
+| 2935 | 15 | P0 | `UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs:500-556` | KuznyechikStrategy uses `Gost28147Engine` (Magma, 64-bit block) instead of Kuznyechik (128-bit block) — completely wrong cipher. Incompatible with any real GOST R 34.12-2015 implementation. | [X]
+| 2936 | 2 | P0 | `UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs:33-38,395-399` | Paillier and ElGamal store mutable key state (`_n`, `_lambda`, `_mu`, `_x`) in instance fields — concurrent callers overwrite each other's keys silently. Wrong key used for encrypt/decrypt. | [X]
 | 2937 | 5 | P0 | `UltimateEncryption/Strategies/Asymmetric/RsaStrategies.cs:272-311,571-620` | RSA `ParsePublicKey`/`ParsePrivateKey` bare `catch { }` on BouncyCastle path — silently falls through to .NET RSA fallback which may parse with different key interpretation. | [X]
-| 2938 | 4 | P0 | `UltimateEncryption/Strategies/Hybrid/HybridStrategies.cs:500-507` | HKDF salt is all-zero `new byte[48]` in `CombineSecrets` across 3 hybrid strategies — comment implies random salt but uses zeros, weakening key derivation. | [ ]
+| 2938 | 4 | P0 | `UltimateEncryption/Strategies/Hybrid/HybridStrategies.cs:500-507` | HKDF salt is all-zero `new byte[48]` in `CombineSecrets` across 3 hybrid strategies — comment implies random salt but uses zeros, weakening key derivation. | [X]
 | 2939 | 2 | P1 | `UltimateEncryption/Scaling/EncryptionScalingManager.cs:396-418` | `ReconfigureLimitsAsync` non-atomic semaphore swap — concurrent `ExecuteMigrationAsync` can `WaitAsync` on old semaphore then `Release` on new, or get permanently blocked when old is disposed. | [ ]
 | 2940 | 12 | P1 | `UltimateEncryption/Strategies/Aes/AesCtrXtsStrategies.cs:343-450` | XTS ciphertext stealing has redundant `MultiplyAlphaByTwo` immediately overwritten. Decryption path incomplete — doesn't re-decrypt penultimate block with alpha_n+1 per IEEE P1619. | [ ]
 | 2941 | 12/4 | P1 | `UltimateEncryption/Strategies/ChaCha/ChaChaStrategies.cs:315-333` | `ChaCha20Strategy` decrypt: encrypts zeros to extract keystream then XORs manually. Generates unused Poly1305 tag, uses separate HMAC-SHA256 — dual-auth scheme, one unused. | [ ]
@@ -4647,9 +4647,9 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2961 | 1 | P0 | `UltimateEncryption/Strategies/Transit/SerpentGcmTransitStrategy.cs:59-66` | Comments say "Production code would use BouncyCastle" and "simplified" but the code actually does use BouncyCastle correctly. Misleading Rule 13 comments contradict the real implementation — auditors cannot trust the cipher without reading full source. | [ ]
-| 2962 | 4 | P0 | `UltimateEncryption/Strategies/Transit/TlsBridgeTransitStrategy.cs:173-181` | `VerifyTlsActive()` silently returns when `TlsStream` is null — comment says "In production, this should check." Encrypt returns plaintext unmodified, caller believes data is protected. Security vulnerability: silent plaintext passthrough. | [ ]
-| 2963 | 4 | P0 | `UltimateEncryption/Strategies/Transit/XChaCha20TransitStrategy.cs:197-206` | HChaCha20 subkey derivation replaced with HKDF-SHA256 — produces a different cipher incompatible with any real XChaCha20 implementation. Comment says "simplified for demonstration." Broken crypto + Rule 13 + naming lie. | [ ]
+| 2961 | 1 | P0 | `UltimateEncryption/Strategies/Transit/SerpentGcmTransitStrategy.cs:59-66` | Comments say "Production code would use BouncyCastle" and "simplified" but the code actually does use BouncyCastle correctly. Misleading Rule 13 comments contradict the real implementation — auditors cannot trust the cipher without reading full source. | [X]
+| 2962 | 4 | P0 | `UltimateEncryption/Strategies/Transit/TlsBridgeTransitStrategy.cs:173-181` | `VerifyTlsActive()` silently returns when `TlsStream` is null — comment says "In production, this should check." Encrypt returns plaintext unmodified, caller believes data is protected. Security vulnerability: silent plaintext passthrough. | [X]
+| 2963 | 4 | P0 | `UltimateEncryption/Strategies/Transit/XChaCha20TransitStrategy.cs:197-206` | HChaCha20 subkey derivation replaced with HKDF-SHA256 — produces a different cipher incompatible with any real XChaCha20 implementation. Comment says "simplified for demonstration." Broken crypto + Rule 13 + naming lie. | [X]
 | 2964 | 13 | P1 | `UltimateEncryption/Strategies/Transit/CompoundTransitStrategy.cs:122,204,235` | All three async methods do synchronous crypto then `await Task.FromResult(...)` — pointless async state machine + Task allocation per call. | [ ]
 | 2965 | 15 | P2 | `UltimateEncryption/Strategies/Transit/CompoundTransitStrategy.cs:25-26` | `NonceSize=24` comment says "12 bytes per cipher" and `TagSize=32` says "16 bytes per cipher" — values are combined totals, comments are wrong. Misleads crypto wire format auditing. | [ ]
 | 2966 | 13 | P1 | `UltimateEncryption/Strategies/Transit/SerpentGcmTransitStrategy.cs:89,139,235` | Same `await Task.FromResult(...)` wrapping synchronous BouncyCastle crypto. Unnecessary allocations in high-frequency encryption path. | [ ]
@@ -4685,10 +4685,10 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2990 | 10 | P0 | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:522-543` | `RemoveChaffFromCiphertext` cannot recover original ciphertext for RandomBurst/HeaderHeavy/TailHeavy modes. RandomBurst comment says "simplified approach" and copies front of buffer (includes chaff). HeaderHeavy/TailHeavy uses stride that doesn't mirror write-time interleaving. Data encrypted with 3/4 modes is unrecoverable. | [ ]
-| 2991 | 4 | P0 | `UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs:88-91` | All legacy strategies (Blowfish/IDEA/CAST5/CAST6/RC5) do `Buffer.BlockCopy(key, 0, encKey, 0, KeySizeBits/8)` without checking `key.Length >= KeySizeBits/8`. Blowfish needs 56 bytes — shorter key causes `ArgumentException` crash. No validation guard. | [ ]
-| 2992 | 15 | P0 | `UltimateEncryption/Strategies/PostQuantum/CrystalsKyberStrategies.cs:176,300,425` + `MlKemStrategies.cs:44-63` | Kyber/ML-KEM strategies claim FIPS 203 compliance but use NTRU (`NtruHps2048509/677/4096821`) — completely different lattice construction. Keys not interoperable with any FIPS 203 implementation. False compliance labelling. | [ ]
-| 2993 | 12 | P0 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:109,257,389` | Argon2id/i/d silently discard user-provided salt when `key.Length < 16` — generates random salt instead. Caller relying on short salt for deterministic derivation gets different key each time. Same issue in Scrypt (line 528, 32 bytes) and PBKDF2 (line 962). | [ ]
+| 2990 | 10 | P0 | `UltimateEncryption/Strategies/Padding/ChaffPaddingStrategy.cs:522-543` | `RemoveChaffFromCiphertext` cannot recover original ciphertext for RandomBurst/HeaderHeavy/TailHeavy modes. RandomBurst comment says "simplified approach" and copies front of buffer (includes chaff). HeaderHeavy/TailHeavy uses stride that doesn't mirror write-time interleaving. Data encrypted with 3/4 modes is unrecoverable. | [X]
+| 2991 | 4 | P0 | `UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs:88-91` | All legacy strategies (Blowfish/IDEA/CAST5/CAST6/RC5) do `Buffer.BlockCopy(key, 0, encKey, 0, KeySizeBits/8)` without checking `key.Length >= KeySizeBits/8`. Blowfish needs 56 bytes — shorter key causes `ArgumentException` crash. No validation guard. | [X]
+| 2992 | 15 | P0 | `UltimateEncryption/Strategies/PostQuantum/CrystalsKyberStrategies.cs:176,300,425` + `MlKemStrategies.cs:44-63` | Kyber/ML-KEM strategies claim FIPS 203 compliance but use NTRU (`NtruHps2048509/677/4096821`) — completely different lattice construction. Keys not interoperable with any FIPS 203 implementation. False compliance labelling. | [X]
+| 2993 | 12 | P0 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:109,257,389` | Argon2id/i/d silently discard user-provided salt when `key.Length < 16` — generates random salt instead. Caller relying on short salt for deterministic derivation gets different key each time. Same issue in Scrypt (line 528, 32 bytes) and PBKDF2 (line 962). | [X]
 | 2994 | 5 | P1 | `UltimateEncryption/Strategies/PostQuantum/CrystalsDilithiumStrategies.cs:67-70` + `SphincsPlusStrategies.cs:68-71` | Bare `catch { return false; }` in signature verification swallows all exceptions including `OutOfMemoryException`. Root cause of BouncyCastle errors lost. | [X]
 | 2995 | 10 | P1 | `UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs:136-213` + `AesGcmTransitStrategy.cs:136-214` + `ChaCha20TransitStrategy.cs:136-213` | Streaming encryption: chunks individually authenticated but no cross-chunk ordering/completeness verification. Attacker can reorder, truncate, or replay chunks across sessions. No end-of-stream sentinel. | [ ]
 | 2996 | 12 | P1 | `UltimateEncryption/Strategies/Kdf/KdfStrategies.cs:955-976,1064-1084` | PBKDF2 Sha256/Sha512 `EncryptCoreAsync` runs 600K/210K iterations synchronously on calling thread (no `Task.Run`). 300-600ms thread-pool stall unlike Argon2 which wraps in Task.Run. | [ ]
@@ -5805,8 +5805,8 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3838 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:314-315,434-437` | `RebuildArrayAsync` = `Task.Delay(100)` stub. RAID 6 delegates to RAID 5 ("Simplified"). Dual-parity never computed — arrays silently behave as RAID 5. | [ ]
-| 3839 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:398-431` | `WriteRaid5Async` copies data stripe as parity verbatim (no XOR). Comment: "simplified — real RAID 5 would calculate XOR parity". Recovery from failure produces corrupt data. | [ ]
+| 3838 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:314-315,434-437` | `RebuildArrayAsync` = `Task.Delay(100)` stub. RAID 6 delegates to RAID 5 ("Simplified"). Dual-parity never computed — arrays silently behave as RAID 5. | [X]
+| 3839 | 1 | P0 | `UltimateStorage/Features/RaidIntegrationFeature.cs:398-431` | `WriteRaid5Async` copies data stripe as parity verbatim (no XOR). Comment: "simplified — real RAID 5 would calculate XOR parity". Recovery from failure produces corrupt data. | [X]
 | 3840 | 2 | P1 | `UltimateStorage/Features/MultiBackendFanOutFeature.cs:352-376` | `PrimaryPlusAsync` — fire-and-forget `Task.Run` mutates `result.SuccessCount/FailureCount` after caller already returned result. Torn reads. | [ ]
 | 3841 | 2 | P1 | `UltimateStorage/Features/ReplicationIntegrationFeature.cs:233-245` | Fire-and-forget `Task.Run` for async replication. Unhandled exceptions silently swallowed. | [ ]
 | 3842 | 5 | P1 | `UltimateStorage/Features/MultiBackendFanOutFeature.cs:421-464` | `ReadFromFastestAsync` — `Task.WhenAny` races backends but losing tasks' streams never disposed. 2 streams leaked per call in 3-backend scenario. | [ ]
@@ -5849,9 +5849,9 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3873 | 10 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:842-847` | `GenerateChecksum` hashes only `cartridgeBarcode + key` — no content. Fabricated ETag written to catalog. Data corruption passes silently. | [ ]
-| 3874 | 4 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:849-855` | `CalculateFileChecksumAsync` uses MD5 for WORM write verification. Only integrity check for archival media uses collision-vulnerable hash. | [ ]
-| 3875 | 1 | P0 | `UltimateStorage/Strategies/Cloud/MinioStrategy.cs:745-778` | `SetBucketReplicationAsync` sets "replication-enabled" tag then `Task.CompletedTask`. No actual replication. Data redundancy contract broken. | [ ]
+| 3873 | 10 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:842-847` | `GenerateChecksum` hashes only `cartridgeBarcode + key` — no content. Fabricated ETag written to catalog. Data corruption passes silently. | [X]
+| 3874 | 4 | P0 | `UltimateStorage/Strategies/Archive/OdaStrategy.cs:849-855` | `CalculateFileChecksumAsync` uses MD5 for WORM write verification. Only integrity check for archival media uses collision-vulnerable hash. | [X]
+| 3875 | 1 | P0 | `UltimateStorage/Strategies/Cloud/MinioStrategy.cs:745-778` | `SetBucketReplicationAsync` sets "replication-enabled" tag then `Task.CompletedTask`. No actual replication. Data redundancy contract broken. | [X]
 | 3876 | 6 | P1 | `UltimateStorage/Strategies/Cloud/AzureBlobStrategy.cs:286-290` | Fire-and-forget `_ = AutoTransitionTierAsync(...).ContinueWith(...)`. Tier transitions fail silently in production. | [X]
 | 3877 | 3 | P1 | `UltimateStorage/Strategies/Cloud/AlibabaOssStrategy.cs:242-245,363-364` | Sync-over-async `Task.Run(() => _client.PutObject(...))` wrapping sync OSS SDK. Saturates thread pool under load. Same in TencentCos (~12 sites). | [ ]
 | 3878 | 3 | P1 | `UltimateStorage/Strategies/Cloud/TencentCosStrategy.cs:207-268,325-366` | Temp-file upload with retry: stream seek not reset between retries → corrupt/partial data. `finally` may delete temp before retry reads it. | [ ]
@@ -5891,10 +5891,10 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3906 | 1 | P0 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:41,107-215` | Entire strategy non-functional. `IsProductionReady => false` but returns fake success data. TestConnection=CompletedTask, Retrieve=hardcoded JSON, Exists=always true, List=3 hardcoded names. | [ ]
-| 3907 | 1 | P0 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:61-77,156-158` | No real Kafka client. InitializeCoreAsync=CompletedTask. All ops on in-memory ConcurrentQueue. ExistsAsync returns IsEmpty (not per-key). | [ ]
-| 3908 | 1 | P0 | `UltimateStorage/Strategies/Connectors/NatsConnectorStrategy.cs:56-67,142-145` | No real NATS client. Same pattern: InitializeCoreAsync=CompletedTask, in-memory queue, ExistsAsync=IsEmpty. | [ ]
-| 3909 | 1 | P0 | `UltimateStorage/Strategies/Connectors/PulsarConnectorStrategy.cs:55-67,141-144` | No real Pulsar client. Same pattern. DeleteAsyncCore=CompletedTask. | [ ]
+| 3906 | 1 | P0 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:41,107-215` | Entire strategy non-functional. `IsProductionReady => false` but returns fake success data. TestConnection=CompletedTask, Retrieve=hardcoded JSON, Exists=always true, List=3 hardcoded names. | [X]
+| 3907 | 1 | P0 | `UltimateStorage/Strategies/Connectors/KafkaConnectorStrategy.cs:61-77,156-158` | No real Kafka client. InitializeCoreAsync=CompletedTask. All ops on in-memory ConcurrentQueue. ExistsAsync returns IsEmpty (not per-key). | [X]
+| 3908 | 1 | P0 | `UltimateStorage/Strategies/Connectors/NatsConnectorStrategy.cs:56-67,142-145` | No real NATS client. Same pattern: InitializeCoreAsync=CompletedTask, in-memory queue, ExistsAsync=IsEmpty. | [X]
+| 3909 | 1 | P0 | `UltimateStorage/Strategies/Connectors/PulsarConnectorStrategy.cs:55-67,141-144` | No real Pulsar client. Same pattern. DeleteAsyncCore=CompletedTask. | [X]
 | 3910 | 1 | P1 | `UltimateStorage/Strategies/Connectors/GrpcConnectorStrategy.cs:131-132` | ETag uses `HashCode.Combine` — process-local, non-deterministic. Must use SHA-256 for stable ETags. | [ ]
 | 3911 | 2 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:67-68` | `_keyToDealMap` (Dictionary) with lock, but background monitoring tasks race with Dispose. Use ConcurrentDictionary. | [ ]
 | 3912 | 6 | P1 | `UltimateStorage/Strategies/Decentralized/FilecoinStrategy.cs:554-557` | Fire-and-forget `MonitorDealStatusAsync` with caller's per-request `ct`. Background monitor killed when request completes. | [X]
@@ -5934,9 +5934,9 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3940 | 1 | P0 | `UltimateStorage/Strategies/Import/BigQueryImportStrategy.cs:16-70` | Rule 13 stub: named `BigQueryImportStrategy` but does nothing related to BigQuery — no client, no load jobs. All ops use in-memory `BoundedDictionary`. `IsProductionReady = false` is an admission flag. | [ ]
-| 3941 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:549-560` | `ReconstructShard()` XOR-only, not Reed-Solomon. Valid only for 1-parity scheme; silently produces corrupted data for multi-parity without error. | [ ]
-| 3942 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:71-73` | Read-repair stub: sets `ReadRepairTriggered=true` but never writes back to stale replicas. Comment says "In production, this would write back". Consistency guarantee is a lie. | [ ]
+| 3940 | 1 | P0 | `UltimateStorage/Strategies/Import/BigQueryImportStrategy.cs:16-70` | Rule 13 stub: named `BigQueryImportStrategy` but does nothing related to BigQuery — no client, no load jobs. All ops use in-memory `BoundedDictionary`. `IsProductionReady = false` is an admission flag. | [X]
+| 3941 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:549-560` | `ReconstructShard()` XOR-only, not Reed-Solomon. Valid only for 1-parity scheme; silently produces corrupted data for multi-parity without error. | [X]
+| 3942 | 10 | P0 | `UltimateStorage/Strategies/DistributedStorageInfrastructure.cs:71-73` | Read-repair stub: sets `ReadRepairTriggered=true` but never writes back to stale replicas. Comment says "In production, this would write back". Consistency guarantee is a lie. | [X]
 | 3943 | 6 | P1 | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:249-254` | Fire-and-forget replication via `_ = Task.Run(...)`. ContinueWith only logs on fault. Shares request's CancellationToken — replication abandoned if request completes. | [X]
 | 3944 | 2 | P1 | `UltimateStorage/Strategies/Enterprise/HpeStoreOnceStrategy.cs:677-683` | Token refresh race: `EnsureAuthenticatedAsync` reads/writes `_authToken`/`_tokenExpiry` without sync. Concurrent expired-token requests cause multiple re-auth flows. | [ ]
 | 3945 | 2 | P1 | `UltimateStorage/Strategies/Enterprise/WekaIoStrategy.cs:586-622` | Same token acquisition race: checks `_apiToken` then sets it without lock. Multiple threads can simultaneously POST to `/login`. | [ ]
@@ -5974,10 +5974,10 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3971 | 1 | P0 | `UltimateStorage/Strategies/Import/CassandraImportStrategy.cs:16-70` | Complete stub: in-memory BoundedDictionary, no CQL, no Cassandra.Driver. `IsProductionReady = false`. Rule 13 violation. | [ ]
-| 3972 | 1 | P0 | `UltimateStorage/Strategies/Import/DatabricksImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No Databricks SDK, no Delta Lake. Rule 13 violation. | [ ]
-| 3973 | 1 | P0 | `UltimateStorage/Strategies/Import/MongoImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No MongoDB.Driver. Rule 13 violation. | [ ]
-| 3974 | 1 | P0 | `UltimateStorage/Strategies/Import/SqlServerImportStrategy.cs:84-113` | Retrieve returns empty 4096-byte MemoryStream regardless of key. Exists unconditionally returns true. Delete no-op. StoreAsync connects but discards data — no SqlBulkCopy. | [ ]
+| 3971 | 1 | P0 | `UltimateStorage/Strategies/Import/CassandraImportStrategy.cs:16-70` | Complete stub: in-memory BoundedDictionary, no CQL, no Cassandra.Driver. `IsProductionReady = false`. Rule 13 violation. | [X]
+| 3972 | 1 | P0 | `UltimateStorage/Strategies/Import/DatabricksImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No Databricks SDK, no Delta Lake. Rule 13 violation. | [X]
+| 3973 | 1 | P0 | `UltimateStorage/Strategies/Import/MongoImportStrategy.cs:16-70` | Complete stub: identical BoundedDictionary backend. No MongoDB.Driver. Rule 13 violation. | [X]
+| 3974 | 1 | P0 | `UltimateStorage/Strategies/Import/SqlServerImportStrategy.cs:84-113` | Retrieve returns empty 4096-byte MemoryStream regardless of key. Exists unconditionally returns true. Delete no-op. StoreAsync connects but discards data — no SqlBulkCopy. | [X]
 | 3975 | 1 | P1 | `UltimateStorage/Strategies/Import/MySqlImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no MySqlConnector, no LOAD DATA INFILE. | [ ]
 | 3976 | 1 | P1 | `UltimateStorage/Strategies/Import/OracleImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no Oracle.ManagedDataAccess. | [ ]
 | 3977 | 1 | P1 | `UltimateStorage/Strategies/Import/PostgresImportStrategy.cs:16-70` | Complete stub: BoundedDictionary backend, no Npgsql, no COPY protocol. | [ ]
@@ -6015,9 +6015,9 @@
 
 | # | Cat | Severity | Location | Description |
 |---|-----|----------|----------|-------------|
-| 4003 | 4 | P0 | `UltimateStorage/Strategies/Innovation/InfiniteStorageStrategy.cs:592-603` | MD5 used for consistent hash ring and provider ID generation. MD5 is broken — replace with XxHash64 or SHA256. | [ ]
+| 4003 | 4 | P0 | `UltimateStorage/Strategies/Innovation/InfiniteStorageStrategy.cs:592-603` | MD5 used for consistent hash ring and provider ID generation. MD5 is broken — replace with XxHash64 or SHA256. | [X]
 | 4004 | 6 | P0 | `UltimateStorage/Strategies/Innovation/InfiniteStorageStrategy.cs:241` | Fire-and-forget `_ = Task.WhenAll(deleteTasks)` — provider delete failures silently swallowed with no log/metric/rethrow. | [X]
-| 4005 | 2 | P0 | `UltimateStorage/Strategies/Innovation/GeoSovereignStrategy.cs:652-665` | `AddAuditEntry` mutates `List<ComplianceAuditEntry>` inside BoundedDictionary without synchronization. Concurrent store/retrieve calls race on the list. | [ ]
+| 4005 | 2 | P0 | `UltimateStorage/Strategies/Innovation/GeoSovereignStrategy.cs:652-665` | `AddAuditEntry` mutates `List<ComplianceAuditEntry>` inside BoundedDictionary without synchronization. Concurrent store/retrieve calls race on the list. | [X]
 | 4006 | 5 | P1 | `UltimateStorage/Strategies/Innovation/GeoSovereignStrategy.cs:219-222` | Silent catch in `LoadResidencyRecordsAsync` — corrupted index file indistinguishable from fresh start. | [X]
 | 4007 | 5 | P1 | `UltimateStorage/Strategies/Innovation/GeoSovereignStrategy.cs:236-239` | Silent catch in `SaveResidencyRecordsAsync` — disk-full/permission errors cause permanent data loss with no diagnostic. | [X]
 | 4008 | 5 | P1 | `UltimateStorage/Strategies/Innovation/GeoSovereignStrategy.cs:264-267` | Silent catch in `LoadAuditLogAsync` — no logging on failure. | [X]
@@ -6118,10 +6118,10 @@
 
 | # | Cat | Severity | Location | Description |
 |---|-----|----------|----------|-------------|
-| 4090 | 1 | P0 | `UltimateStorage/Strategies/Network/NvmeOfStrategy.cs:77` | In-process Dictionary used to cache block device data — entire WriteBlocks/ReadBlocks tunnels through REST API as base64 JSON. No actual NVMe-oF driver/kernel path. Simulation stub. | [ ]
-| 4091 | 1 | P0 | `UltimateStorage/Strategies/Network/AfpStrategy.cs:790-796,711-713` | `AfpResolveFileIdAsync` and AFP FPEnumerate parser throw NotSupportedException unconditionally. Store/Retrieve/List cannot work — non-functional stub. | [ ]
-| 4092 | 4 | P0 | `UltimateStorage/Strategies/OpenStack/SwiftStrategy.cs:174-176` | MD5.HashData(content) used for object ETag sent to Swift server. MD5 is broken — violates security policy. | [ ]
-| 4093 | 4 | P0 | `UltimateStorage/Strategies/OpenStack/SwiftStrategy.cs:235` | MD5 used for segment ETag computation in SLO uploads. Same MD5 violation. | [ ]
+| 4090 | 1 | P0 | `UltimateStorage/Strategies/Network/NvmeOfStrategy.cs:77` | In-process Dictionary used to cache block device data — entire WriteBlocks/ReadBlocks tunnels through REST API as base64 JSON. No actual NVMe-oF driver/kernel path. Simulation stub. | [X]
+| 4091 | 1 | P0 | `UltimateStorage/Strategies/Network/AfpStrategy.cs:790-796,711-713` | `AfpResolveFileIdAsync` and AFP FPEnumerate parser throw NotSupportedException unconditionally. Store/Retrieve/List cannot work — non-functional stub. | [X]
+| 4092 | 4 | P0 | `UltimateStorage/Strategies/OpenStack/SwiftStrategy.cs:174-176` | MD5.HashData(content) used for object ETag sent to Swift server. MD5 is broken — violates security policy. | [X]
+| 4093 | 4 | P0 | `UltimateStorage/Strategies/OpenStack/SwiftStrategy.cs:235` | MD5 used for segment ETag computation in SLO uploads. Same MD5 violation. | [X]
 | 4094 | 1 | P1 | `UltimateStorage/Strategies/Network/NvmeOfStrategy.cs:793-828,837-880` | WriteBlocksAsync/ReadBlocksAsync tunnel through vendor REST API as base64 JSON — not real NVMe-oF data path (no RDMA, no TCP NVMe-oF PDUs). Comment confirms gap. | [ ]
 | 4095 | 1 | P1 | `UltimateStorage/Strategies/Network/NvmeOfStrategy.cs:924-945` | SaveBlockMappingsAsync silently swallows all exceptions — in-memory mapping diverges from persistent state, causing data loss on restart. | [ ]
 | 4096 | 1 | P1 | `UltimateStorage/Strategies/Network/AfpStrategy.cs:743-751` | AfpGetFileDirParmsAsync returns hardcoded DateTime.UtcNow instead of actual file timestamps from AFP response. Metadata is fabricated. | [ ]

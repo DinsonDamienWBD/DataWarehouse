@@ -104,9 +104,28 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
-                // plaintext is the password, key is the salt (or generate if empty)
+                // plaintext is the password, key is the salt (or generate if empty).
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead: if the caller supplies a
+                // salt (key.Length > 0), it must be at least 16 bytes.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : GenerateSalt(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = GenerateSalt(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2id salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2id(password);
                 argon2.Salt = salt;
@@ -253,8 +272,26 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : RandomNumberGenerator.GetBytes(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = RandomNumberGenerator.GetBytes(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2i salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2i(password);
                 argon2.Salt = salt;
@@ -385,8 +422,26 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : RandomNumberGenerator.GetBytes(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = RandomNumberGenerator.GetBytes(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2d salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2d(password);
                 argon2.Salt = salt;

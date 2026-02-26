@@ -174,10 +174,12 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
     {
         if (TlsStream == null)
         {
-            // In production, this should check for active TLS connection
-            // For now, we'll issue a warning but allow operation
-            // Assumption: TLS is handled externally by the network stack
-            return;
+            // Fail-closed: a null TlsStream means no TLS session has been established.
+            // Silently allowing operation would return plaintext while the caller believes
+            // data is TLS-protected — a critical security vulnerability (finding #2962).
+            throw new InvalidOperationException(
+                "TLS stream is not configured. TlsBridgeTransitStrategy requires an active, " +
+                "authenticated SslStream before encrypting or decrypting data.");
         }
 
         if (!TlsStream.IsAuthenticated)
