@@ -137,6 +137,7 @@ public class V3ComponentTests
         // Act
         var report = new VdeHealthReport
         {
+            BlockSize = 4096,
             TotalBlocks = 10000,
             FreeBlocks = 8000,
             UsedBlocks = 2000,
