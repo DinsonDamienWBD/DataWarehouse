@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -34,6 +35,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private readonly BoundedDictionary<string, FederatedSession> _sessions = new BoundedDictionary<string, FederatedSession>(1000);
         private readonly BoundedDictionary<string, IdentityMapping> _identityMappings = new BoundedDictionary<string, IdentityMapping>(1000);
         private readonly BoundedDictionary<string, TokenCache> _tokenCache = new BoundedDictionary<string, TokenCache>(1000);
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _tokenValidationLocks = new();
         private readonly BoundedDictionary<string, ClaimsTransformation> _claimsTransformations = new BoundedDictionary<string, ClaimsTransformation>(1000);
         private readonly HttpClient _httpClient;
 
@@ -201,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 };
             }
 
-            // Check token cache
+            // Check token cache (fast path — no lock needed for valid hits)
             var cacheKey = ComputeTokenCacheKey(token);
             if (_tokenCache.TryGetValue(cacheKey, out var cached) &&
                 cached.ExpiresAt > DateTime.UtcNow)
@@ -209,42 +211,61 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 return cached.ValidationResult;
             }
 
+            // Serialize concurrent validation for the same cache key to prevent duplicate
+            // IdP round-trips (finding 1170: token refresh race on concurrent misses).
+            var keyLock = _tokenValidationLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+            await keyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             TokenValidationResult result;
-
             try
             {
-                result = idp.Protocol switch
+                // Re-check inside the lock — a previous waiter may have populated the cache.
+                if (_tokenCache.TryGetValue(cacheKey, out cached) &&
+                    cached.ExpiresAt > DateTime.UtcNow)
                 {
-                    FederationProtocol.OIDC => await ValidateOidcTokenAsync(token, idp, cancellationToken),
-                    FederationProtocol.OAuth2 => await ValidateOAuth2TokenAsync(token, idp, cancellationToken),
-                    FederationProtocol.SAML2 => ValidateSamlToken(token, idp),
-                    FederationProtocol.WsFederation => ValidateWsFederationToken(token, idp),
-                    _ => new TokenValidationResult
+                    return cached.ValidationResult;
+                }
+
+                try
+                {
+                    result = idp.Protocol switch
+                    {
+                        FederationProtocol.OIDC => await ValidateOidcTokenAsync(token, idp, cancellationToken),
+                        FederationProtocol.OAuth2 => await ValidateOAuth2TokenAsync(token, idp, cancellationToken),
+                        FederationProtocol.SAML2 => ValidateSamlToken(token, idp),
+                        FederationProtocol.WsFederation => ValidateWsFederationToken(token, idp),
+                        _ => new TokenValidationResult
+                        {
+                            IsValid = false,
+                            Error = "Unsupported federation protocol",
+                            ErrorCode = TokenValidationError.UnsupportedProtocol
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    result = new TokenValidationResult
                     {
                         IsValid = false,
-                        Error = "Unsupported federation protocol",
-                        ErrorCode = TokenValidationError.UnsupportedProtocol
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                result = new TokenValidationResult
-                {
-                    IsValid = false,
-                    Error = $"Token validation failed: {ex.Message}",
-                    ErrorCode = TokenValidationError.ValidationFailed
-                };
-            }
+                        Error = $"Token validation failed: {ex.Message}",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
 
-            // Cache the result
-            if (result.IsValid)
-            {
-                _tokenCache[cacheKey] = new TokenCache
+                // Cache the result
+                if (result.IsValid)
                 {
-                    ValidationResult = result,
-                    ExpiresAt = DateTime.UtcNow.Add(_tokenCacheDuration)
-                };
+                    _tokenCache[cacheKey] = new TokenCache
+                    {
+                        ValidationResult = result,
+                        ExpiresAt = DateTime.UtcNow.Add(_tokenCacheDuration)
+                    };
+                }
+            }
+            finally
+            {
+                keyLock.Release();
+                // Clean up the per-key lock after use to prevent unbounded growth.
+                _tokenValidationLocks.TryRemove(cacheKey, out _);
             }
 
             return result;

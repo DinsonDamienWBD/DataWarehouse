@@ -117,9 +117,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 Timestamp = DateTime.UtcNow
             };
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return new ComplianceResult
@@ -355,7 +356,20 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
             IncrementCounter("automated_compliance_checking.shutdown");
+            _continuousCheckTimer?.Dispose();
+            _continuousCheckTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _continuousCheckTimer?.Dispose();
+            _continuousCheckTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 

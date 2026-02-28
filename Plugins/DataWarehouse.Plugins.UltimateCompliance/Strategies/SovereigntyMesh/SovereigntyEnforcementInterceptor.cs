@@ -237,14 +237,17 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
             });
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant
-                : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant
+                : hasHighViolations ? ComplianceStatus.NonCompliant
                 : ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,

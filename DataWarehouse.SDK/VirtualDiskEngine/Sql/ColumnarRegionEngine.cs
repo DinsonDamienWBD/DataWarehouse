@@ -291,6 +291,12 @@ public sealed class ColumnarRegionEngine
         int dataLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(5, 4));
         int headerSize = 9;
 
+        // Validate rowCount before use to prevent OOM from corrupt/malicious on-disk values (finding 910).
+        const int MaxRowCount = 100_000_000; // 100M rows per column block is a safe upper bound
+        if (rowCount < 0 || rowCount > MaxRowCount)
+            throw new InvalidDataException(
+                $"Columnar region block at offset {blockOffset} has invalid rowCount={rowCount}. Data may be corrupt.");
+
         // Validate dataLen before allocation to prevent OOM from corrupt/malicious on-disk values
         const int MaxColumnarDataLen = 256 * 1024 * 1024; // 256 MB upper bound
         if (dataLen < 0 || dataLen > MaxColumnarDataLen)

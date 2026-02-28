@@ -37,6 +37,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private TimeSpan _minimumDelay = TimeSpan.FromHours(1);
         private TimeSpan _commitmentTimeout = TimeSpan.FromHours(24);
         private string? _auditChainHash;
+        private readonly object _auditChainLock = new(); // guards _auditChainHash for atomic read-update
         private byte[]? _signingKey;
 
         /// <inheritdoc/>
@@ -509,9 +510,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 recommendations.Add($"{nearExpiration.Count} pending authorizations expire within 2 hours");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -771,19 +773,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private void LogAuditEntry(string eventType, string actorId, string operation, string details)
         {
-            var entry = new TamperEvidentAuditEntry
+            TamperEvidentAuditEntry entry;
+            lock (_auditChainLock)
             {
-                EntryId = Guid.NewGuid().ToString(),
-                Timestamp = DateTime.UtcNow,
-                EventType = eventType,
-                ActorId = actorId,
-                Operation = operation,
-                Details = details,
-                PreviousHash = _auditChainHash ?? "",
-                EntryHash = ComputeEntryHash(eventType, actorId, operation, details, DateTime.UtcNow, _auditChainHash)
-            };
-
-            _auditChainHash = entry.EntryHash;
+                var timestamp = DateTime.UtcNow;
+                var previousHash = _auditChainHash ?? "";
+                var entryHash = ComputeEntryHash(eventType, actorId, operation, details, timestamp, _auditChainHash);
+                entry = new TamperEvidentAuditEntry
+                {
+                    EntryId = Guid.NewGuid().ToString(),
+                    Timestamp = timestamp,
+                    EventType = eventType,
+                    ActorId = actorId,
+                    Operation = operation,
+                    Details = details,
+                    PreviousHash = previousHash,
+                    EntryHash = entryHash
+                };
+                _auditChainHash = entryHash;
+            }
             _auditLog.Add(entry);
         }
 

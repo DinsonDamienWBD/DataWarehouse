@@ -36,8 +36,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "LEYPROT-003", Description = "Data security measures not implemented", Severity = ViolationSeverity.High, Remediation = "Implement appropriate security measures", RegulatoryReference = "Security Principle" });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     

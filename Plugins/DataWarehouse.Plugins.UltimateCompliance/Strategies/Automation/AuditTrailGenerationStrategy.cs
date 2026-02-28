@@ -397,7 +397,20 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
             IncrementCounter("audit_trail_generation.shutdown");
+            _flushTimer?.Dispose();
+            _flushTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _flushTimer?.Dispose();
+            _flushTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 }

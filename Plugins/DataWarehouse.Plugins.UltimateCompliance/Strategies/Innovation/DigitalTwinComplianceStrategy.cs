@@ -21,9 +21,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             IncrementCounter("digital_twin_compliance.check");
             var violations = new List<ComplianceViolation>();
 
-            // Check 1: Verify digital twin exists
-            if (!context.Attributes.TryGetValue("HasDigitalTwin", out var hasTwin) ||
-                !(hasTwin is bool exists && exists))
+            // Check 1: Verify digital twin exists (single lookup, reused in check 2)
+            bool hasDigitalTwin = context.Attributes.TryGetValue("HasDigitalTwin", out var hasTwinObj) &&
+                                  hasTwinObj is bool hasTwinBool && hasTwinBool;
+
+            if (!hasDigitalTwin)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -36,12 +38,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            // Check 2: Verify twin synchronization
-            if (context.Attributes.TryGetValue("HasDigitalTwin", out var ht) &&
-                ht is bool hasDt && hasDt)
+            // Check 2: Verify twin synchronization (only when twin exists; reuse hasDigitalTwin)
+            if (hasDigitalTwin)
             {
-                if (!context.Attributes.TryGetValue("LastSyncTime", out var syncTime) ||
-                    !(syncTime is DateTime lastSync && (DateTime.UtcNow - lastSync).TotalDays <= 7))
+                bool syncRecent = false;
+                if (context.Attributes.TryGetValue("LastSyncTime", out var syncTime))
+                {
+                    // Accept both DateTime and DateTimeOffset stored in the attributes bag
+                    DateTime? lastSync = syncTime switch
+                    {
+                        DateTime dt => dt,
+                        DateTimeOffset dto => dto.UtcDateTime,
+                        _ => null
+                    };
+                    syncRecent = lastSync.HasValue && (DateTime.UtcNow - lastSync.Value).TotalDays <= 7;
+                }
+
+                if (!syncRecent)
                 {
                     violations.Add(new ComplianceViolation
                     {

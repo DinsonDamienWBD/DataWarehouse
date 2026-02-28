@@ -127,13 +127,16 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             });
         }
 
+        // Static readonly arrays avoid per-call heap allocations (finding 1458)
+        private static readonly string[] _pqSignatures = { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
+        private static readonly string[] _pqKEMs = { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
+
         private static bool IsPostQuantumSignature(string? algorithm)
         {
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            var pqSignatures = new[] { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
-            return pqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return _pqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsPostQuantumKEM(string? algorithm)
@@ -141,8 +144,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            var pqKEMs = new[] { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
-            return pqKEMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return _pqKEMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsQuantumResistantHash(string? algorithm)

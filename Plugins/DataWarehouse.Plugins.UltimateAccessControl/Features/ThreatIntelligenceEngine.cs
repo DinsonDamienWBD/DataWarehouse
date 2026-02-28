@@ -49,6 +49,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 
             foreach (var indicator in indicators)
             {
+                // Skip indicators with null/empty Value to prevent ArgumentNullException
+                // when used as dictionary key and false-positive threat matches (finding 1139).
+                if (string.IsNullOrEmpty(indicator.Value))
+                    continue;
+
                 // Store a defensive copy to prevent external mutation of stored data
                 var storedIndicator = new ThreatIndicator
                 {

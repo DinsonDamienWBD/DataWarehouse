@@ -21,9 +21,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             IncrementCounter("self_healing_compliance.check");
             var violations = new List<ComplianceViolation>();
 
-            // Check 1: Verify auto-remediation capability
-            if (!context.Attributes.TryGetValue("AutoRemediationEnabled", out var autoRemediation) ||
-                !(autoRemediation is bool enabled && enabled))
+            // Check 1: Verify auto-remediation capability (single lookup; result reused in check 3)
+            bool autoRemediationEnabled = context.Attributes.TryGetValue("AutoRemediationEnabled", out var autoRemediationObj) &&
+                                          autoRemediationObj is bool autoRemBool && autoRemBool;
+
+            if (!autoRemediationEnabled)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -51,9 +53,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            // Check 3: Verify rollback capability
-            if (context.Attributes.TryGetValue("AutoRemediationEnabled", out var ar) &&
-                ar is bool autoRem && autoRem)
+            // Check 3: Verify rollback capability (reuse autoRemediationEnabled from check 1)
+            if (autoRemediationEnabled)
             {
                 if (!context.Attributes.ContainsKey("RollbackSupported") ||
                     !context.Attributes.ContainsKey("BackupBeforeRemediation"))

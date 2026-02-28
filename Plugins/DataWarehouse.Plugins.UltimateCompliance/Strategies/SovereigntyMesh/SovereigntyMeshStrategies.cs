@@ -100,14 +100,17 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -495,14 +498,17 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
             recommendations.Add("Consider establishing a data embassy for enhanced protection");
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -824,14 +830,17 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
             UpdateDataLocation(resourceId, destinationLocation, context);
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -1066,7 +1075,10 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {

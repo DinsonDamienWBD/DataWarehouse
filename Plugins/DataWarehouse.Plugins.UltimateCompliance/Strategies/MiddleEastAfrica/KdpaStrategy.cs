@@ -33,17 +33,42 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
 
             if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 30)
+                // Accept int, long, double, or string to avoid silent miss when stored as non-int (finding 1466)
+                if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) &&
+                    TryGetDays(daysObj, out var days) && days > 30)
                 {
                     violations.Add(new ComplianceViolation { Code = "KDPA-003", Description = $"Access request exceeded 30 days ({days} days)", Severity = ViolationSeverity.High, Remediation = "Respond within 30 days", RegulatoryReference = "KDPA Section 38" });
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
+    /// <summary>Converts ResponseDays attribute value to int regardless of stored type.</summary>
+    private static bool TryGetDays(object? value, out int days)
+    {
+        days = 0;
+        switch (value)
+        {
+            case int i:
+                days = i;
+                return days >= 0;
+            case long l:
+                days = (int)l;
+                return days >= 0;
+            case double d:
+                days = (int)d;
+                return days >= 0;
+            case string s:
+                return int.TryParse(s, out days);
+            default:
+                return false;
+        }
+    }
+
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {

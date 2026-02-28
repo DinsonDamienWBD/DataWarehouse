@@ -390,7 +390,20 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
             IncrementCounter("compliance_reporting.shutdown");
+            _reportGenerationTimer?.Dispose();
+            _reportGenerationTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _reportGenerationTimer?.Dispose();
+            _reportGenerationTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 }

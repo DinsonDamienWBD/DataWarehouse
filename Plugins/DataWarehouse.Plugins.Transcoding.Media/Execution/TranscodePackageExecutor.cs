@@ -110,7 +110,6 @@ public sealed class TranscodePackageExecutor
         // Bounds constants to prevent OOM from crafted/corrupt packages
         const int MaxStringFieldBytes = 64 * 1024;         // 64 KB for encoder name and args
         const int MaxHashBytes = 256;                       // Hash at most 256 bytes
-        const int MaxSourceDataBytes = 2 * 1024 * 1024 * 1024 - 1; // 2 GB - 1 (int upper bound)
 
         // Read encoder name (length-prefixed)
         var encoderLength = reader.ReadInt32();
