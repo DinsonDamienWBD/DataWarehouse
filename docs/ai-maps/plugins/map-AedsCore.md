@@ -509,6 +509,7 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
     public async Task<AedsClient> RegisterClientAsync(string clientName, ClientCapabilities capabilities, CancellationToken ct = default);
     public async Task ElevateTrustAsync(string clientId, string adminVerifiedPIN, ClientTrustLevel newLevel, CancellationToken ct = default);
     public bool VerifyPairing(string clientId);
+    public void RecordTrustElevation(string clientId, ClientTrustLevel level);
     public override Task StartAsync(CancellationToken ct);
     public override Task StopAsync();
 }

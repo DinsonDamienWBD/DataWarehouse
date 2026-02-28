@@ -273,6 +273,7 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
     public Stereo3DVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<Stream> ConvertStereoFormatAsync(Stream input, StereoLayout inputLayout, StereoLayout outputLayout, CancellationToken cancellationToken = default);
@@ -291,6 +292,7 @@ internal sealed class Video360Strategy : MediaStrategyBase
  MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "vp9", "equirect", "cubemap" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<CubemapResult> ConvertToCubemapAsync(Stream equirectangularInput, int faceSize = 1024, CancellationToken cancellationToken = default);
@@ -308,6 +310,7 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
     public VrVideoStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: true, SupportsAdaptiveBitrate: true, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h265", "av1", "vr-viewport" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<VrFrameResult> RenderViewportFrameAsync(Stream vrInput, VrOrientation orientation, VrRenderConfig config, CancellationToken cancellationToken = default);
@@ -325,6 +328,7 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
     public HdrToneMappingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264", "h265", "av1", "tone-map" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<ToneMappingResult> ToneMapAsync(Stream hdrInput, ToneMappingOperator toneMapOp, ToneMappingConfig? config = null, CancellationToken cancellationToken = default);
@@ -439,6 +443,7 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
     public OnnxInferenceStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WAV }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "onnx-inference" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public OnnxModelInfo LoadModel(string modelName, string modelPath, string? version = null);
@@ -458,6 +463,7 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
     public AiUpscalingStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.PNG, MediaFormat.JPEG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "ai-upscale" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public void Configure(string modelPath, int scaleFactor = 2, int tileSize = 512, int tileOverlap = 32);
@@ -475,6 +481,7 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
     public ObjectDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.MP4 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "yolo-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public void Configure(string modelPath, float confidenceThreshold = 0.5f, float iouThreshold = 0.45f, string[]? classLabels = null);
@@ -493,6 +500,7 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
     public FaceDetectionStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.UHD, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "face-detection" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<FaceDetectionResult> DetectFacesAsync(Stream inputImage, CancellationToken cancellationToken = default);
@@ -510,6 +518,7 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
  }, SupportsStreaming: true, SupportsAdaptiveBitrate: false, MaxResolution: default, MaxBitrate: null, SupportedCodecs: new HashSet<string> { "whisper-stt" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<TranscriptionResult> TranscribeAsync(Stream audioStream, CancellationToken cancellationToken = default);
@@ -670,6 +679,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     public GpuAccelerationStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: Resolution.EightK, MaxBitrate: Bitrate.Video4K.BitsPerSecond, SupportedCodecs: new HashSet<string> { "h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_qsv", "hevc_qsv", "av1_qsv", "h264_amf", "hevc_amf", "av1_amf", "h264", "h265", "av1" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public async Task<GpuDetectionResult> DetectGpuHardwareAsync(CancellationToken cancellationToken = default);
@@ -678,9 +688,9 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     public void ReleaseGpuMemory(GpuMemoryAllocation allocation);
     public string GetEncoderArgs(string codec);
     public GpuHealthStats GetHealthStats();
-    protected override Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
+    protected override async Task<Stream> TranscodeAsyncCore(Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken);
     protected override Task<MediaMetadata> ExtractMetadataAsyncCore(Stream inputStream, CancellationToken cancellationToken);
-    protected override Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken);
     protected override Task<Uri> StreamAsyncCore(Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken);;
 }
 ```
@@ -777,6 +787,7 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
     public GltfModelStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.GLTF }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.GLTF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: null, MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "gltf", "gltf2", "glb", "draco" }, SupportsThumbnailGeneration: false, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -1141,6 +1152,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
     public KtxTextureStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.KTX, MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.DDS }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.KTX }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(16384, 16384), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ktx", "ktx2", "basis-etc1s", "basis-uastc", "etc2", "astc", "pvrtc" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -1272,6 +1284,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
     public Cr2RawStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.CR2 }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(8192, 5464), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "cr2", "canon-raw", "lossless-jpeg" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: false));
     public override string StrategyId;;
     public override string Name;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -1342,6 +1355,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
 }
     public AvifImageStrategy() : base(new MediaCapabilities(SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP }, SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.AVIF }, SupportsStreaming: false, SupportsAdaptiveBitrate: false, MaxResolution: new Resolution(65536, 65536), MaxBitrate: null, SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "avif", "av1", "avif-hdr", "avif-lossless" }, SupportsThumbnailGeneration: true, SupportsMetadataExtraction: true, SupportsHardwareAcceleration: true));
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string Name;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);

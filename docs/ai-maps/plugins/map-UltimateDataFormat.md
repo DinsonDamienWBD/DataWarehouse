@@ -464,6 +464,7 @@ public sealed class VtkStrategy : DataFormatStrategyBase
 }
     public override string StrategyId;;
     public override string DisplayName;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -484,6 +485,7 @@ public sealed class CgnsStrategy : DataFormatStrategyBase
 }
     public override string StrategyId;;
     public override string DisplayName;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -504,6 +506,7 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
 }
     public override string StrategyId;;
     public override string DisplayName;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -573,6 +576,7 @@ public sealed class ProtobufStrategy : DataFormatStrategyBase
 }
     public override string StrategyId;;
     public override string DisplayName;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
@@ -651,6 +655,7 @@ public sealed class GeoTiffStrategy : DataFormatStrategyBase
 }
     public override string StrategyId;;
     public override string DisplayName;;
+    public override bool IsProductionReady;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);;
