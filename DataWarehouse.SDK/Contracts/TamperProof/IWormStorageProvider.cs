@@ -4,6 +4,7 @@
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Threading;
 
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -355,13 +356,17 @@ public abstract class WormStorageProviderPluginBase : IntegrityPluginBase, IWorm
 
         try
         {
-            var request = new PluginMessage("intelligence.worm.retention.recommend")
+            var request = new PluginMessage
             {
+                Type = "intelligence.worm.retention.recommend",
                 Payload = { ["objectId"] = objectId.ToString() }
             };
             var response = await MessageBus.SendAsync("intelligence.worm.retention.recommend", request, TimeSpan.FromSeconds(10), ct);
-            if (response.Success && response.Payload.TryGetValue("recommendation", out var rec) && rec is RetentionPolicyRecommendation recommendation)
+            if (response.Success && response.Payload is RetentionPolicyRecommendation recommendation)
                 return recommendation;
+            if (response.Success && response.Payload is Dictionary<string, object> dict
+                && dict.TryGetValue("recommendation", out var rec) && rec is RetentionPolicyRecommendation recTyped)
+                return recTyped;
         }
         catch (TimeoutException) { }
         catch (OperationCanceledException) { throw; }

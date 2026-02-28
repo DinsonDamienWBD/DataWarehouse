@@ -769,15 +769,15 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                var totalAssessments = Interlocked.Read(ref _totalAssessments);
+                var totalAssessments = _totalAssessments;
 
                 return new ComplianceStatistics
                 {
                     TotalAssessments = totalAssessments,
-                    CompliantCount = Interlocked.Read(ref _compliantCount),
-                    NonCompliantCount = Interlocked.Read(ref _nonCompliantCount),
-                    TotalViolations = Interlocked.Read(ref _totalViolations),
-                    ErrorCount = Interlocked.Read(ref _errorCount),
+                    CompliantCount = _compliantCount,
+                    NonCompliantCount = _nonCompliantCount,
+                    TotalViolations = _totalViolations,
+                    ErrorCount = _errorCount,
                     AverageAssessmentTimeMs = totalAssessments > 0 ? _totalAssessmentTimeMs / totalAssessments : 0,
                     AverageComplianceScore = totalAssessments > 0 ? _totalComplianceScore / totalAssessments : 0,
                     AssessmentsByFramework = new Dictionary<ComplianceFramework, long>(_assessmentsByFramework),
@@ -793,11 +793,11 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                Interlocked.Exchange(ref _totalAssessments, 0);
-                Interlocked.Exchange(ref _compliantCount, 0);
-                Interlocked.Exchange(ref _nonCompliantCount, 0);
-                Interlocked.Exchange(ref _totalViolations, 0);
-                Interlocked.Exchange(ref _errorCount, 0);
+                _totalAssessments = 0;
+                _compliantCount = 0;
+                _nonCompliantCount = 0;
+                _totalViolations = 0;
+                _errorCount = 0;
                 _totalAssessmentTimeMs = 0;
                 _totalComplianceScore = 0;
                 _lastUpdateTime = DateTime.UtcNow;

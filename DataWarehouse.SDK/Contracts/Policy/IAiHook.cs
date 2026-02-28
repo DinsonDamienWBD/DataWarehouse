@@ -109,14 +109,14 @@ public sealed class RecommendationReceiver
         _pluginId = pluginId;
     }
 
+    private readonly List<Func<PolicyRecommendation, CancellationToken, Task>> _handlers = new();
+    private readonly object _handlersLock = new();
+
     /// <summary>
     /// Subscribe to recommendations. Returns a disposable subscription handle.
     /// </summary>
     /// <param name="handler">The handler to invoke when a recommendation is received.</param>
     /// <returns>A disposable subscription handle.</returns>
-    private readonly List<Func<PolicyRecommendation, CancellationToken, Task>> _handlers = new();
-    private readonly object _handlersLock = new();
-
     public IDisposable Subscribe(Func<PolicyRecommendation, CancellationToken, Task> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);

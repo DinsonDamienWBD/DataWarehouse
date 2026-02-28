@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Frozen;
+using System.IO;
 using System.Linq;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Interface;
@@ -68,7 +69,7 @@ public sealed record ProtoStoreRequest
     /// <summary>Serializes to length-prefixed binary matching proto wire format field order.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(256);
+        var buffer = new MemoryStream(256);
         WriteString(buffer, Key);
         WriteBytes(buffer, Data);
         WriteString(buffer, ContentType);
@@ -130,7 +131,7 @@ public sealed record ProtoStoreResponse
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(64);
+        var buffer = new MemoryStream(64);
         WriteInt64(buffer, Version);
         WriteString(buffer, Checksum);
         WriteInt64(buffer, StoredAtTicks);
@@ -172,7 +173,7 @@ public sealed record ProtoRetrieveRequest
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(64);
+        var buffer = new MemoryStream(64);
         WriteString(buffer, Key);
         WriteInt64(buffer, Version);
         WriteBool(buffer, IncludeMetadata);
@@ -220,7 +221,7 @@ public sealed record ProtoRetrieveChunk
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(256);
+        var buffer = new MemoryStream(256);
         WriteBytes(buffer, Data);
         WriteInt32(buffer, ChunkIndex);
         WriteInt32(buffer, TotalChunks);
@@ -280,7 +281,7 @@ public sealed record ProtoQueryRequest
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(128);
+        var buffer = new MemoryStream(128);
         WriteString(buffer, Query);
         WriteInt32(buffer, Parameters.Count);
         foreach (var kv in Parameters)
@@ -334,7 +335,7 @@ public sealed record ProtoQueryResultBatch
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(512);
+        var buffer = new MemoryStream(512);
         WriteInt32(buffer, Columns.Count);
         foreach (var col in Columns)
         {
@@ -432,7 +433,7 @@ public sealed record ProtoSearchRequest
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(64);
+        var buffer = new MemoryStream(64);
         WriteString(buffer, Query);
         WriteInt32(buffer, MaxResults);
         WriteInt32(buffer, Offset);
@@ -478,7 +479,7 @@ public sealed record ProtoSearchResult
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(128);
+        var buffer = new MemoryStream(128);
         WriteString(buffer, Key);
         WriteInt64(buffer, BitConverter.DoubleToInt64Bits(Score));
         WriteInt32(buffer, Metadata.Count);
@@ -535,7 +536,7 @@ public sealed record ProtoHealthResponse
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(128);
+        var buffer = new MemoryStream(128);
         WriteInt32(buffer, Status);
         WriteInt64(buffer, UptimeSeconds);
         WriteString(buffer, Version);
@@ -609,7 +610,7 @@ public sealed record ProtoCapabilitiesResponse
     /// <summary>Serializes to length-prefixed binary.</summary>
     public byte[] ToBytes()
     {
-        var buffer = new List<byte>(256);
+        var buffer = new MemoryStream(256);
         WriteInt32(buffer, Capabilities.Count);
         foreach (var cap in Capabilities)
         {
@@ -803,40 +804,36 @@ public static class DataWarehouseGrpcServices
 /// </summary>
 internal static class ProtoSerializationHelpers
 {
-    internal static void WriteString(List<byte> buffer, string value)
+    internal static void WriteString(MemoryStream buffer, string value)
     {
         var bytes = Encoding.UTF8.GetBytes(value);
         WriteInt32(buffer, bytes.Length);
-        buffer.AddRange(bytes);
+        buffer.Write(bytes, 0, bytes.Length);
     }
 
-    internal static void WriteBytes(List<byte> buffer, byte[] value)
+    internal static void WriteBytes(MemoryStream buffer, byte[] value)
     {
         WriteInt32(buffer, value.Length);
-        buffer.AddRange(value);
+        buffer.Write(value, 0, value.Length);
     }
 
-    internal static void WriteInt32(List<byte> buffer, int value)
+    internal static void WriteInt32(MemoryStream buffer, int value)
     {
         Span<byte> tmp = stackalloc byte[4];
         BinaryPrimitives.WriteInt32LittleEndian(tmp, value);
-        buffer.Add(tmp[0]);
-        buffer.Add(tmp[1]);
-        buffer.Add(tmp[2]);
-        buffer.Add(tmp[3]);
+        buffer.Write(tmp);
     }
 
-    internal static void WriteInt64(List<byte> buffer, long value)
+    internal static void WriteInt64(MemoryStream buffer, long value)
     {
         Span<byte> tmp = stackalloc byte[8];
         BinaryPrimitives.WriteInt64LittleEndian(tmp, value);
-        for (int i = 0; i < 8; i++)
-            buffer.Add(tmp[i]);
+        buffer.Write(tmp);
     }
 
-    internal static void WriteBool(List<byte> buffer, bool value)
+    internal static void WriteBool(MemoryStream buffer, bool value)
     {
-        buffer.Add(value ? (byte)1 : (byte)0);
+        buffer.WriteByte(value ? (byte)1 : (byte)0);
     }
 
     /// <summary>Maximum element count allowed in deserialized collections to prevent unbounded allocation.</summary>

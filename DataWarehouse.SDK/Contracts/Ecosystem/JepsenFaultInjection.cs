@@ -2,6 +2,7 @@
 // Network partition, process kill, clock skew, and disk corruption fault injectors
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -9,6 +10,13 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts.Ecosystem;
+
+// Cached SearchValues for container name validation (CA1870)
+file static class FaultInjectionConstants
+{
+    internal static readonly SearchValues<char> InvalidContainerChars =
+        SearchValues.Create(";'&|$`\n\r\"'");
+}
 
 #region Interfaces and Records
 
@@ -216,7 +224,7 @@ public sealed class NetworkPartitionFault : IFaultInjector
         // Validate inputs to prevent shell injection
         if (string.IsNullOrWhiteSpace(containerName))
             throw new ArgumentException("Container name must not be empty.", nameof(containerName));
-        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+        if (containerName.AsSpan().IndexOfAny(FaultInjectionConstants.InvalidContainerChars) >= 0)
             throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
         if (string.IsNullOrWhiteSpace(command))
             throw new ArgumentException("Command must not be empty.", nameof(command));
@@ -310,18 +318,31 @@ public sealed class ProcessKillFault : IFaultInjector
 
     private static async Task DockerExecAsync(string containerName, string command, CancellationToken ct)
     {
+        // Validate inputs to prevent shell injection
+        if (string.IsNullOrWhiteSpace(containerName))
+            throw new ArgumentException("Container name must not be empty.", nameof(containerName));
+        if (containerName.AsSpan().IndexOfAny(FaultInjectionConstants.InvalidContainerChars) >= 0)
+            throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
+        if (string.IsNullOrWhiteSpace(command))
+            throw new ArgumentException("Command must not be empty.", nameof(command));
+
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"exec {containerName} /bin/sh -c \"{command}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
         };
+
+        process.StartInfo.ArgumentList.Add("exec");
+        process.StartInfo.ArgumentList.Add(containerName);
+        process.StartInfo.ArgumentList.Add("/bin/sh");
+        process.StartInfo.ArgumentList.Add("-c");
+        process.StartInfo.ArgumentList.Add(command);
 
         process.Start();
         await process.WaitForExitAsync(ct).ConfigureAwait(false);
@@ -419,7 +440,7 @@ public sealed class ClockSkewFault : IFaultInjector
         // Validate inputs to prevent shell injection
         if (string.IsNullOrWhiteSpace(containerName))
             throw new ArgumentException("Container name must not be empty.", nameof(containerName));
-        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+        if (containerName.AsSpan().IndexOfAny(FaultInjectionConstants.InvalidContainerChars) >= 0)
             throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
         if (string.IsNullOrWhiteSpace(command))
             throw new ArgumentException("Command must not be empty.", nameof(command));
@@ -517,7 +538,7 @@ public sealed class DiskCorruptionFault : IFaultInjector
         // Validate inputs to prevent shell injection
         if (string.IsNullOrWhiteSpace(containerName))
             throw new ArgumentException("Container name must not be empty.", nameof(containerName));
-        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+        if (containerName.AsSpan().IndexOfAny(FaultInjectionConstants.InvalidContainerChars) >= 0)
             throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
         if (string.IsNullOrWhiteSpace(command))
             throw new ArgumentException("Command must not be empty.", nameof(command));

@@ -510,7 +510,7 @@ public abstract class AccessLogProviderPluginBase : IntegrityPluginBase, IAccess
         foreach (var entry in oldEntries)
         {
             ct.ThrowIfCancellationRequested();
-            await DeleteLogEntryAsync(entry.EntryId, ct).ConfigureAwait(false);
+            await DeleteLogEntryAsync(entry.EntryId.ToString(), ct).ConfigureAwait(false);
         }
     }
 

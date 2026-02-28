@@ -878,11 +878,11 @@ public sealed class JepsenTestHarness
                             {
                                 violations.Add(new ConsistencyViolation
                                 {
-                                    Type = ConsistencyViolationType.CausalViolation,
-                                    Description = $"Client '{op.ClientId}' read stale value for key '{writerKv.Key}' " +
+                                    Description = $"Causal violation: Client '{op.ClientId}' read stale value for key '{writerKv.Key}' " +
                                         $"(got '{staleRead.Value}', expected at least '{writerKv.Value}' from causal dependency on '{writer}')",
-                                    Entry1 = op,
-                                    Entry2 = staleRead
+                                    Operation = op,
+                                    ExpectedBehavior = $"Read should return value >= '{writerKv.Value}' written by causally-dependent client '{writer}'",
+                                    ActualBehavior = $"Read returned stale value '{staleRead.Value}'"
                                 });
                             }
                         }

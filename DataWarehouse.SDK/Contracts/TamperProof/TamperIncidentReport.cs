@@ -324,7 +324,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Suspected confidence.</returns>
     public static AttributionAnalysis CreateSuspected(
         string suspectedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset? estimatedTimeFrom = null,
         DateTimeOffset? estimatedTimeTo = null)
@@ -352,7 +352,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Likely confidence.</returns>
     public static AttributionAnalysis CreateLikely(
         string suspectedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset? estimatedTimeFrom = null,
         DateTimeOffset? estimatedTimeTo = null)
@@ -379,7 +379,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Confirmed confidence.</returns>
     public static AttributionAnalysis CreateConfirmed(
         string confirmedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset tamperTime)
     {

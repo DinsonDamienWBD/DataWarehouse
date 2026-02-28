@@ -55,10 +55,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 20 | 11 | P1 | `Contracts/ChaosVaccination/IImmuneResponseSystem.cs:64` + `Contracts/Composition/AutonomousOperationsTypes.cs:29` | Duplicate `RemediationActionType` enum and `RemediationAction` record in two namespaces with different members — ambiguous type resolution. | [ ]
-| 21 | 2 | P1 | `Contracts/Compliance/ComplianceStrategy.cs:946-978` | Mixed lock + Interlocked pattern: `IncrementErrorCount()` uses Interlocked outside `_statsLock` while `UpdateStatistics` uses Interlocked inside lock. Inconsistent synchronization. | [ ]
-| 22 | 15 | P1 | `Contracts/Compute/ComputeTypes.cs:79,90,188` | `GetXxxAsString()` XML doc claims `InvalidOperationException` on invalid UTF-8, but UTF-8 default encoding silently replaces with U+FFFD — never throws. | [ ]
-| 23 | 4 | P1 | `Contracts/Composition/SupplyChainAttestationTypes.cs:281-322` | Path traversal: `VerifyAsync(string binaryPath)` reads arbitrary caller-supplied file paths without sanitization or base-directory constraint. | [ ]
+| 20 | 11 | P1 | `Contracts/ChaosVaccination/IImmuneResponseSystem.cs:64` + `Contracts/Composition/AutonomousOperationsTypes.cs:29` | Duplicate `RemediationActionType` enum and `RemediationAction` record in two namespaces with different members — ambiguous type resolution. | [X] |
+| 21 | 2 | P1 | `Contracts/Compliance/ComplianceStrategy.cs:946-978` | Mixed lock + Interlocked pattern: `IncrementErrorCount()` uses Interlocked outside `_statsLock` while `UpdateStatistics` uses Interlocked inside lock. Inconsistent synchronization. | [X] |
+| 22 | 15 | P1 | `Contracts/Compute/ComputeTypes.cs:79,90,188` | `GetXxxAsString()` XML doc claims `InvalidOperationException` on invalid UTF-8, but UTF-8 default encoding silently replaces with U+FFFD — never throws. | [X]
+| 23 | 4 | P1 | `Contracts/Composition/SupplyChainAttestationTypes.cs:281-322` | Path traversal: `VerifyAsync(string binaryPath)` reads arbitrary caller-supplied file paths without sanitization or base-directory constraint. | [X]
 | 24 | 12 | P2 | `Contracts/Compression/CompressionStrategy.cs:439-441` | `AverageDecompressionThroughput` uses `TotalBytesOut` (compressed) instead of `TotalBytesIn` — systematically wrong metric. | [ ]
 | 25 | 12 | P2 | `Contracts/Composition/ProvenanceCertificateTypes.cs:156-167` | Hash-chain verification skips link when `AfterHash` is null — attacker can bypass continuity check by removing AfterHash. | [ ]
 | 26 | 12/10 | P2 | `Contracts/Composition/ProvenanceCertificateTypes.cs:187-196` | `ComputeCertificateHash` claims "sorted keys" but System.Text.Json does not sort dictionary keys — non-canonical serialization breaks verification. | [ ]
@@ -80,10 +80,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 34 | 5/4 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:347` | `WarnInsecureMode()` is complete no-op — security alert never emitted. Method is `private` so cannot be overridden despite comment claiming otherwise. | [ ]
-| 35 | 2 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:50,349` | `_insecureModeWarned` bool flag read/written without synchronization across concurrent publish paths. | [ ]
-| 36 | 13/9 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:190` | `PublishToAllNodesAsync` broadcasts sequentially (N x RTT). No cancellation check between iterations. | [ ]
-| 37 | 15 | P1 | `Contracts/Compute/PipelineComputeStrategy.cs:689,715` | `EstimateCapacityCoreAsync` returns `double` not `Task<double>` — Async suffix is a lie. `EstimateThroughputAsync` is async with no awaits. | [ ]
+| 34 | 5/4 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:347` | `WarnInsecureMode()` is complete no-op — security alert never emitted. Method is `private` so cannot be overridden despite comment claiming otherwise. | [X]
+| 35 | 2 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:50,349` | `_insecureModeWarned` bool flag read/written without synchronization across concurrent publish paths. | [X]
+| 36 | 13/9 | P1 | `Contracts/Distributed/FederatedMessageBusBase.cs:190` | `PublishToAllNodesAsync` broadcasts sequentially (N x RTT). No cancellation check between iterations. | [X]
+| 37 | 15 | P1 | `Contracts/Compute/PipelineComputeStrategy.cs:689,715` | `EstimateCapacityCoreAsync` returns `double` not `Task<double>` — Async suffix is a lie. `EstimateThroughputAsync` is async with no awaits. | [X]
 | 38 | 13/14 | P2 | `Contracts/Consciousness/IConsciousnessScorer.cs:64,21` | `byte[] data` parameter forces full object materialization — no streaming alternative for TB-scale data. | [ ]
 | 39 | 15/14 | P2 | `Contracts/Consciousness/IConsciousnessScorer.cs:24,43,67` | `Dictionary<string, object>` as public interface parameter instead of `IReadOnlyDictionary`. | [ ]
 | 40 | 10/12 | P2 | `Contracts/DataLake/DataLakeStrategy.cs:214,225` | `TotalSizeBytes` accumulates both read and write throughput — inflated/wrong storage footprint values. | [ ]
@@ -103,10 +103,10 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 45 | 6 | P1 | `Contracts/Ecosystem/ConnectionPoolImplementations.cs:113-114` | Fire-and-forget health/eviction timers: `_ = RunHealthChecksAsync()` — post-await exceptions silently lost. | [X]
-| 46 | 4 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:127,201-217` | Shell injection: unvalidated `IpAddress` and `ContainerName` passed to `/bin/sh -c` via `docker exec`. | [ ]
-| 47 | 4 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:923-930` | Shell injection: caller-supplied env var keys/values concatenated into Docker command without escaping. | [ ]
-| 48 | 12 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:820-860` | `CheckCausalConsistency` is a no-op — builds dependency graph but if-block body is empty. Always returns zero violations. | [ ]
-| 49 | 9 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:201-218` | Process exit code not checked in `DockerExecAsync` — fault injection silently fails, producing false-positive test passes. | [ ]
+| 46 | 4 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:127,201-217` | Shell injection: unvalidated `IpAddress` and `ContainerName` passed to `/bin/sh -c` via `docker exec`. | [X]
+| 47 | 4 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:923-930` | Shell injection: caller-supplied env var keys/values concatenated into Docker command without escaping. | [X]
+| 48 | 12 | P1 | `Contracts/Ecosystem/JepsenTestHarness.cs:820-860` | `CheckCausalConsistency` is a no-op — builds dependency graph but if-block body is empty. Always returns zero violations. | [X]
+| 49 | 9 | P1 | `Contracts/Ecosystem/JepsenFaultInjection.cs:201-218` | Process exit code not checked in `DockerExecAsync` — fault injection silently fails, producing false-positive test passes. | [X]
 | 50 | 7 | P2 | `Contracts/Ecosystem/ConnectionPoolImplementations.cs:544-561` | `NetworkStream` may be abandoned if `Dispose()` throws in `DestroyAsync`. | [ ]
 | 51 | 13 | P2 | `Contracts/Ecosystem/JepsenReportGenerator.cs:379-421` | O(n²) timeline bucketing — full history scan per second bucket. | [ ]
 | 52 | 13 | P2 | `Contracts/Ecosystem/JepsenTestHarness.cs:1009` | `List.Contains` in hot loop (100ms tick) — use HashSet for O(1) lookup. | [ ]
@@ -132,10 +132,10 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 63 | 1 | P0 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:193-667` | All 9 database execution methods are non-functional stubs — `_ = node; _ = key; return null/true/CompletedTask`. Entire Jepsen harness produces fabricated history. | [X]
-| 64 | 10 | P1 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:154-167` | Timeout catch always records `Type = OperationType.Read` regardless of actual operation — corrupts linearizability checker input. | [ ]
-| 65 | 13 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:70-627` | `List<byte>` + `AddRange` for binary serialization in every `ToBytes()` method — 3 copies per message. | [ ]
-| 66 | 14 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:93,245,373` | Unbounded count allocation from untrusted input in `FromBytes()` — deserialization DoS. | [ ]
-| 67 | 12 | P1 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:453-455` | Generated Go missing `plugin` import — provider will not compile. | [ ]
+| 64 | 10 | P1 | `Contracts/Ecosystem/JepsenWorkloadGenerators.cs:154-167` | Timeout catch always records `Type = OperationType.Read` regardless of actual operation — corrupts linearizability checker input. | [X]
+| 65 | 13 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:70-627` | `List<byte>` + `AddRange` for binary serialization in every `ToBytes()` method — 3 copies per message. | [X]
+| 66 | 14 | P1 | `Contracts/Ecosystem/ProtoServiceDefinitions.cs:93,245,373` | Unbounded count allocation from untrusted input in `FromBytes()` — deserialization DoS. | [X]
+| 67 | 12 | P1 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:453-455` | Generated Go missing `plugin` import — provider will not compile. | [X]
 | 68 | 1 | P2 | `Contracts/Ecosystem/TerraformProviderSpecification.cs:558-574` | Generated CRUD Go functions are `// TODO` stubs with hardcoded IDs. | [ ]
 | 69 | 15 | P2 | `Contracts/Ecosystem/SdkLanguageTemplates.cs:158` | Generated Python SDK methods use `...` (Ellipsis) as body — silently do nothing. | [ ]
 | 70 | 2 | P2 | `Contracts/Encryption/EncryptionStrategy.cs:534` | `_lastUpdateTime` (DateTime) written without synchronization — torn read on 32-bit. | [ ]
@@ -162,8 +162,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 82 | 6 | P1 | `Contracts/Hierarchy/DataPipeline/StoragePluginBase.cs:132-137` | Timer callback `async _ => await CleanupExpiredCacheAsync()` is fire-and-forget — `TimerCallback` is void-returning, exceptions silently lost. | [X]
-| 83 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:177` | `_totalProcessingTime += duration` is non-atomic read-modify-write on a shared TimeSpan field — data race under concurrent `ProcessAsync` calls. | [ ]
-| 84 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:146-154` | `_initialized` (bool) and `_startTime` (DateTime) read/written without volatile/lock — double-checked locking on non-volatile field, double init risk. | [ ]
+| 83 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:177` | `_totalProcessingTime += duration` is non-atomic read-modify-write on a shared TimeSpan field — data race under concurrent `ProcessAsync` calls. | [X]
+| 84 | 2 | P1 | `Contracts/HardwareAccelerationPluginBases.cs:146-154` | `_initialized` (bool) and `_startTime` (DateTime) read/written without volatile/lock — double-checked locking on non-volatile field, double init risk. | [X]
 | 85 | 7 | P1 | `Contracts/Hierarchy/DataPipeline/EncryptionPluginBase.cs:479` | `(int)encryptedData.Length` silently overflows for streams >2GB — corrupt MemoryStream capacity or ArgumentOutOfRangeException. | [X]
 | 86 | 12 | P1 | `Contracts/Hierarchy/DataPipeline/ReplicationPluginBase.cs:152-163` | `ContinueWith(OnlyOnRanToCompletion)` discards faulted/cancelled task context — replication failures produce misleading exceptions. Same at line 192-199. | [X]
 | 87 | 15 | P1 | `Contracts/Hierarchy/DataPipeline/IntegrityPluginBase.cs:26-27` | `ValidateChainAsync` always returns `true` — subclasses that forget to override silently approve all chain validations. | [X]
@@ -215,8 +215,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 114 | 14 | P1 | `Contracts/IMetadataIndex.cs:15,24,39` | Three async methods (`IndexManifestAsync`, `SearchAsync`, `UpdateLastAccessAsync`) lack CancellationToken — inconsistent with other methods on same interface. | [ ]
-| 115 | 14 | P1 | `Contracts/IReplicationService.cs:17` + `Contracts/IFederationNode.cs:31,39,49,58` | `RestoreAsync` and all 4 `IFederationNode` methods lack CancellationToken — network I/O operations uninterruptible. | [ ]
+| 114 | 14 | P1 | `Contracts/IMetadataIndex.cs:15,24,39` | Three async methods (`IndexManifestAsync`, `SearchAsync`, `UpdateLastAccessAsync`) lack CancellationToken — inconsistent with other methods on same interface. | [X]
+| 115 | 14 | P1 | `Contracts/IReplicationService.cs:17` + `Contracts/IFederationNode.cs:31,39,49,58` | `RestoreAsync` and all 4 `IFederationNode` methods lack CancellationToken — network I/O operations uninterruptible. | [X]
 | 116 | 5 | P2 | `Contracts/IPipelineOrchestrator.cs:271` | `PipelineContext.Dispose` bare `catch { /* Ignore disposal errors */ }` — zero diagnostic signal on stream disposal failures. | [X]
 | 117 | 15 | P2 | `Contracts/IMessageBus.cs:263-266` | `PublishAndWaitAsync` default delegates to fire-and-forget `PublishAsync` — contract lie, callers think handlers complete before return. | [ ]
 | 118 | 14 | P2 | `Contracts/IFederationNode.cs:31,39,49,58` | All four gRPC federation methods lack CancellationToken — cannot propagate deadlines/cancellations. | [ ]
@@ -283,9 +283,9 @@
 |---|-----|-----|-----------|-------------|
 | 147 | 2 | P0 | `Contracts/MilitarySecurityPluginBases.cs:435` | `TwoPersonIntegrityPluginBase._pendingOperations` is plain `Dictionary` accessed concurrently — race allows dual-auth bypass on nuclear/crypto ops. | [X]
 | 148 | 6 | P1 | `Contracts/OrchestrationContracts.cs:610` | `_ = Task.WhenAll(optionalTasks)` fire-and-forget — exceptions lost, `timeoutCts` disposed while tasks run. | [X]
-| 149 | 7 | P1 | `Contracts/OrchestrationContracts.cs:602-610` | `using var timeoutCts` disposed before fire-and-forget tasks complete — `ObjectDisposedException` in running tasks. | [ ]
-| 150 | 4 | P1 | `Contracts/MilitarySecurityPluginBases.cs:330-341` | `DowngradeAsync` accepts null/empty `authorizationCode` — unauthorized declassification risk. | [ ]
-| 151 | 9 | P1 | `Contracts/Persistence/DefaultPluginStateStore.cs:118-125` | `catch (Exception) when` swallows `OperationCanceledException` — cancellation silently ignored on fallback. | [ ]
+| 149 | 7 | P1 | `Contracts/OrchestrationContracts.cs:602-610` | `using var timeoutCts` disposed before fire-and-forget tasks complete — `ObjectDisposedException` in running tasks. | [X]
+| 150 | 4 | P1 | `Contracts/MilitarySecurityPluginBases.cs:330-341` | `DowngradeAsync` accepts null/empty `authorizationCode` — unauthorized declassification risk. | [X]
+| 151 | 9 | P1 | `Contracts/Persistence/DefaultPluginStateStore.cs:118-125` | `catch (Exception) when` swallows `OperationCanceledException` — cancellation silently ignored on fallback. | [X]
 | 152 | 12 | P2 | `Contracts/MilitarySecurityPluginBases.cs:568` | Expired TPI operations never evicted — unbounded memory growth in `_pendingOperations`. | [ ]
 | 153 | 13 | P2 | `Contracts/Observability/MetricTypes.cs:136,143` | Factory returns mutable `List<T>` as `IReadOnlyList` — callers can cast and mutate. | [ ]
 | 154 | 12 | P2 | `Contracts/Observability/TraceTypes.cs:186-193` | `ParseTraceparent` doesn't validate field lengths; `Convert.ToByte` throws wrong exception type. | [ ]
@@ -304,9 +304,9 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 159 | 1 | P1 | `Contracts/Policy/IAiHook.cs:119` | `RecommendationReceiver.Subscribe` silently discards the handler and returns a no-op disposable — comment says "Phase 77 will implement". Entire AI recommendation delivery path is broken at SDK layer. | [ ]
+| 159 | 1 | P1 | `Contracts/Policy/IAiHook.cs:119` | `RecommendationReceiver.Subscribe` silently discards the handler and returns a no-op disposable — comment says "Phase 77 will implement". Entire AI recommendation delivery path is broken at SDK layer. | [X]
 | 160 | 6 | P1 | `Contracts/PluginBase.cs:821-868` | Message bus subscription callbacks are async lambdas with no try/catch — exceptions escape unobserved, silently killing the subscription for the plugin's lifetime. | [X]
-| 161 | 2 | P1 | `Contracts/PluginBase.cs:708-713` | `_knowledgeRegistered` is plain bool (not volatile) used in lock pattern — derived classes doing unsynchronized reads may see stale `false`, causing duplicate registrations. | [ ]
+| 161 | 2 | P1 | `Contracts/PluginBase.cs:708-713` | `_knowledgeRegistered` is plain bool (not volatile) used in lock pattern — derived classes doing unsynchronized reads may see stale `false`, causing duplicate registrations. | [X]
 | 162 | 13 | P2 | `Contracts/PluginBase.cs:1274` | `CreateBoundedDictionary` ignores `maxCapacity` parameter — hardcodes 1000 instead, silently breaking caller-specified cache sizing. | [ ]
 | 163 | 15 | P2 | `Contracts/Policy/IPolicyEngine.cs:58-68` | `SimulateAsync` XML doc says "(PERF-07 placeholder)" — explicit stub marker in production interface contract. | [ ]
 | 164 | 9 | P2 | `Contracts/PluginBase.cs:818-873` | `SubscribeToKnowledgeRequests` catch swallows Subscribe failure after Debug.WriteLine — plugin reports Healthy with zero subscriptions. | [ ]
@@ -324,8 +324,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 167 | 5 | P1 | `Contracts/Query/FederatedQueryEngine.cs:534` | `PublishExecutionEventAsync` catch-all with no logging — message bus failures completely invisible to operators. | [X]
-| 168 | 2 | P1 | `Contracts/Query/CostBasedQueryPlanner.cs:21-25` | `_stats` is a shared mutable instance field written per `Plan()` call with no synchronization — concurrent queries silently use wrong statistics producing incorrect query plans. | [ ]
-| 169 | 2 | P1 | `Contracts/Query/ColumnarBatch.cs:229-230` | `ColumnarBatchBuilder._maxRowIndex` and `_columns` mutated without synchronization — classic check-then-act race in parallel batch-building. | [ ]
+| 168 | 2 | P1 | `Contracts/Query/CostBasedQueryPlanner.cs:21-25` | `_stats` is a shared mutable instance field written per `Plan()` call with no synchronization — concurrent queries silently use wrong statistics producing incorrect query plans. | [X]
+| 169 | 2 | P1 | `Contracts/Query/ColumnarBatch.cs:229-230` | `ColumnarBatchBuilder._maxRowIndex` and `_columns` mutated without synchronization — classic check-then-act race in parallel batch-building. | [X]
 | 170 | 15 | P2 | `Contracts/Query/ParquetCompatibleWriter.cs:458-460` | `ReadFromStream` wraps sync `ReadRowGroup` in `Task.FromResult` inside async IAsyncEnumerable — false async contract, blocks thread pool on network streams. | [ ]
 | 171 | 3 | P2 | `Contracts/Query/ParquetCompatibleWriter.cs:149-182` | `WriteToStreamAsync` does synchronous BinaryWriter.Write inside async method — thread pool starvation on slow streams. | [ ]
 | 172 | 4 | P2 | `Contracts/Query/FederatedQueryEngine.cs:189,237` | Raw SQL published verbatim to message bus — sensitive data in literal values leaks to all subscribers and downstream sinks. | [ ]
@@ -346,8 +346,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 178 | 4 | P1 | `Contracts/Query/QueryExecutionEngine.cs:844-845` | `Regex.IsMatch` without timeout on LIKE pattern — ReDoS vulnerability + per-row regex recompilation. | [X]
-| 179 | 9 | P1 | `Contracts/Query/QueryExecutionEngine.cs:935-951` | Single-arg `tag('name')` and `has_tag('name')` always return null/false — one-arg code path falls through without calling provider. | [ ]
-| 180 | 12 | P1 | `Contracts/Query/QueryExecutionEngine.cs:1006-1021` | `CastValue` throws unhandled `FormatException`/`OverflowException` on bad data — tears down query enumerator instead of SQL-standard null/error. | [ ]
+| 179 | 9 | P1 | `Contracts/Query/QueryExecutionEngine.cs:935-951` | Single-arg `tag('name')` and `has_tag('name')` always return null/false — one-arg code path falls through without calling provider. | [X]
+| 180 | 12 | P1 | `Contracts/Query/QueryExecutionEngine.cs:1006-1021` | `CastValue` throws unhandled `FormatException`/`OverflowException` on bad data — tears down query enumerator instead of SQL-standard null/error. | [X]
 | 181 | 6 | P1 | `Contracts/Scaling/BoundedCache.cs:483-485` | Fire-and-forget write-through in `EvictLruNode` swallows all errors — silent data loss when backing store is degraded. | [X]
 | 182 | 13 | P2 | `Contracts/Query/QueryExecutionEngine.cs:872-873` | `EvaluateBinaryOp` uses `ToString()` for equality — loses numeric type semantics (`1` != `1.0`). | [ ]
 | 183 | 4 | P2 | `Contracts/Replication/ReplicationStrategy.cs:440,444` | `DateTimeOffset.Parse` on untrusted metadata without `CultureInfo.InvariantCulture` — culture-sensitive, throws on malformed timestamps. | [ ]
@@ -369,8 +369,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 191 | 2 | P1 | `Contracts/Security/SecurityStrategy.cs:477,611-730` | Mixed `Interlocked.*` + `lock(_statsLock)` on same fields — `IncrementErrorCount` races with `ResetStatistics`, `_totalEvaluationTimeMs` read non-atomically relative to `_totalEvaluations`. | [ ]
-| 192 | 9 | P1 | `Contracts/Security/SecurityStrategy.cs:672-689` | `EvaluateDomainCoreAsync` silently returns Deny on domain mismatch instead of forcing override — spurious denials for all domains except the one `EvaluateCoreAsync` returns. | [ ]
+| 191 | 2 | P1 | `Contracts/Security/SecurityStrategy.cs:477,611-730` | Mixed `Interlocked.*` + `lock(_statsLock)` on same fields — `IncrementErrorCount` races with `ResetStatistics`, `_totalEvaluationTimeMs` read non-atomically relative to `_totalEvaluations`. | [X]
+| 192 | 9 | P1 | `Contracts/Security/SecurityStrategy.cs:672-689` | `EvaluateDomainCoreAsync` silently returns Deny on domain mismatch instead of forcing override — spurious denials for all domains except the one `EvaluateCoreAsync` returns. | [X]
 | 193 | 14 | P2 | `Contracts/Scaling/PluginScalingMigrationHelper.cs:312` | `DefaultDeserialize` uses null-forgiving `!` on `JsonSerializer.Deserialize` — silent null on type mismatch. | [ ]
 | 194 | 10 | P2 | `Contracts/Spatial/GpsCoordinate.cs:74-77` | `Equals` uses direct `==` on `double` latitude/longitude/altitude — IEEE 754 false-negative equality for computed coordinates. | [ ]
 | 195 | 9 | P2 | `Contracts/Security/SecurityStrategy.cs:541-545` | `EvaluateAsync` wraps `OperationCanceledException` in `SecurityException` — breaks standard cancellation semantics. | [ ]
@@ -393,13 +393,13 @@
 | 201 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:402,419` | `Principal = "system"` hardcoded in tamper-proof audit log — defeats forensic attribution for all read/audit ops. | [X]
 | 202 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:329-339` | Pre-write log entry has `Succeeded=false` with no `ErrorMessage` — fails own `Validate()`, throws on every write. | [X]
 | 203 | 5 | P1 | `Contracts/TamperProof/IBlockchainProvider.cs:562-564` | Bare `catch { return false; }` in `ValidateChainIntegrityAsync` — network errors indistinguishable from corruption. | [X]
-| 204 | 3 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:131` + 4 others | All 5 TamperProof bases: `ComputeHashAsync` wraps sync `sha.ComputeHash(Stream)` in `Task.FromResult` — blocks thread. | [ ]
+| 204 | 3 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:131` + 4 others | All 5 TamperProof bases: `ComputeHashAsync` wraps sync `sha.ComputeHash(Stream)` in `Task.FromResult` — blocks thread. | [X]
 | 205 | 2 | P1 | `Contracts/StrategyBase.cs:88-98` | `InitializeAsync` broken DCL — `_initialized` not volatile, set outside lock after await. Race allows duplicate init. | [X]
-| 206 | 2 | P1 | `Contracts/StorageOrchestratorBase.cs:15` | `_strategy` field not volatile — concurrent reads can see stale reference after `SetStrategy`. | [ ]
-| 207 | 1 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:500-514` | `PurgeAsync` base queries entries but deletes nothing — silent no-op purge. | [ ]
-| 208 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:329-330` | `ExistsBatchAsync` only checks first provider — ignores strategy, false negatives for mirrored/WAL. | [ ]
-| 209 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:71` | `data.Length` read without `CanSeek` guard — throws `NotSupportedException` on non-seekable streams. | [ ]
-| 210 | 9 | P1 | `Contracts/StorageOrchestratorBase.cs:154-155` | `DeleteAsync` passes no `ct` to providers, swallows partial failures silently. | [ ]
+| 206 | 2 | P1 | `Contracts/StorageOrchestratorBase.cs:15` | `_strategy` field not volatile — concurrent reads can see stale reference after `SetStrategy`. | [X]
+| 207 | 1 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:500-514` | `PurgeAsync` base queries entries but deletes nothing — silent no-op purge. | [X]
+| 208 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:329-330` | `ExistsBatchAsync` only checks first provider — ignores strategy, false negatives for mirrored/WAL. | [X]
+| 209 | 12 | P1 | `Contracts/StorageOrchestratorBase.cs:71` | `data.Length` read without `CanSeek` guard — throws `NotSupportedException` on non-seekable streams. | [X]
+| 210 | 9 | P1 | `Contracts/StorageOrchestratorBase.cs:154-155` | `DeleteAsync` passes no `ct` to providers, swallows partial failures silently. | [X]
 | 211 | 14 | P2 | `Contracts/Spatial/SpatialAnchor.cs:38-43` | `CreatedAt`/`ExpiresAt` are `DateTime` not `DateTimeOffset` — timezone ambiguity in expiry check. | [ ]
 | 212 | 14 | P2 | `Contracts/Spatial/VisualFeatureSignature.cs:62` | `CapturedAt <= DateTime.UtcNow` comparison on plain `DateTime` — timezone-ambiguous. | [ ]
 | 213 | 14 | P2 | `Contracts/StrategyRegistry.cs:224-228` | `DiscoverFromAssembly` silently skips instantiation failures — caller cannot detect them. | [ ]
@@ -419,16 +419,16 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 218 | 4 | P0 | `Contracts/TamperProof/WriteContext.cs:43-46` | `ClientIp`, `UserAgent`, `SessionId` stored in audit records without any length/format validation — injection into tamper-proof manifests. | [X]
-| 219 | 1 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:348,537-546` | `RequestRetentionPolicyAsync` always returns null + region explicitly named "Stub Types". | [ ]
-| 220 | 3 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:287-291` | `ComputeHashAsync` blocks on `sha.ComputeHash(data)` stream read — sync-over-async. | [ ]
+| 219 | 1 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:348,537-546` | `RequestRetentionPolicyAsync` always returns null + region explicitly named "Stub Types". | [X]
+| 220 | 3 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:287-291` | `ComputeHashAsync` blocks on `sha.ComputeHash(data)` stream read — sync-over-async. | [X]
 | 221 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:97-102` | Endpoint URIs logged without credential redaction — `sftp://user:password@host` leaks to bus. | [X]
-| 222 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:72` | Auto-generated `AuditId = Guid.NewGuid()` in record breaks equality/dedup semantics. | [ ]
-| 223 | 10 | P1 | `Contracts/TamperProof/TamperProofManifest.cs:241-274` | `ComputeManifestHash` hardcodes SHA-256 regardless of configured `HashAlgorithm` — self-consistency broken. | [ ]
-| 224 | 10 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:283-284` | `VerifyAsync` unconditionally returns `verified=true` — silent integrity bypass for any non-overriding subclass. | [ ]
-| 225 | 11 | P1 | `Contracts/TamperProof/TamperIncidentReport.cs:77-78` | `RelatedAccessLogs` typed as `List<object>?` with "when type is available" comment — deferred type binding. | [ ]
-| 226 | 12 | P1 | `Contracts/TamperProof/TamperProofConfiguration.cs:297-303` | `required` properties have unreachable null guards — dead code creates confusing validation output. | [ ]
-| 227 | 12 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:415` | `ExtendRetentionAsync` skips validation when retention is indefinite (null) — past dates accepted. | [ ]
-| 228 | 14 | P1 | `Contracts/Transit/TransitAuditTypes.cs:87-102` | `TransitAuditEntry` has no validation — `StrategyId` defaults to empty, `Timestamp` can be MinValue. | [ ]
+| 222 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:72` | Auto-generated `AuditId = Guid.NewGuid()` in record breaks equality/dedup semantics. | [X]
+| 223 | 10 | P1 | `Contracts/TamperProof/TamperProofManifest.cs:241-274` | `ComputeManifestHash` hardcodes SHA-256 regardless of configured `HashAlgorithm` — self-consistency broken. | [X]
+| 224 | 10 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:283-284` | `VerifyAsync` unconditionally returns `verified=true` — silent integrity bypass for any non-overriding subclass. | [X]
+| 225 | 11 | P1 | `Contracts/TamperProof/TamperIncidentReport.cs:77-78` | `RelatedAccessLogs` typed as `List<object>?` with "when type is available" comment — deferred type binding. | [X]
+| 226 | 12 | P1 | `Contracts/TamperProof/TamperProofConfiguration.cs:297-303` | `required` properties have unreachable null guards — dead code creates confusing validation output. | [X]
+| 227 | 12 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:415` | `ExtendRetentionAsync` skips validation when retention is indefinite (null) — past dates accepted. | [X]
+| 228 | 14 | P1 | `Contracts/Transit/TransitAuditTypes.cs:87-102` | `TransitAuditEntry` has no validation — `StrategyId` defaults to empty, `Timestamp` can be MinValue. | [X]
 | 229 | 10 | P2 | `Contracts/TamperProof/TamperProofResults.cs:886-906` | `IntegrityHash.Parse` sets `ComputedAt = UtcNow` — falsified audit timestamp on parsed hashes. | [ ]
 | 230 | 2 | P2 | `Contracts/Transit/DataTransitStrategyBase.cs:73,161` | `_lastUpdateTime` not thread-safe despite "Thread-safe" class claim — torn reads on DateTime. | [ ]
 | 231 | 13 | P2 | `Contracts/TamperProof/TamperProofResults.cs:1123-1126` | `AuditChain.GetVersion` uses O(n) linear scan on ordered list — should be binary search or index. | [ ]
@@ -452,7 +452,7 @@
 | 238 | 1 | P1 | `Deployment/BareMetalDetector.cs:91-93` | Comment reads "In production, this would check if Phase 35 NvmePassthroughStrategy is available — For now, assume SPDK available if NVMe present". Any NVMe system is misclassified as SPDK-capable. | [ ]
 | 239 | 6 | P1 | `Deployment/BalloonCoordinator.cs:101` | `_ = Task.Run(async () => {...}, ct)` — discarded task. Inner try/catch only covers `GetStatisticsAsync`; outer `Task.Delay` and `HandleBalloonInflation/Deflation` are uncaught. Monitoring loop dies silently on cancellation or exception. | [X]
 | 240 | 2 | P1 | `Deployment/BalloonCoordinator.cs:62,96,137` | `_isActive` is plain `bool` written from `StartCooperationAsync`/`StopCooperationAsync`/`Dispose` but read from `Task.Run` background thread — no volatile, no Interlocked, no memory barrier. Loop may not stop on ARM. | [ ]
-| 241 | 2 | P1 | `Contracts/TransitEncryptionPluginBases.cs:105,266-281` | `_presetsInitialized` is plain `bool` in double-checked lock pattern — outer check at line 266 is non-volatile read, no memory barrier on fast path. Double-initialization race on weak-ordering architectures. | [ ]
+| 241 | 2 | P1 | `Contracts/TransitEncryptionPluginBases.cs:105,266-281` | `_presetsInitialized` is plain `bool` in double-checked lock pattern — outer check at line 266 is non-volatile read, no memory barrier on fast path. Double-initialization race on weak-ordering architectures. | [X]
 | 242 | 7 | P1 | `Deployment/BareMetalDetector.cs:127` | `new HttpClient` per-call inside `IsCloudEnvironmentAsync` — classic socket exhaustion anti-pattern. Each disposal puts socket in TIME_WAIT for 4 minutes. | [ ]
 | 243 | 7 | P1 | `Deployment/CloudDetector.cs:46` | Same per-request `new HttpClient` anti-pattern — creates fresh client on every `DetectAsync` call with up to 5 HTTP requests. | [ ]
 | 244 | 1 | P2 | `Deployment/CloudProviders/CloudProviderFactory.cs:41-53` | Comment describes intended production behavior (dynamic SDK loading via assembly contexts) but implementation just calls `new AwsProvider()`/`new AzureProvider()`/`new GcpProvider()` — all stubs. | [ ]

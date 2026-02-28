@@ -20,11 +20,11 @@ public sealed class CostBasedQueryPlanner : IQueryPlanner
     private readonly QueryOptimizer _optimizer = new();
 
     /// <summary>
-    /// Per-thread statistics provider used during planning.
-    /// ThreadStatic ensures concurrent Plan() calls on different threads don't share state.
+    /// Statistics provider used during the current planning session.
+    /// This class is not thread-safe — callers must create a new instance per thread
+    /// or synchronize access externally if concurrent Plan() calls are needed.
     /// </summary>
-    [ThreadStatic]
-    private static ITableStatisticsProvider? _stats;
+    private ITableStatisticsProvider? _stats;
 
     /// <inheritdoc />
     public QueryPlanNode Plan(SelectStatement statement, ITableStatisticsProvider? stats = null)

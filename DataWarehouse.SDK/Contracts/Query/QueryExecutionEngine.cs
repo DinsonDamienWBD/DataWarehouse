@@ -949,7 +949,7 @@ public sealed class QueryExecutionEngine
             // Single argument: tag(tagName) — use first column as implicit object key
             var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
             if (tagName == null) return null;
-            var objectKey = batch.ColumnCount > 0 ? batch.GetValue(0, row)?.ToString() : null;
+            var objectKey = batch.ColumnCount > 0 ? batch.Columns[0].GetValue(row)?.ToString() : null;
             if (objectKey != null)
                 return _tagProvider.GetTag(objectKey, tagName);
         }
@@ -974,7 +974,7 @@ public sealed class QueryExecutionEngine
             // Single argument: has_tag(tagName) — use first column as implicit object key
             var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
             if (tagName == null) return false;
-            var objectKey = batch.ColumnCount > 0 ? batch.GetValue(0, row)?.ToString() : null;
+            var objectKey = batch.ColumnCount > 0 ? batch.Columns[0].GetValue(row)?.ToString() : null;
             if (objectKey != null)
                 return _tagProvider.HasTag(objectKey, tagName);
         }

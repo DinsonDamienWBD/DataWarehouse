@@ -85,7 +85,7 @@ namespace DataWarehouse.SDK.Contracts
 
                         await plan.Provider.SaveAsync(uri, data);
                         usedProviders.Add((plan.Provider as IPlugin)?.Id ?? plan.Provider.Scheme);
-                        bytesWritten = data.Length;
+                        bytesWritten = data.CanSeek ? data.Length : dataLength;
                     }
 
                     return new StorageResult
@@ -152,8 +152,9 @@ namespace DataWarehouse.SDK.Contracts
 
         public virtual async Task DeleteAsync(Uri uri, CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
             var tasks = Providers.Select(p => p.DeleteAsync(uri));
-            var results = await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks);
             // Any exceptions from individual providers will propagate via AggregateException
         }
 
