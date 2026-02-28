@@ -113,14 +113,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             {
                 if (!request.DoubleOptInConfirmed)
                 {
+                    // P2-1492: Generate a cryptographically random token for the pending
+                    // consent so that ConfirmDoubleOptIn can validate it is authentic.
                     var pendingId = Guid.NewGuid().ToString();
+                    var optInToken = Convert.ToBase64String(
+                        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
                     _consents[pendingId] = new ConsentRecord
                     {
                         ConsentId = pendingId,
                         SubjectId = request.SubjectId,
                         PurposeId = request.PurposeId,
                         Status = ConsentStatus.PendingConfirmation,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow,
+                        DoubleOptInToken = optInToken
                     };
 
                     return new ConsentRecordResult
@@ -128,6 +133,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                         Success = false,
                         RequiresDoubleOptIn = true,
                         PendingConsentId = pendingId,
+                        // Surface the token so the caller can embed it in the confirmation email/link.
+                        ConfirmationToken = optInToken,
                         ErrorMessage = "Double opt-in confirmation required"
                     };
                 }
@@ -731,6 +738,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         public string? UserAgent { get; init; }
         public string? ParentalConsentId { get; init; }
         public string? ProofOfConsent { get; init; }
+        /// <summary>
+        /// P2-1492: Cryptographically random token stored when pending double opt-in is created.
+        /// Must be presented verbatim in <see cref="ConsentManagementStrategy.ConfirmDoubleOptIn"/>.
+        /// </summary>
+        public string? DoubleOptInToken { get; init; }
     }
 
     /// <summary>

@@ -54,20 +54,25 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
                 landlockScript.AppendLine($"exec sandboxer sh \"{codePath}\"");
 
                 var wrapperPath = Path.GetTempFileName() + "_ll.sh";
-                await File.WriteAllTextAsync(wrapperPath, landlockScript.ToString(), cancellationToken);
+                try
+                {
+                    await File.WriteAllTextAsync(wrapperPath, landlockScript.ToString(), cancellationToken);
 
-                var timeout = GetEffectiveTimeout(task);
-                var result = await RunProcessAsync("bash", $"\"{wrapperPath}\"",
-                    stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,
-                    environment: task.Environment,
-                    timeout: timeout, cancellationToken: cancellationToken);
+                    var timeout = GetEffectiveTimeout(task);
+                    var result = await RunProcessAsync("bash", $"\"{wrapperPath}\"",
+                        stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,
+                        environment: task.Environment,
+                        timeout: timeout, cancellationToken: cancellationToken);
 
-                try { File.Delete(wrapperPath); } catch { /* Best-effort cleanup */ }
+                    if (result.ExitCode != 0)
+                        throw new InvalidOperationException($"Landlock sandbox exited with code {result.ExitCode}: {result.StandardError}");
 
-                if (result.ExitCode != 0)
-                    throw new InvalidOperationException($"Landlock sandbox exited with code {result.ExitCode}: {result.StandardError}");
-
-                return (EncodeOutput(result.StandardOutput), $"Landlock ({allowedPaths.Count} paths allowed) completed in {result.Elapsed.TotalMilliseconds:F0}ms\n{result.StandardError}");
+                    return (EncodeOutput(result.StandardOutput), $"Landlock ({allowedPaths.Count} paths allowed) completed in {result.Elapsed.TotalMilliseconds:F0}ms\n{result.StandardError}");
+                }
+                finally
+                {
+                    try { File.Delete(wrapperPath); } catch { /* Best-effort cleanup */ }
+                }
             }
             finally
             {

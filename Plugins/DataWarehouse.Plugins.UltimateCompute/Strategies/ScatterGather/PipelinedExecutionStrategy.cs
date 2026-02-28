@@ -79,6 +79,7 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                 stageTasks[stageIdx] = Task.Run(async () =>
                 {
                     var codePath = Path.GetTempFileName() + ".sh";
+                    Exception? stageException = null;
                     try
                     {
                         await File.WriteAllTextAsync(codePath, stageCode, cancellationToken);
@@ -92,9 +93,15 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                                 await outputChannel.Writer.WriteAsync(outLine, cancellationToken);
                         }
                     }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        stageException = ex;
+                        throw;
+                    }
                     finally
                     {
-                        outputChannel.Writer.Complete();
+                        // Propagate exception into the channel so downstream stages unblock instead of hanging.
+                        outputChannel.Writer.Complete(stageException);
                         try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                     }
                 }, cancellationToken);

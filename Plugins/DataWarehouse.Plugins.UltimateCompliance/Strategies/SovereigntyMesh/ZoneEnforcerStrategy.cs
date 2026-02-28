@@ -37,6 +37,10 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
+    // P2-1550: Time-based eviction trigger — avoids O(n) full scan on every 50th write.
+    private DateTimeOffset _lastCacheEviction = DateTimeOffset.MinValue;
+    private static readonly TimeSpan EvictionInterval = TimeSpan.FromMinutes(5);
+
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-zone-enforcer";
 
@@ -470,9 +474,12 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     {
         _enforcementCache[cacheKey] = new CachedEnforcementResult(result, DateTimeOffset.UtcNow.Add(CacheTtl));
 
-        // Opportunistic eviction of expired entries (every 50 cache writes)
-        if (_enforcementCache.Count % 50 == 0)
+        // P2-1550: Time-based eviction — avoid O(n) full scan on every 50th write.
+        // BoundedDictionary handles LRU capacity eviction; this scan handles TTL expiry.
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastCacheEviction >= EvictionInterval)
         {
+            _lastCacheEviction = now;
             EvictExpiredCacheEntries();
         }
     }

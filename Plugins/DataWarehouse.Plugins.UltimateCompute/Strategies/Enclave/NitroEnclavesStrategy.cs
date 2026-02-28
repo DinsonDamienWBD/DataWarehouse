@@ -66,8 +66,12 @@ internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
                 if (runResult.ExitCode != 0)
                     throw new InvalidOperationException($"Enclave launch failed: {runResult.StandardError}");
 
-                // Extract enclave ID from output
-                enclaveId = runResult.StandardOutput.Trim();
+                // Extract and validate the enclave ID from run output.
+                // The ID must be non-empty and contain only alphanumeric chars and hyphens.
+                var rawId = runResult.StandardOutput.Trim();
+                if (string.IsNullOrEmpty(rawId) || !System.Text.RegularExpressions.Regex.IsMatch(rawId, @"^[A-Za-z0-9\-]+$"))
+                    throw new InvalidOperationException($"Enclave launch returned invalid enclave ID: '{rawId}'");
+                enclaveId = rawId;
 
                 // Communicate via vsock (CID from describe-enclaves)
                 var descResult = await RunProcessAsync("nitro-cli", "describe-enclaves",

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compute;
 using DataWarehouse.SDK.Utilities;
@@ -189,8 +190,10 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
             }
 
             var results = new BoundedDictionary<int, string>(1000);
-            var gpuElapsed = TimeSpan.Zero;
-            var cpuElapsed = TimeSpan.Zero;
+            // Use long ticks (64-bit atomic on 64-bit platforms) to avoid torn reads of TimeSpan
+            // across the cpuTask/gpuTask boundaries. Read after Task.WhenAll for happens-before.
+            long gpuElapsedTicks = 0L;
+            long cpuElapsedTicks = 0L;
 
             // Launch CPU and GPU work in parallel
             var cpuTask = Task.Run(async () =>
@@ -218,7 +221,7 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                         });
 
                     sw.Stop();
-                    cpuElapsed = sw.Elapsed;
+                    Interlocked.Exchange(ref cpuElapsedTicks, sw.Elapsed.Ticks);
                 }
                 finally
                 {
@@ -262,12 +265,12 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                     for (var i = 0; i < gpuSegments.Count && i < gpuOutputLines.Length; i++)
                         results[gpuSegments[i].index] = gpuOutputLines[i] + "\n";
 
-                    // If GPU output has fewer lines, assign remaining
+                    // If GPU output has fewer lines than segments, remaining segments produce no output.
+                    // Assigning the entire stdout to each remaining slot would duplicate data N times.
                     if (gpuOutputLines.Length < gpuSegments.Count)
                     {
-                        var fullOutput = result.StandardOutput;
                         for (var i = gpuOutputLines.Length; i < gpuSegments.Count; i++)
-                            results[gpuSegments[i].index] = fullOutput;
+                            results[gpuSegments[i].index] = string.Empty;
                     }
                 }
                 finally
@@ -276,7 +279,7 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                 }
 
                 sw.Stop();
-                gpuElapsed = sw.Elapsed;
+                Interlocked.Exchange(ref gpuElapsedTicks, sw.Elapsed.Ticks);
             }, cancellationToken);
 
             await Task.WhenAll(cpuTask, gpuTask);
@@ -289,7 +292,9 @@ internal sealed class HybridComputeStrategy : ComputeRuntimeStrategyBase
                     output.Append(result);
             }
 
-            // Record metrics
+            // Record metrics — read ticks after Task.WhenAll establishes happens-before.
+            var cpuElapsed = TimeSpan.FromTicks(Interlocked.Read(ref cpuElapsedTicks));
+            var gpuElapsed = TimeSpan.FromTicks(Interlocked.Read(ref gpuElapsedTicks));
             var taskKey = task.Language ?? "unknown";
             _metrics[taskKey] = new ExecutionMetrics(
                 cpuSegments.Count, gpuSegments.Count,

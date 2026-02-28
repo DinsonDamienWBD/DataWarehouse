@@ -563,10 +563,13 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
-                // If sovereignty check fails for a backend, skip it (fail-safe: exclude uncertain backends)
+                // P2-1548: Log the exception so that configuration errors are visible;
+                // fail-safe by excluding backends whose sovereignty cannot be determined.
                 IncrementCounter("sovereignty_routing.backend_check_error");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SovereigntyRouting] Backend check failed for '{backendId}' (object '{objectId}'): {ex.GetType().Name}: {ex.Message}");
             }
         }
 

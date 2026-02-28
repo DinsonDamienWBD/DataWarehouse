@@ -13,9 +13,11 @@ using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 {
     /// <summary>
-    /// RAR-compatible compression strategy with read-only RAR support via SharpCompress.
-    /// For compression, uses Deflate with RAR-compatible format headers.
-    /// Decompression supports real RAR archives when available.
+    /// RAR-like compression strategy. NOTE: this strategy is NOT RAR-compatible.
+    /// It produces a custom container format (magic 'Rar!' + Deflate payload) that is not
+    /// readable by standard RAR tools (WinRAR, unrar, etc.).
+    /// Use this strategy only for internal DataWarehouse round-trip storage where both
+    /// compress and decompress are handled by this class.
     /// </summary>
     /// <remarks>
     /// RAR format characteristics:
@@ -23,9 +25,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     /// 2. Advanced features: recovery records, solid archives, encryption
     /// 3. PPM (Prediction by Partial Matching) compression option
     /// Due to RAR's proprietary nature, this implementation:
-    /// - Reads RAR archives using SharpCompress (read-only)
-    /// - Writes RAR-compatible headers with Deflate compression
-    /// - Maintains format compatibility where possible
+    /// - Writes a custom container (NOT a valid RAR archive)
+    /// - Uses Deflate for the actual compression
+    /// - Does NOT support reading third-party RAR files
     /// </remarks>
     public sealed class RarStrategy : CompressionStrategyBase
     {

@@ -264,6 +264,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 else
                 {
                     // Literal token
+                    // Encoder writes: length<=15 => ctrl=length-1 (ctrl<15), length>15 => ctrl=14+(length-1)=13+length
+                    // Decoder: ctrl<16 => literalLen=ctrl+1, ctrl>=16 => literalLen=ctrl-13
                     int literalLen;
                     if (ctrl < 16)
                     {
@@ -272,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                     }
                     else
                     {
-                        literalLen = ctrl - 14;
+                        literalLen = ctrl - 13;
                         ip++;
                     }
 

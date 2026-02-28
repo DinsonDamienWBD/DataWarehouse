@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Compute;
@@ -44,8 +45,16 @@ internal sealed class SeccompStrategy : ComputeRuntimeStrategyBase
             try
             {
                 var allowedSyscalls = DefaultAllowedSyscalls;
-                if (task.Metadata?.TryGetValue("allowed_syscalls", out var sc) == true && sc is string[] sca)
-                    allowedSyscalls = sca;
+                if (task.Metadata?.TryGetValue("allowed_syscalls", out var sc) == true && sc != null)
+                {
+                    // Accept string[], List<string>, or any IEnumerable<string> to avoid silent cast failure.
+                    allowedSyscalls = sc switch
+                    {
+                        string[] arr => arr,
+                        System.Collections.Generic.IEnumerable<string> enumerable => enumerable.ToArray(),
+                        _ => DefaultAllowedSyscalls
+                    };
+                }
 
                 var profile = new
                 {

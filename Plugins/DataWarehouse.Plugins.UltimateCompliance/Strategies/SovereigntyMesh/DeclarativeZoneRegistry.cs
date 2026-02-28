@@ -42,16 +42,18 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     public override string Framework => "SovereigntyMesh";
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
+        // P2-1535: Call base first so that if base throws the zones are not left
+        // in a half-registered state that could cause inconsistent behaviour on retry.
+        await base.InitializeAsync(configuration, cancellationToken).ConfigureAwait(false);
+
         RegisterEuZones();
         RegisterAmericasZones();
         RegisterApacZones();
         RegisterMiddleEastAfricaZones();
         RegisterIndustryZones();
         RegisterSupranationalZones();
-
-        return base.InitializeAsync(configuration, cancellationToken);
     }
 
     // ==================================================================================

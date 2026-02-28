@@ -50,8 +50,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             CompressionMemoryUsage = 256 * 1024,
             DecompressionMemoryUsage = 128 * 1024,
             SupportsStreaming = true,
-            SupportsParallelCompression = true,
-            SupportsParallelDecompression = true,
+            // Blocks are compressed sequentially in this implementation; set false to avoid misleading callers.
+            SupportsParallelCompression = false,
+            SupportsParallelDecompression = false,
             SupportsRandomAccess = true,
             MinimumRecommendedSize = 128,
             OptimalBlockSize = BlockSize

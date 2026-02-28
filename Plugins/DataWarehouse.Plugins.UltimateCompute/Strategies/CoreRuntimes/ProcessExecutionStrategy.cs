@@ -165,12 +165,14 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
     {
         // AWS Lambda invocation via CLI (aws lambda invoke)
         var functionName = task.EntryPoint ?? task.Metadata?["function_name"]?.ToString() ?? throw new ArgumentException("Lambda function name required");
-        var payload = task.GetInputDataAsString();
 
+        // Write payload to a temp file and pass via --payload fileb:// to prevent shell injection.
+        var payloadFile = Path.GetTempFileName();
         var outputFile = Path.GetTempFileName();
         try
         {
-            var args = $"lambda invoke --function-name {functionName} --payload \"{payload.Replace("\"", "\\\"")}\" \"{outputFile}\"";
+            await File.WriteAllBytesAsync(payloadFile, task.InputData.ToArray(), ct);
+            var args = $"lambda invoke --function-name {functionName} --payload fileb://\"{payloadFile}\" \"{outputFile}\"";
             var result = await RunProcessAsync("aws", args,
                 timeout: GetEffectiveTimeout(task),
                 cancellationToken: ct);
@@ -180,6 +182,7 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
         }
         finally
         {
+            try { File.Delete(payloadFile); } catch { /* cleanup */ }
             try { File.Delete(outputFile); } catch { /* cleanup */ }
         }
     }

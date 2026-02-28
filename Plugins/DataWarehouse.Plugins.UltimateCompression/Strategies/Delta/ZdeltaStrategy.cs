@@ -141,10 +141,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             if (input.Length == 0)
                 return output.ToArray();
 
-            // Initialize hash table with linked lists
+            // Initialize hash table with linked lists.
+            // Each bucket is capped at MaxBucketDepth to bound memory: older entries are dropped.
+            const int MaxBucketDepth = 8;
             var hashTable = new List<int>[HashSize];
             for (int i = 0; i < HashSize; i++)
-                hashTable[i] = new List<int>();
+                hashTable[i] = new List<int>(MaxBucketDepth);
 
             int pos = 0;
 
@@ -188,7 +190,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            hashTable[hIdx].Add(pos);
+                            var zBucket = hashTable[hIdx];
+                            if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
+                            zBucket.Add(pos);
                         }
                         pos++;
                     }
@@ -228,7 +232,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            hashTable[hIdx].Add(pos);
+                            var zBucket = hashTable[hIdx];
+                            if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
+                            zBucket.Add(pos);
                         }
 
                         pos++;

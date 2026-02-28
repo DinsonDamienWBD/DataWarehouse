@@ -226,7 +226,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
                 if ((flag & 0x80) != 0)
                 {
-                    // Match: read offset and length
+                    // Match: read offset and length — require 2 more bytes
+                    if (inputStream.Position + 2 > inputStream.Length) break;
                     ushort encoded = reader.ReadUInt16();
                     int offset = encoded >> 8;
                     int length = encoded & 0xFF;
