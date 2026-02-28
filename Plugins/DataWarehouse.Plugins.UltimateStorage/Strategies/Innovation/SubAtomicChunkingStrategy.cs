@@ -268,10 +268,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
                 else
                 {
-                    // Existing chunk - just increment reference count
+                    // Existing chunk - increment reference count atomically under per-chunk lock
                     if (_chunkIndex.TryGetValue(chunkHash, out var chunkMeta))
                     {
-                        chunkMeta.RefCount++;
+                        lock (chunkMeta)
+                        {
+                            chunkMeta.RefCount++;
+                        }
                     }
                 }
             }
@@ -338,10 +341,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 if (_chunkIndex.TryGetValue(chunkHash, out var chunkMeta))
                 {
-                    chunkMeta.RefCount--;
+                    int remaining;
+                    lock (chunkMeta)
+                    {
+                        remaining = --chunkMeta.RefCount;
+                    }
 
                     // Delete chunk if no longer referenced
-                    if (chunkMeta.RefCount <= 0)
+                    if (remaining <= 0)
                     {
                         await DeleteChunkAsync(chunkHash, ct);
                         _chunkIndex.TryRemove(chunkHash, out _);

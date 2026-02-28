@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,8 +47,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private TimeSpan _loadTimeout = TimeSpan.FromMinutes(2);
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly BoundedDictionary<string, TapeInfo> _tapeInventory = new BoundedDictionary<string, TapeInfo>(1000);
-        private readonly BoundedDictionary<string, string> _objectToTapeMap = new BoundedDictionary<string, string>(1000);
+        // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) to prevent
+        // silent eviction of tape inventory entries; tape libraries may contain thousands of tapes.
+        private readonly ConcurrentDictionary<string, TapeInfo> _tapeInventory = new();
+        private readonly ConcurrentDictionary<string, string> _objectToTapeMap = new();
         private TapeCatalog? _catalog;
         private IntPtr _tapeHandle = IntPtr.Zero;
         private string? _currentLoadedTape = null;
@@ -1346,7 +1349,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class TapeCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly BoundedDictionary<string, TapeCatalogEntry> _entries = new BoundedDictionary<string, TapeCatalogEntry>(1000);
+        // Use ConcurrentDictionary (unbounded): tape catalogs may hold millions of entries.
+        private readonly ConcurrentDictionary<string, TapeCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private TapeCatalog(string catalogPath)

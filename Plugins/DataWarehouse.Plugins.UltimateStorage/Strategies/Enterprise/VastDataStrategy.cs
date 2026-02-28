@@ -547,7 +547,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                throw new PlatformNotSupportedException(
+                    "NFS-based VAST Data operations require a native NFS mount. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API, or mount the NFS export and set NfsMountPath.");
             }
         }
 
@@ -584,7 +586,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                throw new PlatformNotSupportedException(
+                    "NFS-based VAST Data operations require a native NFS mount. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API, or mount the NFS export and set NfsMountPath.");
             }
         }
 
@@ -630,7 +634,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                throw new PlatformNotSupportedException(
+                    "NFS-based VAST Data operations require a native NFS mount. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API, or mount the NFS export and set NfsMountPath.");
             }
         }
 
@@ -671,7 +677,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                throw new PlatformNotSupportedException(
+                    "NFS-based VAST Data operations require a native NFS mount. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API, or mount the NFS export and set NfsMountPath.");
             }
         }
 
@@ -725,7 +733,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                throw new PlatformNotSupportedException(
+                    "NFS-based VAST Data operations require a native NFS mount. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API, or mount the NFS export and set NfsMountPath.");
             }
         }
 

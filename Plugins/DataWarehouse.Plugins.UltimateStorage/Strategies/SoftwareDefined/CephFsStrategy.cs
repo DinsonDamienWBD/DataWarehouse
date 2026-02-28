@@ -83,6 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         public override string StrategyId => "cephfs";
         public override string Name => "Ceph Distributed File System (CephFS)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // Metadata stored in sidecar JSON files; requires actual CephFS POSIX mount and libcephfs/ceph-fuse integration for xattr and snapshot support
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {

@@ -112,6 +112,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         public override string StrategyId => "beegfs";
         public override string Name => "BeeGFS Parallel File System";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // Metadata stored in sidecar JSON files; requires actual BeeGFS client (beegfs-client kernel module) and management API integration
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {

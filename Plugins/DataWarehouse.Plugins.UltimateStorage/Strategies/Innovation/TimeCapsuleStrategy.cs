@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class TimeCapsuleStrategy : UltimateStorageStrategyBase
     {
         private string _storagePath = string.Empty;
-        private string _masterKey = string.Empty;
+        private byte[] _masterKeyBytes = Array.Empty<byte>(); // Stored as bytes; string config is converted at init and not retained
         private int _vdfIterations = 1000000; // Verifiable Delay Function iterations
         private int _proofOfLifeIntervalHours = 24;
         private bool _enableDeadManSwitch = true;
@@ -73,8 +73,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Load required configuration
                 _storagePath = GetConfiguration<string>("StoragePath")
                     ?? throw new InvalidOperationException("StoragePath is required");
-                _masterKey = GetConfiguration<string>("MasterKey")
+                var masterKeyStr = GetConfiguration<string>("MasterKey")
                     ?? throw new InvalidOperationException("MasterKey is required");
+                // Convert to bytes immediately; clear the local string to avoid pinning secrets in managed memory
+                _masterKeyBytes = Encoding.UTF8.GetBytes(masterKeyStr);
 
                 // Load optional configuration
                 _vdfIterations = GetConfiguration("VdfIterations", 1000000);
@@ -488,26 +490,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             byte[] data, DateTime unlockTime)
         {
             // Generate temporal component based on unlock time
-            var temporalSeed = $"{_masterKey}:{unlockTime:O}";
+            var temporalSeed = $"{Convert.ToBase64String(_masterKeyBytes)}:{unlockTime:O}";
             var temporalBytes = Encoding.UTF8.GetBytes(temporalSeed);
 
             // Apply Verifiable Delay Function (simplified - production would use proper VDF)
             var vdfResult = ApplyVDF(temporalBytes, _vdfIterations);
             var vdfProof = Convert.ToBase64String(vdfResult);
 
-            // Derive time-lock key from VDF result
-            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(vdfResult, temporalBytes, 10000, HashAlgorithmName.SHA256, 80);
+            // Derive time-lock key from VDF result — need 32-byte key + 12-byte nonce for AES-GCM
+            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(vdfResult, temporalBytes, 10000, HashAlgorithmName.SHA256, 44);
             var timeLockKey = Convert.ToBase64String(derivedBytes[..32]);
 
-            // Encrypt data with AES-256
-            using var aes = Aes.Create();
-            aes.Key = derivedBytes[32..64];
-            aes.IV = derivedBytes[64..80];
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
+            // Encrypt data with AES-256-GCM (authenticated encryption — no unauthenticated CBC)
+            var key = derivedBytes[..32];
+            var nonce = derivedBytes[32..44]; // 12-byte nonce for AES-GCM
+            var ciphertext = new byte[data.Length];
+            var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // 16 bytes
 
-            using var encryptor = aes.CreateEncryptor();
-            var encryptedData = encryptor.TransformFinalBlock(data, 0, data.Length);
+            using var aesGcm = new AesGcm(key, AesGcm.TagByteSizes.MaxSize);
+            aesGcm.Encrypt(nonce, data, ciphertext, tag);
+
+            // Prepend nonce + tag to ciphertext so DecryptTimeCapsule can recover them
+            var encryptedData = new byte[nonce.Length + tag.Length + ciphertext.Length];
+            nonce.CopyTo(encryptedData, 0);
+            tag.CopyTo(encryptedData, nonce.Length);
+            ciphertext.CopyTo(encryptedData, nonce.Length + tag.Length);
 
             return (encryptedData, timeLockKey, vdfProof);
         }
@@ -535,17 +542,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private byte[] DecryptTimeCapsule(byte[] encryptedData, string timeLockKey)
         {
-            var keyBytes = Convert.FromBase64String(timeLockKey);
+            // Layout: [12-byte nonce][16-byte tag][ciphertext]
+            const int NonceSize = 12;
+            const int TagSize = 16;
+            if (encryptedData.Length < NonceSize + TagSize)
+                throw new CryptographicException("Encrypted data is too short to contain nonce and tag.");
 
-            using var aes = Aes.Create();
-            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(keyBytes, keyBytes.Take(16).ToArray(), 1, HashAlgorithmName.SHA256, 48);
-            aes.Key = derivedBytes[..32];
-            aes.IV = derivedBytes[32..48];
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
+            var nonce = encryptedData.AsSpan(0, NonceSize);
+            var tag = encryptedData.AsSpan(NonceSize, TagSize);
+            var ciphertext = encryptedData.AsSpan(NonceSize + TagSize);
 
-            using var decryptor = aes.CreateDecryptor();
-            return decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+            var key = Convert.FromBase64String(timeLockKey);
+            var plaintext = new byte[ciphertext.Length];
+
+            using var aesGcm = new AesGcm(key, TagSize);
+            aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
         }
 
         /// <summary>

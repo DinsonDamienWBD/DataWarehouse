@@ -32,7 +32,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     /// </summary>
     public class SelfReplicatingStorageStrategy : UltimateStorageStrategyBase
     {
+        // Populated once in InitializeCoreAsync under _initLock; read-only afterwards — no lock needed for reads.
         private readonly List<ReplicaLocation> _replicaLocations = new();
+        private IReadOnlyList<ReplicaLocation> _replicaLocationsSnapshot = Array.Empty<ReplicaLocation>();
         private readonly BoundedDictionary<string, ReplicaStatus> _replicaStatus = new BoundedDictionary<string, ReplicaStatus>(1000);
         private int _replicationFactor = 3;
         private bool _enableErasureCoding = false;
@@ -112,6 +114,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 {
                     throw new InvalidOperationException($"Number of replica locations ({_replicaLocations.Count}) is less than replication factor ({_replicationFactor})");
                 }
+
+                // Publish immutable snapshot so reader threads see a stable list without locking
+                _replicaLocationsSnapshot = _replicaLocations.ToArray();
 
                 // Start background tasks
                 if (_enableHealthMonitoring)
@@ -217,7 +222,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
 
             // Try each replica location until successful
-            foreach (var location in _replicaLocations.Where(l => l.IsHealthy))
+            foreach (var location in _replicaLocationsSnapshot.Where(l => l.IsHealthy))
             {
                 var filePath = Path.Combine(location.Path, key);
                 if (File.Exists(filePath))
@@ -259,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var deletedCount = 0;
 
             // Delete from all replica locations
-            foreach (var location in _replicaLocations)
+            foreach (var location in _replicaLocationsSnapshot)
             {
                 var filePath = Path.Combine(location.Path, key);
                 if (File.Exists(filePath))
@@ -298,7 +303,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
 
             // Check if key exists in any replica location
-            foreach (var location in _replicaLocations.Where(l => l.IsHealthy))
+            foreach (var location in _replicaLocationsSnapshot.Where(l => l.IsHealthy))
             {
                 var filePath = Path.Combine(location.Path, key);
                 if (File.Exists(filePath))
@@ -318,7 +323,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var seenKeys = new HashSet<string>();
 
             // List from all replica locations and deduplicate
-            foreach (var location in _replicaLocations.Where(l => l.IsHealthy))
+            foreach (var location in _replicaLocationsSnapshot.Where(l => l.IsHealthy))
             {
                 var searchPath = string.IsNullOrEmpty(prefix)
                     ? location.Path
@@ -365,7 +370,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            foreach (var location in _replicaLocations.Where(l => l.IsHealthy))
+            foreach (var location in _replicaLocationsSnapshot.Where(l => l.IsHealthy))
             {
                 var filePath = Path.Combine(location.Path, key);
                 if (File.Exists(filePath))
@@ -392,7 +397,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var healthyCount = _replicaLocations.Count(l => l.IsHealthy);
+            var snapshot = _replicaLocationsSnapshot;
+            var healthyCount = snapshot.Count(l => l.IsHealthy);
             var totalReplicas = _replicaStatus.Values.Sum(s => s.ReplicaCount);
             var targetReplicas = _replicaStatus.Values.Sum(s => s.TargetReplicaCount);
 
@@ -403,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Status = healthyCount >= _replicationFactor ? HealthStatus.Healthy :
                          healthyCount > 0 ? HealthStatus.Degraded : HealthStatus.Unhealthy,
                 LatencyMs = 5,
-                Message = $"Healthy Replicas: {healthyCount}/{_replicaLocations.Count}, Replication Health: {replicationHealth:P0}",
+                Message = $"Healthy Replicas: {healthyCount}/{snapshot.Count}, Replication Health: {replicationHealth:P0}",
                 CheckedAt = DateTime.UtcNow
             };
         }
@@ -415,7 +421,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Return capacity of the replica with most available space
             long maxCapacity = 0;
 
-            foreach (var location in _replicaLocations.Where(l => l.IsHealthy))
+            foreach (var location in _replicaLocationsSnapshot.Where(l => l.IsHealthy))
             {
                 try
                 {
@@ -455,10 +461,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                     await File.WriteAllBytesAsync(filePath, data, ct);
 
-                    // Update replica status
+                    // Update replica status atomically under per-status lock
                     if (_replicaStatus.TryGetValue(key, out var status))
                     {
-                        status.ReplicaCount++;
+                        lock (status)
+                        {
+                            status.ReplicaCount++;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -471,7 +480,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private List<ReplicaLocation> SelectReplicaLocations(int count)
         {
-            return _replicaLocations
+            return _replicaLocationsSnapshot
                 .Where(l => l.IsHealthy)
                 .OrderBy(_ => Guid.NewGuid()) // Random selection
                 .Take(count)
@@ -480,7 +489,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private void MonitorReplicaHealth()
         {
-            foreach (var location in _replicaLocations)
+            foreach (var location in _replicaLocationsSnapshot)
             {
                 try
                 {
@@ -508,7 +517,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     try
                     {
                         // Find a healthy replica to copy from
-                        foreach (var sourceLocation in _replicaLocations.Where(l => l.IsHealthy))
+                        var repairSnapshot = _replicaLocationsSnapshot;
+                        foreach (var sourceLocation in repairSnapshot.Where(l => l.IsHealthy))
                         {
                             var sourcePath = Path.Combine(sourceLocation.Path, key);
                             if (File.Exists(sourcePath))
@@ -523,7 +533,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                                 }
 
                                 // Replicate to locations that don't have it
-                                var missingLocations = _replicaLocations
+                                var missingLocations = repairSnapshot
                                     .Where(l => l.IsHealthy && !File.Exists(Path.Combine(l.Path, key)))
                                     .Take(status.TargetReplicaCount - status.ReplicaCount)
                                     .ToList();

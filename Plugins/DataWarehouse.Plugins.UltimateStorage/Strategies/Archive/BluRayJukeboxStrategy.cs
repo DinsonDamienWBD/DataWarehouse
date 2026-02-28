@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -53,8 +54,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private TimeSpan _verificationTimeout = TimeSpan.FromMinutes(10);
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly BoundedDictionary<string, BluRayDiscInfo> _discInventory = new BoundedDictionary<string, BluRayDiscInfo>(1000);
-        private readonly BoundedDictionary<string, string> _objectToDiscMap = new BoundedDictionary<string, string>(1000);
+        // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) to prevent
+        // silent eviction of disc inventory entries; jukeboxes may contain thousands of discs.
+        private readonly ConcurrentDictionary<string, BluRayDiscInfo> _discInventory = new();
+        private readonly ConcurrentDictionary<string, string> _objectToDiscMap = new();
         private BluRayDiscCatalog? _catalog;
         private IntPtr _driveHandle = IntPtr.Zero;
         private string? _currentLoadedDisc = null;
@@ -1253,7 +1256,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class BluRayDiscCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly BoundedDictionary<string, BluRayCatalogEntry> _entries = new BoundedDictionary<string, BluRayCatalogEntry>(1000);
+        // Use ConcurrentDictionary (unbounded): disc catalogs may contain millions of entries.
+        private readonly ConcurrentDictionary<string, BluRayCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private BluRayDiscCatalog(string catalogPath)

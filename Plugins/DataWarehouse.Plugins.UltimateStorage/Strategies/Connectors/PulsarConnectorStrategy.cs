@@ -34,6 +34,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         private string _subscription = "datawarehouse-sub";
         private readonly ConcurrentQueue<PulsarMessage> _messageQueue = new();
         private int _maxQueueSize = 10000;
+        // Interlocked counter mirrors queue size to make check-then-enqueue atomic (TOCTOU fix).
+        private int _enqueuedCount = 0;
 #pragma warning restore CS0414
 
         public override string StrategyId => "pulsar-connector";
@@ -83,8 +85,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Properties = metadata
             };
 
-            if (_messageQueue.Count >= _maxQueueSize)
+            // Atomic bounded enqueue: use Interlocked to prevent TOCTOU race between count check and enqueue.
+            var currentCount = Interlocked.Increment(ref _enqueuedCount);
+            if (currentCount > _maxQueueSize)
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 throw new InvalidOperationException($"Pulsar message queue is full ({_maxQueueSize})");
             }
 
@@ -118,6 +123,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             if (_messageQueue.TryDequeue(out var message))
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 var stream = new MemoryStream(Encoding.UTF8.GetBytes(message.Value));
 
                 IncrementBytesRetrieved(stream.Length);
