@@ -1356,7 +1356,7 @@
 | 767 | 7 | P1 | `VDE/BlockExport/ZeroCopyBlockReader.cs:63-75` | MemoryMappedViewAccessor held open for object lifetime after full file read into managed buffer — wastes OS handle, prevents file release on Windows. Accessor unused after constructor. | [ ]
 | 768 | 2 | P1 | `VDE/BlockExport/ZeroCopyBlockReader.cs:36,200-206` | `_disposed` plain bool with no volatile/Interlocked — concurrent Dispose+Read race. Same in ArcCacheL2Mmap:36 and ArcCacheL3NVMe:38. | [ ]
 | 769 | 5 | P1 | `VDE/Cache/ArcCacheL3NVMe.cs:339-343` | Silent catch in `EnsureInitialized` — FileStream construction failure swallowed with zero logging, L3 cache silently disabled for entire lifetime. | [X]
-| 770 | 2 | P1 | `VDE/Cache/ArcCacheL3NVMe.cs:319-344` | Double-checked locking on non-volatile `_initialized` — stale reads on ARM/weakly-ordered CPUs. Same in ArcCacheL2Mmap:137. | [ ]
+| 770 | 2 | P1 | `VDE/Cache/ArcCacheL3NVMe.cs:319-344` | Double-checked locking on non-volatile `_initialized` — stale reads on ARM/weakly-ordered CPUs. Same in ArcCacheL2Mmap:137. | [X]
 | 771 | 13 | P2 | `VDE/BlockExport/ZeroCopyBlockReader.cs:74-75` | Entire VDE file read into managed byte[] in constructor — LOH allocation, Gen2 GC pressure, defeats zero-copy purpose. | [ ]
 | 772 | 12 | P2 | `VDE/Compatibility/VdeMigrationEngine.cs:279-293` | Partial-batch short-read writes truncated data but `blocksCopied` increments by full batch — silent data corruption on migration. | [ ]
 | 773 | 9 | P2 | `VDE/Compression/PerExtentCompressor.cs:144-149` | BrotliStream decompression truncation silently returns zero-padded buffer — caller cannot distinguish success from corruption. | [ ]
@@ -1372,12 +1372,12 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 775 | 1 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:306-310` | `CollectBlockNumbersAsync` only collects indirect/double-indirect pointer blocks themselves, not the data blocks they reference — snapshots of large files miss data blocks, incorrect refcount frees in-use blocks. Same gap in SpaceReclaimer.cs:139-154. | [ ]
-| 776 | 1 | P1 | `VDE/CopyOnWrite/SpaceReclaimer.cs:277-289` | `MarkSweepGarbageCollectAsync` sweep phase is explicitly incomplete — comment states "In a full implementation, we'd iterate…" but no blocks are actually freed. Reports `BlocksFreed` count without freeing. Disk fills permanently. | [ ]
-| 777 | 2 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:67-68` | `_snapshots` (List\<Snapshot\>) and `_nextSnapshotId` (long) are shared mutable fields with zero synchronization — concurrent create+delete produces lost updates, duplicate IDs, or exception from mid-iteration modification. | [ ]
-| 778 | 12 | P1 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:84-96` | `DecrementRef` removes entry when count hits 0, but subsequent `GetRefCount` returns default 1 — extents at zero silently treated as ref-count 1, causing double-use of freed blocks. | [ ]
-| 779 | 2 | P1 | `VDE/Container/ContainerFile.cs:17` + `VDE/FileBlockDevice.cs:19` | `_disposed` plain bool without volatile in both — concurrent async operations may not see disposal on weakly-ordered hardware. | [ ]
-| 780 | 4 | P1 | `VDE/Encryption/PerExtentEncryptor.cs:139-151` | `DeriveNonce` uses HKDF with empty salt (all-zero HMAC key) — weakens nonce derivation per RFC 5869. Nonce fully deterministic without per-volume secret, enabling prediction across shared-key volumes. | [ ]
+| 775 | 1 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:306-310` | `CollectBlockNumbersAsync` only collects indirect/double-indirect pointer blocks themselves, not the data blocks they reference — snapshots of large files miss data blocks, incorrect refcount frees in-use blocks. Same gap in SpaceReclaimer.cs:139-154. | [X]
+| 776 | 1 | P1 | `VDE/CopyOnWrite/SpaceReclaimer.cs:277-289` | `MarkSweepGarbageCollectAsync` sweep phase is explicitly incomplete — comment states "In a full implementation, we'd iterate…" but no blocks are actually freed. Reports `BlocksFreed` count without freeing. Disk fills permanently. | [X]
+| 777 | 2 | P1 | `VDE/CopyOnWrite/SnapshotManager.cs:67-68` | `_snapshots` (List\<Snapshot\>) and `_nextSnapshotId` (long) are shared mutable fields with zero synchronization — concurrent create+delete produces lost updates, duplicate IDs, or exception from mid-iteration modification. | [X]
+| 778 | 12 | P1 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:84-96` | `DecrementRef` removes entry when count hits 0, but subsequent `GetRefCount` returns default 1 — extents at zero silently treated as ref-count 1, causing double-use of freed blocks. | [X]
+| 779 | 2 | P1 | `VDE/Container/ContainerFile.cs:17` + `VDE/FileBlockDevice.cs:19` | `_disposed` plain bool without volatile in both — concurrent async operations may not see disposal on weakly-ordered hardware. | [X]
+| 780 | 4 | P1 | `VDE/Encryption/PerExtentEncryptor.cs:139-151` | `DeriveNonce` uses HKDF with empty salt (all-zero HMAC key) — weakens nonce derivation per RFC 5869. Nonce fully deterministic without per-volume secret, enabling prediction across shared-key volumes. | [X]
 | 781 | 13 | P2 | `VDE/CopyOnWrite/CowBlockManager.cs:291-296` | `EncodeBlockNumberKey` allocates new byte[8] per call on hot path — massive GC pressure on high-throughput snapshot workloads. | [ ]
 | 782 | 12 | P2 | `VDE/Container/ContainerFormat.cs:66-86` | Layout recalculation produces different bitmap/checksum counts than initially reserved regions — potential region overlap if counts grew. | [ ]
 | 783 | 3 | P2 | `VDE/FileExtension/DwvdContentDetector.cs:254-271` | `IsLikelyDwvd(string)` uses synchronous FileStream.Read in library code — blocks thread-pool thread on network paths. | [ ]
@@ -1386,7 +1386,7 @@
 | 786 | 14 | P2 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:391-411` | `DeserializeRefCounts` reads `entryCount` from untrusted data without sanity check — corrupt/malicious value silently truncated by offset guard with no corruption detection. | [ ]
 | 787 | 9 | P2 | `VDE/FileExtension/Import/DwvdImporter.cs:314-316` | VMDK descriptor parsing — malformed descriptor line could cause IndexOutOfRangeException on `parts[1]`. | [ ]
 | 788 | 15 | LOW | `VDE/Encryption/PerExtentEncryptor.cs:71,108` | `EncryptExtentAsync`/`DecryptExtentAsync` named Async but entirely synchronous with Task.FromResult — contract lie. | [ ]
-| 789 | 12 | LOW | `VDE/CopyOnWrite/SpaceReclaimer.cs:226` | Hardcoded `blockSize = 4096` with "use VdeConstants.DefaultBlockSize in production" comment — wrong estimates on non-default block sizes. | [ ]
+| 789 | 12 | LOW | `VDE/CopyOnWrite/SpaceReclaimer.cs:226` | Hardcoded `blockSize = 4096` with "use VdeConstants.DefaultBlockSize in production" comment — wrong estimates on non-default block sizes. | [X]
 | 790 | 14 | LOW | `VDE/Container/Superblock.cs:186-187` | Deserialized `blockSize` not validated against Min/MaxBlockSize — extreme values pass checksum but cause downstream exceptions. | [ ]
 | 791 | 13 | LOW | `VDE/CopyOnWrite/SnapshotManager.cs:106,173,219` | `_snapshots.Any()`/`FirstOrDefault()` O(n) scans on every mutation — performance cliff with thousands of snapshots. | [ ]
 | 792 | 9 | LOW | `VDE/CopyOnWrite/CowBlockManager.cs:238` | B-Tree operations in `DecrementRefInternalAsync` bypass WAL transaction — crash between WAL entry and B-Tree update leaves inconsistent state. | [ ]
@@ -1402,8 +1402,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 793 | 5 | P1 | `VDE/FileExtension/Import/ImportSuggestion.cs:58-66` | Bare `catch` with no type filter silently discards all exceptions (including OOM) — `EstimatedDwvdSizeBytes` of 0 conflated with "unknown". Should narrow to IOException/UnauthorizedAccessException. | [X]
-| 794 | 12 | P1 | `VDE/FileExtension/OsIntegration/WindowsShellHandler.cs:104` | `CommandTemplate.Replace("dw ", ...)` not anchored to start — matches substring anywhere in template, produces broken commands if "dw " appears mid-string (e.g., `--dw-details`). | [ ]
-| 795 | 14 | P1 | `VDE/FileExtension/Import/FormatDetector.cs:127` | `stream.Length` throws NotSupportedException on non-seekable streams — no `CanSeek` guard. | [ ]
+| 794 | 12 | P1 | `VDE/FileExtension/OsIntegration/WindowsShellHandler.cs:104` | `CommandTemplate.Replace("dw ", ...)` not anchored to start — matches substring anywhere in template, produces broken commands if "dw " appears mid-string (e.g., `--dw-details`). | [X]
+| 795 | 14 | P1 | `VDE/FileExtension/Import/FormatDetector.cs:127` | `stream.Length` throws NotSupportedException on non-seekable streams — no `CanSeek` guard. | [X]
 | 796 | 15 | P2 | `VDE/FileExtension/Import/VirtualDiskFormat.cs:18` | VHD doc says "conectix at offset 0 for fixed, end-512 for dynamic" but FormatDetector only checks offset 0 — dynamic VHD returns Unknown. | [ ]
 | 797 | 13 | P2 | `VDE/FileExtension/Import/ImportSuggestion.cs:50` | `format.ToString().ToLowerInvariant()` allocates via reflection per call — should use switch lookup for fixed enum set. | [ ]
 | 798 | 4 | P2 | `VDE/FileExtension/OsIntegration/WindowsRegistryBuilder.cs:80` | `$ErrorActionPreference = 'SilentlyContinue'` at script level swallows all PowerShell errors — partial registration undetectable. | [ ]
@@ -1422,10 +1422,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 803 | 10 | P1 | `VDE/Format/DualWalHeader.cs:33` | `SerializedSize = 82` but only 81 bytes written/read — off-by-one corrupts capacity calculations, uninitialized garbage byte at position 81. | [ ]
-| 804 | 10 | P1 | `VDE/Format/CompactInode64.cs:157-162` | `Equals` excludes `InlineData` — two inodes with different content compare equal, breaks dedup/cache/snapshot diffing. | [ ]
-| 805 | 12 | P1 | `VDE/Format/AddressWidthDescriptor.cs:122` | 75% threshold check multiplies `long.MaxValue * 0.75` — relies on undocumented sentinel contract, fragile if MaxBlockCount changes. | [ ]
-| 806 | 10 | P1 | `VDE/Format/IntegrityAnchor.cs:226-229` | `Equals` compares only 3 scalar fields, ignores all 10 hash arrays — attacker-supplied anchor accepted as matching if counter/generation/timestamp known. Security risk in tamper-detection context. | [ ]
+| 803 | 10 | P1 | `VDE/Format/DualWalHeader.cs:33` | `SerializedSize = 82` but only 81 bytes written/read — off-by-one corrupts capacity calculations, uninitialized garbage byte at position 81. | [X]
+| 804 | 10 | P1 | `VDE/Format/CompactInode64.cs:157-162` | `Equals` excludes `InlineData` — two inodes with different content compare equal, breaks dedup/cache/snapshot diffing. | [X]
+| 805 | 12 | P1 | `VDE/Format/AddressWidthDescriptor.cs:122` | 75% threshold check multiplies `long.MaxValue * 0.75` — relies on undocumented sentinel contract, fragile if MaxBlockCount changes. | [X]
+| 806 | 10 | P1 | `VDE/Format/IntegrityAnchor.cs:226-229` | `Equals` compares only 3 scalar fields, ignores all 10 hash arrays — attacker-supplied anchor accepted as matching if counter/generation/timestamp known. Security risk in tamper-detection context. | [X]
 | 807 | 10 | P2 | `VDE/Format/ExtendedMetadata.cs:349` | `Equals` compares only NamespaceUuid, ignores all content fields — useless for change detection. | [ ]
 | 808 | 15 | P2 | `VDE/Format/CompactInode64.cs:96-103` | `ToStandardInode()` silently discards InlineData payload — returned InodeV2 has Size but no data, contract implies safe upgrade. | [ ]
 | 809 | 14 | P2 | `VDE/Format/InodeExtent.cs:66-72` | Constructor accepts negative blockCount/startBlock/logicalOffset from deserialized on-disk bytes without validation. | [ ]

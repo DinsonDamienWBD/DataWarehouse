@@ -130,35 +130,56 @@ public sealed class PerExtentEncryptor : IDisposable
     }
 
     /// <summary>
-    /// Derives a deterministic 12-byte nonce from extent position using HKDF-SHA256.
-    /// This enables random-access decryption of individual extents without a stored nonce table.
+    /// Derives a deterministic 12-byte nonce from extent position using HKDF-SHA256 with the
+    /// per-volume encryption key as the HKDF salt.
+    /// This enables random-access decryption of individual extents without a stored nonce table,
+    /// and binds the nonce to the volume key so nonces are unpredictable across shared-key volumes.
     /// </summary>
     /// <param name="startBlock">The physical start block number of the extent.</param>
     /// <param name="logicalOffset">The logical byte offset within the file.</param>
-    /// <returns>A 12-byte nonce deterministically derived from the extent position.</returns>
-    public static byte[] DeriveNonce(long startBlock, long logicalOffset)
+    /// <returns>A 12-byte nonce deterministically derived from the extent position and volume key.</returns>
+    public byte[] DeriveNonce(long startBlock, long logicalOffset)
     {
         // Build 16-byte input: startBlock(8) + logicalOffset(8)
         Span<byte> input = stackalloc byte[16];
         System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(input[..8], startBlock);
         System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(input[8..16], logicalOffset);
 
-        // Use HKDF to derive a 12-byte nonce (AES-GCM nonce size)
+        // Use HKDF to derive a 12-byte nonce (AES-GCM nonce size).
+        // Per RFC 5869: use the per-volume key as salt so nonces are volume-specific and
+        // unpredictable without the key. This prevents nonce prediction across volumes.
         byte[] nonce = new byte[NonceSize];
-        // Use volume key material as salt for HKDF to prevent nonce prediction across volumes.
-        // If no volume-specific salt is available, use the info string as domain separator.
-        HKDF.DeriveKey(HashAlgorithmName.SHA256, input.ToArray(), nonce, "VDE-Extent-Salt-v1"u8, "VDE-Extent-Nonce"u8);
+        HKDF.DeriveKey(HashAlgorithmName.SHA256, input.ToArray(), nonce, _key, "VDE-Extent-Nonce"u8);
 
         return nonce;
     }
 
     /// <summary>
-    /// Returns the IV/nonce for plan backward-compatibility. Internally calls <see cref="DeriveNonce"/>.
+    /// Derives a deterministic nonce using a caller-supplied volume key as HKDF salt.
+    /// Use this overload when a key is available but no encryptor instance exists.
     /// </summary>
     /// <param name="startBlock">The physical start block number of the extent.</param>
     /// <param name="logicalOffset">The logical byte offset within the file.</param>
-    /// <returns>A deterministic 12-byte IV derived from extent position.</returns>
-    public static byte[] DeriveIV(long startBlock, long logicalOffset)
+    /// <param name="volumeKey">The 32-byte per-volume AES-256 key used as HKDF salt.</param>
+    /// <returns>A 12-byte nonce deterministically derived from the extent position and volume key.</returns>
+    public static byte[] DeriveNonce(long startBlock, long logicalOffset, ReadOnlySpan<byte> volumeKey)
+    {
+        Span<byte> input = stackalloc byte[16];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(input[..8], startBlock);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(input[8..16], logicalOffset);
+
+        byte[] nonce = new byte[NonceSize];
+        HKDF.DeriveKey(HashAlgorithmName.SHA256, input.ToArray(), nonce, volumeKey, "VDE-Extent-Nonce"u8);
+        return nonce;
+    }
+
+    /// <summary>
+    /// Returns the IV/nonce for plan backward-compatibility. Internally calls <see cref="DeriveNonce(long, long)"/>.
+    /// </summary>
+    /// <param name="startBlock">The physical start block number of the extent.</param>
+    /// <param name="logicalOffset">The logical byte offset within the file.</param>
+    /// <returns>A deterministic 12-byte IV derived from extent position and volume key.</returns>
+    public byte[] DeriveIV(long startBlock, long logicalOffset)
         => DeriveNonce(startBlock, logicalOffset);
 
     /// <summary>

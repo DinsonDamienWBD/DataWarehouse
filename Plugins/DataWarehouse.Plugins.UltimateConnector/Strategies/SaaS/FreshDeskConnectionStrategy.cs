@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
@@ -16,20 +18,45 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public override ConnectionStrategyCapabilities Capabilities => new();
         public override string SemanticDescription => "Connects to Freshdesk customer support platform using HTTPS REST API.";
         public override string[] Tags => new[] { "freshdesk", "support", "ticketing", "saas", "rest-api" };
+
+        private volatile string _encodedApiKey = "";
+
         public FreshDeskConnectionStrategy(ILogger? logger = null) : base(logger) { }
+
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var domain = GetConfiguration<string>(config, "Domain", string.Empty);
             if (string.IsNullOrWhiteSpace(domain))
                 throw new ArgumentException("Required configuration key 'Domain' is missing or empty.", nameof(config));
+
+            var apiKey = GetConfiguration<string>(config, "ApiKey", string.Empty)
+                ?? config.AuthCredential
+                ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(apiKey))
+                throw new ArgumentException("Required configuration key 'ApiKey' (or AuthCredential) is missing. Provide a Freshdesk API key.", nameof(config));
+
+            // Freshdesk uses Basic auth with apiKey:X (the password is the literal character X)
+            _encodedApiKey = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiKey}:X"));
+
             var endpoint = $"https://{domain}.freshdesk.com";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", _encodedApiKey);
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Domain"] = domain, ["Endpoint"] = endpoint });
         }
+
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/api/v2/tickets?per_page=1", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Freshdesk is reachable" : "Freshdesk is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
-        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default) => Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(24)));
+
+        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // Freshdesk uses Basic auth — return encoded credential (apiKey:X)
+            var encoded = _encodedApiKey;
+            if (!string.IsNullOrEmpty(encoded))
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddDays(365)));
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
+
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default) => AuthenticateAsync(handle, ct);
     }
 }

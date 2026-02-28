@@ -24,8 +24,8 @@ public sealed class ArcCacheL2Mmap : IArcCache, IDisposable
     private MemoryMappedFile? _mmf;
     private MemoryMappedViewAccessor? _accessor;
     private readonly object _initLock = new();
-    private bool _initialized;
-    private bool _disposed;
+    private volatile bool _initialized;
+    private volatile bool _disposed;
 
     // Statistics
     private long _hits;
