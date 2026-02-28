@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
@@ -344,8 +345,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 TimeSpan.FromSeconds((total - rebuilt) / speed), (long)speed));
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -434,8 +458,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             }
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -509,8 +556,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             return (disks.Count - 1, offset - cumulativeSize + disks[^1].Capacity);
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -767,8 +837,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 TimeSpan.FromSeconds((total - rebuilt) / speed), (long)speed));
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -872,8 +965,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             }
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -933,8 +1049,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             return (disks.Count - 1, offset - cumulative + disks[^1].Capacity);
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 
     /// <summary>
@@ -1131,8 +1270,31 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             return chunks;
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
 
         private enum PowerState { SpunDown, SpinningUp, Active, Idle }
         private sealed class DiskPowerState { public PowerState State { get; set; } public DateTime LastAccess { get; set; } }
@@ -1195,7 +1357,30 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             return (disks.Count - 1, offset - cumulative + disks[^1].Capacity);
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
+        }
     }
 }

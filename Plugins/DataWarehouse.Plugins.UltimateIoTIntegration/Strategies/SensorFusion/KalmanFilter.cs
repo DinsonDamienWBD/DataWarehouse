@@ -13,6 +13,11 @@ public sealed class KalmanFilter
     private KalmanState? _state;
 
     /// <summary>
+    /// Gets whether the filter has been initialized with an initial position.
+    /// </summary>
+    public bool IsInitialized => _state != null;
+
+    /// <summary>
     /// Initializes the Kalman filter with an initial position.
     /// </summary>
     /// <param name="initialPosition">Initial position [x, y, z].</param>

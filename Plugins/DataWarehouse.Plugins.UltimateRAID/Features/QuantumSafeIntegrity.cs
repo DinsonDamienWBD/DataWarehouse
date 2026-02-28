@@ -292,53 +292,47 @@ public sealed class QuantumSafeIntegrity
 
     private byte[] CalculateSHA3_256(byte[] data)
     {
-        // Use SHA256 as placeholder - in production would use SHA3-256
-        using var hasher = SHA256.Create();
-        return hasher.ComputeHash(data);
+        // .NET 8+ provides real SHA3-256 via System.Security.Cryptography
+        return SHA3_256.HashData(data);
     }
 
     private byte[] CalculateSHA3_512(byte[] data)
     {
-        // Use SHA512 as placeholder - in production would use SHA3-512
-        using var hasher = SHA512.Create();
-        return hasher.ComputeHash(data);
+        // .NET 8+ provides real SHA3-512 via System.Security.Cryptography
+        return SHA3_512.HashData(data);
     }
 
     private byte[] CalculateSHAKE256(byte[] data)
     {
-        // SHAKE256 extendable-output function simulation
-        using var hasher = SHA256.Create();
-        var baseHash = hasher.ComputeHash(data);
-        var extended = new byte[64];
-        Array.Copy(baseHash, extended, 32);
-        Array.Copy(hasher.ComputeHash(baseHash), 0, extended, 32, 32);
-        return extended;
+        // .NET 8+ provides real SHAKE-256 extendable-output function
+        var output = new byte[64];
+        Shake256.HashData(data, output);
+        return output;
     }
 
     private byte[] CalculateBLAKE3(byte[] data)
     {
-        // BLAKE3 simulation - in production would use actual BLAKE3
-        using var hasher = SHA256.Create();
-        var hash1 = hasher.ComputeHash(data);
-        var hash2 = hasher.ComputeHash(hash1);
-        return hash1.Zip(hash2, (a, b) => (byte)(a ^ b)).ToArray();
+        // BLAKE3 has no built-in .NET implementation.
+        // Fail explicitly rather than silently returning a weaker hash.
+        throw new PlatformNotSupportedException(
+            "BLAKE3 requires the 'Blake3' NuGet package (https://github.com/xoofx/Blake3.NET). " +
+            "Install it and replace this method with Blake3.Hasher.Hash(data).");
     }
 
     private byte[] CalculateDilithiumHash(byte[] data)
     {
-        // Dilithium-based hash simulation
-        // In production would use actual post-quantum Dilithium implementation
-        using var hasher = SHA512.Create();
-        return hasher.ComputeHash(data);
+        // Dilithium is a signature scheme, not a hash function.
+        // Use SHA3-512 as the collision-resistant hash backing Dilithium-based integrity.
+        return SHA3_512.HashData(data);
     }
 
     private byte[] CalculateSPHINCSHash(byte[] data)
     {
-        // SPHINCS+ hash simulation
-        // In production would use actual SPHINCS+ implementation
-        using var hasher = SHA512.Create();
-        var hash = hasher.ComputeHash(data);
-        return hasher.ComputeHash(hash);
+        // SPHINCS+ uses SHA3/SHAKE internally for its hash-based signatures.
+        // Use SHAKE-256 with 64-byte output as the quantum-safe hash primitive.
+        var output = new byte[64];
+        Shake256.HashData(data, output);
+        return output;
     }
 
     private byte[] CombineHashes(byte[] left, byte[] right, HashAlgorithmType algorithm)

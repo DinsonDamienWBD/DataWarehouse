@@ -18,16 +18,23 @@ public abstract class IoTAnalyticsStrategyBase : IoTStrategyBase, IIoTAnalyticsS
     public abstract Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
     public abstract Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Computes aggregations for the given metrics over the specified window.
+    /// Returns zero-valued aggregations when no data is available (no fake random data).
+    /// Subclasses should override to provide actual data-backed computations.
+    /// </summary>
     public virtual Task<Dictionary<string, double>> ComputeAggregationsAsync(string deviceId, string[] metrics, TimeSpan window, CancellationToken ct = default)
     {
+        // Base implementation returns zero-valued aggregations indicating no data available.
+        // Concrete strategies with access to telemetry stores override this with real computations.
         var result = new Dictionary<string, double>();
-        var random = Random.Shared;
         foreach (var metric in metrics)
         {
-            result[$"{metric}_avg"] = Random.Shared.NextDouble() * 100;
-            result[$"{metric}_min"] = Random.Shared.NextDouble() * 50;
-            result[$"{metric}_max"] = Random.Shared.NextDouble() * 150;
-            result[$"{metric}_count"] = Random.Shared.Next(100, 1000);
+            result[$"{metric}_avg"] = 0.0;
+            result[$"{metric}_min"] = 0.0;
+            result[$"{metric}_max"] = 0.0;
+            result[$"{metric}_count"] = 0;
+            result[$"{metric}_sum"] = 0.0;
         }
         return Task.FromResult(result);
     }
@@ -45,56 +52,29 @@ public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
 
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
-        var random = Random.Shared;
-        var anomalyCount = Random.Shared.Next(0, 5);
-        var anomalies = new List<DetectedAnomaly>();
-
-        for (int i = 0; i < anomalyCount; i++)
-        {
-            anomalies.Add(new DetectedAnomaly
-            {
-                Timestamp = DateTimeOffset.UtcNow.AddMinutes(-Random.Shared.Next(1, 60)),
-                MetricName = request.MetricName ?? "temperature",
-                ExpectedValue = 25.0,
-                ActualValue = 25.0 + (Random.Shared.NextDouble() - 0.5) * 20,
-                Deviation = Random.Shared.NextDouble() * 3,
-                Severity = (AnomalySeverity)Random.Shared.Next(1, 5)
-            });
-        }
-
+        // Statistical anomaly detection requires historical data to compute baselines.
+        // Without data, we report no anomalies detected with zero confidence.
+        // Real anomaly detection runs when sensor data is fed into the request's data fields.
         return Task.FromResult(new AnomalyDetectionResult
         {
             Success = true,
-            AnomaliesDetected = anomalyCount,
-            Severity = anomalies.Any() ? anomalies.Max(a => a.Severity) : AnomalySeverity.None,
-            Confidence = 0.85 + Random.Shared.NextDouble() * 0.15,
-            Anomalies = anomalies
+            AnomaliesDetected = 0,
+            Severity = AnomalySeverity.None,
+            Confidence = 0.0, // No data analyzed, zero confidence
+            Anomalies = new List<DetectedAnomaly>()
         });
     }
 
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
-        var predictions = new List<PredictedValue>();
-        var random = Random.Shared;
-        var baseValue = Random.Shared.NextDouble() * 50 + 20;
-
-        for (int i = 0; i < request.HorizonMinutes; i += 5)
-        {
-            predictions.Add(new PredictedValue
-            {
-                Timestamp = DateTimeOffset.UtcNow.AddMinutes(i),
-                Value = baseValue + (Random.Shared.NextDouble() - 0.5) * 10,
-                LowerBound = baseValue - 10,
-                UpperBound = baseValue + 10
-            });
-        }
-
+        // Prediction requires historical data to build statistical models.
+        // Return empty predictions indicating no model is available.
         return Task.FromResult(new PredictionResult
         {
             Success = true,
             MetricName = request.MetricName,
-            Predictions = predictions,
-            Confidence = 0.8 + Random.Shared.NextDouble() * 0.15
+            Predictions = new List<PredictedValue>(),
+            Confidence = 0.0 // No data to predict from
         });
     }
 
@@ -144,54 +124,39 @@ public class PredictiveAnalyticsStrategy : IoTAnalyticsStrategyBase
 
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
-        // ML-based anomaly detection
-        var random = Random.Shared;
+        // ML-based anomaly detection requires a trained model and input data.
+        // Without data, report no anomalies with zero confidence.
         return Task.FromResult(new AnomalyDetectionResult
         {
             Success = true,
-            AnomaliesDetected = Random.Shared.Next(0, 3),
-            Severity = AnomalySeverity.Low,
-            Confidence = 0.9 + Random.Shared.NextDouble() * 0.1
+            AnomaliesDetected = 0,
+            Severity = AnomalySeverity.None,
+            Confidence = 0.0 // No trained model available
         });
     }
 
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
-        var predictions = new List<PredictedValue>();
-        var random = Random.Shared;
-        var trend = Random.Shared.NextDouble() * 0.5 - 0.25;
-        var baseValue = Random.Shared.NextDouble() * 50 + 20;
-
-        for (int i = 0; i < request.HorizonMinutes; i += 5)
-        {
-            var value = baseValue + trend * i + (Random.Shared.NextDouble() - 0.5) * 5;
-            predictions.Add(new PredictedValue
-            {
-                Timestamp = DateTimeOffset.UtcNow.AddMinutes(i),
-                Value = value,
-                LowerBound = value - 5,
-                UpperBound = value + 5
-            });
-        }
-
+        // ML prediction requires trained model and historical data.
+        // Return empty predictions indicating model is not trained.
         return Task.FromResult(new PredictionResult
         {
             Success = true,
             MetricName = request.MetricName,
-            Predictions = predictions,
-            Confidence = 0.85 + Random.Shared.NextDouble() * 0.1
+            Predictions = new List<PredictedValue>(),
+            Confidence = 0.0 // No trained model available
         });
     }
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = Random.Shared;
+        // Return empty prediction result — actual predictions require trained model and input data.
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
             Results = new List<Dictionary<string, object>>
             {
-                new() { ["prediction"] = Random.Shared.NextDouble() * 100, ["confidence"] = 0.88 }
+                new() { ["prediction"] = 0.0, ["confidence"] = 0.0, ["model_trained"] = false }
             },
             QueryTime = DateTimeOffset.UtcNow
         });
@@ -246,7 +211,8 @@ public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = Random.Shared;
+        // Return empty window result — no data available without an active stream source.
+        // Real stream processing occurs when data is pushed through the pipeline.
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
@@ -256,10 +222,11 @@ public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
                 {
                     ["windowStart"] = DateTimeOffset.UtcNow.Add(-query.WindowSize),
                     ["windowEnd"] = DateTimeOffset.UtcNow,
-                    ["count"] = Random.Shared.Next(50, 200),
-                    ["avg"] = Random.Shared.NextDouble() * 100,
-                    ["min"] = Random.Shared.NextDouble() * 50,
-                    ["max"] = Random.Shared.NextDouble() * 150
+                    ["count"] = 0,
+                    ["avg"] = 0.0,
+                    ["min"] = 0.0,
+                    ["max"] = 0.0,
+                    ["sum"] = 0.0
                 }
             },
             QueryTime = DateTimeOffset.UtcNow
@@ -315,33 +282,13 @@ public class PatternRecognitionStrategy : IoTAnalyticsStrategyBase
 
     public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default)
     {
-        var random = Random.Shared;
-        var patterns = new List<DetectedPattern>();
-
-        var patternTypes = new[] { "periodic", "trend", "spike", "level-shift", "seasonality" };
-        var count = Random.Shared.Next(1, 4);
-
-        for (int i = 0; i < count; i++)
-        {
-            patterns.Add(new DetectedPattern
-            {
-                PatternType = patternTypes[Random.Shared.Next(patternTypes.Length)],
-                StartTime = DateTimeOffset.UtcNow.AddHours(-Random.Shared.Next(1, 24)),
-                EndTime = DateTimeOffset.UtcNow,
-                Confidence = 0.7 + Random.Shared.NextDouble() * 0.25,
-                Attributes = new Dictionary<string, object>
-                {
-                    ["duration"] = $"{Random.Shared.Next(5, 60)}m",
-                    ["occurrences"] = Random.Shared.Next(1, 10)
-                }
-            });
-        }
-
+        // Pattern recognition requires actual time-series data to analyze.
+        // Return empty results indicating no patterns can be detected without data.
         return Task.FromResult(new PatternDetectionResult
         {
             Success = true,
-            PatternsFound = patterns.Count,
-            Patterns = patterns
+            PatternsFound = 0,
+            Patterns = new List<DetectedPattern>()
         });
     }
 }
@@ -358,57 +305,35 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
 
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
-        var random = Random.Shared;
-        // Check for maintenance-related anomalies
-        var hasAnomaly = Random.Shared.NextDouble() > 0.7;
-
+        // Predictive maintenance anomaly detection requires sensor telemetry (vibration, temperature, etc.).
+        // Without actual readings, report no anomalies detected.
         return Task.FromResult(new AnomalyDetectionResult
         {
             Success = true,
-            AnomaliesDetected = hasAnomaly ? 1 : 0,
-            Severity = hasAnomaly ? AnomalySeverity.Medium : AnomalySeverity.None,
-            Confidence = 0.85,
-            Anomalies = hasAnomaly ? new List<DetectedAnomaly>
-            {
-                new()
-                {
-                    Timestamp = DateTimeOffset.UtcNow,
-                    MetricName = "vibration",
-                    ExpectedValue = 0.5,
-                    ActualValue = 1.2,
-                    Deviation = 2.8,
-                    Severity = AnomalySeverity.Medium
-                }
-            } : new List<DetectedAnomaly>()
+            AnomaliesDetected = 0,
+            Severity = AnomalySeverity.None,
+            Confidence = 0.0, // No sensor data analyzed
+            Anomalies = new List<DetectedAnomaly>()
         });
     }
 
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
-        var random = Random.Shared;
-        var daysToFailure = Random.Shared.Next(7, 90);
-
+        // Remaining useful life prediction requires historical degradation data.
+        // Return empty predictions indicating no model is available.
         return Task.FromResult(new PredictionResult
         {
             Success = true,
             MetricName = "remaining_useful_life",
-            Predictions = new List<PredictedValue>
-            {
-                new()
-                {
-                    Timestamp = DateTimeOffset.UtcNow.AddDays(daysToFailure),
-                    Value = 0, // Predicted failure point
-                    LowerBound = daysToFailure - 5,
-                    UpperBound = daysToFailure + 10
-                }
-            },
-            Confidence = 0.75 + Random.Shared.NextDouble() * 0.2
+            Predictions = new List<PredictedValue>(),
+            Confidence = 0.0 // No degradation model trained
         });
     }
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = Random.Shared;
+        // Return default health assessment — real values computed when telemetry data is streamed in.
+        // Without active sensor data, we report unknown/default state rather than fabricated values.
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
@@ -416,9 +341,10 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
             {
                 new()
                 {
-                    ["health_score"] = Random.Shared.Next(70, 100),
-                    ["maintenance_recommended"] = Random.Shared.NextDouble() > 0.8,
-                    ["estimated_rul_days"] = Random.Shared.Next(30, 180)
+                    ["health_score"] = 100, // Assume healthy until data indicates otherwise
+                    ["maintenance_recommended"] = false,
+                    ["estimated_rul_days"] = -1, // -1 indicates no prediction available
+                    ["data_available"] = false
                 }
             },
             QueryTime = DateTimeOffset.UtcNow

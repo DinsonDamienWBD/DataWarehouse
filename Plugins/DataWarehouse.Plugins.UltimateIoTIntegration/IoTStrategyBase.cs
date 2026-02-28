@@ -170,25 +170,24 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     }
 
     /// <summary>
-    /// Publishes a message to the message bus.
+    /// Publishes a message to the message bus asynchronously.
+    /// Callers should await this method to ensure delivery and proper error propagation.
+    /// Errors are logged and suppressed to avoid disrupting the calling strategy.
     /// </summary>
-    protected Task PublishMessage(string topic, PluginMessage message)
+    protected async Task PublishMessage(string topic, PluginMessage message)
     {
-        if (MessageBus != null)
+        if (MessageBus == null)
+            return;
+
+        try
         {
-            return Task.Run(async () =>
-            {
-                try
-                {
-                    await MessageBus.PublishAsync(topic, message);
-                }
-                catch (Exception ex)
-                {
-                    // Gracefully handle message bus unavailability
-                    System.Diagnostics.Debug.WriteLine($"IoT message publish failed: {ex.Message}");
-                }
-            });
+            await MessageBus.PublishAsync(topic, message).ConfigureAwait(false);
         }
-        return Task.CompletedTask;
+        catch (Exception ex)
+        {
+            // Log failure but do not propagate — message bus unavailability should not crash the strategy.
+            System.Diagnostics.Debug.WriteLine($"IoT message publish failed for topic '{topic}': {ex.Message}");
+            RecordFailure();
+        }
     }
 }

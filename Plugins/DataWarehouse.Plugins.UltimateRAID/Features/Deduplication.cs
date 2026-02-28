@@ -1,5 +1,6 @@
 // 91.F4: RAID-Aware Deduplication
 using System.Security.Cryptography;
+using System.Threading;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
@@ -378,10 +379,13 @@ public sealed class RaidDeduplication
         return sha256.ComputeHash(data);
     }
 
+    private static long _nextStorageAddress = DateTime.UtcNow.Ticks;
+
     private long AllocateStorageAddress(string arrayId)
     {
-        // Simulated storage allocation
-        return DateTime.UtcNow.Ticks;
+        // Atomic counter guarantees unique addresses even under concurrent access.
+        // Initialized from clock ticks to avoid collisions across process restarts.
+        return Interlocked.Increment(ref _nextStorageAddress);
     }
 
     private long GetParityAddressForBlock(string arrayId, long blockAddress)

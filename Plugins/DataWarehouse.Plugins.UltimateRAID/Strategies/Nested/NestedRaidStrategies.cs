@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -374,14 +375,30 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
             return result;
         }
 
-        private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
         {
-            return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+            fs.Seek(offset, SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
         }
 
-        private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
         {
-            return Task.FromResult(new byte[length]);
+            if (string.IsNullOrWhiteSpace(disk.Location))
+                throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+            if (!File.Exists(disk.Location))
+                throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+            using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+            if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+            fs.Seek(offset, SeekOrigin.Begin);
+            var buffer = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+            if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+            return buffer;
         }
     }
 }

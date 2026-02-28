@@ -147,7 +147,7 @@ public sealed class SensorFusionEngine
         }
 
         // Initialize filter if needed
-        if (_kalmanFilter!.GetEstimate == null)
+        if (!_kalmanFilter!.IsInitialized)
         {
             _kalmanFilter.Initialize(gpsReading.Value);
         }

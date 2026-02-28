@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.Security;
 
 /// <summary>
 /// Base class for IoT security strategies.
+/// Delegates encryption/decryption to the UltimateEncryption plugin via message bus.
 /// </summary>
 public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStrategy
 {
@@ -21,18 +24,84 @@ public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStr
     public abstract Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
     public abstract Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
 
-    public virtual Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default)
+    /// <summary>
+    /// Encrypts data by delegating to the UltimateEncryption plugin via message bus.
+    /// Returns the encrypted payload including key material needed for decryption.
+    /// </summary>
+    public virtual async Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default)
     {
-        using var aes = Aes.Create();
-        aes.GenerateKey();
-        aes.GenerateIV();
-        using var encryptor = aes.CreateEncryptor();
-        return Task.FromResult(encryptor.TransformFinalBlock(data, 0, data.Length));
+        if (MessageBus == null)
+            throw new InvalidOperationException(
+                "Encryption requires a configured message bus. Configure encryption via the UltimateEncryption plugin.");
+
+        var message = new PluginMessage
+        {
+            Type = "encryption.encrypt",
+            SourcePluginId = "com.datawarehouse.iot.ultimate",
+            Payload =
+            {
+                ["data"] = Convert.ToBase64String(data),
+                ["deviceId"] = deviceId,
+                ["algorithm"] = "AES-256-GCM"
+            }
+        };
+
+        var response = await MessageBus.SendAsync("encryption.encrypt", message, TimeSpan.FromSeconds(30), ct);
+
+        if (!response.Success)
+            throw new CryptographicException(
+                $"Encryption failed via message bus: {response.ErrorMessage ?? "Unknown error"}");
+
+        if (response.Payload is byte[] encryptedBytes)
+            return encryptedBytes;
+
+        if (response.Payload is string base64Result)
+            return Convert.FromBase64String(base64Result);
+
+        // Extract from metadata if payload is structured
+        if (response.Metadata.TryGetValue("encryptedData", out var encData) && encData is string encStr)
+            return Convert.FromBase64String(encStr);
+
+        throw new CryptographicException("Encryption response did not contain encrypted data in expected format.");
     }
 
-    public virtual Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default)
+    /// <summary>
+    /// Decrypts data by delegating to the UltimateEncryption plugin via message bus.
+    /// </summary>
+    public virtual async Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default)
     {
-        return Task.FromResult(data); // Simplified for demo
+        if (MessageBus == null)
+            throw new InvalidOperationException(
+                "Decryption requires a configured message bus. Configure encryption via the UltimateEncryption plugin.");
+
+        var message = new PluginMessage
+        {
+            Type = "encryption.decrypt",
+            SourcePluginId = "com.datawarehouse.iot.ultimate",
+            Payload =
+            {
+                ["data"] = Convert.ToBase64String(data),
+                ["deviceId"] = deviceId,
+                ["algorithm"] = "AES-256-GCM"
+            }
+        };
+
+        var response = await MessageBus.SendAsync("encryption.decrypt", message, TimeSpan.FromSeconds(30), ct);
+
+        if (!response.Success)
+            throw new CryptographicException(
+                $"Decryption failed via message bus: {response.ErrorMessage ?? "Unknown error"}");
+
+        if (response.Payload is byte[] decryptedBytes)
+            return decryptedBytes;
+
+        if (response.Payload is string base64Result)
+            return Convert.FromBase64String(base64Result);
+
+        if (response.Metadata.TryGetValue("decryptedData", out var decData) && decData is string decStr)
+            return Convert.FromBase64String(decStr);
+
+        throw new CryptographicException("Decryption response did not contain decrypted data in expected format.");
     }
 }
 
@@ -372,8 +441,21 @@ public class CertificateManagementStrategy : IoTSecurityStrategyBase
 
     public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default)
     {
-        // Generate new certificate
-        var certificate = $"-----BEGIN CERTIFICATE-----\nMIIB...{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}...\n-----END CERTIFICATE-----";
+        // Generate real self-signed X.509 certificate
+        using var rsa = RSA.Create(2048);
+        var subjectName = new X500DistinguishedName($"CN={deviceId},O=DataWarehouse IoT,OU=Devices");
+        var request = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+        // Add key usage extensions
+        request.CertificateExtensions.Add(
+            new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, critical: true));
+        request.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(certificateAuthority: false, hasPathLengthConstraint: false, pathLengthConstraint: 0, critical: true));
+
+        var notBefore = DateTimeOffset.UtcNow;
+        var notAfter = DateTimeOffset.UtcNow.AddYears(1);
+        using var cert = request.CreateSelfSigned(notBefore, notAfter);
+        var certificatePem = cert.ExportCertificatePem();
 
         return Task.FromResult(new CredentialRotationResult
         {
@@ -383,8 +465,8 @@ public class CertificateManagementStrategy : IoTSecurityStrategyBase
             {
                 DeviceId = deviceId,
                 Type = CredentialType.X509Certificate,
-                Certificate = certificate,
-                ExpiresAt = DateTimeOffset.UtcNow.AddYears(1)
+                Certificate = certificatePem,
+                ExpiresAt = notAfter
             },
             RotatedAt = DateTimeOffset.UtcNow
         });
