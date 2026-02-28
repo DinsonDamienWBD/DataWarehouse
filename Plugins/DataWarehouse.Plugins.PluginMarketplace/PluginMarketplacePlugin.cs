@@ -511,9 +511,10 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         }
         catch (TimeoutException)
         {
-            // Timeout waiting for kernel response - treat as potential success
-            // The kernel may have loaded the plugin but failed to respond in time
-            return true;
+            // P2-1001: Return false on timeout — the kernel did not confirm load success.
+            // Treating a timeout as success would cause the catalog to diverge from kernel state.
+            System.Diagnostics.Debug.WriteLine($"[Marketplace] Timeout waiting for kernel to confirm plugin load: {pluginId} v{version}");
+            return false;
         }
         catch
         {
@@ -644,7 +645,10 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         }
         catch (TimeoutException)
         {
-            return true;
+            // P2-1001: Return false on timeout — the kernel did not confirm unload success.
+            // Treating a timeout as success would cause catalog state to diverge from kernel state.
+            System.Diagnostics.Debug.WriteLine($"[Marketplace] Timeout waiting for kernel to confirm plugin unload: {pluginId}");
+            return false;
         }
         catch
         {

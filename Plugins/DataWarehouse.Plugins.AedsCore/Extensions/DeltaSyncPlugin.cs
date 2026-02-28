@@ -1,3 +1,4 @@
+using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK;
@@ -176,37 +177,50 @@ public sealed class DeltaSyncPlugin : DataManagementPluginBase
         var baseData = new byte[baseLength];
         await baseStream.ReadExactlyAsync(baseData, 0, baseLength, ct);
 
-        var processedChunks = new HashSet<int>(delta.RemovedChunks);
+        // P2-988: Build a lookup of modified chunks by index so we can interleave them with
+        // unchanged chunks in correct chunk-index order, rather than writing all modified chunks
+        // first and all unchanged chunks second (which corrupts output for interleaved modifications).
+        var modifiedByIndex = delta.ModifiedChunks.ToDictionary(c => c.ChunkIndex);
+        var removedSet = new HashSet<int>(delta.RemovedChunks);
 
-        foreach (var chunk in delta.ModifiedChunks.OrderBy(c => c.ChunkIndex))
+        // Determine total output chunks: max of base chunks and highest modified/added index + 1
+        var baseChunks = (int)Math.Ceiling(baseData.Length / (double)SignatureChunkSize);
+        var maxModifiedIndex = modifiedByIndex.Count > 0 ? modifiedByIndex.Keys.Max() : -1;
+        var totalChunks = Math.Max(baseChunks, maxModifiedIndex + 1);
+
+        for (int i = 0; i < totalChunks; i++)
         {
-            switch (chunk.Operation)
-            {
-                case DeltaOperation.CopyFromBase:
-                    if (chunk.BaseOffset < baseData.Length)
-                    {
-                        var copyLength = Math.Min(SignatureChunkSize, baseData.Length - chunk.BaseOffset);
-                        await resultStream.WriteAsync(baseData, (int)chunk.BaseOffset, (int)copyLength, ct);
-                    }
-                    break;
+            ct.ThrowIfCancellationRequested();
 
-                case DeltaOperation.InsertNew:
-                    if (chunk.NewData != null)
-                    {
-                        await resultStream.WriteAsync(chunk.NewData, 0, chunk.NewData.Length, ct);
-                    }
-                    break;
+            if (removedSet.Contains(i))
+            {
+                // Chunk removed in delta — skip it
+                continue;
             }
 
-            processedChunks.Add(chunk.ChunkIndex);
-        }
-
-        // Copy unchanged chunks from base
-        var maxChunks = (int)Math.Ceiling(baseData.Length / (double)SignatureChunkSize);
-        for (int i = 0; i < maxChunks; i++)
-        {
-            if (!processedChunks.Contains(i))
+            if (modifiedByIndex.TryGetValue(i, out var chunk))
             {
+                switch (chunk.Operation)
+                {
+                    case DeltaOperation.CopyFromBase:
+                        if (chunk.BaseOffset >= 0 && chunk.BaseOffset < baseData.Length)
+                        {
+                            var copyLength = (int)Math.Min(SignatureChunkSize, baseData.Length - chunk.BaseOffset);
+                            await resultStream.WriteAsync(baseData, (int)chunk.BaseOffset, copyLength, ct);
+                        }
+                        break;
+
+                    case DeltaOperation.InsertNew:
+                        if (chunk.NewData != null)
+                        {
+                            await resultStream.WriteAsync(chunk.NewData, 0, chunk.NewData.Length, ct);
+                        }
+                        break;
+                }
+            }
+            else if (i < baseChunks)
+            {
+                // Unchanged chunk — copy verbatim from base
                 var offset = i * SignatureChunkSize;
                 var length = Math.Min(SignatureChunkSize, baseData.Length - offset);
                 await resultStream.WriteAsync(baseData, offset, length, ct);
@@ -261,25 +275,18 @@ public sealed class DeltaSyncPlugin : DataManagementPluginBase
     }
 
     /// <summary>
-    /// Computes Adler-32 rolling hash for a chunk.
+    /// Computes a 64-bit non-cryptographic hash for a chunk using XxHash64.
+    /// XxHash64 has a 2^64 collision space, far less collision-prone than Adler-32 (2^32),
+    /// eliminating the false-positive chunk matches that could cause silent data corruption
+    /// in delta reconstruction (finding P2-987).
     /// </summary>
     /// <param name="data">Data bytes.</param>
     /// <param name="length">Length of data to hash.</param>
-    /// <returns>Base64-encoded hash.</returns>
-    private string ComputeRollingHash(byte[] data, int length)
+    /// <returns>Base64-encoded 64-bit hash.</returns>
+    private static string ComputeRollingHash(byte[] data, int length)
     {
-        const uint Modulus = 65521;
-        uint a = 1;
-        uint b = 0;
-
-        for (int i = 0; i < length; i++)
-        {
-            a = (a + data[i]) % Modulus;
-            b = (b + a) % Modulus;
-        }
-
-        uint adler32 = (b << 16) | a;
-        return Convert.ToBase64String(BitConverter.GetBytes(adler32));
+        var hash = XxHash64.HashToUInt64(data.AsSpan(0, length));
+        return Convert.ToBase64String(BitConverter.GetBytes(hash));
     }
 
     /// <summary>

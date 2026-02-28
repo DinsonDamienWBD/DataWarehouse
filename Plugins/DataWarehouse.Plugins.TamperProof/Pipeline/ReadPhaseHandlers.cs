@@ -123,6 +123,26 @@ public static class ReadPhaseHandlers
                 return null;
             }
 
+            // P2-1017: Validate required manifest fields before returning — null RaidConfiguration,
+            // Shards, or FinalContentHash cause NullReferenceException deep in reconstruction.
+            if (manifest.RaidConfiguration == null)
+            {
+                logger.LogError("Manifest for object {ObjectId} has null RaidConfiguration — corrupt or truncated manifest.", objectId);
+                return null;
+            }
+
+            if (manifest.RaidConfiguration.Shards == null || manifest.RaidConfiguration.Shards.Count == 0)
+            {
+                logger.LogError("Manifest for object {ObjectId} has null or empty Shards list — cannot reconstruct data.", objectId);
+                return null;
+            }
+
+            if (string.IsNullOrEmpty(manifest.FinalContentHash))
+            {
+                logger.LogError("Manifest for object {ObjectId} has null or empty FinalContentHash — integrity verification will fail.", objectId);
+                return null;
+            }
+
             logger.LogDebug("Manifest loaded successfully for object {ObjectId} version {Version}",
                 objectId, manifest.Version);
 
