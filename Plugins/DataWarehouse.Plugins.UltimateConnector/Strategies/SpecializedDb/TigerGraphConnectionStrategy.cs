@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
@@ -10,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class TigerGraphConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
 
         public override string StrategyId => "tigergraph";
         public override string DisplayName => "TigerGraph";
@@ -41,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             if (_httpClient == null) return false;
             try { using var response = await _httpClient.GetAsync("/echo", ct); return response.IsSuccessStatusCode; }
-            catch { return false; /* Connection validation - failure acceptable */ }
+            catch { return false; }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -53,29 +56,107 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(isHealthy, isHealthy ? "TigerGraph healthy" : "TigerGraph unhealthy", TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "TigerGraph healthy" : "TigerGraph unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        /// <summary>
+        /// Executes a GSQL query via TigerGraph REST API.
+        /// Supports inline GSQL statements submitted to /gsqlserver/gsql/file.
+        /// </summary>
+        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+            IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<Dictionary<string, object?>> { new() { ["v_id"] = "vertex123", ["v_type"] = "Person", ["attributes"] = new Dictionary<string, object> { ["name"] = "Sample" } } };
+            var client = handle.GetConnection<HttpClient>();
+            // TigerGraph REST++ API: POST /gsqlserver/gsql/file with GSQL body
+            using var content = new StringContent(query, Encoding.UTF8, "text/plain");
+            using var response = await client.PostAsync("/gsqlserver/gsql/file", content, ct).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var results = new List<Dictionary<string, object?>>();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                // TigerGraph responses vary; attempt to parse "results" array
+                if (root.TryGetProperty("results", out var resultsProp) &&
+                    resultsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in resultsProp.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.Object)
+                        {
+                            var dict = new Dictionary<string, object?>();
+                            foreach (var prop in item.EnumerateObject())
+                                dict[prop.Name] = prop.Value.ValueKind == JsonValueKind.Null ? null : prop.Value.ToString();
+                            results.Add(dict);
+                        }
+                    }
+                }
+            }
+            catch { /* Return empty on parse failure */ }
+
+            return results;
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        /// <summary>
+        /// Executes a GSQL DDL/DML statement.
+        /// </summary>
+        public override async Task<int> ExecuteNonQueryAsync(
+            IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
+            var client = handle.GetConnection<HttpClient>();
+            using var content = new StringContent(command, Encoding.UTF8, "text/plain");
+            using var response = await client.PostAsync("/gsqlserver/gsql/file", content, ct).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
             return 1;
         }
 
+        /// <summary>
+        /// Retrieves graph schema via TigerGraph's /gsqlserver/gsql/schema endpoint.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<DataSchema>
+            var client = handle.GetConnection<HttpClient>();
+            try
             {
-                new DataSchema("Person", new[] { new DataSchemaField("id", "String", false, null, null), new DataSchemaField("name", "String", true, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "vertex" })
-            };
+                using var response = await client.GetAsync("/gsqlserver/gsql/schema", ct).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                    return Array.Empty<DataSchema>();
+
+                using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>(ct).ConfigureAwait(false);
+                var root = doc!.RootElement;
+                var schemas = new List<DataSchema>();
+
+                if (root.TryGetProperty("VertexTypes", out var vertexTypes))
+                {
+                    foreach (var vt in vertexTypes.EnumerateArray())
+                    {
+                        var typeName = vt.TryGetProperty("Name", out var n) ? n.GetString() ?? "Vertex" : "Vertex";
+                        var fields = new List<DataSchemaField>();
+                        if (vt.TryGetProperty("Attributes", out var attrs))
+                        {
+                            foreach (var attr in attrs.EnumerateArray())
+                            {
+                                var attrName = attr.TryGetProperty("AttributeName", out var an) ? an.GetString() ?? "attr" : "attr";
+                                var attrType = attr.TryGetProperty("AttributeType", out var at) && at.TryGetProperty("Name", out var atn) ? atn.GetString() ?? "STRING" : "STRING";
+                                fields.Add(new DataSchemaField(attrName, attrType, true, null, null));
+                            }
+                        }
+                        schemas.Add(new DataSchema(typeName, fields.ToArray(), new[] { "id" },
+                            new Dictionary<string, object> { ["type"] = "vertex" }));
+                    }
+                }
+                return schemas;
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
