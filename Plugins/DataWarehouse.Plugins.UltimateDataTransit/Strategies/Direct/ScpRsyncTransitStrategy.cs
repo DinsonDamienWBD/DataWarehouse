@@ -125,11 +125,13 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
             {
                 destinationData = await DownloadViaScpAsync(request.Destination, cts.Token);
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Destination file does not exist; full upload required
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Destination file does not exist or is unreachable — full upload required.
+                // Log the specific failure reason (file-not-found vs connection refused) for diagnostics.
+                System.Diagnostics.Trace.TraceInformation(
+                    "[ScpRsync] Delta download failed ({0}: {1}), falling back to full upload.",
+                    ex.GetType().Name, ex.Message);
             }
 
             byte[] dataToTransfer;

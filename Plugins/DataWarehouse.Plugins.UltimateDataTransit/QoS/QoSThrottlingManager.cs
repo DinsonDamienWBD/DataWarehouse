@@ -486,8 +486,9 @@ internal sealed class ThrottledStream : Stream
         var bytesRead = _inner.Read(buffer, offset, count);
         if (bytesRead > 0)
         {
-            // Sync bridge: Stream.Read must be synchronous. Task.Run avoids deadlocks.
-            Task.Run(() => _bucket.ConsumeAsync(bytesRead, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+            // Sync bridge: Stream.Read is inherently synchronous. ConsumeAsync uses ConfigureAwait(false)
+            // to avoid capturing the sync context, reducing deadlock risk in ASP.NET-style environments.
+            _bucket.ConsumeAsync(bytesRead, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         return bytesRead;
     }
@@ -497,8 +498,9 @@ internal sealed class ThrottledStream : Stream
     {
         if (count > 0)
         {
-            // Sync bridge: Stream.Write must be synchronous. Task.Run avoids deadlocks.
-            Task.Run(() => _bucket.ConsumeAsync(count, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+            // Sync bridge: Stream.Write is inherently synchronous. ConsumeAsync uses ConfigureAwait(false)
+            // to avoid capturing the sync context, reducing deadlock risk in ASP.NET-style environments.
+            _bucket.ConsumeAsync(count, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         _inner.Write(buffer, offset, count);
     }

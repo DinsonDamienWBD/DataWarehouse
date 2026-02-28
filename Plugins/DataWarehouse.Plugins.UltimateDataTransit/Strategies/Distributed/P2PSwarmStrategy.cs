@@ -707,8 +707,9 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
             var hasAvailablePeers = state.Peers.Any();
             if (hasAvailablePeers)
             {
-                // Write re-queued pieces
-                _ = Task.Run(async () =>
+                // Write re-queued pieces concurrently with the reader — both tasks run in parallel.
+                // Capture the task so its exceptions are observed (finding 2675).
+                var writeTask = Task.Run(async () =>
                 {
                     foreach (var idx in requeueList)
                     {
@@ -724,6 +725,9 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
                 var retryBytes = await DownloadPiecesFromSwarmAsync(
                     state, retryChannel.Reader, progress, ct);
                 Interlocked.Add(ref totalBytesDownloaded, retryBytes);
+
+                // Await the write task to observe any exceptions.
+                await writeTask;
             }
             else
             {

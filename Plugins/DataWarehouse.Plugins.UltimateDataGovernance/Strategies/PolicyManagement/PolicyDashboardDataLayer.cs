@@ -115,9 +115,13 @@ public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
     /// <summary>
     /// Gets version history for a policy.
     /// </summary>
-    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId) =>
-        _versionHistory.TryGetValue(policyId, out var history)
-            ? history.AsReadOnly() : Array.Empty<PolicyVersionRecord>();
+    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId)
+    {
+        if (!_versionHistory.TryGetValue(policyId, out var history))
+            return Array.Empty<PolicyVersionRecord>();
+        // Lock the list to synchronize with concurrent RecordVersion writers (finding 2307).
+        lock (history) { return history.ToArray(); }
+    }
 
     /// <summary>
     /// Restores a policy to a previous version.

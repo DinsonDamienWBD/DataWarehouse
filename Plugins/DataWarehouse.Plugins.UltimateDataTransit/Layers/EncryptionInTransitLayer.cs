@@ -194,11 +194,14 @@ internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
                 return (encryptedViaPlugin, pluginMetadata);
             }
         }
-        catch
+        catch (Exception ex)
         {
-
-            // Message bus unavailable or encryption plugin not responding -- fall back to AES-GCM
-            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+            // Message bus unavailable or encryption plugin not responding — do NOT silently fall back.
+            // Log a warning with exception details so operators can detect degraded encryption.
+            System.Diagnostics.Trace.TraceWarning(
+                "[EncryptionInTransitLayer] Transit encryption plugin unavailable ({0}: {1}). " +
+                "Refusing to proceed without authenticated encryption.",
+                ex.GetType().Name, ex.Message);
         }
 
         // Fallback: encryption requires UltimateEncryption plugin via message bus.

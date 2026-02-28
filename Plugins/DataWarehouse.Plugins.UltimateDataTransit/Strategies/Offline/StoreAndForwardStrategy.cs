@@ -389,7 +389,22 @@ internal sealed class StoreAndForwardStrategy : DataTransitStrategyBase
         {
             ct.ThrowIfCancellationRequested();
 
-            var entryPath = Path.Combine(dataDir, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            // Path traversal validation: resolve the full path and confirm it is still under dataDir.
+            var entryPath = Path.GetFullPath(Path.Combine(dataDir, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+            var normalizedDataDir = Path.GetFullPath(dataDir) + Path.DirectorySeparatorChar;
+            if (!entryPath.StartsWith(normalizedDataDir, StringComparison.OrdinalIgnoreCase))
+            {
+                RecordTransferFailure();
+                return new TransitResult
+                {
+                    TransferId = transferId,
+                    Success = false,
+                    ErrorMessage = $"Path traversal detected in manifest entry: {entry.RelativePath}",
+                    Duration = stopwatch.Elapsed,
+                    StrategyUsed = StrategyId
+                };
+            }
+
             if (!File.Exists(entryPath))
             {
                 RecordTransferFailure();

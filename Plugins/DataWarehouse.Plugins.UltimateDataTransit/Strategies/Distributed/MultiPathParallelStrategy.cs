@@ -250,6 +250,13 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
             };
             _transferStates[transferId] = transferState;
 
+            // Step 6: Validate source stream is available before spawning parallel tasks (finding 2677).
+            if (request.DataStream is null)
+            {
+                throw new InvalidOperationException(
+                    "TransitRequest.DataStream must not be null for multi-path parallel transfer.");
+            }
+
             // Step 6: Parallel transfer
             var totalSegments = segments.Count;
 
@@ -752,9 +759,16 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
                 segmentSw.Stop();
+
+                // Mark the segment as failed so callers can detect incomplete transfers.
+                segment.Failed = true;
+
+                System.Diagnostics.Trace.TraceWarning(
+                    "[MultiPathParallel] Segment {0} failed on path {1}: {2}: {3}",
+                    segment.Index, path.PathId, ex.GetType().Name, ex.Message);
 
                 lock (path.Lock)
                 {
@@ -1199,6 +1213,12 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
         /// Whether this segment has been successfully transferred.
         /// </summary>
         public bool Completed { get; set; }
+
+        /// <summary>
+        /// Whether this segment permanently failed (all retries exhausted on its path).
+        /// A failed segment prevents the overall transfer from being declared successful.
+        /// </summary>
+        public bool Failed { get; set; }
     }
 
     /// <summary>
