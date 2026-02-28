@@ -334,7 +334,7 @@ internal sealed class ArwRawStrategy : MediaStrategyBase
         for (int i = 0; i < data.Length - 4; i++)
         {
             // Sony tag 0x7200 indicates multi-shot mode
-            if (data[i] == 0x00 && data[i + 1] == 0x72 && i + 8 < data.Length)
+            if (data[i] == 0x00 && data[i + 1] == 0x72 && i + 9 < data.Length)
             {
                 int value = data[i + 8] | (data[i + 9] << 8);
                 return value > 1;

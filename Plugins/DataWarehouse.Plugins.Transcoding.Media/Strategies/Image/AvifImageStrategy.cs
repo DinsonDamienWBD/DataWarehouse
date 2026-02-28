@@ -280,7 +280,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
         WriteIsobmffBox(metaWriter, "pixi", pixiData);
 
         // colr (colour information) property
-        var colorSpace = isHdr ? "nclx" : "nclx";
+        var colorSpace = "nclx";
         var colrData = new byte[11];
         Array.Copy(Encoding.ASCII.GetBytes(colorSpace), colrData, 4);
         colrData[4] = 0; colrData[5] = (byte)(isHdr ? 9 : 1); // Color primaries (BT.2020 or BT.709)

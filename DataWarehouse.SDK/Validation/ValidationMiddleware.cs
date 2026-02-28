@@ -450,17 +450,18 @@ public sealed class CommandInjectionFilter : IValidationFilter
 {
     public string Name => "CommandInjection";
 
+    // NOTE (P2-701): Do NOT include bare '<' and '>' — those are legitimate SQL comparison operators
+    // and XML content characters. Only block shell-specific redirect sequences (e.g. '2>' or '>&').
     private static readonly Regex CommandInjectionPattern = new(
-        @"[;&|`$]|" +                          // Shell metacharacters
+        @"[;&|`$]|" +                          // Shell metacharacters (pipe, semicolon, etc.)
         @"(\|\|)|" +                           // OR operator
         @"(&&)|" +                             // AND operator
-        @"(\$\()|" +                           // Command substitution
+        @"(\$\()|" +                           // Command substitution $()
         @"(`)|" +                              // Backtick substitution
-        @"(\$\{)|" +                           // Variable expansion
-        @"(>)|" +                              // Output redirect
-        @"(<)|" +                              // Input redirect
-        @"(\r\n)|" +                           // CRLF
-        @"(%0[aAdD])",                         // Encoded newline
+        @"(\$\{)|" +                           // Variable expansion ${
+        @"(\d*>&?\d*)|" +                      // Shell redirect: 2>, >&, 1>&2 etc.
+        @"(\r\n)|" +                           // CRLF injection
+        @"(%0[aAdD])",                         // URL-encoded newline
         RegexOptions.Compiled);
 
     public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)

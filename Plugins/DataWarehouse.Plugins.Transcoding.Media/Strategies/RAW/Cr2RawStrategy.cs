@@ -375,7 +375,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
     private static int ExtractIsoSpeed(byte[] data)
     {
         // Search for EXIF ISOSpeedRatings tag (0x8827)
-        for (int i = 0; i < data.Length - 6; i++)
+        for (int i = 0; i < data.Length - 9; i++)
         {
             if (data[i] == 0x27 && data[i + 1] == 0x88)
             {

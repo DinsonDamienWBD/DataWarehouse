@@ -47,6 +47,9 @@ public sealed class OnlineRegionAddition
 {
     private readonly Stream _vdeStream;
     private readonly int _blockSize;
+    // Serializes concurrent AddModuleRegionsAsync calls to prevent TOCTOU race on
+    // superblock slot and bitmap allocation (finding P2-877).
+    private readonly System.Threading.SemaphoreSlim _writeLock = new(1, 1);
 
     /// <summary>
     /// Creates a new OnlineRegionAddition orchestrator for the given VDE stream.
@@ -74,6 +77,18 @@ public sealed class OnlineRegionAddition
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Result indicating success/failure with region location details.</returns>
     public async Task<RegionAdditionResult> AddModuleRegionsAsync(ModuleId module, CancellationToken ct)
+    {
+        // Serialize to prevent concurrent callers from reading the same free-space state and
+        // allocating the same blocks (finding P2-877).
+        await _writeLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+        return await AddModuleRegionsInternalAsync(module, ct).ConfigureAwait(false);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    private async Task<RegionAdditionResult> AddModuleRegionsInternalAsync(ModuleId module, CancellationToken ct)
     {
         // Step 1: Read current superblock group
         var superblockGroup = ReadSuperblockGroup();
