@@ -445,7 +445,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (profile.PrivacyModel == PrivacyModel.KAnonymity)
             {
-                var kValue = options.KAnonymityValue ?? profile.KAnonymityValue ?? _kAnonymityDefault;
+                // P2-1493: Enforce minimum k=2; k≤1 provides no anonymization guarantee.
+                var kValue = Math.Max(2, options.KAnonymityValue ?? profile.KAnonymityValue ?? _kAnonymityDefault);
                 result.RequiredK = kValue;
                 result.AchievedK = CalculateKAnonymity(records, profile.QuasiIdentifiers);
                 result.MeetsKAnonymity = result.AchievedK >= kValue;
@@ -461,7 +462,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (profile.PrivacyModel == PrivacyModel.DifferentialPrivacy)
             {
-                result.EpsilonUsed = options.DifferentialPrivacyEpsilon ?? _differentialPrivacyEpsilon;
+                // P2-1494: Clamp epsilon to [0.01, 10.0]. Epsilon > 10 is effectively
+                // no differential privacy guarantee; warn so operators can detect misconfiguration.
+                var rawEpsilon = options.DifferentialPrivacyEpsilon ?? _differentialPrivacyEpsilon;
+                if (rawEpsilon > 10.0)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[DataAnonymization] WARNING: DifferentialPrivacyEpsilon={rawEpsilon} exceeds recommended maximum of 10.0; clamping to 10.0.");
+                result.EpsilonUsed = Math.Clamp(rawEpsilon, 0.01, 10.0);
                 result.MeetsDifferentialPrivacy = true; // Verified by noise addition
             }
 
