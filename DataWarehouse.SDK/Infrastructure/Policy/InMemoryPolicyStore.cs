@@ -157,12 +157,21 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             // Key format: "featureId:level:path"
             // Find the first colon (end of featureId), then parse level and path
             var firstColon = compositeKey.IndexOf(':');
+            // P2-500: Guard against malformed keys to avoid ArgumentOutOfRangeException.
+            if (firstColon < 0 || firstColon >= compositeKey.Length - 1)
+                throw new ArgumentException($"Malformed policy composite key: '{compositeKey}'.", nameof(compositeKey));
+
             var remaining = compositeKey.Substring(firstColon + 1);
             var secondColon = remaining.IndexOf(':');
+            if (secondColon < 0)
+                throw new ArgumentException($"Malformed policy composite key (missing second colon): '{compositeKey}'.", nameof(compositeKey));
+
             var levelStr = remaining.Substring(0, secondColon);
             var path = remaining.Substring(secondColon + 1);
 
-            var level = (PolicyLevel)Enum.Parse(typeof(PolicyLevel), levelStr);
+            if (!Enum.TryParse<PolicyLevel>(levelStr, out var level))
+                throw new ArgumentException($"Malformed policy composite key (invalid level '{levelStr}'): '{compositeKey}'.", nameof(compositeKey));
+
             return (level, path);
         }
     }
