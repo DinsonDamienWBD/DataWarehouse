@@ -107,7 +107,13 @@ public sealed record HierarchyAccessRule
         if (PrincipalId is not null)
             return string.Equals(PrincipalId, principalId, StringComparison.OrdinalIgnoreCase);
         if (PrincipalPattern is not null)
-            return principalId.StartsWith(PrincipalPattern.TrimEnd('*'), StringComparison.OrdinalIgnoreCase);
+        {
+            // P2-584: Only do prefix match when pattern explicitly ends with '*'.
+            // Without this check, "admin" (no wildcard) would match "adminevil" via StartsWith.
+            if (PrincipalPattern.EndsWith('*'))
+                return principalId.StartsWith(PrincipalPattern.TrimEnd('*'), StringComparison.OrdinalIgnoreCase);
+            return string.Equals(PrincipalPattern, principalId, StringComparison.OrdinalIgnoreCase);
+        }
         return true; // Rule applies to all principals at this level
     }
 

@@ -92,7 +92,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
         private readonly ConcurrentDictionary<string, long> _consumerOffsets = new(StringComparer.OrdinalIgnoreCase);
         private readonly Timer _compactionTimer;
         private readonly Timer? _fsyncTimer;
-        private bool _disposed;
+        private volatile bool _disposed; // P2-524: volatile prevents stale reads from timer callbacks
 
         /// <summary>
         /// Path prefix for WAL storage within <see cref="IPersistentBackingStore"/>.

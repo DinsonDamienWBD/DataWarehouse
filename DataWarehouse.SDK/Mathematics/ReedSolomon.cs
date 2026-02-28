@@ -15,7 +15,8 @@ public sealed class ReedSolomon
     private readonly int _parityShards;
     private readonly int _totalShards;
     private readonly byte[][] _encodingMatrix;
-    private readonly object _lock = new object();
+    // P2-522: _lock field removed — all public methods are stateless over immutable fields;
+    // no shared mutable state requires locking. ReedSolomon instances are thread-safe by construction.
 
     /// <summary>
     /// Gets the number of data shards configured for this instance.

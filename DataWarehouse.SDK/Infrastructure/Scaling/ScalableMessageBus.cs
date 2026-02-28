@@ -75,7 +75,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
         private long _totalDropped;
         private volatile ScalingLimits _currentLimits;
         private volatile BackpressureState _backpressureState = BackpressureState.Normal;
-        private bool _disposed;
+        private volatile bool _disposed; // P2-523: volatile prevents stale reads from concurrent threads
 
         /// <summary>
         /// Initializes a new <see cref="ScalableMessageBus"/> decorating the given inner bus.
