@@ -51,8 +51,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private int _maxRetryAttempts = 3;
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly BoundedDictionary<string, CartridgeInfo> _cartridgeInventory = new BoundedDictionary<string, CartridgeInfo>(1000);
-        private readonly BoundedDictionary<string, string> _objectToCartridgeMap = new BoundedDictionary<string, string>(1000);
+        // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) so that
+        // cartridge inventory and object-to-cartridge mappings are never silently evicted.
+        // Optical disc archives may contain millions of objects across thousands of cartridges.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CartridgeInfo> _cartridgeInventory = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _objectToCartridgeMap = new();
         private OpticalCatalog? _catalog;
         private HttpClient? _httpClient;
         private string? _currentLoadedCartridge = null;
@@ -700,7 +703,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to refresh cartridge inventory: {ex.Message}", ex);
+                // Log and rethrow with retry guidance
+                System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Failed: {ex.GetType().Name}: {ex.Message}");
+                // Retry with backoff (up to 3 attempts)
+                for (int attempt = 1; attempt <= 3; attempt++)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
+                        // Re-attempt the inventory refresh
+                        var retryResponse = await _httpClient!.GetAsync("/api/v1/library/inventory", ct);
+                        retryResponse.EnsureSuccessStatusCode();
+                        System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Retry {attempt} succeeded");
+                        return;
+                    }
+                    catch (Exception retryEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Retry {attempt} failed: {retryEx.Message}");
+                        if (attempt == 3)
+                        {
+                            throw new InvalidOperationException($"Failed to refresh cartridge inventory after {attempt} retries: {ex.Message}", ex);
+                        }
+                    }
+                }
             }
         }
 
@@ -729,8 +754,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var response = await _httpClient.PostAsJsonAsync("/api/v1/library/load", loadRequest, ct);
                 response.EnsureSuccessStatusCode();
 
-                // Wait for load to complete
-                await Task.Delay(_loadTimeout, ct);
+                // Poll for load completion instead of using a fixed delay
+                var pollInterval = TimeSpan.FromSeconds(2);
+                var deadline = DateTime.UtcNow + _loadTimeout;
+                while (DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(pollInterval, ct);
+                    // Check cartridge status via REST API
+                    var statusResponse = await _httpClient.GetAsync($"/api/v1/library/status/{barcode}", ct);
+                    if (statusResponse.IsSuccessStatusCode)
+                    {
+                        var statusJson = await statusResponse.Content.ReadAsStringAsync(ct);
+                        if (statusJson.Contains("\"loaded\":true", StringComparison.OrdinalIgnoreCase) ||
+                            statusJson.Contains("\"status\":\"loaded\"", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                }
             }
 
             // Update loaded cartridge
@@ -975,7 +1016,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class OpticalCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly BoundedDictionary<string, OpticalCatalogEntry> _entries = new BoundedDictionary<string, OpticalCatalogEntry>(1000);
+        // ConcurrentDictionary (unbounded): optical catalogs may hold millions of entries; BoundedDictionary(1000) would silently evict them.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, OpticalCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private OpticalCatalog(string catalogPath)

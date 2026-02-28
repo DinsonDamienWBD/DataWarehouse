@@ -69,8 +69,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _discoveryServiceAddress = string.Empty;
         private int _discoveryServicePort = 8009;
 
-        // State tracking
-        private bool _isConnected = false;
+        // State tracking — volatile so reads/writes are visible across threads without lock
+        private volatile bool _isConnected = false;
         private DateTime _lastKeepAlive = DateTime.MinValue;
         private readonly ConcurrentDictionary<string, BlockDeviceMapping> _blockMappings = new();
         private CancellationTokenSource? _keepAliveCts;
@@ -951,8 +951,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.SaveBlockMappingsAsync] {ex.GetType().Name}: {ex.Message}");
-                // Ignore metadata save errors
+                // Block mapping persistence failure means in-memory state diverges from disk — rethrow so caller knows
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.SaveBlockMappingsAsync] FATAL: Failed to persist block mappings: {ex}");
+                throw;
             }
         }
 

@@ -31,7 +31,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     {
         private readonly HttpClient _httpClient;
         private OracleVaultConfig _config = new();
-        private string? _currentKeyId;
+        // #3460: Use volatile to ensure cross-thread visibility of _currentKeyId assignments.
+        private volatile string? _currentKeyId;
 
         public override KeyStoreCapabilities Capabilities => new()
         {

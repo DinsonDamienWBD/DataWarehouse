@@ -590,21 +590,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // File layout is typically set via extended attributes or ceph commands
-            // Example: setfattr -n ceph.file.layout.stripe_unit -v 4194304 /path
-            // For simplicity, we store layout intention as metadata
-            var layoutMetadata = new Dictionary<string, string>
-            {
-                ["ceph.file.layout.stripe_unit"] = _stripeUnitBytes.ToString(),
-                ["ceph.file.layout.stripe_count"] = _stripeCount.ToString(),
-                ["ceph.file.layout.object_size"] = _objectSizeBytes.ToString(),
-                ["ceph.file.layout.pool"] = _dataPoolName
-            };
-
-            // In a real implementation, this would use setfattr or libcephfs API
-            // For now, store as marker file
-            var layoutFile = Path.Combine(directoryPath, ".ceph_layout");
-            await File.WriteAllTextAsync(layoutFile, JsonSerializer.Serialize(layoutMetadata), ct);
+            // CephFS file layout applied via setfattr extended attributes
+            await RunSetFattrAsync($"-n ceph.file.layout.stripe_unit -v {_stripeUnitBytes} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.stripe_count -v {_stripeCount} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.object_size -v {_objectSizeBytes} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.pool -v \"{_dataPoolName}\" \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -612,11 +602,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task ApplyDirectoryPinningAsync(string directoryPath, int mdsRank, CancellationToken ct)
         {
-            // Directory pinning is set via extended attribute: ceph.dir.pin
-            // Example: setfattr -n ceph.dir.pin -v 0 /path
-            // For simplicity, store as metadata marker
-            var pinFile = Path.Combine(directoryPath, ".ceph_pin");
-            await File.WriteAllTextAsync(pinFile, mdsRank.ToString(), ct);
+            // Directory pinning applied via: setfattr -n ceph.dir.pin -v <rank> <path>
+            await RunSetFattrAsync($"-n ceph.dir.pin -v {mdsRank} \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -624,18 +611,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task ApplyQuotaAsync(string directoryPath, long maxBytes, long maxFiles, CancellationToken ct)
         {
-            // Quota is set via extended attributes:
-            // - ceph.quota.max_bytes
-            // - ceph.quota.max_files
-            // For simplicity, store as metadata marker
-            var quotaMetadata = new Dictionary<string, string>
-            {
-                ["ceph.quota.max_bytes"] = maxBytes.ToString(),
-                ["ceph.quota.max_files"] = maxFiles.ToString()
-            };
-
-            var quotaFile = Path.Combine(directoryPath, ".ceph_quota");
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaMetadata), ct);
+            // CephFS quotas applied via setfattr extended attributes
+            if (maxBytes > 0)
+                await RunSetFattrAsync($"-n ceph.quota.max_bytes -v {maxBytes} \"{directoryPath}\"", ct);
+            if (maxFiles > 0)
+                await RunSetFattrAsync($"-n ceph.quota.max_files -v {maxFiles} \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -965,6 +945,35 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     lockObj?.Dispose();
                 }
                 _fileLocks.Clear();
+            }
+        }
+
+        #endregion
+
+        #region CLI Helpers
+
+        /// <summary>Runs setfattr with the given arguments; throws on non-zero exit.</summary>
+        private static async Task RunSetFattrAsync(string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "setfattr",
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"setfattr {arguments} failed with exit code {process.ExitCode}: {stderr}");
             }
         }
 

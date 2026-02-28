@@ -65,42 +65,30 @@ internal sealed class ParquetCompactionStrategy : StorageProcessingStrategyBase
             });
         }
 
-        // Merge into compacted output
-        var compactedPath = Path.Combine(query.Source, "compacted_output.parquet");
-        await using (var output = new FileStream(compactedPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-        {
-            // Write Parquet magic bytes "PAR1"
-            await output.WriteAsync("PAR1"u8.ToArray(), ct);
-
-            foreach (var file in parquetFiles)
-            {
-                ct.ThrowIfCancellationRequested();
-                await using var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
-                // Skip magic bytes of subsequent files
-                if (input.Length > 4) input.Seek(4, SeekOrigin.Begin);
-                await input.CopyToAsync(output, 81920, ct);
-            }
-
-            // Write footer magic bytes
-            await output.WriteAsync("PAR1"u8.ToArray(), ct);
-        }
-
-        var compactedSize = new FileInfo(compactedPath).Length;
+        // Parquet compaction requires a Parquet library (e.g. Parquet.Net) to properly
+        // merge row groups, rewrite footers, and maintain column statistics. Raw byte
+        // concatenation with injected PAR1 magic produces structurally invalid Parquet
+        // files because each source file's embedded thrift footer remains in the stream.
+        // Return the analysis metadata without attempting the invalid byte-copy merge.
+        var compactedPath = Path.Combine(query.Source, "compacted_output.parquet.pending");
         sw.Stop();
-
         return new ProcessingResult
         {
             Data = new Dictionary<string, object?>
             {
-                ["sourcePath"] = query.Source, ["compactedPath"] = compactedPath,
-                ["inputFileCount"] = parquetFiles.Length, ["totalInputSize"] = totalInputSize,
-                ["compactedSize"] = compactedSize, ["targetRowGroupSize"] = targetRowGroupSize,
-                ["compressionRatio"] = totalInputSize > 0 ? Math.Round((double)compactedSize / totalInputSize, 4) : 1.0,
-                ["fileStats"] = fileStats
+                ["sourcePath"] = query.Source,
+                ["compactedPath"] = compactedPath,
+                ["inputFileCount"] = parquetFiles.Length,
+                ["totalInputSize"] = totalInputSize,
+                ["targetRowGroupSize"] = targetRowGroupSize,
+                ["fileStats"] = fileStats,
+                ["error"] = "Parquet compaction requires a Parquet library (e.g. Parquet.Net) to correctly " +
+                             "merge row groups and rewrite footers. Raw byte-copy merge produces invalid Parquet. " +
+                             "Add the Parquet.Net package reference and implement using ParquetWriter."
             },
             Metadata = new ProcessingMetadata
             {
-                RowsProcessed = parquetFiles.Length, RowsReturned = 1,
+                RowsProcessed = parquetFiles.Length, RowsReturned = 0,
                 BytesProcessed = totalInputSize, ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
             }
         };

@@ -33,6 +33,12 @@ internal sealed class BazelBuildStrategy : StorageProcessingStrategyBase
         var jobs = CliProcessHelper.GetOption<int>(query, "jobs");
         var target = CliProcessHelper.GetOption<string>(query, "target") ?? "//...";
 
+        // Validate user-supplied values before interpolation into CLI args
+        CliProcessHelper.ValidateIdentifier(target, "target");
+        if (config != null) CliProcessHelper.ValidateIdentifier(config, "config");
+        if (jobs < 0 || jobs > 1000)
+            throw new ArgumentException("'jobs' must be between 0 and 1000.", nameof(jobs));
+
         var args = $"build {target}";
         if (config != null) args += $" --config={config}";
         if (jobs > 0) args += $" --jobs={jobs}";

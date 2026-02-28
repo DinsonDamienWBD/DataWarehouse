@@ -548,8 +548,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 // Write to target
                 await targetBackend.StoreAsync(state.Key, data, metadataDict, ct);
 
-                // Delete from source
-                await sourceBackend.DeleteAsync(state.Key, ct);
+                // Delete from source — if this fails, roll back the target write to avoid duplication
+                try
+                {
+                    await sourceBackend.DeleteAsync(state.Key, ct);
+                }
+                catch (Exception deleteEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Source delete failed for {state.Key}, rolling back target write: {deleteEx.Message}");
+                    try { await targetBackend.DeleteAsync(state.Key, ct); } catch { /* best-effort rollback */ }
+                    throw new InvalidOperationException($"Transition aborted: source delete failed for '{state.Key}'", deleteEx);
+                }
 
                 // Update state
                 state.BackendId = targetBackend.StrategyId;

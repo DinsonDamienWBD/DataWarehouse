@@ -226,6 +226,66 @@ internal static class CliProcessHelper
         if (query.Options?.TryGetValue(key, out var v) == true && v is T t) return t;
         return default;
     }
+
+    /// <summary>
+    /// Validates that a string value does not contain shell metacharacters that could
+    /// enable command injection when the value is interpolated into CLI argument strings.
+    /// Throws <see cref="ArgumentException"/> if invalid characters are found.
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    public static void ValidateNoShellMetachars(string value, string paramName)
+    {
+        // Shell metacharacters that could inject additional commands or arguments
+        const string Forbidden = ";&|`$(){}[]<>!\\\"'\n\r\t";
+        foreach (var c in value)
+        {
+            if (Forbidden.Contains(c))
+            {
+                throw new ArgumentException(
+                    $"'{paramName}' contains forbidden character '{c}' (0x{(int)c:X2}) that could enable command injection.",
+                    paramName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates that a string value matches an expected allowlist of safe values.
+    /// Throws <see cref="ArgumentException"/> if the value is not in the allowlist.
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    /// <param name="allowedValues">Case-sensitive set of permitted values.</param>
+    public static void ValidateAllowlist(string value, string paramName, IReadOnlySet<string> allowedValues)
+    {
+        if (!allowedValues.Contains(value))
+        {
+            throw new ArgumentException(
+                $"'{paramName}' value '{value}' is not in the allowlist. Permitted: {string.Join(", ", allowedValues)}",
+                paramName);
+        }
+    }
+
+    /// <summary>
+    /// Validates that a string value matches a safe identifier pattern (alphanumeric, hyphens, underscores, dots only).
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    public static void ValidateIdentifier(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"'{paramName}' must not be null or whitespace.", paramName);
+
+        foreach (var c in value)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '-' && c != '_' && c != '.' && c != ':')
+            {
+                throw new ArgumentException(
+                    $"'{paramName}' contains invalid character '{c}' (0x{(int)c:X2}). Only alphanumeric, hyphen, underscore, dot, and colon are allowed.",
+                    paramName);
+            }
+        }
+    }
 }
 
 /// <summary>

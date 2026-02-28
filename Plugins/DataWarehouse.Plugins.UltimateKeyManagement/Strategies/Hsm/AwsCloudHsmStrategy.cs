@@ -211,8 +211,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
             else
             {
-                // Fallback for testing - consider HSM connected if management API is reachable
-                _hsmHandle = Guid.NewGuid().ToString();
+                // #3491: Do NOT fabricate a random handle. A missing handle from the management API
+                // means the HSM cluster is not properly initialized. Fail loudly so operators are alerted.
+                throw new InvalidOperationException(
+                    "AWS CloudHSM cluster API did not return a handle. " +
+                    "Verify that the cluster is active and the management endpoint is reachable.");
             }
         }
 

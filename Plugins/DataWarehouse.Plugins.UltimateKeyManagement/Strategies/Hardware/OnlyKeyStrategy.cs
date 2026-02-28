@@ -295,9 +295,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 throw new TimeoutException("OnlyKey challenge-response timed out. Button press may be required.");
             }
 
+            // #3486: Validate response length before extracting HMAC bytes to avoid out-of-bounds copy.
+            // Expected layout: 1-byte status + 20 bytes HMAC-SHA1 = 21 bytes minimum.
+            const int HmacOffset = 1;
+            const int HmacLength = 20;
+            if (response.Length < HmacOffset + HmacLength)
+                throw new InvalidOperationException(
+                    $"OnlyKey response too short ({response.Length} bytes); expected at least {HmacOffset + HmacLength}.");
+
             // Extract HMAC response (20 bytes for HMAC-SHA1)
-            var hmacResponse = new byte[20];
-            Array.Copy(response, 1, hmacResponse, 0, 20);
+            var hmacResponse = new byte[HmacLength];
+            Array.Copy(response, HmacOffset, hmacResponse, 0, HmacLength);
 
             // Extend to 32 bytes using HKDF
             var derivedKey = new byte[32];

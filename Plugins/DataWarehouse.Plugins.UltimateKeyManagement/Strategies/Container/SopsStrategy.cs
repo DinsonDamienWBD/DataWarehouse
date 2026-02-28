@@ -403,9 +403,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             // Serialize to appropriate format
             var plaintext = SerializeSecretContent(secretContent, _config.FileFormat);
 
-            // #3457: Write plaintext to a restricted-permission temp file, delete-on-close.
-            // Use the system temp directory but with owner-only permissions.
+            // #3457 / #3467: Write plaintext to a restricted-permission temp file.
+            // The local variable tempFileName is captured once and never mutated inside the try block,
+            // ensuring the finally block always deletes the correct file even if an exception occurs.
             var tempDir = Path.GetTempPath();
+            // Capture path in a separate readonly-like local to make the invariant explicit.
             var tempFileName = Path.Combine(tempDir, $"sops-{Guid.NewGuid():N}{GetFileExtension()}");
             try
             {

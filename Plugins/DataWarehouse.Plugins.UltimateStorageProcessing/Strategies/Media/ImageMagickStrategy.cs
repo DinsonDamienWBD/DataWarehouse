@@ -35,6 +35,30 @@ internal sealed class ImageMagickStrategy : StorageProcessingStrategyBase
         var outputFormat = CliProcessHelper.GetOption<string>(query, "outputFormat");
         var crop = CliProcessHelper.GetOption<string>(query, "crop");
 
+        // Allowlist operations to prevent injection via the operation parameter
+        var allowedOperations = new HashSet<string>(StringComparer.Ordinal) { "convert", "mogrify" };
+        CliProcessHelper.ValidateAllowlist(operation, "operation", allowedOperations);
+
+        // Validate geometry strings (resize, crop) — allow digits, x, +, -, %, ^, !
+        static void ValidateGeometry(string? val, string name)
+        {
+            if (val == null) return;
+            foreach (var c in val)
+            {
+                if (!char.IsDigit(c) && "xX+-.%^!@><".IndexOf(c) < 0)
+                    throw new ArgumentException($"'{name}' contains invalid character '{c}'.", name);
+            }
+        }
+        ValidateGeometry(resize, "resize");
+        ValidateGeometry(crop, "crop");
+
+        // Validate outputFormat as identifier
+        if (outputFormat != null) CliProcessHelper.ValidateIdentifier(outputFormat, "outputFormat");
+
+        // Validate quality range
+        if (quality < 0 || quality > 100)
+            throw new ArgumentException("'quality' must be between 0 and 100.", nameof(quality));
+
         string args;
         string outputPath;
 

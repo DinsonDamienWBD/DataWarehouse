@@ -22,7 +22,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         private BloomFilter? _bloomFilter;
         private List<(byte[] firstKey, long offset)>? _index;
         private long _entryCount;
+        private long _indexOffset; // offset where index section begins; last data block ends here
         private bool _disposed;
+        // Serialize all stream seek+read operations — concurrent readers would corrupt position
+        private readonly SemaphoreSlim _streamLock = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Gets the SSTable metadata.
@@ -75,7 +78,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 throw new InvalidDataException("Failed to read footer");
             }
 
-            var indexOffset = BinaryPrimitives.ReadInt64LittleEndian(footer.AsSpan(0, 8));
+            _indexOffset = BinaryPrimitives.ReadInt64LittleEndian(footer.AsSpan(0, 8));
+            var indexOffset = _indexOffset;
             var bloomOffset = BinaryPrimitives.ReadInt64LittleEndian(footer.AsSpan(8, 8));
             _entryCount = BinaryPrimitives.ReadInt64LittleEndian(footer.AsSpan(16, 8));
             var magic = BinaryPrimitives.ReadUInt32LittleEndian(footer.AsSpan(24, 4));
@@ -95,7 +99,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
 
             // Read metadata
             byte[]? firstKey = _index.Count > 0 ? _index[0].firstKey : null;
-            byte[]? lastKey = _index.Count > 0 ? _index[^1].firstKey : null;
+
+            // Compute true LastKey by scanning the last block (firstKey of last index entry is only the FIRST key in that block)
+            byte[]? lastKey = null;
+            if (_index.Count > 0)
+            {
+                var lastBlockOffset = _index[^1].offset;
+                // Last block ends at indexOffset (the start of the index section)
+                var lastBlockSize = (int)(indexOffset - lastBlockOffset);
+                if (lastBlockSize > 0)
+                {
+                    _stream.Seek(lastBlockOffset, SeekOrigin.Begin);
+                    var lastBlockData = new byte[lastBlockSize];
+                    if (await _stream.ReadAsync(lastBlockData, ct).ConfigureAwait(false) == lastBlockSize)
+                    {
+                        lastKey = GetLastKeyInBlock(lastBlockData) ?? _index[^1].firstKey;
+                    }
+                    else
+                    {
+                        lastKey = _index[^1].firstKey; // fallback
+                    }
+                }
+                else
+                {
+                    lastKey = _index[^1].firstKey;
+                }
+            }
 
             var fileInfo = new FileInfo(_filePath);
 
@@ -175,22 +204,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 return null;
             }
 
-            // Read and scan the block
-            var blockOffset = _index![blockIndex].offset;
-            var nextBlockOffset = blockIndex + 1 < _index.Count
-                ? _index[blockIndex + 1].offset
-                : _stream!.Length - 28; // Footer is 28 bytes
-
-            var blockSize = (int)(nextBlockOffset - blockOffset);
-            _stream!.Seek(blockOffset, SeekOrigin.Begin);
-
-            var blockData = new byte[blockSize];
-            if (await _stream.ReadAsync(blockData, ct) != blockSize)
+            // Serialize stream access to prevent concurrent seek corruption
+            await _streamLock.WaitAsync(ct).ConfigureAwait(false);
+            try
             {
-                throw new InvalidDataException("Failed to read block data");
-            }
+                // Read and scan the block
+                var blockOffset = _index![blockIndex].offset;
+                var nextBlockOffset = blockIndex + 1 < _index.Count
+                    ? _index[blockIndex + 1].offset
+                    : _indexOffset; // Index section starts here — last data block ends at indexOffset
 
-            return ScanBlock(blockData, key);
+                var blockSize = (int)(nextBlockOffset - blockOffset);
+                _stream!.Seek(blockOffset, SeekOrigin.Begin);
+
+                var blockData = new byte[blockSize];
+                if (await _stream.ReadAsync(blockData, ct).ConfigureAwait(false) != blockSize)
+                {
+                    throw new InvalidDataException("Failed to read block data");
+                }
+
+                return ScanBlock(blockData, key);
+            }
+            finally
+            {
+                _streamLock.Release();
+            }
         }
 
         private int FindBlockIndex(byte[] key)
@@ -383,6 +421,35 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             }
         }
 
+        /// <summary>Scans a block and returns the last non-tombstone key, or null if the block is empty.</summary>
+        private static byte[]? GetLastKeyInBlock(byte[] blockData)
+        {
+            byte[]? lastKey = null;
+            int offset = 0;
+            while (offset < blockData.Length)
+            {
+                if (offset + 4 > blockData.Length) break;
+                var keyLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));
+                offset += 4;
+                if (keyLen <= 0 || offset + keyLen > blockData.Length) break;
+                var key = blockData[offset..(offset + keyLen)];
+                offset += keyLen;
+                if (offset + 4 > blockData.Length) break;
+                var valueLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));
+                offset += 4;
+                if (valueLen == -1)
+                {
+                    // Tombstone — key exists but no value
+                    lastKey = key;
+                    continue;
+                }
+                if (valueLen < 0 || offset + valueLen > blockData.Length) break;
+                lastKey = key;
+                offset += valueLen;
+            }
+            return lastKey;
+        }
+
         private static bool StartsWithPrefix(byte[] key, byte[] prefix)
         {
             if (key.Length < prefix.Length)
@@ -404,10 +471,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
 
             _disposed = true;
 
-            if (_stream != null)
+            // Acquire lock before disposing stream to prevent concurrent readers from accessing a disposed stream
+            await _streamLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await _stream.DisposeAsync();
-                _stream = null;
+                if (_stream != null)
+                {
+                    await _stream.DisposeAsync().ConfigureAwait(false);
+                    _stream = null;
+                }
+            }
+            finally
+            {
+                _streamLock.Release();
+                _streamLock.Dispose();
             }
         }
     }

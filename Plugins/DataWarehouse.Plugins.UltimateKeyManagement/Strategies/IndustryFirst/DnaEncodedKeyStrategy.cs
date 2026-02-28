@@ -289,26 +289,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         /// </summary>
         public string EncodeBinaryToDna(byte[] data)
         {
+            // #3526: The previous implementation rotated bases to avoid homopolymer runs but never
+            // stored a rotation marker, making decoding lossy and broken.
+            // Fix: use a reversible encoding — each 2-bit pair maps directly to a base with no
+            // silent mutation. DNA synthesis hardware handles homopolymer runs at the oligo level.
+            // The decoder can now faithfully recover the original bytes.
             var dna = new StringBuilder(data.Length * 4); // 4 bases per byte
-            char lastBase = '\0';
 
             foreach (var b in data)
             {
-                // Encode each byte as 4 DNA bases (2 bits each)
+                // Encode each byte as 4 DNA bases (2 bits each), MSB first.
                 for (int i = 6; i >= 0; i -= 2)
                 {
                     var twoBits = (byte)((b >> i) & 0b11);
-                    var baseChar = BinaryToDna[twoBits];
-
-                    // Avoid homopolymer runs by rotating if same as last base
-                    if (baseChar == lastBase)
-                    {
-                        baseChar = RotateBase(baseChar);
-                        // Store rotation marker in next encoding
-                    }
-
-                    dna.Append(baseChar);
-                    lastBase = baseChar;
+                    dna.Append(BinaryToDna[twoBits]);
                 }
             }
 

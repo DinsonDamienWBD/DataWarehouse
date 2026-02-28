@@ -36,6 +36,20 @@ internal sealed class AudioConversionStrategy : StorageProcessingStrategyBase
         var normalize = CliProcessHelper.GetOption<bool>(query, "normalize");
         var bitrate = CliProcessHelper.GetOption<string>(query, "bitrate") ?? "128k";
 
+        // Validate user-supplied values before interpolation into CLI args
+        var allowedFormats = new HashSet<string>(StringComparer.Ordinal) { "ogg", "mp3", "aac", "opus", "flac", "wav", "m4a" };
+        CliProcessHelper.ValidateAllowlist(outputFormat, "outputFormat", allowedFormats);
+        // bitrate is like "128k", "192k", "320k" — digits + k/K only
+        foreach (var c in bitrate)
+        {
+            if (!char.IsDigit(c) && c != 'k' && c != 'K')
+                throw new ArgumentException($"'bitrate' contains invalid character '{c}'. Use format like '128k'.", nameof(bitrate));
+        }
+        if (sampleRate < 0 || sampleRate > 384000)
+            throw new ArgumentException("'sampleRate' must be between 0 and 384000 Hz.", nameof(sampleRate));
+        if (channels < 0 || channels > 8)
+            throw new ArgumentException("'channels' must be between 0 and 8.", nameof(channels));
+
         var codec = outputFormat switch
         {
             "ogg" => "libvorbis",

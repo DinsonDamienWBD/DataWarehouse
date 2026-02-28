@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -37,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
     /// </remarks>
     public class DellPowerScaleStrategy : UltimateStorageStrategyBase
     {
+        private static readonly SearchValues<char> _headerInjectionChars = SearchValues.Create(new[] { '\r', '\n', ';' });
         private HttpClient? _httpClient;
         private string _endpoint = string.Empty;
         private string _username = string.Empty;
@@ -231,7 +233,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             request.Headers.Add("X-Isi-Ifs-Target-Type", "object");
             request.Headers.Add("X-Isi-Ifs-Access-Control", "public-read-write");
 
-            // Add session token
+            // Add session token; validate token contains no header-injection characters
+            if (_authToken != null && _authToken.AsSpan().IndexOfAny(_headerInjectionChars) >= 0)
+            {
+                throw new InvalidOperationException("Auth token contains invalid characters and cannot be used in Cookie header.");
+            }
             request.Headers.Add("Cookie", $"isisessid={_authToken}");
 
             // Add SmartPools policy if specified
@@ -256,9 +262,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
 
             // Copy stream to request content
-            var ms = new MemoryStream(65536);
-            await data.CopyToAsync(ms, 81920, ct);
-            var content = ms.ToArray();
+            byte[] content;
+            using (var ms = new MemoryStream(65536))
+            {
+                await data.CopyToAsync(ms, 81920, ct);
+                content = ms.ToArray();
+            }
             request.Content = new ByteArrayContent(content);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 

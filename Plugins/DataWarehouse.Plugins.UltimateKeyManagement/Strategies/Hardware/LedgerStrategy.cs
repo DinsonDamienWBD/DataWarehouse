@@ -553,14 +553,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             return packets;
         }
 
+        // #3484: Maximum packets to read before declaring an error (prevents unbounded loop).
+        private const int MaxResponsePackets = 64;
+        // Default HID read timeout: 5 seconds.
+        private static readonly TimeSpan HidReadTimeout = TimeSpan.FromSeconds(5);
+
         private byte[] ReceiveResponse()
         {
             var response = new List<byte>();
             var expectedLen = 0;
             var packetIndex = 0;
+            var deadline = DateTime.UtcNow + HidReadTimeout;
 
             while (true)
             {
+                // #3484: Enforce per-response timeout and packet-count ceiling.
+                if (DateTime.UtcNow > deadline)
+                    throw new TimeoutException("Ledger device did not respond within the expected time.");
+
+                if (packetIndex >= MaxResponsePackets)
+                    throw new InvalidOperationException(
+                        $"Ledger response exceeded maximum packet count ({MaxResponsePackets}). Possible protocol error.");
+
                 var packet = new byte[HidPacketSize];
                 var bytesRead = _stream!.Read(packet, 0, packet.Length);
 
@@ -576,6 +590,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     // First packet
                     dataOffset = 7; // Skip header
                     expectedLen = (packet[5] << 8) | packet[6];
+                    // Sanity-check the expected length to avoid allocating huge buffers.
+                    if (expectedLen > HidPacketSize * MaxResponsePackets)
+                        throw new InvalidOperationException($"Ledger response claims unreasonably large payload ({expectedLen} bytes).");
                 }
                 else
                 {

@@ -565,8 +565,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         private string GetPassPath(string keyId)
         {
-            // Sanitize keyId to prevent path traversal
-            var safeKeyId = Regex.Replace(keyId, @"[^a-zA-Z0-9_/-]", "_");
+            // #3466: Disallow '/' and '..' in keyId to prevent path traversal into parent pass stores.
+            // Only allow alphanumeric, underscore, and hyphen — no slashes, no dots.
+            if (string.IsNullOrWhiteSpace(keyId))
+                throw new ArgumentException("Key ID must not be empty.", nameof(keyId));
+
+            var safeKeyId = Regex.Replace(keyId, @"[^a-zA-Z0-9_-]", "_");
+
+            // Extra guard: reject any remaining traversal sequences.
+            if (safeKeyId.Contains(".."))
+                throw new ArgumentException($"Key ID '{keyId}' is unsafe.", nameof(keyId));
 
             if (string.IsNullOrEmpty(_config.SubPath))
             {

@@ -35,6 +35,14 @@ internal sealed class HlsPackagingStrategy : StorageProcessingStrategyBase
         var listSize = CliProcessHelper.GetOption<int>(query, "listSize");
         var segmentType = CliProcessHelper.GetOption<string>(query, "segmentType") ?? "mpegts";
 
+        // Allowlist segmentType to prevent injection into ffmpeg -hls_segment_type arg
+        var allowedSegmentTypes = new HashSet<string>(StringComparer.Ordinal) { "mpegts", "fmp4" };
+        CliProcessHelper.ValidateAllowlist(segmentType, "segmentType", allowedSegmentTypes);
+
+        // Validate segment duration range
+        if (segmentDuration < 1 || segmentDuration > 3600)
+            throw new ArgumentException("'segmentDuration' must be between 1 and 3600 seconds.", nameof(segmentDuration));
+
         var outputDir = Path.Combine(Path.GetDirectoryName(query.Source)!, "hls_output");
         Directory.CreateDirectory(outputDir);
 

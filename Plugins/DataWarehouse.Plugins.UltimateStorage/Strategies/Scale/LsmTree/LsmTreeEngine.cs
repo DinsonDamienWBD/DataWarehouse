@@ -23,8 +23,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         private WalWriter _wal;
         private readonly List<SSTableReader> _sstables;
         private readonly CompactionManager _compactionManager;
-        private bool _disposed;
-        private bool _initialized;
+        private volatile bool _disposed;
+        private volatile bool _initialized;
 
         /// <summary>
         /// Initializes a new LSM-Tree engine.

@@ -100,10 +100,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 else if (slotObj is long slotIdLong) _config.SlotId = (ulong)slotIdLong;
                 else if (slotObj is ulong slotIdUlong) _config.SlotId = slotIdUlong;
             }
+            // #3485: PINs are stored as strings because the underlying PKCS#11 library requires strings.
+            // We read them from configuration and clear them from the config dictionary immediately after
+            // use so they do not persist in memory longer than necessary.
             if (Configuration.TryGetValue("UserPin", out var pinObj) && pinObj is string pin)
+            {
                 _config.UserPin = pin;
+                Configuration.Remove("UserPin"); // Clear from config map to reduce plaintext exposure.
+            }
             if (Configuration.TryGetValue("SoPin", out var soPinObj) && soPinObj is string soPin)
+            {
                 _config.SoPin = soPin;
+                Configuration.Remove("SoPin");
+            }
             if (Configuration.TryGetValue("DefaultKeyLabel", out var labelObj) && labelObj is string label)
                 _config.DefaultKeyLabel = label;
             if (Configuration.TryGetValue("Model", out var modelObj) && modelObj is string model)

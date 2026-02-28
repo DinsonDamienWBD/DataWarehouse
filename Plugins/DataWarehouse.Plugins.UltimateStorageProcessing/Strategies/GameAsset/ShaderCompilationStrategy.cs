@@ -35,6 +35,18 @@ internal sealed class ShaderCompilationStrategy : StorageProcessingStrategyBase
         var stage = CliProcessHelper.GetOption<string>(query, "stage");
         var entryPoint = CliProcessHelper.GetOption<string>(query, "entryPoint") ?? "main";
 
+        // Validate stage and entryPoint to prevent command injection
+        // entryPoint must be a valid C identifier: letters, digits, underscores only
+        var allowedTargets = new HashSet<string>(StringComparer.Ordinal) { "spirv", "dxil", "msl", "glsl" };
+        CliProcessHelper.ValidateAllowlist(target, "target", allowedTargets);
+        if (stage != null) CliProcessHelper.ValidateIdentifier(stage, "stage");
+        // entryPoint: only word characters (letters/digits/underscore)
+        foreach (var c in entryPoint)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_')
+                throw new ArgumentException($"'entryPoint' contains invalid character '{c}'. Only letters, digits, and underscores are allowed.", nameof(entryPoint));
+        }
+
         CliOutput result;
         string outputPath;
         string tool;

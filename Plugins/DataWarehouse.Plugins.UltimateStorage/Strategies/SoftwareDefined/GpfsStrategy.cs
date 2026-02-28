@@ -774,10 +774,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Applies immutability (WORM - Write Once Read Many) to a file.
         /// Immutable files cannot be modified or deleted for the retention period.
         /// </summary>
-        private Task ApplyImmutabilityAsync(string filePath, int retentionDays, CancellationToken ct)
+        private async Task ApplyImmutabilityAsync(string filePath, int retentionDays, CancellationToken ct)
         {
-            throw new NotSupportedException(
-                "GPFS WORM/immutability requires 'mmchattr -i yes' CLI integration.");
+            // mmchattr -i yes <filePath>
+            // Optionally: mmchattr --expiration <date> <filePath>
+            await RunMmchattrAsync($"-i yes \"{filePath}\"", ct).ConfigureAwait(false);
+            if (retentionDays > 0)
+            {
+                var expires = DateTime.UtcNow.AddDays(retentionDays).ToString("yyyy-MM-dd");
+                await RunMmchattrAsync($"--expiration {expires} \"{filePath}\"", ct).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -817,10 +823,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// Applies compression to a file.
         /// GPFS supports LZ4 and zlib compression algorithms.
         /// </summary>
-        private Task ApplyCompressionAsync(string filePath, CancellationToken ct)
+        private async Task ApplyCompressionAsync(string filePath, CancellationToken ct)
         {
-            throw new NotSupportedException(
-                "GPFS compression requires 'mmchattr --compression' CLI integration.");
+            // mmchattr --compression lz4|zlib <filePath>
+            var algo = _compressionAlgorithm?.ToLowerInvariant() switch
+            {
+                "zlib" => "zlib",
+                _ => "lz4" // default to lz4
+            };
+            await RunMmchattrAsync($"--compression {algo} \"{filePath}\"", ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1203,6 +1214,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     lockObj?.Dispose();
                 }
                 _fileLocks.Clear();
+            }
+        }
+
+        #endregion
+
+        #region CLI Helpers
+
+        private async Task RunMmchattrAsync(string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mmchattr",
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"mmchattr {arguments} failed with exit code {process.ExitCode}: {stderr}");
             }
         }
 

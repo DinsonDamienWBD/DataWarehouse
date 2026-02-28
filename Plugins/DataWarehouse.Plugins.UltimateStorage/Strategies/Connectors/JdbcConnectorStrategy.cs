@@ -117,7 +117,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             // Parse key: jdbc://table/operation
             var parts = ParseJdbcKey(key);
-            var sqlCommand = metadata?.TryGetValue("SqlCommand", out var cmd) == true ? cmd : parts.query;
+            // Never accept raw SQL from caller-supplied metadata to prevent injection.
+            // SqlCommand metadata key is rejected; use the parsed key's query only.
+            if (metadata?.ContainsKey("SqlCommand") == true)
+            {
+                throw new ArgumentException(
+                    "SqlCommand metadata key is rejected to prevent SQL injection. " +
+                    "Use jdbc://table/operation key format to specify operations.");
+            }
+            var sqlCommand = parts.query;
 
             using var connection = new OdbcConnection(_connectionString);
             connection.ConnectionTimeout = _connectionTimeout;

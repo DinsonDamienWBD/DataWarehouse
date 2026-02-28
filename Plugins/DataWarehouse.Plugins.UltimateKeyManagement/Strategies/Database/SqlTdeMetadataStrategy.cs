@@ -141,15 +141,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
 
         public override async Task<string> GetCurrentKeyIdAsync()
         {
-            // Return the most recently imported certificate
+            // #3461: Take a snapshot outside the lock so that expensive LINQ sort does not hold _certificateLock.
+            List<(string CertificateId, DateTime ImportedAt)> snapshot;
             lock (_certificateLock)
             {
-                var latest = _certificates.Values
-                    .OrderByDescending(c => c.ImportedAt)
-                    .FirstOrDefault();
-
-                return latest?.CertificateId ?? "default";
+                snapshot = _certificates.Values
+                    .Select(c => (c.CertificateId, c.ImportedAt))
+                    .ToList();
             }
+
+            var latest = snapshot
+                .OrderByDescending(c => c.ImportedAt)
+                .FirstOrDefault();
+
+            return await Task.FromResult(latest.CertificateId ?? "default");
         }
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)

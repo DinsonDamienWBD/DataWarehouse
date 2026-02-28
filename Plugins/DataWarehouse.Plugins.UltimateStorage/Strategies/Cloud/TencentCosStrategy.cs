@@ -207,6 +207,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var tempFile = Path.GetTempFileName();
             try
             {
+                // Write stream to temp file once before the retry loop so that the stream
+                // seek position is consumed only once regardless of retry count.
                 if (data.CanSeek) data.Position = 0;
 
                 using (var fs = File.Create(tempFile))

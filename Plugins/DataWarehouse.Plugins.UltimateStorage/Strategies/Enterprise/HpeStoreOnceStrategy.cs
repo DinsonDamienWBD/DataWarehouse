@@ -674,11 +674,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         /// <summary>
         /// Ensures authentication token is valid, refreshing if necessary.
         /// </summary>
+        private readonly SemaphoreSlim _authLock = new(1, 1);
+
         private async Task EnsureAuthenticatedAsync(CancellationToken ct)
         {
-            if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_authToken))
+            // Double-check locking to prevent concurrent token refresh races
+            if (DateTime.UtcNow < _tokenExpiry && !string.IsNullOrEmpty(_authToken))
+                return;
+
+            await _authLock.WaitAsync(ct);
+            try
             {
-                await AuthenticateAsync(ct);
+                // Re-check inside the lock (another thread may have refreshed already)
+                if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_authToken))
+                {
+                    await AuthenticateAsync(ct);
+                }
+            }
+            finally
+            {
+                _authLock.Release();
             }
         }
 

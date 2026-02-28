@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -38,6 +39,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         private string _topic = string.Empty;
         private readonly ConcurrentQueue<KafkaMessage> _messageQueue = new();
         private int _maxQueueSize = 10000;
+        private int _enqueuedCount = 0; // Tracks current queue depth atomically to prevent TOCTOU
 #pragma warning restore CS0414
 
         public override string StrategyId => "kafka-connector";
@@ -90,8 +92,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Headers = metadata
             };
 
-            if (_messageQueue.Count >= _maxQueueSize)
+            // Atomic bounded enqueue: use Interlocked to prevent TOCTOU race between count check and enqueue.
+            // We track the count separately with Interlocked to make the check-then-act atomic.
+            var currentCount = Interlocked.Increment(ref _enqueuedCount);
+            if (currentCount > _maxQueueSize)
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 throw new InvalidOperationException($"Kafka message queue is full ({_maxQueueSize})");
             }
 
@@ -106,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = messageValue.Length,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(topic, partition, offset):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{topic}:{partition}:{offset}"))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {
@@ -123,9 +129,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             EnsureInitialized();
             ValidateKey(key);
 
-            // Dequeue message from internal queue
+            // Dequeue message from internal queue; decrement atomic count
             if (_messageQueue.TryDequeue(out var message))
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 var stream = new MemoryStream(Encoding.UTF8.GetBytes(message.Value));
 
                 IncrementBytesRetrieved(stream.Length);
@@ -166,7 +173,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     Size = message.Value.Length,
                     Created = message.Timestamp,
                     Modified = message.Timestamp,
-                    ETag = $"\"{HashCode.Combine(message.Topic, message.Offset):x}\"",
+                    ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{message.Topic}:{message.Offset}"))).ToLowerInvariant()}\"",
                     ContentType = "application/json",
                     Tier = Tier
                 };
@@ -190,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = 0,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(topic, offset):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{topic}:{offset}"))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {

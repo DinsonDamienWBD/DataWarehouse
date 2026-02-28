@@ -60,9 +60,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private TimeSpan _fabricLoginTimeout = TimeSpan.FromSeconds(30);
         private TimeSpan _ioTimeout = TimeSpan.FromSeconds(60);
 
-        // Connection state
-        private bool _isFabricConnected = false;
-        private DateTime _lastFabricLogin = DateTime.MinValue;
+        // Connection state — volatile so reads outside lock see the latest value written inside lock
+        private volatile bool _isFabricConnected = false;
+        private DateTime _lastFabricLogin = DateTime.MinValue; // reads/writes always under _connectionLock
         private readonly Dictionary<string, MultipathState> _multipathStates = new();
         private HttpClient? _fabricApiClient;
 

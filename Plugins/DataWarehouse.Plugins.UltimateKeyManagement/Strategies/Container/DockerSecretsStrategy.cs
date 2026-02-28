@@ -523,9 +523,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
 
         private string GetSecretName(string keyId)
         {
-            // Docker secret names can contain letters, numbers, periods, underscores, and hyphens
-            var safeName = keyId.ToLowerInvariant()
-                .Replace(' ', '_');
+            // #3465: Sanitize keyId to prevent path traversal or injection.
+            // Docker secret names may only contain [a-zA-Z0-9._-]; reject anything outside that set.
+            if (string.IsNullOrWhiteSpace(keyId))
+                throw new ArgumentException("Key ID must not be empty.", nameof(keyId));
+
+            // Strip all characters that are not alphanumeric, dot, underscore, or hyphen.
+            var safeName = System.Text.RegularExpressions.Regex
+                .Replace(keyId.ToLowerInvariant(), @"[^a-z0-9._-]", "_");
+
+            // Prevent directory traversal segments after sanitization.
+            if (safeName.Contains(".."))
+                throw new ArgumentException($"Key ID '{keyId}' resolves to an unsafe secret name.", nameof(keyId));
 
             return $"{_config.SecretNamePrefix}{safeName}";
         }

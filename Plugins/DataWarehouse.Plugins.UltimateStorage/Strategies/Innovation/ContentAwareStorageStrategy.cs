@@ -124,7 +124,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
 
             var categoryPath = GetCategoryPath(contentType);
-            var filePath = Path.Combine(_baseStoragePath, categoryPath, key);
+            var rawFilePath = Path.Combine(_baseStoragePath, categoryPath, key);
+            var filePath = Path.GetFullPath(rawFilePath);
+            if (!filePath.StartsWith(_baseStoragePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside storage root.");
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
             {

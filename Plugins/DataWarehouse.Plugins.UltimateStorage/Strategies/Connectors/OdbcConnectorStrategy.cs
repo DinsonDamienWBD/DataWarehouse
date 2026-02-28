@@ -7,6 +7,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -215,16 +216,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             var (operationType, target, identifier) = ParseKey(key);
 
-            // Construct or get SQL query
+            // Construct or get SQL query — validate identifiers to prevent SQL injection
             string sqlQuery;
             if (operationType == "sql")
             {
-                sqlQuery = $"SELECT * FROM {target} WHERE id = @id";
+                var safeTable = ValidateSqlIdentifier(target, "table");
+                sqlQuery = $"SELECT * FROM {safeTable} WHERE id = @id";
             }
             else if (operationType == "query")
             {
-                // Target contains the full query
-                sqlQuery = target;
+                // query:// requires the full query to be pre-configured by the operator;
+                // reject if it was supplied via the key (untrusted caller input).
+                // In production, queries must be loaded from server-side configuration only.
+                throw new NotSupportedException(
+                    "query:// key type is not supported for RetrieveAsync. " +
+                    "Use sql://table/id key format. Raw SQL queries from keys are rejected to prevent injection.");
             }
             else
             {
@@ -287,7 +293,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 throw new ArgumentException($"Delete only supports 'sql://' keys. Got: {key}");
             }
 
-            var sqlCommand = $"DELETE FROM {target} WHERE id = @id";
+            var safeDeleteTable = ValidateSqlIdentifier(target, "table");
+            var sqlCommand = $"DELETE FROM {safeDeleteTable} WHERE id = @id";
 
             using var connection = new OdbcConnection(_connectionString);
             connection.ConnectionTimeout = _connectionTimeout;
@@ -334,7 +341,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 return false;
             }
 
-            var sqlQuery = $"SELECT COUNT(*) FROM {target} WHERE id = @id";
+            var safeExistsTable = ValidateSqlIdentifier(target, "table");
+            var sqlQuery = $"SELECT COUNT(*) FROM {safeExistsTable} WHERE id = @id";
 
             try
             {
@@ -430,7 +438,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             connection.ConnectionTimeout = _connectionTimeout;
             await connection.OpenAsync(ct);
 
-            var countQuery = $"SELECT COUNT(*) FROM {target}";
+            var safeMetaTable = ValidateSqlIdentifier(target, "table");
+            var countQuery = $"SELECT COUNT(*) FROM {safeMetaTable}";
             long rowCount = 0;
 
             using (var command = new OdbcCommand(countQuery, connection))
@@ -510,6 +519,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         /// <summary>
         /// Parses a key in format "protocol://target/identifier".
         /// </summary>
+        /// <summary>
+        /// Validates that a SQL identifier (table or column name) contains only safe characters.
+        /// Prevents SQL injection through identifier embedding.
+        /// </summary>
+        private static string ValidateSqlIdentifier(string identifier, string context)
+        {
+            // Allow only alphanumeric, underscore, and dot (schema.table)
+            if (!Regex.IsMatch(identifier, @"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$"))
+            {
+                throw new ArgumentException(
+                    $"Invalid SQL identifier for {context}: '{identifier}'. " +
+                    "Only alphanumeric characters, underscores, and schema.table notation are allowed.");
+            }
+            return identifier;
+        }
+
         private (string operationType, string target, string identifier) ParseKey(string key)
         {
             var parts = key.Split(new[] { "://" }, StringSplitOptions.None);

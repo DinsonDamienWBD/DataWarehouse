@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
 
@@ -31,69 +30,16 @@ internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
     };
 
     /// <inheritdoc/>
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
-        ValidateQuery(query);
-        var sw = Stopwatch.StartNew();
-        var sourcePath = query.Source;
-        var mode = GetOption<string>(query, "mode") ?? "compress";
-        var hcMode = GetOption<bool>(query, "hcMode");
-
-        if (!File.Exists(sourcePath))
-            return MakeError("Source file not found", sourcePath, sw);
-
-        var originalSize = new FileInfo(sourcePath).Length;
-        var outputPath = mode == "decompress"
-            ? (sourcePath.EndsWith(".lz4", StringComparison.OrdinalIgnoreCase) ? sourcePath[..^4] : sourcePath + ".decompressed")
-            : sourcePath + ".lz4";
-
-        // LZ4 uses fast byte-level compression; we simulate via DeflateStream at fastest level
-        // since LZ4 native requires external library; this provides real compression at LZ4-competitive speeds
-        var compressionLevel = hcMode ? CompressionLevel.Optimal : CompressionLevel.Fastest;
-
-        await using (var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, true))
-        await using (var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
-        {
-            if (mode == "decompress")
-            {
-                await using var decompressor = new DeflateStream(input, CompressionMode.Decompress);
-                await decompressor.CopyToAsync(output, 65536, ct);
-            }
-            else
-            {
-                // Write LZ4 frame header (magic: 0x184D2204)
-                var header = new byte[] { 0x04, 0x22, 0x4D, 0x18 };
-                await output.WriteAsync(header, ct);
-                await using var compressor = new DeflateStream(output, compressionLevel, leaveOpen: true);
-                await input.CopyToAsync(compressor, 65536, ct);
-            }
-        }
-
-        var resultSize = new FileInfo(outputPath).Length;
-        var ratio = mode == "decompress" ? 0.0 : (originalSize > 0 ? (double)resultSize / originalSize : 1.0);
-        sw.Stop();
-
-        return new ProcessingResult
-        {
-            Data = new Dictionary<string, object?>
-            {
-                ["sourcePath"] = sourcePath,
-                ["outputPath"] = outputPath,
-                ["originalSize"] = originalSize,
-                ["resultSize"] = resultSize,
-                ["compressionRatio"] = Math.Round(ratio, 4),
-                ["mode"] = mode,
-                ["hcMode"] = hcMode,
-                ["algorithm"] = "lz4"
-            },
-            Metadata = new ProcessingMetadata
-            {
-                RowsProcessed = 1,
-                RowsReturned = 1,
-                BytesProcessed = originalSize,
-                ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
-            }
-        };
+        // LZ4 native compression is not available in .NET BCL. A production implementation
+        // requires a native LZ4 library (e.g. K4os.Compression.LZ4 NuGet package).
+        // Previous implementation silently wrote fake LZ4 (Deflate stream with LZ4 magic header)
+        // producing files that any real LZ4 reader would reject or corrupt.
+        throw new NotSupportedException(
+            "LZ4 compression requires a native LZ4 library (e.g. K4os.Compression.LZ4). " +
+            "Add the package reference and implement using LZ4Stream/LZ4EncoderStream. " +
+            "The previous implementation produced invalid LZ4 files (Deflate data with forged magic bytes).");
     }
 
     /// <inheritdoc/>

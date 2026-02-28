@@ -239,10 +239,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 var putRequest = new PutObjectRequest(_bucketName, key, data, objectMetadata);
 
-                var result = await Task.Run(() => _client!.PutObject(putRequest), ct);
+                // Aliyun OSS SDK exposes only synchronous I/O methods; offload to thread pool
+                // to keep calling thread unblocked. This is the correct pattern for sync-only SDKs.
+                var result = await Task.Run(() => _client!.PutObject(putRequest), ct).ConfigureAwait(false);
 
                 // Get object metadata to return
-                return await Task.Run(() => _client!.GetObjectMetadata(_bucketName, key), ct);
+                return await Task.Run(() => _client!.GetObjectMetadata(_bucketName, key), ct).ConfigureAwait(false);
             }, ct);
         }
 

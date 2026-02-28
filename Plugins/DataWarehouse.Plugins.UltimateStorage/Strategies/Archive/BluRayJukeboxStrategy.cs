@@ -168,6 +168,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
 
             await _driveLock.WaitAsync(ct);
+            MemoryStream? bufferedStream = null;
             try
             {
                 // Find disc with available capacity or prepare new disc
@@ -184,16 +185,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                     await LoadDiscAsync(targetDisc.VolumeId, ct);
                 }
 
-                // Calculate data size
+                // Calculate data size; for non-seekable streams, buffer into memory first.
+                // bufferedStream declared outside try so finally can dispose it.
                 var dataLength = data.CanSeek ? data.Length - data.Position : 0L;
                 if (dataLength == 0)
                 {
-                    // Read into memory to get size
-                    using var ms = new MemoryStream(65536);
-                    await data.CopyToAsync(ms, 81920, ct);
-                    dataLength = ms.Length;
-                    ms.Position = 0;
-                    data = ms;
+                    // Read into memory to get size (non-seekable or empty-position seekable)
+                    bufferedStream = new MemoryStream(65536);
+                    await data.CopyToAsync(bufferedStream, 81920, ct);
+                    dataLength = bufferedStream.Length;
+                    bufferedStream.Position = 0;
+                    data = bufferedStream;
                 }
 
                 // Check if disc has enough capacity
@@ -241,6 +243,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             finally
             {
                 _driveLock.Release();
+                bufferedStream?.Dispose();
             }
         }
 

@@ -51,6 +51,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private bool _useS3Protocol = true;
         private bool _useNfsProtocol = false;
         private string? _nfsExportPath = null;
+        private string _nfsMountPath = string.Empty;
         private bool _enableSnapshots = false;
         private string? _protectionPolicyId = null;
         private int _snapshotRetentionDays = 30;
@@ -153,6 +154,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             _viewPath = GetConfiguration<string>("ViewPath", "/");
             _viewName = GetConfiguration<string?>("ViewName", null);
             _nfsExportPath = GetConfiguration<string?>("NfsExportPath", null);
+            _nfsMountPath = GetConfiguration<string>("NfsMountPath", string.Empty);
             _enableSnapshots = GetConfiguration<bool>("EnableSnapshots", false);
             _protectionPolicyId = GetConfiguration<string?>("ProtectionPolicyId", null);
             _snapshotRetentionDays = GetConfiguration<int>("SnapshotRetentionDays", 30);
@@ -262,8 +264,56 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             }
             else
             {
-                throw new NotSupportedException("Only S3 protocol is currently supported for VAST Data operations");
+                // NFS path: use POSIX filesystem operations via the configured NFS mount point
+                return await StoreViaNfsAsync(key, data, metadata, ct);
             }
+        }
+
+        private async Task<StorageObjectMetadata> StoreViaNfsAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(_nfsMountPath))
+            {
+                throw new InvalidOperationException(
+                    "NfsMountPath configuration is required for NFS-based VAST Data operations. " +
+                    "Set UseS3Protocol=true to use the S3-compatible API instead.");
+            }
+
+            // Validate path traversal
+            var fullPath = Path.GetFullPath(Path.Combine(_nfsMountPath, key));
+            var basePath = Path.GetFullPath(_nfsMountPath);
+            if (!fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Path traversal detected: key '{key}' resolves outside NFS mount.");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+            long bytesWritten;
+            using (var fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, useAsync: true))
+            {
+                await data.CopyToAsync(fs, 65536, ct);
+                bytesWritten = fs.Length;
+            }
+
+            if (metadata != null && metadata.Count > 0)
+            {
+                var metaPath = fullPath + ".meta";
+                await File.WriteAllTextAsync(metaPath, System.Text.Json.JsonSerializer.Serialize(metadata), ct);
+            }
+
+            IncrementBytesStored(bytesWritten);
+            IncrementOperationCounter(StorageOperationType.Store);
+
+            return new StorageObjectMetadata
+            {
+                Key = key,
+                Size = bytesWritten,
+                Created = DateTime.UtcNow,
+                Modified = DateTime.UtcNow,
+                ETag = $"\"{System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key + bytesWritten)):X}\"",
+                ContentType = "application/octet-stream",
+                Tier = Tier
+            };
         }
 
         private async Task<StorageObjectMetadata> StoreViaS3Async(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)

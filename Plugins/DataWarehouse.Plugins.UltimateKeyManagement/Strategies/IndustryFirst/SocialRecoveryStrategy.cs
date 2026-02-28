@@ -40,6 +40,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private readonly SecureRandom _secureRandom = new();
         private bool _disposed;
 
+        // #3533: Share wrapping key so EncryptedShare actually stores ciphertext, not raw share bytes.
+        private static readonly byte[] _shareWrapKey = HKDF.DeriveKey(
+            HashAlgorithmName.SHA256,
+            SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"SocialRecovery.ShareWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
+            32,
+            salt: Encoding.UTF8.GetBytes("dw-social-recovery-share-wrap-v1"),
+            info: Encoding.UTF8.GetBytes("guardian-share-protection"));
+
         // 256-bit prime field for Shamir's Secret Sharing
         private static readonly BigInteger FieldPrime = new BigInteger(
             "115792089237316195423570985008687907853269984665640564039457584007913129639747", 10);
@@ -109,7 +118,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                return _keys.Count >= 0;
+                // #3534: _keys.Count >= 0 is always true. Healthy only when at least one key exists.
+                return _keys.Count > 0;
             }
             finally
             {
@@ -167,11 +177,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 // Assign shares to guardians
                 for (int i = 0; i < shares.Count; i++)
                 {
+                    var guardianId = Guid.NewGuid().ToString();
+                    var rawShare = shares[i].Value.ToByteArrayUnsigned();
                     var guardian = new Guardian
                     {
-                        GuardianId = Guid.NewGuid().ToString(),
+                        GuardianId = guardianId,
                         ShareIndex = shares[i].Index,
-                        EncryptedShare = shares[i].Value.ToByteArrayUnsigned(),
+                        // #3533: Wrap the raw share bytes so EncryptedShare actually contains ciphertext.
+                        EncryptedShare = WrapShare(rawShare, guardianId),
                         Status = GuardianStatus.Pending,
                         CreatedAt = DateTime.UtcNow
                     };
@@ -257,7 +270,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 {
                     Success = true,
                     GuardianId = guardianId,
-                    ShareData = guardian.EncryptedShare // Encrypted for guardian's public key
+                    // #3533: Return the unwrapped share to the guardian for their own secure custody.
+                    ShareData = UnwrapShare(guardian.EncryptedShare, guardian.GuardianId)
                 };
             }
             finally
@@ -417,8 +431,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     }
                 }
 
-                // #3518: Use constant-time comparison to prevent timing side-channel attacks.
-                if (!CryptographicOperations.FixedTimeEquals(share, guardian.EncryptedShare))
+                // #3518/#3533: Unwrap the stored encrypted share and compare with constant-time equals.
+                var storedShare = UnwrapShare(guardian.EncryptedShare, guardian.GuardianId);
+                if (!CryptographicOperations.FixedTimeEquals(share, storedShare))
                 {
                     keyData.AuditLog.Add(new RecoveryAuditEntry
                     {
@@ -578,19 +593,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 var oldGuardian = keyData.Guardians.FirstOrDefault(g => g.GuardianId == oldGuardianId)
                     ?? throw new ArgumentException($"Guardian '{oldGuardianId}' not found.");
 
-                // Verify old share
-                if (!oldShare.SequenceEqual(oldGuardian.EncryptedShare))
+                // Verify old share — unwrap stored encrypted share first (#3533).
+                var storedOldShare = UnwrapShare(oldGuardian.EncryptedShare, oldGuardian.GuardianId);
+                if (!CryptographicOperations.FixedTimeEquals(oldShare, storedOldShare))
                     throw new UnauthorizedAccessException("Invalid share - cannot rotate guardian.");
 
                 // Create new guardian with same share index but new share value
                 // This uses proactive secret sharing - generating a new polynomial
                 // that evaluates to the same secret but different shares
 
+                var newGuardianId = Guid.NewGuid().ToString();
                 var newGuardian = new Guardian
                 {
-                    GuardianId = Guid.NewGuid().ToString(),
+                    GuardianId = newGuardianId,
                     ShareIndex = oldGuardian.ShareIndex,
-                    EncryptedShare = oldGuardian.EncryptedShare, // Same share value, new guardian
+                    // #3533: Re-wrap the share under the new guardian ID.
+                    EncryptedShare = WrapShare(storedOldShare, newGuardianId),
                     Status = GuardianStatus.Pending,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -946,6 +964,41 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         };
 
         #endregion
+
+        /// <summary>#3533: AES-GCM wraps a raw share so EncryptedShare actually stores ciphertext.</summary>
+        private static byte[] WrapShare(byte[] plainShare, string guardianId)
+        {
+            var nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ciphertext = new byte[plainShare.Length];
+            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, _shareWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-social-per-guardian-v1"),
+                info: Encoding.UTF8.GetBytes(guardianId));
+            using var aes = new AesGcm(perGuardian, 16);
+            aes.Encrypt(nonce, plainShare, ciphertext, tag);
+            var wrapped = new byte[12 + 16 + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+            Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+            Buffer.BlockCopy(ciphertext, 0, wrapped, 28, ciphertext.Length);
+            return wrapped;
+        }
+
+        /// <summary>#3533: Decrypts a share wrapped by WrapShare.</summary>
+        internal static byte[] UnwrapShare(byte[] wrapped, string guardianId)
+        {
+            if (wrapped.Length < 28) throw new InvalidOperationException("Wrapped share too short.");
+            var nonce = wrapped[..12];
+            var tag = wrapped[12..28];
+            var ciphertext = wrapped[28..];
+            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, _shareWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-social-per-guardian-v1"),
+                info: Encoding.UTF8.GetBytes(guardianId));
+            var plaintext = new byte[ciphertext.Length];
+            using var aes = new AesGcm(perGuardian, 16);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
+        }
 
         public override void Dispose()
         {

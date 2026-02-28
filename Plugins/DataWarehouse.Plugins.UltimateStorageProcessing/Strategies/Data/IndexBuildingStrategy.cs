@@ -57,8 +57,9 @@ internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
                 var key = doc.RootElement.TryGetProperty(keyField, out var prop) ? prop.ToString() : offset.ToString();
                 entries.Add((key, offset));
             }
-            catch
+            catch (JsonException)
             {
+                // Line is not valid JSON — use byte offset as fallback key
                 entries.Add((offset.ToString(), offset));
             }
             offset += Encoding.UTF8.GetByteCount(line) + 1;

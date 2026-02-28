@@ -308,11 +308,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
                 else
                 {
-                    // Existing chunk - increment reference count
+                    // Existing chunk - increment reference count atomically under per-chunk lock
                     if (_globalChunkStore.TryGetValue(chunkHash, out var globalChunk))
                     {
-                        globalChunk.RefCount++;
-                        globalChunk.TenantRefs.Add(tenantId);
+                        lock (globalChunk)
+                        {
+                            globalChunk.RefCount++;
+                            globalChunk.TenantRefs.Add(tenantId);
+                        }
                     }
                 }
             }

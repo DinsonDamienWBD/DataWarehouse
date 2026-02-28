@@ -209,16 +209,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var carbonEmitted = CalculateCarbonEmission(energyConsumed, selectedDC);
             var renewableEnergy = energyConsumed * (selectedDC.RenewablePercentage / 100.0);
 
-            // Update totals
-            Interlocked.Exchange(ref _totalEnergyConsumedKWh, _totalEnergyConsumedKWh + energyConsumed);
-            Interlocked.Exchange(ref _totalRenewableEnergyKWh, _totalRenewableEnergyKWh + renewableEnergy);
-            Interlocked.Exchange(ref _totalCarbonEmittedKg, _totalCarbonEmittedKg + carbonEmitted);
+            // Update totals atomically using CompareExchange loop (double does not support Interlocked.Add)
+            InterlockedAddDouble(ref _totalEnergyConsumedKWh, energyConsumed);
+            InterlockedAddDouble(ref _totalRenewableEnergyKWh, renewableEnergy);
+            InterlockedAddDouble(ref _totalCarbonEmittedKg, carbonEmitted);
 
             // Purchase carbon offset if needed
             if (_enableCarbonOffsets && carbonEmitted > 0)
             {
                 await PurchaseCarbonOffsetAsync(carbonEmitted, ct);
-                Interlocked.Exchange(ref _totalCarbonOffsetKg, _totalCarbonOffsetKg + carbonEmitted);
+                InterlockedAddDouble(ref _totalCarbonOffsetKg, carbonEmitted);
             }
 
             // Store to selected datacenter
@@ -292,13 +292,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var energyConsumed = CalculateEnergyConsumption(size, dcForEnergy, OperationType.Read);
             var carbonEmitted = CalculateCarbonEmission(energyConsumed, dcForEnergy);
 
-            Interlocked.Exchange(ref _totalEnergyConsumedKWh, _totalEnergyConsumedKWh + energyConsumed);
-            Interlocked.Exchange(ref _totalCarbonEmittedKg, _totalCarbonEmittedKg + carbonEmitted);
+            InterlockedAddDouble(ref _totalEnergyConsumedKWh, energyConsumed);
+            InterlockedAddDouble(ref _totalCarbonEmittedKg, carbonEmitted);
 
             if (_enableCarbonOffsets && carbonEmitted > 0)
             {
                 await PurchaseCarbonOffsetAsync(carbonEmitted, ct);
-                Interlocked.Exchange(ref _totalCarbonOffsetKg, _totalCarbonOffsetKg + carbonEmitted);
+                InterlockedAddDouble(ref _totalCarbonOffsetKg, carbonEmitted);
             }
 
             return new MemoryStream(fileData);
@@ -529,6 +529,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private string GetKeyFromFilePath(string filePath, string basePath)
         {
             return Path.GetRelativePath(basePath, filePath).Replace('\\', '/');
+        }
+
+        /// <summary>Atomically adds a double value using CAS loop (Interlocked.Add does not support double).</summary>
+        private static void InterlockedAddDouble(ref double location, double value)
+        {
+            double currentVal, newVal;
+            do
+            {
+                currentVal = Volatile.Read(ref location);
+                newVal = currentVal + value;
+            }
+            while (Interlocked.CompareExchange(ref location, newVal, currentVal) != currentVal);
         }
 
         /// <summary>

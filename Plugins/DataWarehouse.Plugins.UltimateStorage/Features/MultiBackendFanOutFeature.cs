@@ -347,33 +347,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return;
             }
 
-            // Write to other backends asynchronously (fire and forget)
+            // Write to other backends synchronously to avoid torn reads on shared result
             if (backendIds.Count > 1)
             {
-                _ = Task.Run(async () =>
+                for (int i = 1; i < backendIds.Count; i++)
                 {
-                    for (int i = 1; i < backendIds.Count; i++)
+                    var backendId = backendIds[i];
+                    try
                     {
-                        var backendId = backendIds[i];
-                        try
+                        var strategy = _registry.Get(backendId);
+                        if (strategy != null)
                         {
-                            var strategy = _registry.Get(backendId);
-                            if (strategy != null)
-                            {
-                                using var ms = new MemoryStream(data);
-                                await strategy.StoreAsync(key, ms, metadata, CancellationToken.None);
-                                result.SuccessfulBackends.Add(backendId);
-                                Interlocked.Increment(ref result.SuccessCount);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[MultiBackendFanOutFeature] Async write to {backendId} failed: {ex.Message}");
-                            result.FailedBackends.Add(backendId);
-                            Interlocked.Increment(ref result.FailureCount);
+                            using var ms = new MemoryStream(data);
+                            await strategy.StoreAsync(key, ms, metadata, ct);
+                            result.SuccessfulBackends.Add(backendId);
+                            Interlocked.Increment(ref result.SuccessCount);
                         }
                     }
-                }, CancellationToken.None);
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MultiBackendFanOutFeature] Write to {backendId} failed: {ex.Message}");
+                        result.FailedBackends.Add(backendId);
+                        Interlocked.Increment(ref result.FailureCount);
+                        result.Errors[backendId] = ex.Message;
+                    }
+                }
             }
         }
 
@@ -423,6 +421,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             IReadOnlyList<string> backendIds,
             CancellationToken ct)
         {
+            // Use CancellationTokenSource to cancel losers once a winner is found
+            using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var raceToken = raceCts.Token;
+
             var readTasks = backendIds.Select(async backendId =>
             {
                 try
@@ -430,7 +432,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     var strategy = _registry.Get(backendId);
                     if (strategy != null)
                     {
-                        var stream = await strategy.RetrieveAsync(key, ct);
+                        var stream = await strategy.RetrieveAsync(key, raceToken);
                         return (backendId, stream, success: true, error: (Exception?)null);
                     }
                     return (backendId, stream: (Stream?)null, success: false, error: new InvalidOperationException("Backend not found"));
@@ -441,21 +443,40 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 }
             });
 
-            var completedTask = await Task.WhenAny(readTasks.Select(async t =>
+            // Materialize all tasks so we can await and dispose streams from losers
+            var allTasks = readTasks.Select(t => t).ToList();
+
+            // Wait for all tasks; cancel losers once a winner found
+            var results = await Task.WhenAll(allTasks);
+
+            // Cancel remaining in-flight (if any are still running, they will observe raceToken)
+            raceCts.Cancel();
+
+            // Find first success and dispose all other streams
+            (string backendId, Stream? stream, bool success, Exception? error) winner = default;
+            foreach (var r in results)
             {
-                var result = await t;
-                return result.success ? result : default;
-            }));
+                if (r.success && r.stream != null)
+                {
+                    if (!winner.success)
+                    {
+                        winner = r;
+                    }
+                    else
+                    {
+                        // Dispose losing streams
+                        try { r.stream.Dispose(); } catch { /* best-effort */ }
+                    }
+                }
+            }
 
-            var firstSuccess = await completedTask;
-
-            if (firstSuccess.success && firstSuccess.stream != null)
+            if (winner.success && winner.stream != null)
             {
                 return new FanOutReadResult
                 {
                     Key = key,
-                    Data = firstSuccess.stream,
-                    SourceBackend = firstSuccess.backendId,
+                    Data = winner.stream,
+                    SourceBackend = winner.backendId,
                     IsSuccess = true
                 };
             }

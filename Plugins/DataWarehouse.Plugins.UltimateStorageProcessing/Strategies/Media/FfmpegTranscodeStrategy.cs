@@ -38,6 +38,21 @@ internal sealed class FfmpegTranscodeStrategy : StorageProcessingStrategyBase
         var preset = CliProcessHelper.GetOption<string>(query, "preset") ?? "medium";
         var outputFormat = CliProcessHelper.GetOption<string>(query, "outputFormat") ?? "mp4";
 
+        // Allowlist video codecs, audio codecs, presets to prevent injection
+        var allowedVideoCodecs = new HashSet<string>(StringComparer.Ordinal) { "libx264", "libx265", "h264_nvenc", "hevc_nvenc", "vp8", "vp9", "av1", "libvpx", "libvpx-vp9", "copy" };
+        var allowedAudioCodecs = new HashSet<string>(StringComparer.Ordinal) { "aac", "mp3", "libmp3lame", "opus", "libopus", "flac", "pcm_s16le", "copy" };
+        var allowedPresets = new HashSet<string>(StringComparer.Ordinal) { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
+        var allowedFormats = new HashSet<string>(StringComparer.Ordinal) { "mp4", "mkv", "avi", "mov", "webm", "flv", "ts", "m4v" };
+
+        CliProcessHelper.ValidateAllowlist(videoCodec, "videoCodec", allowedVideoCodecs);
+        CliProcessHelper.ValidateAllowlist(audioCodec, "audioCodec", allowedAudioCodecs);
+        CliProcessHelper.ValidateAllowlist(preset, "preset", allowedPresets);
+        CliProcessHelper.ValidateAllowlist(outputFormat, "outputFormat", allowedFormats);
+
+        // bitrate and resolution validated as identifiers (e.g. "5000k", "1280x720")
+        if (bitrate != null) CliProcessHelper.ValidateIdentifier(bitrate, "bitrate");
+        if (resolution != null) CliProcessHelper.ValidateNoShellMetachars(resolution, "resolution");
+
         var outputPath = Path.ChangeExtension(query.Source, $".transcoded.{outputFormat}");
         var args = $"-i \"{query.Source}\" -c:v {videoCodec} -c:a {audioCodec} -preset {preset}";
         if (bitrate != null) args += $" -b:v {bitrate}";

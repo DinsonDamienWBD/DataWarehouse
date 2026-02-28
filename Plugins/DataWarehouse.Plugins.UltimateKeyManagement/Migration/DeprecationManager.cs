@@ -25,7 +25,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
     {
         private static readonly Lazy<DeprecationManager> _instance = new(() => new DeprecationManager());
         private readonly BoundedDictionary<string, DeprecationInfo> _deprecatedItems = new BoundedDictionary<string, DeprecationInfo>(1000);
-        private readonly ConcurrentBag<DeprecationWarning> _emittedWarnings = new();
+        // #3439: ConcurrentBag.Any() is O(n) and has TOCTOU. Use ConcurrentDictionary for O(1) de-dup.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeprecationWarning> _emittedWarnings = new();
         private readonly DeprecationManagerOptions _options;
         private readonly object _lock = new();
         private bool _disposed;
@@ -277,8 +278,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             var warningKey = $"{info.ItemId}:{callerFilePath}:{callerLineNumber}";
             if (_options.SuppressDuplicateWarnings)
             {
-                if (_emittedWarnings.Any(w => w.WarningKey == warningKey))
-                    return;
+                // #3439: TryAdd is O(1) and atomic — no TOCTOU, no linear scan.
+                // We build the warning object speculatively but only store if first occurrence.
             }
 
             var warning = new DeprecationWarning
@@ -296,7 +297,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
                 MigrationGuideUrl = info.MigrationGuideUrl
             };
 
-            _emittedWarnings.Add(warning);
+            // #3439: TryAdd is atomic; if suppress-duplicates is on and key already exists, skip emission.
+            if (_options.SuppressDuplicateWarnings && !_emittedWarnings.TryAdd(warningKey, warning))
+                return;
+            else if (!_options.SuppressDuplicateWarnings)
+                _emittedWarnings[warningKey + "_" + DateTime.UtcNow.Ticks] = warning;
 
             // Emit to configured outputs
             if (_options.EmitToConsole)
@@ -387,7 +392,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
         /// </summary>
         public IReadOnlyList<DeprecationWarning> GetEmittedWarnings()
         {
-            return _emittedWarnings.ToList().AsReadOnly();
+            return _emittedWarnings.Values.ToList().AsReadOnly();
         }
 
         /// <summary>
@@ -455,12 +460,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
                 GeneratedAt = DateTime.UtcNow,
                 TotalDeprecatedItems = _deprecatedItems.Count,
                 WarningsEmitted = _emittedWarnings.Count,
-                UniqueItemsWarned = _emittedWarnings.Select(w => w.ItemId).Distinct().Count()
+                UniqueItemsWarned = _emittedWarnings.Values.Select(w => w.ItemId).Distinct().Count()
             };
 
             foreach (var (itemId, info) in _deprecatedItems)
             {
-                var warningsForItem = _emittedWarnings.Where(w => w.ItemId == itemId).ToList();
+                var warningsForItem = _emittedWarnings.Values.Where(w => w.ItemId == itemId).ToList();
 
                 report.Items.Add(new DeprecationReportItem
                 {

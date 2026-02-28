@@ -65,23 +65,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             _useTls = GetConfiguration("UseTls", true);
             _authToken = GetConfiguration<string?>("AuthToken", null);
 
-            // Create gRPC channel
-            var channelOptions = new GrpcChannelOptions
+            // Acquire channel lock to prevent concurrent channel creation
+            await _channelLock.WaitAsync(ct);
+            try
             {
-                MaxReceiveMessageSize = _maxMessageSize,
-                MaxSendMessageSize = _maxMessageSize,
-                HttpHandler = new System.Net.Http.HttpClientHandler
+                // Create gRPC channel
+                var channelOptions = new GrpcChannelOptions
                 {
-                    ServerCertificateCustomValidationCallback = !_useTls
-                        ? (message, cert, chain, errors) => true
-                        : null
-                }
-            };
+                    MaxReceiveMessageSize = _maxMessageSize,
+                    MaxSendMessageSize = _maxMessageSize,
+                    HttpHandler = new System.Net.Http.HttpClientHandler
+                    {
+                        ServerCertificateCustomValidationCallback = !_useTls
+                            ? (message, cert, chain, errors) => true
+                            : null
+                    }
+                };
 
-            _channel = GrpcChannel.ForAddress(_serverUrl, channelOptions);
+                _channel = GrpcChannel.ForAddress(_serverUrl, channelOptions);
 
-            // Test connection
-            await TestConnectionAsync(ct);
+                // Test connection
+                await TestConnectionAsync(ct);
+            }
+            finally
+            {
+                _channelLock.Release();
+            }
         }
 
         private async Task TestConnectionAsync(CancellationToken ct)

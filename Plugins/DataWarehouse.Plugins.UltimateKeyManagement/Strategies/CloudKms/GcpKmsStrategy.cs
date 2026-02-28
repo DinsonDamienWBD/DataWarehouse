@@ -30,6 +30,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         private readonly HttpClient _httpClient;
         private GcpKmsConfig _config = new();
         private string? _currentKeyId;
+        // #3459: Protect token fields with a dedicated lock to prevent race conditions.
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
 
@@ -422,9 +424,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(_accessToken) || DateTime.UtcNow >= _tokenExpiry)
+            // #3459: Double-checked lock pattern to prevent concurrent token refresh races.
+            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
+                return;
+
+            await _tokenLock.WaitAsync(cancellationToken);
+            try
             {
-                await AuthenticateAsync(cancellationToken);
+                if (string.IsNullOrEmpty(_accessToken) || DateTime.UtcNow >= _tokenExpiry)
+                    await AuthenticateAsync(cancellationToken);
+            }
+            finally
+            {
+                _tokenLock.Release();
             }
         }
 

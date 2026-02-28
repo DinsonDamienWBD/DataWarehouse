@@ -925,7 +925,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             return outputStream.ToArray();
         }
 
-        protected override int GetMaxKeyLength() => 512 * 1024 * 1024; // Redis key length limit
+        protected override int GetMaxKeyLength() => 512; // Redis maximum key length is 512 bytes (not the value limit)
 
         #endregion
     }

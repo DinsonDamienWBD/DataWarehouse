@@ -46,6 +46,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _username = string.Empty;
         private string _password = string.Empty;
         private AfpAuthMethod _authMethod = AfpAuthMethod.CleartextPassword;
+        private bool _allowCleartextPassword = false;
         private int _timeoutSeconds = 30;
         private int _maxBufferSize = 64 * 1024; // 64KB
         private bool _autoReconnect = true;
@@ -113,14 +114,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             _maxBufferSize = GetConfiguration<int>("MaxBufferSize", 64 * 1024);
             _autoReconnect = GetConfiguration<bool>("AutoReconnect", true);
 
-            var authMethodStr = GetConfiguration<string>("AuthMethod", "CleartextPassword");
+            _allowCleartextPassword = GetConfiguration<bool>("AllowCleartextPassword", false);
+
+            var authMethodStr = GetConfiguration<string>("AuthMethod", "DHX2");
             _authMethod = authMethodStr.ToUpperInvariant() switch
             {
                 "CLEARTEXT" or "CLEARTEXTPASSWORD" => AfpAuthMethod.CleartextPassword,
                 "DHX" => AfpAuthMethod.DHX,
                 "DHX2" => AfpAuthMethod.DHX2,
                 "KERBEROS" => AfpAuthMethod.Kerberos,
-                _ => AfpAuthMethod.CleartextPassword
+                _ => AfpAuthMethod.DHX2
             };
 
             // Normalize base path
@@ -434,11 +437,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             bw.Write((byte)_username.Length);
             bw.Write(Encoding.UTF8.GetBytes(_username));
 
-            // For cleartext password, append password
+            // For cleartext password, append password — refuse unless explicitly enabled by admin
             if (_authMethod == AfpAuthMethod.CleartextPassword)
             {
+                if (!_allowCleartextPassword)
+                    throw new InvalidOperationException(
+                        "AFP cleartext password authentication is disabled. " +
+                        "Set AllowCleartextPassword=true in configuration only if AFP traffic is protected by TLS/VPN, " +
+                        "or switch to AuthMethod=DHX2 or Kerberos.");
                 System.Diagnostics.Debug.WriteLine(
-                    "[AfpStrategy] WARNING: AFP Cleartxt Passwrd UAM transmits credentials in cleartext over TCP. " +
+                    "[AfpStrategy] WARNING: AFP Cleartext Password UAM transmits credentials in cleartext over TCP. " +
                     "Use DHX2, Kerberos, or wrap AFP traffic in TLS/VPN in production environments.");
                 // Pad username to 8-byte boundary
                 var usernamePadding = (8 - (_username.Length + 1) % 8) % 8;
@@ -740,14 +748,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var command = ms.ToArray();
             var response = await SendDsiCommandAsync(command, ct);
 
-            // Parse file info (simplified)
+            // Parse file info from AFP FPGetFileDirParms response
+            // AFP timestamps are seconds since 2000-01-01 (Mac epoch) as big-endian int32
+            var now = DateTime.UtcNow;
+            DateTime created = now;
+            DateTime modified = now;
+            long size = 0;
+            if (response.Length >= 8)
+            {
+                size = BinaryPrimitives.ReadInt64BigEndian(response.AsSpan(0));
+            }
+            if (response.Length >= 16)
+            {
+                // Offset 8: CreateDate (4 bytes, AFP Mac epoch = seconds since 2000-01-01)
+                var macEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var createSeconds = BinaryPrimitives.ReadInt32BigEndian(response.AsSpan(8));
+                var modSeconds = BinaryPrimitives.ReadInt32BigEndian(response.AsSpan(12));
+                if (createSeconds != 0) created = macEpoch.AddSeconds(createSeconds);
+                if (modSeconds != 0) modified = macEpoch.AddSeconds(modSeconds);
+            }
             return new AfpFileInfo
             {
                 Name = filename,
                 IsDirectory = false,
-                Size = response.Length >= 8 ? BinaryPrimitives.ReadInt64BigEndian(response.AsSpan(0)) : 0,
-                Created = DateTime.UtcNow,
-                Modified = DateTime.UtcNow
+                Size = size,
+                Created = created,
+                Modified = modified
             };
         }
 

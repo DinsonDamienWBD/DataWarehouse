@@ -106,7 +106,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             var originDir = Path.GetDirectoryName(originFilePath);
             if (!string.IsNullOrEmpty(originDir))
             {
@@ -168,7 +168,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 return new MemoryStream(originCached.Data);
             }
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (!File.Exists(originFilePath))
             {
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
@@ -204,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (File.Exists(originFilePath))
             {
                 File.Delete(originFilePath);
@@ -225,7 +225,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 return true;
             }
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             await Task.CompletedTask;
             return File.Exists(originFilePath);
         }
@@ -264,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (!File.Exists(originFilePath))
             {
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
@@ -318,6 +318,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 edgeCache.TryRemove(key, out _);
             }
+        }
+
+        /// <summary>Resolves and validates a key against the origin path to prevent path traversal.</summary>
+        private string GetSafeOriginPath(string key)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(_originPath, key));
+            if (!fullPath.StartsWith(_originPath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside origin storage path.");
+            return fullPath;
         }
 
         private class EdgeTier

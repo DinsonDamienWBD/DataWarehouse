@@ -124,17 +124,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     return result;
                 }
 
-                // Get source metadata
-                var sourceMetadata = await sourceBackend.GetMetadataAsync(key, ct);
-                result.BytesTotal = sourceMetadata.Size;
-
-                // Check if object exists in source
+                // Check if object exists in source before calling GetMetadataAsync
+                // (GetMetadataAsync would throw on non-existent objects)
                 if (!await sourceBackend.ExistsAsync(key, ct))
                 {
                     result.Success = false;
                     result.ErrorMessage = "Object does not exist in source backend";
                     return result;
                 }
+
+                // Get source metadata
+                var sourceMetadata = await sourceBackend.GetMetadataAsync(key, ct);
+                result.BytesTotal = sourceMetadata.Size;
 
                 // Stream data from source to target
                 using var sourceStream = await sourceBackend.RetrieveAsync(key, ct);
@@ -389,11 +390,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     return false;
                 }
 
-                // Compare ETags if available
+                // Compare ETags if available; ETags are opaque hash strings — use Ordinal comparison
+                // to avoid false positives from case-insensitive folding on hex digest strings.
                 if (!string.IsNullOrEmpty(sourceMetadata.ETag) &&
                     !string.IsNullOrEmpty(targetMetadata.ETag))
                 {
-                    return sourceMetadata.ETag.Equals(targetMetadata.ETag, StringComparison.OrdinalIgnoreCase);
+                    return sourceMetadata.ETag.Equals(targetMetadata.ETag, StringComparison.Ordinal);
                 }
 
                 // Fallback: byte-by-byte comparison (expensive)

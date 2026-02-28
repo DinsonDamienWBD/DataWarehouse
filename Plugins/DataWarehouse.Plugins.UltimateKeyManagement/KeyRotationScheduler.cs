@@ -321,9 +321,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             _disposed = true;
 
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
-
+            // #3435: Do NOT call DisposeAsync().AsTask().Wait() — deadlock risk in sync contexts.
+            // Signal cancellation synchronously and let any in-progress rotation observe it.
+            _shutdownCts.Cancel();
             _shutdownCts.Dispose();
 
             GC.SuppressFinalize(this);

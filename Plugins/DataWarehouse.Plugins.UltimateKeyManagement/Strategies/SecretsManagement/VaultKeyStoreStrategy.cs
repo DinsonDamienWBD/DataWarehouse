@@ -115,28 +115,35 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{keyId}");
-            using var response = await _httpClient.SendAsync(request);
+            // #3597: Validate and sanitize keyId to prevent path traversal in Vault KV paths.
+            var safeKeyId = SanitizeKeyId(keyId);
+            var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{safeKeyId}");
+            // #3596: Pass CancellationToken through to HttpClient to allow cancellation.
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
             var keyBase64 = doc.RootElement.GetProperty("data").GetProperty("data").GetProperty("key").GetString();
-            return Convert.FromBase64String(keyBase64!);
+            // #3597: Null guard before FromBase64String to avoid NullReferenceException.
+            if (string.IsNullOrEmpty(keyBase64))
+                throw new InvalidOperationException($"Vault returned null or empty key material for key '{safeKeyId}'.");
+            return Convert.FromBase64String(keyBase64);
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
         {
+            var safeKeyId = SanitizeKeyId(keyId); // #3597
             var keyBase64 = Convert.ToBase64String(keyData);
 
             var content = JsonSerializer.Serialize(new { data = new { key = keyBase64 } });
-            var request = CreateRequest(HttpMethod.Post, $"/v1/{_config.MountPath}/data/{keyId}");
+            var request = CreateRequest(HttpMethod.Post, $"/v1/{_config.MountPath}/data/{safeKeyId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None); // #3596
             response.EnsureSuccessStatusCode();
 
-            _currentKeyId = keyId;
+            _currentKeyId = safeKeyId;
         }
 
         public async Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context)
@@ -270,8 +277,34 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         private HttpRequestMessage CreateRequest(HttpMethod method, string path)
         {
             var request = new HttpRequestMessage(method, $"{_config.Address}{path}");
-            request.Headers.Add("X-Vault-Token", _config.Token);
+            // #3595: X-Vault-Token is a secret. Add it via a TryAddWithoutValidation to keep it
+            // out of default request logging. Do NOT log request headers when Vault is involved.
+            request.Headers.TryAddWithoutValidation("X-Vault-Token", _config.Token);
             return request;
+        }
+
+        /// <summary>
+        /// #3597: Sanitizes a keyId for use in Vault KV paths to prevent path traversal.
+        /// Only allows alphanumeric, hyphen, underscore, and forward-slash (for namespaces).
+        /// </summary>
+        private static string SanitizeKeyId(string keyId)
+        {
+            if (string.IsNullOrWhiteSpace(keyId))
+                throw new ArgumentException("Key ID must not be empty.", nameof(keyId));
+
+            // Allow only safe characters for Vault KV paths.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(keyId, @"^[a-zA-Z0-9/_\-]+$"))
+                throw new ArgumentException(
+                    $"Key ID '{keyId}' contains invalid characters for a Vault KV path. " +
+                    "Only alphanumeric characters, hyphens, underscores, and forward-slashes are allowed.",
+                    nameof(keyId));
+
+            // Prevent directory traversal.
+            if (keyId.Contains(".."))
+                throw new ArgumentException(
+                    $"Key ID '{keyId}' contains a path traversal sequence.", nameof(keyId));
+
+            return keyId;
         }
 
         public override void Dispose()

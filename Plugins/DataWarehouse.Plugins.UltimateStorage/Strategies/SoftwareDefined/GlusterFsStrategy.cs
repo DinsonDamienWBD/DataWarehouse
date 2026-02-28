@@ -380,12 +380,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 await fileStream.FlushAsync(ct);
             }
 
-            // Apply sharding if enabled and file is large (throws NotSupportedException until CLI integration)
+            // Apply sharding via setfattr if enabled and file exceeds threshold
             if (_enableSharding && bytesWritten >= _shardFileSizeThresholdBytes)
             {
                 await ApplyShardingAsync(filePath, ct);
             }
-            // Note: ApplyShardingAsync throws NotSupportedException — callers should disable sharding or implement CLI integration
 
             // Store metadata as sidecar file
             if (metadata != null && metadata.Count > 0)
@@ -770,15 +769,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>
         /// Applies sharding to a large file.
         /// </summary>
-        private Task ApplyShardingAsync(string filePath, CancellationToken ct)
+        private async Task ApplyShardingAsync(string filePath, CancellationToken ct)
         {
             if (!_enableSharding)
             {
-                return Task.CompletedTask;
+                return;
             }
 
-            throw new NotSupportedException(
-                "GlusterFS sharding requires 'gluster volume set' with features.shard CLI integration.");
+            // GlusterFS sharding: set shard block size via extended attribute on the file
+            // Equivalent to: gluster volume set <vol> features.shard on && setfattr -n trusted.glusterfs.shard.block-size -v <size> <file>
+            await RunGlusterCommandAsync("setfattr", $"-n trusted.glusterfs.shard.block-size -v {_shardBlockSizeBytes} \"{filePath}\"", ct)
+                .ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1143,6 +1144,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             // Dispose HTTP client
             _httpClient?.Dispose();
+        }
+
+        #endregion
+
+        #region CLI Helpers
+
+        private static async Task RunGlusterCommandAsync(string command, string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = command,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"'{command} {arguments}' failed with exit code {process.ExitCode}: {stderr}");
+            }
         }
 
         #endregion

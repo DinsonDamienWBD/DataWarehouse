@@ -42,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, SatelliteNode> _availableSatellites = new BoundedDictionary<string, SatelliteNode>(1000);
         private readonly BoundedDictionary<string, GroundStation> _groundStations = new BoundedDictionary<string, GroundStation>(1000);
-        private readonly Timer? _orbitUpdateTimer = null;
+        private Timer? _orbitUpdateTimer = null;
         private readonly BoundedDictionary<string, byte[]> _fallbackCache = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "satellite-storage";
@@ -117,14 +117,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Initialize ground stations
                 await InitializeGroundStationsAsync(ct);
 
-                // Start orbit tracking timer
-                var timer = new Timer(
+                // Start orbit tracking timer — store to prevent GC collection and enable disposal
+                _orbitUpdateTimer = new Timer(
                     async _ => await UpdateSatelliteOrbitsAsync(CancellationToken.None),
                     null,
                     TimeSpan.Zero,
                     TimeSpan.FromSeconds(_orbitUpdateIntervalSeconds));
-
-                // Note: Store timer reference if needed for disposal
             }
             finally
             {
@@ -730,15 +728,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// <summary>
         /// Stores data in fallback storage.
         /// </summary>
-        private Task<StorageObjectMetadata> StoreFallbackAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
+        private async Task<StorageObjectMetadata> StoreFallbackAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             _fallbackCache[key] = data;
 
             var fallbackFilePath = GetFallbackFilePath(key);
             Directory.CreateDirectory(Path.GetDirectoryName(fallbackFilePath)!);
-            File.WriteAllBytes(fallbackFilePath, data);
+            await File.WriteAllBytesAsync(fallbackFilePath, data, ct).ConfigureAwait(false);
 
-            return Task.FromResult(new StorageObjectMetadata
+            return new StorageObjectMetadata
             {
                 Key = key,
                 Size = data.Length,
@@ -748,7 +746,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 ContentType = "application/octet-stream",
                 CustomMetadata = metadata != null ? new Dictionary<string, string>(metadata) : null,
                 Tier = StorageTier.Warm
-            });
+            };
         }
 
         /// <summary>

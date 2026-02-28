@@ -65,7 +65,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
             return Task.FromResult(new StorageObjectMetadata { Key = key, Size = data.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier });
         }
 
-        protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct) => Task.FromResult(new StorageHealthInfo { Status = HealthStatus.Healthy, Message = "Exascale indexing with trillion-object capacity", CheckedAt = DateTime.UtcNow });
+        protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct) => Task.FromResult(new StorageHealthInfo { Status = HealthStatus.Degraded, Message = "Not production-ready: in-memory BoundedDictionary(1000) stub — requires real distributed B-tree and bloom filter index layer.", CheckedAt = DateTime.UtcNow });
         protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct) => Task.FromResult<long?>(null);
         protected override int GetMaxKeyLength() => 4096;
     }

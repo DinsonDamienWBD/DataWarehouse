@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -31,11 +32,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     public class WebhookConnectorStrategy : UltimateStorageStrategyBase
     {
         private readonly ConcurrentQueue<WebhookEvent> _eventQueue = new();
-        private readonly BoundedDictionary<string, WebhookEvent> _eventCache = new BoundedDictionary<string, WebhookEvent>(1000);
+        // Use ConcurrentDictionary (unbounded) for dedup cache; BoundedDictionary(1000) evicts
+        // entries silently which can allow replay attacks after eviction.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, WebhookEvent> _eventCache = new();
         private string? _webhookSecret;
         private int _maxQueueSize = 10000;
         private int _replayWindowSeconds = 300; // 5 minutes
         private readonly SemaphoreSlim _queueLock = new(1, 1);
+        private int _enqueuedEventCount = 0; // Atomic counter to prevent TOCTOU on queue size
 
         public override string StrategyId => "webhook-connector";
         public override string Name => "Webhook Connector";
@@ -110,13 +114,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 }
             }
 
-            // Check for duplicate events
-            if (_eventCache.ContainsKey(eventId))
-            {
-                throw new InvalidOperationException($"Duplicate webhook event: {eventId}");
-            }
-
-            // Create event
+            // Create event first, then atomically add to dedup cache to prevent TOCTOU race
             var webhookEvent = new WebhookEvent
             {
                 EventId = eventId,
@@ -126,14 +124,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Metadata = metadata
             };
 
-            // Add to queue
-            if (_eventQueue.Count >= _maxQueueSize)
+            // Atomic dedup check: TryAdd returns false if key already exists (no race window)
+            if (!_eventCache.TryAdd(eventId, webhookEvent))
             {
+                throw new InvalidOperationException($"Duplicate webhook event: {eventId}");
+            }
+
+            // Atomic bounded enqueue to prevent TOCTOU on queue size
+            var currentCount = Interlocked.Increment(ref _enqueuedEventCount);
+            if (currentCount > _maxQueueSize)
+            {
+                Interlocked.Decrement(ref _enqueuedEventCount);
+                _eventCache.TryRemove(eventId, out _); // Roll back dedup entry
                 throw new InvalidOperationException($"Webhook queue is full ({_maxQueueSize} events)");
             }
 
             _eventQueue.Enqueue(webhookEvent);
-            _eventCache.TryAdd(eventId, webhookEvent);
 
             // Clean old cache entries
             CleanOldCacheEntries();
@@ -147,7 +153,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = payload.Length,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(eventId):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(eventId))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {
@@ -253,7 +259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = webhookEvent.Payload.Length,
                 Created = webhookEvent.ReceivedAt,
                 Modified = webhookEvent.ReceivedAt,
-                ETag = $"\"{HashCode.Combine(eventId):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(eventId))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {

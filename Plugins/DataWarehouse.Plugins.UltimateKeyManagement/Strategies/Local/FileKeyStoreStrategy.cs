@@ -176,6 +176,27 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             var keyPath = GetKeyPath(keyId);
             if (File.Exists(keyPath))
             {
+                // #3544: Overwrite with zeros before deletion to minimize data remanence on disk.
+                try
+                {
+                    var size = new FileInfo(keyPath).Length;
+                    if (size > 0)
+                    {
+                        await using var fs = new FileStream(keyPath, FileMode.Open, FileAccess.Write, FileShare.None);
+                        var zeros = new byte[Math.Min(size, 4096)];
+                        long remaining = size;
+                        while (remaining > 0)
+                        {
+                            var toWrite = (int)Math.Min(remaining, zeros.Length);
+                            await fs.WriteAsync(zeros.AsMemory(0, toWrite), cancellationToken);
+                            remaining -= toWrite;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Best-effort zero-wipe; still proceed with deletion.
+                }
                 File.Delete(keyPath);
             }
 
@@ -215,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 tiers.Add(new DpapiTier(_config));
-                tiers.Add(new CredentialManagerTier(_config));
+                tiers.Add(new MasterKeyDerivedTier(_config));
             }
 
             tiers.Add(new DatabaseTier(_config));
@@ -369,14 +390,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
         }
     }
 
-    internal class CredentialManagerTier : IKeyProtectionTier
+    internal class MasterKeyDerivedTier : IKeyProtectionTier
     {
         private readonly FileKeyStoreConfig _config;
 
-        public string Name => "CredentialManager";
+        // #3543: Renamed from CredentialManagerTier — this tier uses PBKDF2 key derivation,
+        // not the Windows Credential Manager API. Name updated to reflect actual behaviour.
+        public string Name => "MasterKeyDerived";
         public bool IsAvailable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
-        public CredentialManagerTier(FileKeyStoreConfig config)
+        public MasterKeyDerivedTier(FileKeyStoreConfig config)
         {
             _config = config;
         }

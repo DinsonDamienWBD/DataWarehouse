@@ -541,7 +541,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 throw new InvalidOperationException("Key revocation transaction failed.");
             }
 
-            _keyStore.Remove(keyId);
+            // #3532: Protect _keyStore mutation with _lock to prevent race with concurrent readers/writers.
+            await _lock.WaitAsync();
+            try
+            {
+                _keyStore.Remove(keyId);
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         private async Task LoadKeysFromContract(CancellationToken cancellationToken)

@@ -94,10 +94,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
             }
 
-            var teamPath = Path.Combine(_baseStoragePath, teamName);
+            // Sanitize teamName to prevent path traversal via user-controlled TeamName metadata
+            var safeTeamName = string.Join("_", teamName.Split(Path.GetInvalidFileNameChars())).TrimStart('.', ' ');
+            if (string.IsNullOrWhiteSpace(safeTeamName)) safeTeamName = "default";
+            var teamPath = Path.GetFullPath(Path.Combine(_baseStoragePath, safeTeamName));
+            if (!teamPath.StartsWith(_baseStoragePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Team name '{teamName}' resolves outside storage root.");
             Directory.CreateDirectory(teamPath);
 
-            var filePath = Path.Combine(teamPath, key);
+            // Canonicalize file path to prevent key-based traversal
+            var rawFilePath = Path.Combine(teamPath, key);
+            var filePath = Path.GetFullPath(rawFilePath);
+            if (!filePath.StartsWith(teamPath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside team storage path.");
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
             {
@@ -109,9 +118,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             _objectToTeam[key] = teamName;
 
             var accessInfo = _teamAccess.GetOrAdd(teamName, _ => new TeamAccessInfo { TeamName = teamName });
-            accessInfo.TotalAccesses++;
-            accessInfo.LastAccessTime = DateTime.UtcNow;
-            accessInfo.ActiveUsers.Add(userName);
+            lock (accessInfo)
+            {
+                accessInfo.TotalAccesses++;
+                accessInfo.LastAccessTime = DateTime.UtcNow;
+                accessInfo.ActiveUsers.Add(userName);
+            }
 
             var fileInfo = new FileInfo(filePath);
             return new StorageObjectMetadata

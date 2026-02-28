@@ -140,7 +140,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                return _keys.Count >= 0;
+                // #3538: _keys.Count >= 0 is always true. Healthy only when at least one key exists.
+                return _keys.Count > 0;
             }
             finally
             {

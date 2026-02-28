@@ -45,6 +45,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private readonly SecureRandom _secureRandom = new();
         private bool _disposed;
 
+        // #3540: Master wrapping key for encrypting DecryptedKey at rest.
+        private static readonly byte[] _vdfWrapKey = System.Security.Cryptography.HKDF.DeriveKey(
+            System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(
+                    $"VDF.PersistWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
+            32,
+            salt: System.Text.Encoding.UTF8.GetBytes("dw-vdf-persist-wrap-v1"),
+            info: System.Text.Encoding.UTF8.GetBytes("vdf-decrypted-key-at-rest"));
+
         // RSA modulus bit size for group of unknown order
         private const int ModulusBits = 2048;
 
@@ -134,7 +144,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                return _keys.Count >= 0;
+                // #3542: _keys.Count >= 0 is always true. Healthy only when at least one key exists.
+                return _keys.Count > 0;
             }
             finally
             {
@@ -826,7 +837,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             CreatedAt = data.CreatedAt,
             CreatedBy = data.CreatedBy,
             EvaluatedAt = data.EvaluatedAt,
-            DecryptedKey = data.DecryptedKey
+            // #3540: Encrypt DecryptedKey before writing to disk — never store raw key bytes.
+            DecryptedKey = data.DecryptedKey != null ? WrapVdfKey(data.DecryptedKey, data.KeyId) : null
         };
 
         private static VdfKeyData DeserializeKeyData(VdfKeyDataSerialized data) => new()
@@ -845,10 +857,46 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             CreatedAt = data.CreatedAt,
             CreatedBy = data.CreatedBy,
             EvaluatedAt = data.EvaluatedAt,
-            DecryptedKey = data.DecryptedKey
+            // #3540: Decrypt wrapped key on load.
+            DecryptedKey = data.DecryptedKey != null ? UnwrapVdfKey(data.DecryptedKey, data.KeyId ?? "") : null
         };
 
         #endregion
+
+        /// <summary>#3540: AES-GCM wraps decrypted key bytes for at-rest storage.</summary>
+        private static byte[] WrapVdfKey(byte[] plaintext, string keyId)
+        {
+            var nonce = new byte[12];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ct = new byte[plaintext.Length];
+            var pk = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256, _vdfWrapKey, 32,
+                salt: System.Text.Encoding.UTF8.GetBytes("dw-vdf-per-key-v1"),
+                info: System.Text.Encoding.UTF8.GetBytes(keyId));
+            using var aes = new System.Security.Cryptography.AesGcm(pk, 16);
+            aes.Encrypt(nonce, plaintext, ct, tag);
+            var wrapped = new byte[12 + 16 + ct.Length];
+            Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+            Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+            Buffer.BlockCopy(ct, 0, wrapped, 28, ct.Length);
+            return wrapped;
+        }
+
+        /// <summary>#3540: Decrypts a VDF key wrapped by WrapVdfKey.</summary>
+        private static byte[] UnwrapVdfKey(byte[] wrapped, string keyId)
+        {
+            if (wrapped.Length < 28) throw new InvalidOperationException("VDF wrapped key too short.");
+            var nonce = wrapped[..12]; var tag = wrapped[12..28]; var ct = wrapped[28..];
+            var pk = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256, _vdfWrapKey, 32,
+                salt: System.Text.Encoding.UTF8.GetBytes("dw-vdf-per-key-v1"),
+                info: System.Text.Encoding.UTF8.GetBytes(keyId));
+            var plaintext = new byte[ct.Length];
+            using var aes = new System.Security.Cryptography.AesGcm(pk, 16);
+            aes.Decrypt(nonce, ct, tag, plaintext);
+            return plaintext;
+        }
 
         public override void Dispose()
         {

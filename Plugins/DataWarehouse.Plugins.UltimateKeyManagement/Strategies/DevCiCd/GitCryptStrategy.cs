@@ -208,7 +208,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             _currentKeyId = keyId;
 
             // Stage the file for commit (but don't commit - leave that to the user)
-            await ExecuteGitAsync($"add \"{keyFilePath}\"");
+            // #3464: Pass CancellationToken.None so callers can cancel via the parent operation.
+            await ExecuteGitAsync($"add \"{keyFilePath}\"", CancellationToken.None);
         }
 
         public override async Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)

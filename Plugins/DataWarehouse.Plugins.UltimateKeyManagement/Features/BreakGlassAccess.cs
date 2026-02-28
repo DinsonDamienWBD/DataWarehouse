@@ -19,7 +19,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     public sealed class BreakGlassAccess : IDisposable
     {
         private readonly BoundedDictionary<string, BreakGlassSession> _activeSessions = new BoundedDictionary<string, BreakGlassSession>(1000);
-        private readonly BoundedDictionary<string, BreakGlassAuditEntry> _auditLog = new BoundedDictionary<string, BreakGlassAuditEntry>(1000);
+        // #3415: Compliance audit log must never silently evict entries.
+        // Use ConcurrentDictionary (unbounded) so no audit entry is silently dropped.
+        // Callers should periodically flush to durable storage to avoid unbounded growth.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, BreakGlassAuditEntry> _auditLog = new();
         private readonly BoundedDictionary<string, EmergencyAccessPolicy> _policies = new BoundedDictionary<string, EmergencyAccessPolicy>(1000);
         private readonly BoundedDictionary<string, AuthorizedResponder> _responders = new BoundedDictionary<string, AuthorizedResponder>(1000);
         private readonly IKeyStore _keyStore;
@@ -543,7 +546,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 
             if (session.ExpiresAt < DateTime.UtcNow)
             {
-                session.Status = BreakGlassSessionStatus.Expired;
+                // Mutate status inside the lock to prevent race conditions (#3408)
+                await _accessLock.WaitAsync();
+                try { session.Status = BreakGlassSessionStatus.Expired; }
+                finally { _accessLock.Release(); }
                 return new BreakGlassKeyAccessResult
                 {
                     Success = false,

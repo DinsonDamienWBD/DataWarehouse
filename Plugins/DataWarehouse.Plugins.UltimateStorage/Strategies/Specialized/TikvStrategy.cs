@@ -51,6 +51,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         public override string Name => "TiKV Distributed Storage";
         public override StorageTier Tier => StorageTier.Hot; // Distributed SSD storage is hot tier
 
+        // TiKV Raw KV uses gRPC (tikv-client protocol), not REST over PD's management API.
+        // The current HTTP-based implementation targets /pd/api/v1/raw/... which does not exist
+        // in any released TiKV version. A production implementation requires the tikv-client-go
+        // gRPC binding or a .NET gRPC client generated from kvpb.proto.
+        public override bool IsProductionReady => false;
+
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
             SupportsMetadata = true,
@@ -569,9 +575,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 return new StorageHealthInfo
                 {
-                    Status = HealthStatus.Healthy,
+                    Status = HealthStatus.Degraded,
                     LatencyMs = sw.ElapsedMilliseconds,
-                    Message = $"TiKV cluster is healthy. PD latency: {sw.ElapsedMilliseconds}ms",
+                    Message = $"TiKV PD reachable (latency: {sw.ElapsedMilliseconds}ms) but data-plane operations use incorrect HTTP paths. TiKV Raw KV requires gRPC, not PD REST. This strategy is not production-ready.",
                     CheckedAt = DateTime.UtcNow
                 };
             }

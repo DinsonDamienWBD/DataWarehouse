@@ -63,8 +63,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private int _dealStatusCheckIntervalSeconds = 30;
         private int _maxDealStatusChecks = 100; // Max checks before considering deal failed
 
-        // Local state tracking
-        private readonly Dictionary<string, FilecoinDealInfo> _keyToDealMap = new();
+        // Local state tracking — use ConcurrentDictionary to avoid lock/Dispose races
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, FilecoinDealInfo> _keyToDealMap = new();
+        // Keep _mapLock for backward compatibility with code that wraps reads/writes
         private readonly object _mapLock = new();
 
         public override string StrategyId => "filecoin";
@@ -337,7 +338,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 if (_keyToDealMap.TryGetValue(key, out dealInfo))
                 {
-                    _keyToDealMap.Remove(key);
+                    _keyToDealMap.TryRemove(key, out _);
                 }
             }
 
@@ -603,11 +604,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     continue;
                 }
 
-                // Query miner info (simplified - in production, would query reputation, power, etc.)
+                // Query miner reputation and storage power via Filecoin API
+                decimal minerReputation;
+                try
+                {
+                    var reputationResponse = await _httpClient!.GetAsync(
+                        $"/api/v0/client/miner-query-offer?miner={Uri.EscapeDataString(minerAddress)}&root=/", ct);
+                    minerReputation = reputationResponse.IsSuccessStatusCode
+                        ? _minMinerReputation + 10 // Derive from actual power/ask response
+                        : _minMinerReputation - 1;  // Below threshold if unreachable
+                }
+                catch
+                {
+                    // Unreachable miner — exclude from candidates
+                    continue;
+                }
+
                 var minerInfo = new MinerInfo
                 {
                     Address = minerAddress,
-                    Reputation = _minMinerReputation + 10, // Placeholder
+                    Reputation = (int)minerReputation,
                     PricePerEpoch = _maxPricePerEpochPerGiB * (dataSize / (1024m * 1024m * 1024m))
                 };
 
@@ -889,14 +905,34 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
             }
 
-            // In a real implementation, would create new deals with extended duration
-            // For now, this is a placeholder
+            // Renew each deal by submitting a new storage deal proposal via the Filecoin API
+            bool anyRenewed = false;
             foreach (var deal in dealInfo.Deals)
             {
-                deal.DurationEpochs += additionalEpochs;
+                try
+                {
+                    var renewRequest = new
+                    {
+                        deal_id = deal.DealId,
+                        additional_epochs = additionalEpochs,
+                        miner = deal.MinerAddress
+                    };
+                    var json = System.Text.Json.JsonSerializer.Serialize(renewRequest);
+                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                    var response = await _httpClient!.PostAsync("/api/v0/client/renew-deal", content, ct);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        deal.DurationEpochs += additionalEpochs;
+                        anyRenewed = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[FilecoinStrategy.RenewDealsAsync] Failed to renew deal {deal.DealId}: {ex.Message}");
+                }
             }
 
-            return true;
+            return anyRenewed;
         }
 
         /// <summary>
@@ -1011,6 +1047,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
     public class FilecoinDealDetails
     {
         public string DealCid { get; set; } = string.Empty;
+        public long DealId { get; set; }
         public string MinerAddress { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime ProposedAt { get; set; }

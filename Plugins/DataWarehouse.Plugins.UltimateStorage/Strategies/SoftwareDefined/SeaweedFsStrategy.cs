@@ -224,7 +224,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         {
             var chunkCount = (int)Math.Ceiling((double)dataLength / _chunkSizeBytes);
             var chunkFileIds = new List<ChunkInfo>();
-            var semaphore = new SemaphoreSlim(_maxConcurrentChunks, _maxConcurrentChunks);
+            using var semaphore = new SemaphoreSlim(_maxConcurrentChunks, _maxConcurrentChunks);
 
             var uploadTasks = new List<Task<ChunkInfo>>();
 

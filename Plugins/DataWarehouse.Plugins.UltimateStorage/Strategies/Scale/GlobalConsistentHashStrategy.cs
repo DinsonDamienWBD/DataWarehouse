@@ -18,6 +18,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
         public override string StrategyId => "global-consistent-hash";
         public override string Name => "Global Consistent Hash Strategy";
         public override StorageTier Tier => StorageTier.Warm;
+        public override bool IsProductionReady => false; // BoundedDictionary(1000) in-memory stub — no real consistent hash ring or global replication
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, SupportsMultipart = true, ConsistencyModel = ConsistencyModel.Eventual };
 
@@ -64,7 +65,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
             return Task.FromResult(new StorageObjectMetadata { Key = key, Size = data.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier });
         }
 
-        protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct) => Task.FromResult(new StorageHealthInfo { Status = HealthStatus.Healthy, Message = "Global consistent hashing with minimal rebalancing overhead", CheckedAt = DateTime.UtcNow });
+        protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct) => Task.FromResult(new StorageHealthInfo { Status = HealthStatus.Degraded, Message = "Not production-ready: in-memory BoundedDictionary(1000) stub — no real consistent hash ring or global replication.", CheckedAt = DateTime.UtcNow });
         protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct) => Task.FromResult<long?>(null);
         protected override int GetMaxKeyLength() => 2048;
     }

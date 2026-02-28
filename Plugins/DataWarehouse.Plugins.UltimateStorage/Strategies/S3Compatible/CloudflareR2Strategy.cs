@@ -117,7 +117,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 throw new InvalidOperationException("Multipart chunk size must be at least 5MB for R2");
             }
 
-            // Create HTTP client
+            // Dispose prior HttpClient instance before creating a new one to prevent socket leaks on re-initialization
+            _httpClient?.Dispose();
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(_timeoutSeconds)

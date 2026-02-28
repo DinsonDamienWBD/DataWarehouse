@@ -59,6 +59,14 @@ internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrate
             // GPU-accelerated image resize via ffmpeg with CUDA/NVENC
             outputPath = Path.ChangeExtension(query.Source, ".resized" + Path.GetExtension(query.Source));
             var scale = CliProcessHelper.GetOption<string>(query, "scale") ?? "1280:720";
+
+            // Validate scale against WxH or W:H pattern (digits and : x only)
+            foreach (var c in scale)
+            {
+                if (!char.IsDigit(c) && c != ':' && c != 'x' && c != 'X')
+                    throw new ArgumentException($"'scale' contains invalid character '{c}'. Use WxH or W:H format (e.g. 1280:720).", nameof(scale));
+            }
+
             var args = $"-i \"{query.Source}\" -vf \"scale_cuda={scale}\" -c:v mjpeg -y \"{outputPath}\"";
             result = await CliProcessHelper.RunAsync("ffmpeg", args, Path.GetDirectoryName(query.Source), ct: ct);
 

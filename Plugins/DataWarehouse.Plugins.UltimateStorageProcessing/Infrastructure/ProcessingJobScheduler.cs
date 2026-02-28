@@ -82,7 +82,8 @@ internal sealed class ProcessingJobScheduler : IDisposable
             Query = query,
             Priority = priority,
             ScheduledAt = DateTimeOffset.UtcNow,
-            Completion = tcs
+            Completion = tcs,
+            Cts = cts
         };
 
         _cancellations.TryAdd(jobId, cts);
@@ -157,8 +158,10 @@ internal sealed class ProcessingJobScheduler : IDisposable
                 {
                     _activeJobs.TryAdd(job.JobId, job);
 
-                    var cts = _cancellations.GetValueOrDefault(job.JobId);
-                    var token = cts?.Token ?? CancellationToken.None;
+                    // Use CTS stored on the job — avoids the TryAdd/GetValueOrDefault race where
+                    // Cancel() may have already removed the entry from _cancellations by the time
+                    // we look it up here.
+                    var token = job.Cts.Token;
 
                     var result = await job.Strategy.ProcessAsync(job.Query, token);
                     job.Completion.TrySetResult(result);
@@ -224,5 +227,8 @@ internal sealed class ProcessingJobScheduler : IDisposable
 
         /// <summary>Gets or sets the task completion source for the result.</summary>
         public required TaskCompletionSource<ProcessingResult> Completion { get; init; }
+
+        /// <summary>Gets or sets the CancellationTokenSource owned by this job. Stored here so DrainQueueAsync can read it atomically without re-querying the shared dictionary after Cancel() may have already removed it.</summary>
+        public required CancellationTokenSource Cts { get; init; }
     }
 }

@@ -230,17 +230,30 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
             else
             {
-                // Asynchronous replication - fire and forget
+                // Asynchronous replication - queued background work with proper error tracking
                 Interlocked.Increment(ref _totalAsyncOperations);
+                // Use ThreadPool.QueueUserWorkItem to avoid fire-and-forget task loss;
+                // exceptions are captured via the completion source pattern so the caller
+                // can observe failures through the group status fields.
+                var capturedGroup = group;
+                var capturedKey = objectKey;
+                var capturedData = (byte[])data.Clone();
+                var capturedMetadata = metadata != null ? new Dictionary<string, string>(metadata) : null;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await ReplicateToAllAsync(group, objectKey, data, metadata, CancellationToken.None);
+                        await ReplicateToAllAsync(capturedGroup, capturedKey, capturedData, capturedMetadata, CancellationToken.None);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected during shutdown
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Async replication failed for {objectKey}: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Async replication failed for {capturedKey}: {ex.GetType().Name}: {ex.Message}");
+                        // Track failure in group statistics
+                        Interlocked.Increment(ref capturedGroup.FailedOperations);
                     }
                 }, CancellationToken.None);
             }
@@ -389,7 +402,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             ReplicationGroup group,
             string objectKey,
             byte[] data,
-            Dictionary<string, string> metadata,
+            Dictionary<string, string>? metadata,
             CancellationToken ct)
         {
             var replicationTasks = group.ReplicaBackendIds.Select(async replicaId =>
@@ -626,6 +639,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         /// <summary>Total bytes read from the group.</summary>
         public long TotalBytesRead;
+
+        /// <summary>Total failed async replication operations (interlocked).</summary>
+        public long FailedOperations;
     }
 
     /// <summary>

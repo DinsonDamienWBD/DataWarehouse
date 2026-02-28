@@ -642,19 +642,33 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 var status = await GetChannelStatusAsync();
 
+                // #3529: MonitorChannelHealth must take meaningful action, not just observe.
                 if (status.QuantumBitErrorRate > _config.QberThreshold)
                 {
-                    // Log warning - potential eavesdropping or channel degradation
-                    // In production, this would trigger alerts
+                    // Elevated QBER indicates potential eavesdropping or channel degradation.
+                    // 1. Emit a counter metric for dashboards/alerting systems.
+                    IncrementCounter("qkd.channel.qber_threshold_exceeded");
+
+                    // 2. Emit a structured trace event for SIEM ingestion.
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[QKD] Channel QBER {status.QuantumBitErrorRate:F4} exceeds threshold {_config.QberThreshold:F4}. " +
+                        "Potential eavesdropping or channel degradation detected. " +
+                        "Consider aborting key distribution and inspecting the optical channel.");
+
+                    // 3. Mark the channel as non-operational so callers re-check before using keys.
+                    status.IsOperational = false;
+                    _lastChannelStatus = status;
                 }
-
-                _lastChannelStatus = status;
+                else
+                {
+                    _lastChannelStatus = status;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Monitoring failure - continue silently
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Monitoring failure — log so operators know monitoring is degraded.
+                IncrementCounter("qkd.channel.monitor_error");
+                System.Diagnostics.Trace.TraceError($"[QKD] Channel health monitoring error: {ex.Message}");
             }
         }
 
@@ -767,7 +781,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                         _keyStore[kvp.Key] = new QkdKeyEntry
                         {
                             KeyId = kvp.Value.KeyId,
-                            KeyMaterial = Convert.FromBase64String(kvp.Value.KeyMaterial),
+                            // #3530: Decrypt wrapped key material on load.
+                            KeyMaterial = UnwrapQkdKeyMaterial(kvp.Value.KeyMaterial, kvp.Key),
                             CreatedAt = kvp.Value.CreatedAt,
                             ExpiresAt = kvp.Value.ExpiresAt,
                             CreatedBy = kvp.Value.CreatedBy,
@@ -790,6 +805,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
         }
 
+        // #3530: Master wrapping key for AES-GCM encryption of QKD key material at rest.
+        // Derived from machine identity — in production, store in hardware-backed key store.
+        private static readonly byte[] _persistWrapKey = HKDF.DeriveKey(
+            HashAlgorithmName.SHA256,
+            SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"QKD.PersistWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
+            32,
+            salt: Encoding.UTF8.GetBytes("dw-qkd-persist-wrap-v1"),
+            info: Encoding.UTF8.GetBytes("qkd-key-material-at-rest"));
+
         private async Task PersistCachedKeys()
         {
             var path = GetStoragePath();
@@ -804,7 +829,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 kvp => new QkdKeyEntrySerialized
                 {
                     KeyId = kvp.Value.KeyId,
-                    KeyMaterial = Convert.ToBase64String(kvp.Value.KeyMaterial),
+                    // #3530: Encrypt key material with AES-GCM before writing to JSON file.
+                    KeyMaterial = WrapQkdKeyMaterial(kvp.Value.KeyMaterial, kvp.Key),
                     CreatedAt = kvp.Value.CreatedAt,
                     ExpiresAt = kvp.Value.ExpiresAt,
                     CreatedBy = kvp.Value.CreatedBy,
@@ -814,6 +840,42 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             var json = JsonSerializer.Serialize(toStore, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(path, json);
+        }
+
+        /// <summary>Wraps QKD key bytes with AES-GCM and returns Base64(nonce+tag+ciphertext).</summary>
+        private static string WrapQkdKeyMaterial(byte[] plaintext, string keyId)
+        {
+            var nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ciphertext = new byte[plaintext.Length];
+            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, _persistWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-qkd-per-key-v1"),
+                info: Encoding.UTF8.GetBytes(keyId));
+            using var aes = new AesGcm(perKeyWrap, 16);
+            aes.Encrypt(nonce, plaintext, ciphertext, tag);
+            var wrapped = new byte[12 + 16 + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+            Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+            Buffer.BlockCopy(ciphertext, 0, wrapped, 28, ciphertext.Length);
+            return Convert.ToBase64String(wrapped);
+        }
+
+        /// <summary>Unwraps AES-GCM-encrypted QKD key bytes persisted by WrapQkdKeyMaterial.</summary>
+        private static byte[] UnwrapQkdKeyMaterial(string wrappedBase64, string keyId)
+        {
+            var wrapped = Convert.FromBase64String(wrappedBase64);
+            if (wrapped.Length < 28) throw new InvalidOperationException("QKD persisted key too short.");
+            var nonce = wrapped[..12];
+            var tag = wrapped[12..28];
+            var ciphertext = wrapped[28..];
+            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, _persistWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-qkd-per-key-v1"),
+                info: Encoding.UTF8.GetBytes(keyId));
+            var plaintext = new byte[ciphertext.Length];
+            using var aes = new AesGcm(perKeyWrap, 16);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
         }
 
         public override void Dispose()

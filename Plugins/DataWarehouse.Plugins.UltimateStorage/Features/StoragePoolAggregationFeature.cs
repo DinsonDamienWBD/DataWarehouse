@@ -291,6 +291,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <param name="poolId">Pool identifier.</param>
         /// <returns>Pool capacity information.</returns>
         public PoolCapacityInfo GetPoolCapacity(string poolId)
+            => GetPoolCapacityAsync(poolId, CancellationToken.None).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// Gets aggregate capacity information for a pool by querying actual backend capacity.
+        /// </summary>
+        /// <param name="poolId">Pool identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Pool capacity information with real capacity values from each backend.</returns>
+        public async Task<PoolCapacityInfo> GetPoolCapacityAsync(string poolId, CancellationToken ct)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -303,10 +312,39 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 .Where(b => b.IsEnabled)
                 .ToList();
 
-            // Aggregate capacity from all backends
-            // Note: This is a simplified implementation. Real implementation would query actual backend capacity.
-            var totalCapacity = enabledBackends.Count * pool.Policy.EstimatedBackendCapacityBytes;
-            var usedCapacity = enabledBackends.Sum(b => Interlocked.Read(ref b.StoredBytes));
+            long totalCapacity = 0;
+            long usedCapacity = 0;
+
+            foreach (var backend in enabledBackends)
+            {
+                var strategy = _registry.Get(backend.StrategyId);
+                if (strategy != null)
+                {
+                    // Query real available capacity from backend
+                    var available = await strategy.GetAvailableCapacityAsync(ct).ConfigureAwait(false);
+                    var storedBytes = Interlocked.Read(ref backend.StoredBytes);
+
+                    if (available.HasValue)
+                    {
+                        // Real capacity: used + available = total
+                        totalCapacity += storedBytes + available.Value;
+                        usedCapacity += storedBytes;
+                    }
+                    else
+                    {
+                        // Backend did not report capacity; use policy estimate
+                        totalCapacity += pool.Policy.EstimatedBackendCapacityBytes;
+                        usedCapacity += storedBytes;
+                    }
+                }
+                else
+                {
+                    // Strategy not registered; fall back to estimate
+                    totalCapacity += pool.Policy.EstimatedBackendCapacityBytes;
+                    usedCapacity += Interlocked.Read(ref backend.StoredBytes);
+                }
+            }
+
             var availableCapacity = totalCapacity - usedCapacity;
 
             return new PoolCapacityInfo

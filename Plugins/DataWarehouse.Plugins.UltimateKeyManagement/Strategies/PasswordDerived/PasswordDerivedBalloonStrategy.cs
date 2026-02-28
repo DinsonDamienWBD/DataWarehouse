@@ -207,8 +207,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         public override async Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)
         {
             ValidateSecurityContext(context);
-            await Task.CompletedTask;
-            return _storedKeys.Keys.ToList().AsReadOnly();
+            // #3571: Take a snapshot under the storage lock to prevent torn reads.
+            await _storageLock.WaitAsync(cancellationToken);
+            try
+            {
+                return _storedKeys.Keys.ToList().AsReadOnly();
+            }
+            finally
+            {
+                _storageLock.Release();
+            }
         }
 
         public override async Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)

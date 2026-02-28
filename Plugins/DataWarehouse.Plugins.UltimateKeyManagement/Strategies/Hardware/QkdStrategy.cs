@@ -250,11 +250,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         /// </summary>
         private async Task<byte[]> ExecuteQkdProtocolAsync()
         {
-            // In production, this would communicate with QKD hardware
-            // via _qkdDeviceEndpoint using vendor-specific API (e.g., ETSI QKD 014)
-            throw new InvalidOperationException(
-                $"QKD hardware connection not implemented for endpoint: {_qkdDeviceEndpoint}. " +
-                "Set SimulationMode=true for testing or provide a QKD hardware integration.");
+            // #3488: Throw PlatformNotSupportedException (not InvalidOperationException) so callers can
+            // distinguish "not implemented on this platform" from runtime errors. Set SimulationMode=true
+            // or integrate a vendor SDK (e.g., ETSI QKD 014) to replace this.
+            throw new PlatformNotSupportedException(
+                $"QKD hardware integration is not available for endpoint '{_qkdDeviceEndpoint}'. " +
+                "Enable SimulationMode in configuration, or provide a QKD vendor SDK integration.");
         }
 
         private double CalculateCurrentQber()

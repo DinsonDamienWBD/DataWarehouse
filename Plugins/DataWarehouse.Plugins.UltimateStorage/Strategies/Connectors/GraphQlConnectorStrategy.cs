@@ -301,7 +301,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             // GraphQL doesn't have native delete - execute a delete mutation
-            var deleteMutation = $"mutation {{ delete{ParseGraphQLKey(key)} }}";
+            // Validate the parsed key component to prevent injection into the mutation
+            var parsedKey = ParseGraphQLKey(key);
+            if (!System.Text.RegularExpressions.Regex.IsMatch(parsedKey, @"^[A-Za-z_][A-Za-z0-9_()""':,\s]*$"))
+            {
+                throw new ArgumentException($"GraphQL delete key contains invalid characters: {parsedKey}");
+            }
+            var deleteMutation = $"mutation {{ delete{parsedKey} }}";
 
             var payload = new { query = deleteMutation };
 

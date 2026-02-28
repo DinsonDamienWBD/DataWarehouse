@@ -29,6 +29,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         private readonly HttpClient _httpClient;
         private IbmKeyProtectConfig _config = new();
         private string? _currentKeyId;
+        // #3459: Protect token refresh with a dedicated lock to prevent concurrent refresh races.
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
 
@@ -413,9 +415,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private async Task EnsureValidTokenAsync(CancellationToken cancellationToken = default)
         {
-            if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_accessToken))
+            // #3459: Double-checked lock pattern to prevent concurrent token refresh races.
+            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
+                return;
+
+            await _tokenLock.WaitAsync(cancellationToken);
+            try
             {
-                await RefreshAccessTokenAsync(cancellationToken);
+                if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_accessToken))
+                    await RefreshAccessTokenAsync(cancellationToken);
+            }
+            finally
+            {
+                _tokenLock.Release();
             }
         }
 

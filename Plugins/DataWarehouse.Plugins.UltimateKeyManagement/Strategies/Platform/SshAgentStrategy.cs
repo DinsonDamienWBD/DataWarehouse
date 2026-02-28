@@ -42,7 +42,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         {
             SupportsRotation = true,
             SupportsEnvelope = false,
-            SupportsHsm = true, // When using hardware-backed SSH keys
+            // #3566: SupportsHsm reflects that hardware-backed SSH keys (FIDO2/PIV) can be loaded into
+            // the agent; the strategy itself does not perform HSM operations directly. Callers must
+            // configure a hardware-backed key in the SSH agent. Set false if no hardware key is confirmed.
+            SupportsHsm = false, // Cannot guarantee HSM — depends on agent-loaded key type
             SupportsExpiration = false,
             SupportsReplication = false,
             SupportsVersioning = true,
@@ -371,13 +374,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         {
             if (_selectedIdentity == null)
             {
-                // Fallback to file-based encryption
+                // #3565: No identity loaded from agent — fall back to file-based encryption.
                 return EncryptWithDerivedKey(data);
             }
 
-            // Use SSH public key to derive a shared secret via ECDH-like scheme
-            // Since we can't do true ECDH with SSH agent (it only signs, not encrypts),
-            // we use a hybrid approach:
+            // #3565: NOTE — SSH agents only support signing operations (sign, list-keys, add-key,
+            // remove-key). They do NOT expose a decrypt or ECDH-agree operation. The hybrid scheme
+            // below uses the SSH public key as a static Diffie-Hellman public value to derive an
+            // encryption key via HKDF, which provides sender-side encryption but NOT agent-mediated
+            // decryption (the agent private key is not used during decryption). This means the
+            // "agent involvement" is limited to using the agent's public key as a domain separator.
+            // For true agent-mediated decryption, a custom SSH agent extension (e.g., via ProxyCommand)
+            // or a PKCS#11 bridge is required. Callers must be aware of this limitation.
+            //
+            // Use SSH public key to derive a shared secret via ECDH-like scheme:
             // 1. Generate ephemeral key pair
             // 2. Derive encryption key from ephemeral private + SSH public key
             // 3. Encrypt data with derived key

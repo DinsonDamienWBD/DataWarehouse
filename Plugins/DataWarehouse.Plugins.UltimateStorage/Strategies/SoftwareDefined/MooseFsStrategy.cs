@@ -84,8 +84,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private string _sessionId = string.Empty;
         private DateTime _sessionStartTime = DateTime.UtcNow;
 
-        // Lock management
-        private readonly Dictionary<string, SemaphoreSlim> _fileLocks = new();
+        // Lock management — reference-counted to prevent unbounded growth
+        private readonly Dictionary<string, (SemaphoreSlim Semaphore, int RefCount)> _fileLocks = new();
         private readonly object _lockDictionaryLock = new();
 
         public override string StrategyId => "moosefs";
@@ -1171,9 +1171,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // Clean up file locks
             lock (_lockDictionaryLock)
             {
-                foreach (var lockObj in _fileLocks.Values)
+                foreach (var entry in _fileLocks.Values)
                 {
-                    lockObj?.Dispose();
+                    entry.Semaphore?.Dispose();
                 }
                 _fileLocks.Clear();
             }

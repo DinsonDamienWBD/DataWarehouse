@@ -76,6 +76,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private byte[] _localEncryptionKey = Array.Empty<byte>();
         private bool _disposed;
 
+        // #3536: Master wrapping key — derived from machine identity for at-rest encryption of DerivedKey.
+        private static readonly byte[] _cacheWrapKey = HKDF.DeriveKey(
+            HashAlgorithmName.SHA256,
+            SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"Stellar.CacheWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
+            32,
+            salt: Encoding.UTF8.GetBytes("dw-stellar-cache-wrap-v1"),
+            info: Encoding.UTF8.GetBytes("stellar-derived-key-at-rest"));
+
         public override KeyStoreCapabilities Capabilities => new()
         {
             SupportsRotation = true,
@@ -367,9 +376,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         /// </summary>
         private byte[] DeriveKeyFromStellarAccount(string keyId, string transactionHash)
         {
-            // Use the account secret seed as the input key material
+            // #3537: Use SHA-256 of the base32 seed as IKM rather than the UTF-8 bytes of the string.
+            // This produces a uniform 32-byte value suitable for HKDF input key material with full entropy,
+            // avoiding the structure/bias introduced by treating the base32-encoded string as raw IKM.
             var ikm = _masterKeyPair.SecretSeed ?? throw new InvalidOperationException("SecretSeed is null");
-            var ikmBytes = Encoding.UTF8.GetBytes(ikm);
+            var ikmBytes = SHA256.HashData(Encoding.UTF8.GetBytes(ikm));
 
             // Use transaction hash as salt for uniqueness
             var salt = Convert.FromHexString(transactionHash);
@@ -625,7 +636,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                         _keyStore[kvp.Key] = new StellarKeyEntry
                         {
                             KeyId = kvp.Value.KeyId,
-                            DerivedKey = Convert.FromBase64String(kvp.Value.DerivedKey),
+                            // #3536: Decrypt wrapped DerivedKey on load.
+                            DerivedKey = UnwrapStellarKey(kvp.Value.DerivedKey, kvp.Key),
                             TransactionHash = kvp.Value.TransactionHash,
                             SequenceNumber = kvp.Value.SequenceNumber,
                             AccountId = kvp.Value.AccountId,
@@ -665,7 +677,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 kvp => new StellarKeyEntrySerialized
                 {
                     KeyId = kvp.Value.KeyId,
-                    DerivedKey = Convert.ToBase64String(kvp.Value.DerivedKey),
+                    // #3536: Encrypt DerivedKey before persisting so the cache file is not plaintext.
+                    DerivedKey = WrapStellarKey(kvp.Value.DerivedKey, kvp.Key),
                     TransactionHash = kvp.Value.TransactionHash,
                     SequenceNumber = kvp.Value.SequenceNumber,
                     AccountId = kvp.Value.AccountId,
@@ -734,6 +747,40 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 _lock.Release();
             }
+        }
+
+        /// <summary>#3536: AES-GCM wraps DerivedKey bytes for at-rest storage.</summary>
+        private static string WrapStellarKey(byte[] plaintext, string keyId)
+        {
+            var nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ct = new byte[plaintext.Length];
+            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, _cacheWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-stellar-per-key-v1"),
+                info: Encoding.UTF8.GetBytes(keyId));
+            using var aes = new AesGcm(pk, 16);
+            aes.Encrypt(nonce, plaintext, ct, tag);
+            var wrapped = new byte[12 + 16 + ct.Length];
+            Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+            Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+            Buffer.BlockCopy(ct, 0, wrapped, 28, ct.Length);
+            return Convert.ToBase64String(wrapped);
+        }
+
+        /// <summary>#3536: Decrypts a Stellar key wrapped by WrapStellarKey.</summary>
+        private static byte[] UnwrapStellarKey(string wrappedBase64, string keyId)
+        {
+            var wrapped = Convert.FromBase64String(wrappedBase64);
+            if (wrapped.Length < 28) throw new InvalidOperationException("Stellar cached key too short.");
+            var nonce = wrapped[..12]; var tag = wrapped[12..28]; var ct = wrapped[28..];
+            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, _cacheWrapKey, 32,
+                salt: Encoding.UTF8.GetBytes("dw-stellar-per-key-v1"),
+                info: Encoding.UTF8.GetBytes(keyId));
+            var plaintext = new byte[ct.Length];
+            using var aes = new AesGcm(pk, 16);
+            aes.Decrypt(nonce, ct, tag, plaintext);
+            return plaintext;
         }
 
         public override void Dispose()
