@@ -459,7 +459,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
             if (_connectionPool.TryDequeue(out var pooled))
             {
                 Interlocked.Increment(ref _activeConnections);
-                Stats.PoolHits++;
+                Stats.IncrementPoolHits();
                 return new PooledStorageConnection<TConfig>(pooled, this);
             }
 
@@ -469,7 +469,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
             {
                 var connection = await _connectionFactory(Config);
                 Interlocked.Increment(ref _activeConnections);
-                Stats.ConnectionsCreated++;
+                Stats.IncrementConnectionsCreated();
                 LastActivity = DateTime.UtcNow;
                 Health = InstanceHealthStatus.Healthy;
                 LastError = null;
@@ -483,7 +483,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
         catch (Exception ex)
         {
             _poolSemaphore.Release();
-            Stats.ConnectionErrors++;
+            Stats.IncrementConnectionErrors();
             Health = InstanceHealthStatus.Unhealthy;
             LastError = ex.Message;
             throw new StorageConnectionException($"Failed to get connection for instance '{InstanceId}'", ex);
@@ -507,7 +507,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
 
             _primaryConnection = await _connectionFactory(Config);
             Interlocked.Increment(ref _activeConnections);
-            Stats.ConnectionsCreated++;
+            Stats.IncrementConnectionsCreated();
             LastActivity = DateTime.UtcNow;
             Health = InstanceHealthStatus.Healthy;
             LastError = null;
@@ -516,7 +516,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
         }
         catch (Exception ex)
         {
-            Stats.ConnectionErrors++;
+            Stats.IncrementConnectionErrors();
             Health = InstanceHealthStatus.Unhealthy;
             LastError = ex.Message;
             throw new StorageConnectionException($"Failed to create primary connection for instance '{InstanceId}'", ex);
@@ -604,7 +604,7 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
         if (_connectionPool.Count < MaxPoolSize)
         {
             _connectionPool.Enqueue(connection);
-            Stats.PoolReturns++;
+            Stats.IncrementPoolReturns();
         }
         else
         {
@@ -741,32 +741,91 @@ public enum InstanceHealthStatus
 /// </summary>
 public class StorageConnectionStats
 {
+    // All counters use Interlocked for thread-safe increment from concurrent pool threads.
+    private long _connectionsCreated;
+    private long _connectionErrors;
+    private long _poolHits;
+    private long _poolReturns;
+    private long _operationsExecuted;
+    private long _operationErrors;
+    private long _bytesWritten;
+    private long _bytesRead;
+
     /// <summary>Total connections created.</summary>
-    public long ConnectionsCreated { get; set; }
+    public long ConnectionsCreated
+    {
+        get => Interlocked.Read(ref _connectionsCreated);
+        set => Interlocked.Exchange(ref _connectionsCreated, value);
+    }
 
     /// <summary>Connection creation errors.</summary>
-    public long ConnectionErrors { get; set; }
+    public long ConnectionErrors
+    {
+        get => Interlocked.Read(ref _connectionErrors);
+        set => Interlocked.Exchange(ref _connectionErrors, value);
+    }
 
     /// <summary>Successful pool retrievals (cache hits).</summary>
-    public long PoolHits { get; set; }
+    public long PoolHits
+    {
+        get => Interlocked.Read(ref _poolHits);
+        set => Interlocked.Exchange(ref _poolHits, value);
+    }
 
     /// <summary>Connections returned to pool.</summary>
-    public long PoolReturns { get; set; }
+    public long PoolReturns
+    {
+        get => Interlocked.Read(ref _poolReturns);
+        set => Interlocked.Exchange(ref _poolReturns, value);
+    }
 
     /// <summary>Operations executed.</summary>
-    public long OperationsExecuted { get; set; }
+    public long OperationsExecuted
+    {
+        get => Interlocked.Read(ref _operationsExecuted);
+        set => Interlocked.Exchange(ref _operationsExecuted, value);
+    }
 
     /// <summary>Operation errors.</summary>
-    public long OperationErrors { get; set; }
+    public long OperationErrors
+    {
+        get => Interlocked.Read(ref _operationErrors);
+        set => Interlocked.Exchange(ref _operationErrors, value);
+    }
 
     /// <summary>Total operation time in milliseconds.</summary>
     public double TotalOperationTimeMs { get; set; }
 
     /// <summary>Bytes written.</summary>
-    public long BytesWritten { get; set; }
+    public long BytesWritten
+    {
+        get => Interlocked.Read(ref _bytesWritten);
+        set => Interlocked.Exchange(ref _bytesWritten, value);
+    }
 
     /// <summary>Bytes read.</summary>
-    public long BytesRead { get; set; }
+    public long BytesRead
+    {
+        get => Interlocked.Read(ref _bytesRead);
+        set => Interlocked.Exchange(ref _bytesRead, value);
+    }
+
+    /// <summary>Atomically increments ConnectionsCreated.</summary>
+    public void IncrementConnectionsCreated() => Interlocked.Increment(ref _connectionsCreated);
+    /// <summary>Atomically increments ConnectionErrors.</summary>
+    public void IncrementConnectionErrors() => Interlocked.Increment(ref _connectionErrors);
+    /// <summary>Atomically increments PoolHits.</summary>
+    public void IncrementPoolHits() => Interlocked.Increment(ref _poolHits);
+    /// <summary>Atomically increments PoolReturns.</summary>
+    public void IncrementPoolReturns() => Interlocked.Increment(ref _poolReturns);
+    /// <summary>Atomically increments OperationsExecuted.</summary>
+    public void IncrementOperationsExecuted() => Interlocked.Increment(ref _operationsExecuted);
+    /// <summary>Atomically increments OperationErrors.</summary>
+    public void IncrementOperationErrors() => Interlocked.Increment(ref _operationErrors);
+    /// <summary>Atomically adds bytes to BytesWritten.</summary>
+    public void AddBytesWritten(long bytes) => Interlocked.Add(ref _bytesWritten, bytes);
+    /// <summary>Atomically adds bytes to BytesRead.</summary>
+    public void AddBytesRead(long bytes) => Interlocked.Add(ref _bytesRead, bytes);
 
     /// <summary>Pool hit ratio (0.0 to 1.0).</summary>
     public double PoolHitRatio => ConnectionsCreated > 0

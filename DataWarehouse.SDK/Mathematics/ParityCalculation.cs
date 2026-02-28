@@ -306,8 +306,13 @@ public static class ParityCalculation
             return false;
         }
 
-        // Compute parity from data blocks
-        Span<byte> computedParity = stackalloc byte[blockSize];
+        // Guard against stack overflow for RAID-sized blocks (typical RAID blocks can be MBs).
+        // Limit stackalloc to a safe threshold; use heap allocation for larger blocks.
+        const int MaxStackAllocBytes = 4096;
+        byte[]? heapBuffer = blockSize > MaxStackAllocBytes ? new byte[blockSize] : null;
+        Span<byte> computedParity = heapBuffer != null
+            ? heapBuffer.AsSpan(0, blockSize)
+            : stackalloc byte[blockSize];
         try
         {
             ComputeXorParity(dataBlocks, computedParity);

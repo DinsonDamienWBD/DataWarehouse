@@ -818,7 +818,8 @@ public sealed class MemoryPressureMonitor : IMemoryPressureMonitor, IDisposable
     public MemoryStats GetStats()
     {
         var gcInfo = GC.GetGCMemoryInfo();
-        var process = System.Diagnostics.Process.GetCurrentProcess();
+        // Dispose the Process handle to release OS resources — GetCurrentProcess() returns a new handle each call
+        using var process = System.Diagnostics.Process.GetCurrentProcess();
 
         var totalMemory = gcInfo.TotalAvailableMemoryBytes;
         var usedMemory = process.WorkingSet64;

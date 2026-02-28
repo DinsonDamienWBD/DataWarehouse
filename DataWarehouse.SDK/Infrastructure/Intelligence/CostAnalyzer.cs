@@ -226,7 +226,8 @@ public sealed class CostAnalyzer : IAiAdvisor
         private readonly string _algorithmId;
         private readonly ConcurrentQueue<(DateTimeOffset Timestamp, double DurationMs)> _samples = new();
         private long _operationCount;
-        private double _durationSum;
+        // Store duration sum as long microseconds for Interlocked.Add atomicity
+        private long _durationSumUs;
 
         public AlgorithmTracker(string algorithmId)
         {
@@ -237,8 +238,8 @@ public sealed class CostAnalyzer : IAiAdvisor
         {
             _samples.Enqueue((timestamp, durationMs));
             Interlocked.Increment(ref _operationCount);
-            // Non-atomic add is acceptable for advisory metrics
-            _durationSum += durationMs;
+            // Atomically accumulate duration — store as microseconds (long) for Interlocked.Add
+            Interlocked.Add(ref _durationSumUs, (long)(durationMs * 1000));
 
             // Bound memory: keep last 10000 samples
             while (_samples.Count > 10000)
@@ -250,7 +251,8 @@ public sealed class CostAnalyzer : IAiAdvisor
         public AlgorithmCost ToAlgorithmCost(double cpuCostPerSecondUsd)
         {
             long ops = Volatile.Read(ref _operationCount);
-            double avgMs = ops > 0 ? _durationSum / ops : 0.0;
+            double totalMs = Interlocked.Read(ref _durationSumUs) / 1000.0;
+            double avgMs = ops > 0 ? totalMs / ops : 0.0;
             double cpuSecondsPerOp = avgMs / 1000.0;
             double cloudCostPerOp = cpuSecondsPerOp * cpuCostPerSecondUsd;
 

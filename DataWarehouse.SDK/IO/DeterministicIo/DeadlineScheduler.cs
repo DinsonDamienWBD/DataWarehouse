@@ -95,7 +95,7 @@ public sealed class DeadlineScheduler : IDisposable
 
     // Pre-allocated latency tracking (circular buffer, no List, no allocation)
     private readonly long[] _latencyHistoryUs = new long[LatencyHistorySize];
-    private int _latencyWriteIndex;
+    private volatile int _latencyWriteIndex;
     private int _latencyCount;
 
     // Counters (Interlocked for thread safety)

@@ -478,6 +478,9 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             for (int i = 0; i < policies.Count; i++)
             {
                 var p = policies[i];
+                if (p is null)
+                    throw new InvalidOperationException(
+                        $"PolicyTemplate.Policies contains a null entry at index {i}. Templates must not contain null policy items.");
                 tuples.Add((p.FeatureId, p.Level, "/", p));
             }
             return tuples;

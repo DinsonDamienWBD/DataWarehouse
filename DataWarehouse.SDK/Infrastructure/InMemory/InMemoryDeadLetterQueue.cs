@@ -17,16 +17,19 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
     [SdkCompatibility("2.0.0", Notes = "Phase 26: In-memory implementation")]
     public sealed class InMemoryDeadLetterQueue : IDeadLetterQueue
     {
-        private readonly BoundedDictionary<string, DeadLetterMessage> _messages = new BoundedDictionary<string, DeadLetterMessage>(1000);
-        private readonly int _maxCapacity;
+        private readonly BoundedDictionary<string, DeadLetterMessage> _messages;
 
         /// <summary>
         /// Initializes a new in-memory dead letter queue.
         /// </summary>
         /// <param name="maxCapacity">Maximum number of messages. Default: 10,000.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when maxCapacity is less than 1.</exception>
         public InMemoryDeadLetterQueue(int maxCapacity = 10_000)
         {
-            _maxCapacity = maxCapacity;
+            if (maxCapacity <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxCapacity), maxCapacity,
+                    "Dead letter queue capacity must be at least 1.");
+            _messages = new BoundedDictionary<string, DeadLetterMessage>(maxCapacity);
         }
 
         /// <inheritdoc />
@@ -37,26 +40,8 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         {
             ct.ThrowIfCancellationRequested();
 
-            // Evict oldest if at capacity (O(n) scan instead of O(n log n) sort)
-            while (_messages.Count >= _maxCapacity)
-            {
-                string? oldestKey = null;
-                DateTimeOffset oldestTime = DateTimeOffset.MaxValue;
-                foreach (var kv in _messages)
-                {
-                    if (kv.Value.FailedAt < oldestTime)
-                    {
-                        oldestTime = kv.Value.FailedAt;
-                        oldestKey = kv.Key;
-                    }
-                }
-                if (oldestKey != null)
-                {
-                    _messages.TryRemove(oldestKey, out _);
-                }
-                else break;
-            }
-
+            // BoundedDictionary atomically enforces capacity with LRU eviction under its internal lock.
+            // Manual eviction loop was TOCTOU-racy: check-evict-insert not atomic under ConcurrentDictionary.
             _messages[message.MessageId] = message;
 
             OnDeadLetterEvent?.Invoke(new DeadLetterEvent

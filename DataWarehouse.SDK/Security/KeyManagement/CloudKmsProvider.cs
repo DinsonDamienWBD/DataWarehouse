@@ -259,6 +259,8 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         public async Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context)
         {
             IncrementCounter("gcpkms.wrap");
+            // IEnvelopeKeyStore does not expose CancellationToken; pass CancellationToken.None.
+            // Callers that need cancellation should use the overload EncryptWithKmsAsync directly.
             return await EncryptWithKmsAsync(kekId, dataKey, CancellationToken.None).ConfigureAwait(false);
         }
 
@@ -407,15 +409,14 @@ namespace DataWarehouse.SDK.Security.KeyManagement
 
             var jwt = $"{signingInput}.{Base64UrlEncode(Convert.ToBase64String(signatureBytes))}";
 
-            // Exchange JWT for access token
-            using var client = new HttpClient();
+            // Exchange JWT for access token — reuse the existing _httpClient to avoid socket exhaustion
             var formContent = new FormUrlEncodedContent(new[]
             {
                 new KeyValuePair<string, string>("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
                 new KeyValuePair<string, string>("assertion", jwt)
             });
 
-            using var response = await client.PostAsync(TokenUrl, formContent, ct).ConfigureAwait(false);
+            using var response = await (_httpClient ?? new HttpClient()).PostAsync(TokenUrl, formContent, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

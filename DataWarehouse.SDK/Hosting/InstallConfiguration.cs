@@ -1,3 +1,5 @@
+using System;
+
 namespace DataWarehouse.SDK.Hosting;
 
 /// <summary>
@@ -48,8 +50,22 @@ public sealed class InstallConfiguration
 
     /// <summary>
     /// Admin password (if CreateDefaultAdmin is true).
+    /// Must be set when CreateDefaultAdmin is true; a null or empty password would create a blank admin account.
     /// </summary>
     public string? AdminPassword { get; set; }
+
+    /// <summary>
+    /// Validates the configuration and throws <see cref="InvalidOperationException"/> if required fields are missing.
+    /// Call before passing to the installation pipeline.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when AdminPassword is null or empty and CreateDefaultAdmin is true.</exception>
+    public void Validate()
+    {
+        if (CreateDefaultAdmin && string.IsNullOrWhiteSpace(AdminPassword))
+            throw new InvalidOperationException(
+                "AdminPassword must be set when CreateDefaultAdmin is true. " +
+                "A null or empty password would create a blank admin account, which is a security risk.");
+    }
 
     /// <summary>
     /// Deployment topology: DW-only, VDE-only, or DW+VDE co-located (default).

@@ -355,6 +355,8 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
     /// </summary>
     public static TDigest Deserialize(byte[] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
+
         using var ms = new System.IO.MemoryStream(data);
         using var reader = new System.IO.BinaryReader(ms);
 
@@ -363,6 +365,13 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         var min = reader.ReadDouble();
         var max = reader.ReadDouble();
         var centroidCount = reader.ReadInt32();
+
+        // Guard against OOM bomb from corrupt/malicious data with huge centroidCount
+        // Max realistic t-digest has ~compression * 4 centroids; 100,000 is a conservative upper bound
+        const int MaxCentroidCount = 100_000;
+        if (centroidCount < 0 || centroidCount > MaxCentroidCount)
+            throw new InvalidDataException(
+                $"TDigest deserialization failed: centroidCount {centroidCount} is out of valid range [0, {MaxCentroidCount}].");
 
         var centroids = new List<Centroid>(centroidCount);
         for (int i = 0; i < centroidCount; i++)
