@@ -186,20 +186,7 @@ public sealed class ChecksumTable : IAsyncDisposable
         long absoluteBlock = _checksumTableStartBlock + checksumTableBlock;
         await _device.ReadBlockAsync(absoluteBlock, blockData, ct);
 
-        // Add to cache (with eviction if needed)
-        if (_blockCache.Count >= MaxCacheEntries)
-        {
-            // Evict oldest entry (simplified: just evict first entry)
-            // In production, use LRU or similar
-            foreach (var key in _blockCache.Keys)
-            {
-                if (_blockCache.TryRemove(key, out _))
-                {
-                    break;
-                }
-            }
-        }
-
+        // BoundedDictionary handles LRU eviction at capacity automatically (finding P2-853).
         _blockCache[checksumTableBlock] = blockData;
         return blockData;
     }

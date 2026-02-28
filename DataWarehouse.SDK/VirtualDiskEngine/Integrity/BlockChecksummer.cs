@@ -14,12 +14,10 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 [SdkCompatibility("3.0.0", Notes = "Phase 33: Virtual Disk Engine (VDE-04 Checksumming)")]
 public sealed class BlockChecksummer : IBlockChecksummer
 {
-    private const int MaxVerifiedCacheEntries = 10000;
-
     private readonly ChecksumTable _table;
 
-    // Cache of recently verified blocks (key: block number, value: true if verified)
-    // Avoids redundant re-verification on repeated reads
+    // LRU cache of recently verified blocks (BoundedDictionary enforces capacity and LRU eviction).
+    // Capacity 1000 avoids redundant re-verification on repeated reads (finding P2-852).
     private readonly BoundedDictionary<long, bool> _verifiedCache = new BoundedDictionary<long, bool>(1000);
 
     /// <summary>
@@ -52,22 +50,8 @@ public sealed class BlockChecksummer : IBlockChecksummer
     {
         await _table.SetChecksumAsync(blockNumber, checksum, ct);
 
-        // Update verified cache
+        // BoundedDictionary handles LRU eviction at capacity automatically.
         _verifiedCache[blockNumber] = true;
-
-        // Evict oldest if cache too large
-        if (_verifiedCache.Count > MaxVerifiedCacheEntries)
-        {
-            // Simplified eviction: remove first entry
-            // In production, use LRU or similar
-            foreach (var key in _verifiedCache.Keys)
-            {
-                if (_verifiedCache.TryRemove(key, out _))
-                {
-                    break;
-                }
-            }
-        }
     }
 
     /// <inheritdoc/>
@@ -97,20 +81,8 @@ public sealed class BlockChecksummer : IBlockChecksummer
 
         if (matches)
         {
-            // Add to verified cache
+            // BoundedDictionary handles LRU eviction at capacity automatically.
             _verifiedCache[blockNumber] = true;
-
-            // Evict oldest if cache too large
-            if (_verifiedCache.Count > MaxVerifiedCacheEntries)
-            {
-                foreach (var key in _verifiedCache.Keys)
-                {
-                    if (_verifiedCache.TryRemove(key, out _))
-                    {
-                        break;
-                    }
-                }
-            }
         }
 
         return matches;

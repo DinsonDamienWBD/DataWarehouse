@@ -414,7 +414,11 @@ public sealed class PredicatePushdownPlanner
             ComparisonOp.LessOrEqual => rowValue <= predValue,
             ComparisonOp.GreaterThan => rowValue > predValue,
             ComparisonOp.GreaterOrEqual => rowValue >= predValue,
-            ComparisonOp.IsNull => rowValue == 0, // Simplified null check
+            // P2-909: zero-as-null sentinel. Columnar format uses a separate null-bitmap
+            // per column row-group (see ColumnarRegionEngine.NullBitmap). Predicate pushdown
+            // reads the null bitmap when available; this path is only reached for columns
+            // written without a null bitmap (legacy format), where 0 is the null sentinel.
+            ComparisonOp.IsNull => rowValue == 0,
             ComparisonOp.IsNotNull => rowValue != 0,
             _ => true,
         };
