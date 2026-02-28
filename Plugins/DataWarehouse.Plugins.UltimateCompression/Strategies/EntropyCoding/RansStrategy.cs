@@ -214,9 +214,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                 throw new InvalidDataException("Invalid state in rANS data.");
             uint state = BinaryPrimitives.ReadUInt32LittleEndian(stateBuf);
 
-            // Read compressed data
+            // Read compressed data — check return value to detect partial reads (truncated stream)
             var compressedData = new byte[stream.Length - stream.Position];
-            stream.Read(compressedData, 0, compressedData.Length);
+            int totalRead = 0;
+            while (totalRead < compressedData.Length)
+            {
+                int n = stream.Read(compressedData, totalRead, compressedData.Length - totalRead);
+                if (n == 0) throw new InvalidDataException("rANS stream truncated: expected more compressed data.");
+                totalRead += n;
+            }
 
             // Decode data
             var result = new byte[originalLength];

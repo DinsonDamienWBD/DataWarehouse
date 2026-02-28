@@ -39,7 +39,7 @@ internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var wasmPath = Path.GetTempFileName() + ".wasm";
+            var _wasmBase = Path.GetTempFileName(); var wasmPath = Path.ChangeExtension(_wasmBase, ".wasm"); File.Move(_wasmBase, wasmPath);
             try
             {
                 await File.WriteAllBytesAsync(wasmPath, task.Code.ToArray(), cancellationToken);

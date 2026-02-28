@@ -193,6 +193,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
         private async Task SendEmailAlertAsync(IEnumerable<string> recipients, AccessContext context, CancellationToken cancellationToken)
         {
+            // Materialize to avoid double-enumeration and get accurate count for logging
+            var recipientList = recipients is IReadOnlyList<string> list ? list : recipients.ToList();
             try
             {
                 var smtpServer = Configuration.TryGetValue("SmtpServer", out var serverObj)
@@ -210,26 +212,33 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
                 using var smtpClient = new SmtpClient(smtpServer, smtpPort);
 
-                var subject = $"[CRITICAL] Duress Condition Detected - {context.SubjectId}";
+                // Sanitize fields to prevent SMTP header injection: strip CR/LF from interpolated values
+                var safeSubjectId = (context.SubjectId ?? "").Replace("\r", "").Replace("\n", "");
+                var safeResourceId = (context.ResourceId ?? "").Replace("\r", "").Replace("\n", "");
+                var safeAction = (context.Action ?? "").Replace("\r", "").Replace("\n", "");
+                var safeClientIp = (context.ClientIpAddress ?? "unknown").Replace("\r", "").Replace("\n", "");
+                var safeCountry = (context.Location?.Country ?? "unknown").Replace("\r", "").Replace("\n", "");
+
+                var subject = $"[CRITICAL] Duress Condition Detected - {safeSubjectId}";
                 var body = $@"DURESS ALERT
 
-Subject ID: {context.SubjectId}
-Resource: {context.ResourceId}
-Action: {context.Action}
-Client IP: {context.ClientIpAddress ?? "unknown"}
-Location: {context.Location?.Country ?? "unknown"}
+Subject ID: {safeSubjectId}
+Resource: {safeResourceId}
+Action: {safeAction}
+Client IP: {safeClientIp}
+Location: {safeCountry}
 Timestamp: {DateTime.UtcNow:O}
 
 This is an automated alert indicating a duress condition has been detected.
 Immediate investigation is required.";
 
-                foreach (var recipient in recipients)
+                foreach (var recipient in recipientList)
                 {
                     var message = new MailMessage(fromAddress!, recipient, subject, body);
                     await smtpClient.SendMailAsync(message, cancellationToken);
                 }
 
-                _logger.LogInformation("Email alerts sent to {Count} recipients", recipients.Count());
+                _logger.LogInformation("Email alerts sent to {Count} recipients", recipientList.Count);
             }
             catch (Exception ex)
             {

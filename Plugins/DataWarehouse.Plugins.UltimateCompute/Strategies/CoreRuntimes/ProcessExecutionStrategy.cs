@@ -60,11 +60,14 @@ internal sealed class ProcessExecutionStrategy : ComputeRuntimeStrategyBase
             var maxMem = GetMaxMemoryBytes(task, 1024L * 1024 * 1024); // 1 GB default
 
             // Create temp script file for complex commands
+            // Use Path.GetTempFileName() then move to avoid orphaned zero-byte .tmp file
             string? scriptFile = null;
             if (codeStr.Contains('\n') || codeStr.Length > 8000)
             {
                 var ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".cmd" : ".sh";
-                scriptFile = Path.GetTempFileName() + ext;
+                var tmpBase = Path.GetTempFileName();
+                scriptFile = Path.ChangeExtension(tmpBase, ext);
+                File.Move(tmpBase, scriptFile); // rename removes orphaned .tmp file
                 await File.WriteAllTextAsync(scriptFile, codeStr, cancellationToken);
 
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -262,7 +265,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
     private async Task<(byte[] output, string? logs)> ExecuteCSharpScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
         // C# scripting via dotnet-script or csi
-        var scriptFile = Path.GetTempFileName() + ".csx";
+        var _tmpBase1 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase1, ".csx");
+        File.Move(_tmpBase1, scriptFile);
         try
         {
             // Inject variables from task environment
@@ -290,7 +295,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecuteJavaScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var scriptFile = Path.GetTempFileName() + ".js";
+        var _tmpBase2 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase2, ".js");
+        File.Move(_tmpBase2, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);
@@ -310,7 +317,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecutePythonScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var scriptFile = Path.GetTempFileName() + ".py";
+        var _tmpBase3 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase3, ".py");
+        File.Move(_tmpBase3, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);

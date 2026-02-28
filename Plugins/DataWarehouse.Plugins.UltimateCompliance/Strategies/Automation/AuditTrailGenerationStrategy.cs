@@ -220,7 +220,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             return entry;
         }
 
-        private async Task GenerateChainEntryAsync(AuditEntry entry, CancellationToken cancellationToken)
+        private Task GenerateChainEntryAsync(AuditEntry entry, CancellationToken cancellationToken)
         {
             var chainId = entry.Resource ?? "GLOBAL";
 
@@ -238,6 +238,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             chain.Entries.Enqueue(entry);
             chain.LastUpdated = DateTime.UtcNow;
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Verify chain integrity
             if (chain.Entries.Count > 1)
             {
@@ -248,6 +250,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     System.Diagnostics.Debug.WriteLine($"WARNING: Audit chain integrity violation detected for chain {chainId}");
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         private bool VerifyChainIntegrity(AuditChain chain)

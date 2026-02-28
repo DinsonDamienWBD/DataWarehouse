@@ -571,7 +571,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         if (configuration.TryGetValue("EnableAutoRotation", out var autoRotate) && autoRotate is true)
         {
             _environmentRotationTimer = new Timer(
-                _ => RotateEnvironments(),
+                _ => { try { RotateEnvironments(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[DeceptionNetwork] RotateEnvironments failed: {ex.Message}"); } },
                 null,
                 _rotationInterval,
                 _rotationInterval);
@@ -580,7 +580,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         if (configuration.TryGetValue("EnableAdaptation", out var adapt) && adapt is true)
         {
             _adaptationTimer = new Timer(
-                _ => PerformAdaptation(),
+                _ => { try { PerformAdaptation(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[DeceptionNetwork] PerformAdaptation failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromMinutes(15),
                 TimeSpan.FromMinutes(15));

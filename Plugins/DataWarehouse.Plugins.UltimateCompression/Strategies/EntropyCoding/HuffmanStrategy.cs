@@ -211,7 +211,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             long dataStart = stream.Position;
             long dataLength = stream.Length - dataStart - 1;
             var compressedData = new byte[dataLength];
-            stream.Read(compressedData, 0, (int)dataLength);
+            int totalRead = 0;
+            while (totalRead < (int)dataLength)
+            {
+                int n = stream.Read(compressedData, totalRead, (int)dataLength - totalRead);
+                if (n == 0) throw new InvalidDataException("Huffman stream truncated: expected more compressed data.");
+                totalRead += n;
+            }
 
             int paddingBits = stream.ReadByte();
 

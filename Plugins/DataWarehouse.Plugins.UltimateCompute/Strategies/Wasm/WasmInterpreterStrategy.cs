@@ -84,7 +84,7 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
             int offset = 8;
             while (offset < code.Length)
             {
-                if (offset + 1 >= code.Length) break;
+                if (offset >= code.Length) break; // allows section starting at last byte to be processed
                 var sectionId = code[offset++];
                 // Read LEB128 section size — bounds-checked to prevent infinite loop on malformed input.
                 long sectionSize = 0;

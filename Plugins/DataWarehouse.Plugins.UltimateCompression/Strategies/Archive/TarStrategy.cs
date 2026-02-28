@@ -189,11 +189,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             Array.Copy(ustar, 0, header, 257, ustar.Length);
             header[263] = 0;
 
-            // USTAR version (2 bytes) - "00"
+            // USTAR version (2 bytes) - "00" at offsets 263-264 per POSIX ustar spec
+            header[263] = (byte)'0';
             header[264] = (byte)'0';
-            header[265] = (byte)'0';
 
-            // Owner user name (32 bytes) - "root"
+            // Owner user name (32 bytes) - "root" at offset 265
             byte[] owner = Encoding.ASCII.GetBytes("root");
             Array.Copy(owner, 0, header, 265, owner.Length);
 
@@ -255,7 +255,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
             // Read file size from header (octal string at offset 124)
             string sizeOctal = Encoding.ASCII.GetString(header, 124, 12).TrimEnd('\0', ' ');
-            int fileSize = Convert.ToInt32(sizeOctal, 8);
+            int fileSize;
+            try
+            {
+                fileSize = Convert.ToInt32(sizeOctal, 8);
+                if (fileSize < 0)
+                    throw new InvalidDataException($"Invalid TAR file size: {sizeOctal}");
+            }
+            catch (Exception ex) when (ex is FormatException || ex is OverflowException)
+            {
+                throw new InvalidDataException($"Malformed TAR file size field: '{sizeOctal}'", ex);
+            }
 
             // Read file data
             byte[] data = new byte[fileSize];

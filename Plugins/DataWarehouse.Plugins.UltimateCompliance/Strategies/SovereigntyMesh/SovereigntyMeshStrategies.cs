@@ -517,7 +517,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     /// <summary>
     /// Establishes a data embassy.
     /// </summary>
-    public async Task<DataEmbassy> EstablishEmbassyAsync(
+    public Task<DataEmbassy> EstablishEmbassyAsync(
         string embassyId,
         string hostJurisdiction,
         string sovereignJurisdiction,
@@ -550,13 +550,13 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 
         _embassies[embassyId] = embassy;
 
-        return await Task.FromResult(embassy);
+        return Task.FromResult(embassy);
     }
 
     /// <summary>
     /// Creates a secure channel between embassies.
     /// </summary>
-    public async Task<EmbassyChannel> CreateSecureChannelAsync(
+    public Task<EmbassyChannel> CreateSecureChannelAsync(
         string sourceEmbassyId,
         string destinationEmbassyId,
         CancellationToken ct = default)
@@ -570,11 +570,20 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
         var channelId = $"ch:{sourceEmbassyId}:{destinationEmbassyId}:{Guid.NewGuid():N}";
 
         // Derive shared key from both sovereign keys
-        var sourceKey = _sovereignKeys[source.SovereignKeyId].KeyMaterial;
-        var destKey = _sovereignKeys[destination.SovereignKeyId].KeyMaterial;
+        if (!_sovereignKeys.TryGetValue(source.SovereignKeyId, out var sourceKeyEntry))
+            throw new InvalidOperationException($"Sovereign key not found for embassy '{sourceEmbassyId}'.");
+        if (!_sovereignKeys.TryGetValue(destination.SovereignKeyId, out var destKeyEntry))
+            throw new InvalidOperationException($"Sovereign key not found for embassy '{destinationEmbassyId}'.");
 
-        using var hmac = new HMACSHA256(sourceKey);
-        var sharedKey = hmac.ComputeHash(destKey);
+        var sourceKey = sourceKeyEntry.KeyMaterial;
+        var destKey = destKeyEntry.KeyMaterial;
+
+        // XOR both keys then HMAC to produce a symmetric (bidirectional) shared secret:
+        // Sort keys so A→B and B→A derive the same channel key regardless of call order.
+        var (firstKey, secondKey) = CompareKeyArrays(sourceKey, destKey) <= 0
+            ? (sourceKey, destKey) : (destKey, sourceKey);
+        using var hmac = new HMACSHA256(firstKey);
+        var sharedKey = hmac.ComputeHash(secondKey);
 
         var channel = new EmbassyChannel
         {
@@ -588,13 +597,13 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 
         _channels[channelId] = channel;
 
-        return await Task.FromResult(channel);
+        return Task.FromResult(channel);
     }
 
     /// <summary>
     /// Transfers data through embassy channel.
     /// </summary>
-    public async Task<byte[]> TransferThroughChannelAsync(
+    public Task<byte[]> TransferThroughChannelAsync(
         string channelId,
         byte[] data,
         CancellationToken ct = default)
@@ -624,7 +633,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
         channel.IncrementTransferCount(); // atomic increment via Interlocked
         channel.LastTransferAt = DateTimeOffset.UtcNow;
 
-        return await Task.FromResult(result);
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc/>
@@ -639,6 +648,21 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     {
             IncrementCounter("data_embassy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Compares two byte arrays lexicographically, used to produce a canonical key order
+    /// so A→B and B→A channels derive the same shared secret.
+    /// </summary>
+    private static int CompareKeyArrays(byte[] a, byte[] b)
+    {
+        int len = Math.Min(a.Length, b.Length);
+        for (int i = 0; i < len; i++)
+        {
+            int diff = a[i] - b[i];
+            if (diff != 0) return diff;
+        }
+        return a.Length - b.Length;
     }
 }
 
@@ -822,7 +846,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     /// <summary>
     /// Creates a data residency policy.
     /// </summary>
-    public async Task<DataResidencyPolicy> CreatePolicyAsync(
+    public Task<DataResidencyPolicy> CreatePolicyAsync(
         string policyId,
         IEnumerable<string> allowedLocations,
         string? primaryLocation = null,
@@ -844,7 +868,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
 
         _policies[policyId] = policy;
 
-        return await Task.FromResult(policy);
+        return Task.FromResult(policy);
     }
 
     /// <summary>
@@ -1057,7 +1081,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     /// <summary>
     /// Creates a transfer agreement.
     /// </summary>
-    public async Task<TransferAgreement> CreateAgreementAsync(
+    public Task<TransferAgreement> CreateAgreementAsync(
         string sourceJurisdiction,
         string destinationJurisdiction,
         string agreementType,
@@ -1079,7 +1103,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
 
         _agreements[key] = agreement;
 
-        return await Task.FromResult(agreement);
+        return Task.FromResult(agreement);
     }
 
     private void LogTransfer(string source, string destination, ComplianceContext context, TransferAgreement agreement)
