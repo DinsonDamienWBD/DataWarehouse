@@ -166,9 +166,15 @@ public sealed class DeltaSyncPlugin : DataManagementPluginBase
         if (delta == null)
             throw new ArgumentNullException(nameof(delta));
 
-        var resultStream = new MemoryStream((int)baseStream.Length);
-        var baseData = new byte[baseStream.Length];
-        await baseStream.ReadExactlyAsync(baseData, 0, (int)baseStream.Length, ct);
+        // Guard against streams >2GB to prevent silent integer overflow (finding 979).
+        if (baseStream.Length > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(baseStream),
+                $"Base stream length {baseStream.Length} exceeds maximum supported size of {int.MaxValue} bytes.");
+
+        var baseLength = (int)baseStream.Length;
+        var resultStream = new MemoryStream(baseLength);
+        var baseData = new byte[baseLength];
+        await baseStream.ReadExactlyAsync(baseData, 0, baseLength, ct);
 
         var processedChunks = new HashSet<int>(delta.RemovedChunks);
 

@@ -52,15 +52,25 @@ public sealed class MoonshotRegistryImpl : IMoonshotRegistry
     /// <inheritdoc />
     public void UpdateStatus(MoonshotId id, MoonshotStatus status)
     {
-        if (!_registrations.TryGetValue(id, out var existing))
-            return;
+        // Spin-retry TryUpdate loop to handle concurrent updates without lost writes (finding 2266).
+        // TryUpdate is a CAS — it only succeeds if the stored reference still equals `existing`.
+        // If a concurrent writer updated the record first, TryUpdate returns false and we re-read.
+        MoonshotStatus oldStatus;
+        while (true)
+        {
+            if (!_registrations.TryGetValue(id, out var existing))
+                return;
 
-        var oldStatus = existing.Status;
-        if (oldStatus == status)
-            return;
+            oldStatus = existing.Status;
+            if (oldStatus == status)
+                return; // Already at the desired status; nothing to do.
 
-        var updated = existing with { Status = status };
-        _registrations.TryUpdate(id, updated, existing);
+            var updated = existing with { Status = status };
+            if (_registrations.TryUpdate(id, updated, existing))
+                break; // CAS succeeded — we own this status transition.
+
+            // CAS lost to a concurrent writer; re-read and retry.
+        }
 
         StatusChanged?.Invoke(this, new MoonshotStatusChangedEventArgs
         {

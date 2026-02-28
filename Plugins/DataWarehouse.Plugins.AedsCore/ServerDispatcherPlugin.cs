@@ -140,14 +140,28 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
 
             _logger.LogInformation("Job {JobId}: Resolved {Count} target clients", jobId, targetClients.Count);
 
-            // Simulate delivery to each target
+            // Deliver manifest to each target client via message bus (finding 994 — was Task.Delay stub).
             foreach (var client in targetClients)
             {
                 try
                 {
-                    // In a real implementation, this would send the manifest via Control Plane
-                    // and coordinate Data Plane transfer
-                    await Task.Delay(10, ct); // Simulate network latency
+                    if (MessageBus != null)
+                    {
+                        var deliveryMsg = new PluginMessage
+                        {
+                            Type = "aeds.manifest.deliver",
+                            SourcePluginId = Id,
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["jobId"] = jobId,
+                                ["clientId"] = client.ClientId,
+                                ["manifestId"] = manifest.ManifestId,
+                                ["deliveryMode"] = manifest.DeliveryMode.ToString(),
+                                ["priority"] = manifest.Priority
+                            }
+                        };
+                        await MessageBus.PublishAsync("aeds.manifest.deliver", deliveryMsg, ct);
+                    }
 
                     delivered++;
                     _logger.LogDebug("Job {JobId}: Delivered manifest to client {ClientId}", jobId, client.ClientId);

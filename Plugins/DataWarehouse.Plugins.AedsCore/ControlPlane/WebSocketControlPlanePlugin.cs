@@ -52,10 +52,13 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
     private Task? _heartbeatTask;
     private Task? _receiveTask;
     private Channel<IntentManifest>? _manifestChannel;
-    private DateTimeOffset _lastMessageReceived;
-    private DateTimeOffset _lastHeartbeatSent;
+    // DateTimeOffset is 16 bytes — torn reads on 32-bit ARM.
+    // Store as UTC ticks (long) and use Interlocked for atomic reads/writes (finding 978).
+    private long _lastMessageReceivedTicks;
+    private long _lastHeartbeatSentTicks;
     private const int HeartbeatExpirySeconds = 90;
     private const int MaxBackoffSeconds = 32;
+    // Atomic reconnect counter (finding 977).
     private int _reconnectAttempt;
 
     /// <summary>
@@ -77,8 +80,8 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
     public WebSocketControlPlanePlugin(ILogger<WebSocketControlPlanePlugin> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _lastMessageReceived = DateTimeOffset.UtcNow;
-        _lastHeartbeatSent = DateTimeOffset.UtcNow;
+        _lastMessageReceivedTicks = DateTimeOffset.UtcNow.UtcTicks;
+        _lastHeartbeatSentTicks = DateTimeOffset.UtcNow.UtcTicks;
     }
 
     /// <inheritdoc />
@@ -217,19 +220,19 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
                 var uri = new Uri(config.ServerUrl);
                 await _webSocket.ConnectAsync(uri, ct);
 
-                _lastMessageReceived = DateTimeOffset.UtcNow;
-                _reconnectAttempt = 0;
+                Interlocked.Exchange(ref _lastMessageReceivedTicks, DateTimeOffset.UtcNow.UtcTicks);
+                Interlocked.Exchange(ref _reconnectAttempt, 0);
 
                 _logger.LogInformation("WebSocket connected to {ServerUrl}", config.ServerUrl);
                 return;
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
-                var backoffSeconds = Math.Min((int)Math.Pow(2, _reconnectAttempt), MaxBackoffSeconds);
+                var attempt = Interlocked.Increment(ref _reconnectAttempt);
+                var backoffSeconds = Math.Min((int)Math.Pow(2, attempt - 1), MaxBackoffSeconds);
                 _logger.LogWarning(ex, "WebSocket connection failed, retrying in {BackoffSeconds}s (attempt {Attempt})",
-                    backoffSeconds, _reconnectAttempt + 1);
+                    backoffSeconds, attempt);
 
-                _reconnectAttempt++;
                 await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), ct);
             }
         }
@@ -255,7 +258,8 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
 
                 await TransmitHeartbeatAsync(heartbeat, ct);
 
-                var timeSinceLastMessage = DateTimeOffset.UtcNow - _lastMessageReceived;
+                var lastMsgTicks = Interlocked.Read(ref _lastMessageReceivedTicks);
+                var timeSinceLastMessage = DateTimeOffset.UtcNow - new DateTimeOffset(lastMsgTicks, TimeSpan.Zero);
                 if (timeSinceLastMessage.TotalSeconds > HeartbeatExpirySeconds)
                 {
                     _logger.LogWarning("No message received for {Seconds}s, triggering reconnection",
@@ -316,7 +320,7 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
 
                     if (result.MessageType == WebSocketMessageType.Text && messageBuilder.Length > 0)
                     {
-                        _lastMessageReceived = DateTimeOffset.UtcNow;
+                        Interlocked.Exchange(ref _lastMessageReceivedTicks, DateTimeOffset.UtcNow.UtcTicks);
                         await ProcessReceivedMessageAsync(messageBuilder.ToString(), ct);
                     }
                 }
@@ -494,7 +498,7 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
                 endOfMessage: true,
                 ct);
 
-            _lastHeartbeatSent = DateTimeOffset.UtcNow;
+            Interlocked.Exchange(ref _lastHeartbeatSentTicks, DateTimeOffset.UtcNow.UtcTicks);
             _logger.LogTrace("Transmitted heartbeat for client {ClientId}", heartbeat.ClientId);
         }
         catch (WebSocketException ex)

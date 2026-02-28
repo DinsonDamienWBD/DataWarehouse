@@ -131,9 +131,13 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             "Starting background integrity scanner with interval {Interval} and batch size {BatchSize}",
             _scanInterval, _batchSize);
 
-        _scanTask = Task.Run(() => ScanLoopAsync(_cts.Token), _cts.Token);
-
-        await Task.CompletedTask;
+        // Observe launch-time faults by attaching a continuation that logs them (finding 1027).
+        // We store the task so StopAsync can await it; the continuation fires synchronously on fault.
+        var scanCts = _cts; // Capture for the continuation closure.
+        _scanTask = Task.Run(() => ScanLoopAsync(scanCts.Token), scanCts.Token)
+            .ContinueWith(
+                t => _logger.LogError(t.Exception, "Background integrity scanner terminated with unhandled exception"),
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
     }
 
     /// <inheritdoc/>

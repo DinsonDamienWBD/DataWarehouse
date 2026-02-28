@@ -768,18 +768,20 @@ public class ComplianceReportingService : IComplianceReportingService
         return Convert.ToHexString(SHA256.HashData(blockId.ToByteArray()));
     }
 
+    /// <summary>
+    /// Per-instance HMAC signing key generated from a cryptographically random source at construction time.
+    /// This prevents attestation forgery from a deterministic enum-derived key (finding 1031).
+    /// In production, replace with HSM-backed or asymmetric key management.
+    /// </summary>
+    private readonly byte[] _attestationSigningKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+
     private string SignAttestation(AttestationPayload payload)
     {
-        // In production, would use HSM or secure key management
-        // For now, use HMAC with a derived key
         var payloadJson = JsonSerializer.Serialize(payload);
         var payloadBytes = Encoding.UTF8.GetBytes(payloadJson);
 
-        // Derive signing key from config (in production, use proper key management)
-        var keyMaterial = Encoding.UTF8.GetBytes($"attestation-key-{_config.WormMode}");
-        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
-        using var hmac = new HMACSHA256(SHA256.HashData(keyMaterial));
-
+        // Use a per-instance random key — not derived from a deterministic config value (finding 1031).
+        using var hmac = new HMACSHA256(_attestationSigningKey);
         var signature = hmac.ComputeHash(payloadBytes);
         return Convert.ToBase64String(signature);
     }

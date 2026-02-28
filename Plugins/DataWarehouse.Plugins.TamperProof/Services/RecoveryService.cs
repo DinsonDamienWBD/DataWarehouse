@@ -648,10 +648,14 @@ public class RecoveryService
             // Fall back to WORM recovery
             _logger.LogDebug("Using WORM recovery for corrupted shards");
 
+            // Compute the expected hash from the manifest and pass a distinct "unknown corruption"
+            // marker as the actual hash so the incident record correctly shows a mismatch (finding 1035).
+            // We cannot know the exact corrupted hash at this point; using the expected value
+            // as both arguments would hide the corruption from auditors.
             var expectedIntegrityHash = IntegrityHash.Create(manifest.HashAlgorithm, manifest.FinalContentHash);
-            var placeholderHash = expectedIntegrityHash; // Placeholder for actual corrupted hash
+            var unknownActualHash = IntegrityHash.Create(manifest.HashAlgorithm, "<corrupted-unknown>");
 
-            return await RecoverFromWormAsync(manifest, expectedIntegrityHash, placeholderHash, corruptedShardIndices, ct);
+            return await RecoverFromWormAsync(manifest, expectedIntegrityHash, unknownActualHash, corruptedShardIndices, ct);
         }
         catch (Exception ex)
         {

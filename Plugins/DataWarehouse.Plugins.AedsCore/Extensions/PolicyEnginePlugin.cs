@@ -153,25 +153,92 @@ public sealed class PolicyEnginePlugin : SecurityPluginBase, IClientPolicyEngine
         return new PolicyDecision(true, "Default policies passed", PolicyAction.Allow);
     }
 
+    /// <summary>
+    /// Evaluates a simple boolean condition expression against manifest and policy context.
+    /// Supports: comparisons (&gt;, &lt;, &gt;=, &lt;=, ==, !=), AND/OR, variable substitution.
+    /// Variables: Priority, FileSizeBytes, NetworkType, SourceTrustLevel, IsPeer, Action.
+    /// Falls back to false (deny) on parse errors (fail-closed, finding 976).
+    /// </summary>
     private bool EvaluateCondition(string condition, IntentManifest manifest, PolicyContext context)
     {
-        // Simple expression evaluator
-        // Format: "Priority > 80 AND NetworkType != Metered"
+        if (string.IsNullOrWhiteSpace(condition))
+            return false;
+
         try
         {
-            condition = condition.Replace("Priority", context.Priority.ToString());
-            condition = condition.Replace("FileSizeBytes", context.FileSizeBytes.ToString());
-            condition = condition.Replace("NetworkType", $"\"{context.NetworkType}\"");
-            condition = condition.Replace("SourceTrustLevel", $"\"{context.SourceTrustLevel}\"");
-            condition = condition.Replace("IsPeer", context.IsPeer.ToString());
+            // Substitute named variables with their values before parsing.
+            condition = condition
+                .Replace("Priority", context.Priority.ToString())
+                .Replace("FileSizeBytes", context.FileSizeBytes.ToString())
+                .Replace("NetworkType", $"\"{context.NetworkType}\"")
+                .Replace("SourceTrustLevel", $"\"{context.SourceTrustLevel}\"")
+                .Replace("IsPeer", context.IsPeer.ToString().ToLowerInvariant())
+                .Replace("Action", $"\"{manifest.Action}\"");
 
-            // Basic evaluation (production would use proper parser)
-            return condition.Contains("true") || !condition.Contains("false");
+            // Split on AND/OR and evaluate each clause.
+            return EvaluateOr(condition.Trim());
         }
         catch
         {
-            return false;
+            return false; // Fail-closed: invalid expression denies the rule.
         }
+    }
+
+    private static bool EvaluateOr(string expr)
+    {
+        // Split on OR first (lower precedence).
+        var parts = expr.Split([" OR "], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Any(p => EvaluateAnd(p.Trim()));
+    }
+
+    private static bool EvaluateAnd(string expr)
+    {
+        var parts = expr.Split([" AND "], StringSplitOptions.RemoveEmptyEntries);
+        return parts.All(p => EvaluatePrimary(p.Trim()));
+    }
+
+    private static bool EvaluatePrimary(string expr)
+    {
+        // Handle explicit true/false literals.
+        if (string.Equals(expr, "true", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(expr, "false", StringComparison.OrdinalIgnoreCase)) return false;
+
+        // Operators in descending length order to avoid ">=" being matched as ">".
+        var operators = new[] { ">=", "<=", "!=", ">", "<", "==" };
+        foreach (var op in operators)
+        {
+            var idx = expr.IndexOf(op, StringComparison.Ordinal);
+            if (idx < 0) continue;
+
+            var lhs = expr[..idx].Trim().Trim('"');
+            var rhs = expr[(idx + op.Length)..].Trim().Trim('"');
+
+            // Numeric comparison if both sides parse as numbers.
+            if (double.TryParse(lhs, out var lNum) && double.TryParse(rhs, out var rNum))
+            {
+                return op switch
+                {
+                    ">=" => lNum >= rNum,
+                    "<=" => lNum <= rNum,
+                    "!=" => lNum != rNum,
+                    ">" => lNum > rNum,
+                    "<" => lNum < rNum,
+                    "==" => lNum == rNum,
+                    _ => false
+                };
+            }
+
+            // String comparison.
+            return op switch
+            {
+                "==" => string.Equals(lhs, rhs, StringComparison.OrdinalIgnoreCase),
+                "!=" => !string.Equals(lhs, rhs, StringComparison.OrdinalIgnoreCase),
+                _ => false // Ordered comparisons not supported for non-numeric values.
+            };
+        }
+
+        // No operator found — not a recognisable expression; fail-closed.
+        return false;
     }
 
     /// <inheritdoc />

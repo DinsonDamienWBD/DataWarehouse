@@ -45,7 +45,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             var useTls = GetConfiguration(config, "UseTls", false);
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : (useTls ? 636 : 389);
+            int defaultPort = useTls ? 636 : 389;
+            int port;
+            if (parts.Length > 1)
+            {
+                if (!int.TryParse(parts[1], out port) || port < 1 || port > 65535)
+                    throw new ArgumentException($"Invalid port '{parts[1]}' in LDAP connection string. Expected a number between 1 and 65535.", nameof(config));
+            }
+            else
+            {
+                port = defaultPort;
+            }
 
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
@@ -66,10 +76,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         }
 
         /// <inheritdoc/>
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // TcpClient.Connected reflects last I/O status, not live state.
+            // Perform a real liveness probe by attempting a zero-byte send on the existing socket.
             var client = handle.GetConnection<TcpClient>();
-            return Task.FromResult(client.Connected);
+            if (!client.Connected)
+                return false;
+            try
+            {
+                // Zero-byte send: if connection is half-open, this raises SocketException
+                await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false);
+                return true;
+            }
+            catch (System.IO.IOException)
+            {
+                return false;
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                return false;
+            }
         }
 
         /// <inheritdoc/>
@@ -82,16 +109,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<TcpClient>();
-            var isHealthy = client.Connected;
+            var isHealthy = await TestCoreAsync(handle, ct).ConfigureAwait(false);
 
-            return Task.FromResult(new ConnectionHealth(
+            return new ConnectionHealth(
                 IsHealthy: isHealthy,
                 StatusMessage: isHealthy ? "LDAP server connected" : "LDAP server disconnected",
                 Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+                CheckedAt: DateTimeOffset.UtcNow);
         }
     }
 }

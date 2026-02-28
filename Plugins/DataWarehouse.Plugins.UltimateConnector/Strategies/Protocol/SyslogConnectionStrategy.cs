@@ -44,12 +44,30 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 514;
+            int port;
+            if (parts.Length > 1)
+            {
+                if (!int.TryParse(parts[1], out port) || port < 1 || port > 65535)
+                    throw new ArgumentException($"Invalid port '{parts[1]}' in Syslog connection string. Expected a number between 1 and 65535.", nameof(config));
+            }
+            else
+            {
+                port = 514;
+            }
 
             var client = new UdpClient();
             client.Connect(host, port);
 
-            await Task.Delay(10, ct);
+            // Send a minimal RFC 5424 syslog test message to verify network path
+            var testMsg = System.Text.Encoding.UTF8.GetBytes("<14>1 - - - - - - DataWarehouse Syslog connectivity probe");
+            try
+            {
+                await client.SendAsync(testMsg, testMsg.Length).ConfigureAwait(false);
+            }
+            catch
+            {
+                // UDP send failure is non-fatal — syslog servers may be one-way
+            }
 
             var info = new Dictionary<string, object>
             {
@@ -65,8 +83,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // UdpClient.Client.Connected is always true after Connect() — not a liveness indicator.
+            // Verify the socket is open and bound (not disposed/closed).
             var client = handle.GetConnection<UdpClient>();
-            return Task.FromResult(client.Client?.Connected ?? false);
+            return Task.FromResult(client.Client != null && client.Client.IsBound);
         }
 
         /// <inheritdoc/>
@@ -82,11 +102,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<UdpClient>();
-            var isHealthy = client.Client?.Connected ?? false;
+            var isHealthy = client.Client != null && client.Client.IsBound;
 
             return Task.FromResult(new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "Syslog server connected" : "Syslog server disconnected",
+                StatusMessage: isHealthy ? "Syslog server socket bound" : "Syslog server socket closed",
                 Latency: TimeSpan.Zero,
                 CheckedAt: DateTimeOffset.UtcNow));
         }
