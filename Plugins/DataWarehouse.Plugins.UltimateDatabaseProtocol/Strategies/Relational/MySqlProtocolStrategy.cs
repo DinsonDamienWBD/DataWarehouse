@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.Relational;
 
@@ -117,7 +118,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
     private uint _connectionId;
     private string _authPluginName = "";
     private byte[] _authPluginData = [];
-    private volatile int _sequenceId;
+    private int _sequenceId; // Accessed via Interlocked (finding 2730)
 
     /// <inheritdoc/>
     public override string StrategyId => "mysql-protocol";
@@ -473,7 +474,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         packet[0] = ComQuery;
         queryBytes.CopyTo(packet, 1);
 
-        _sequenceId = 0;
+        Interlocked.Exchange(ref _sequenceId, 0);
         await SendPacketAsync(packet, ct);
 
         // Read response
@@ -728,7 +729,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         header[0] = (byte)(payload.Length & 0xff);
         header[1] = (byte)((payload.Length >> 8) & 0xff);
         header[2] = (byte)((payload.Length >> 16) & 0xff);
-        header[3] = (byte)_sequenceId++;
+        header[3] = (byte)Interlocked.Increment(ref _sequenceId);
 
         await SendAsync(header, ct);
         await SendAsync(payload, ct);
@@ -739,7 +740,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Read header
         var header = await ReceiveExactAsync(4, ct);
         var length = header[0] | (header[1] << 8) | (header[2] << 16);
-        _sequenceId = header[3] + 1;
+        Interlocked.Exchange(ref _sequenceId, header[3] + 1);
 
         // Read payload
         return length > 0 ? await ReceiveExactAsync(length, ct) : [];

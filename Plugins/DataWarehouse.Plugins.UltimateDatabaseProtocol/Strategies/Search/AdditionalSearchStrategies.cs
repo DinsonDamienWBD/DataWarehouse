@@ -13,7 +13,6 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _collection = "";
     private string _baseUrl = "";
-    private bool _verifySsl = true;
 
     /// <inheritdoc/>
     public override string StrategyId => "solr-rest";
@@ -66,13 +65,10 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         var handler = new HttpClientHandler();
-        // SECURITY: TLS certificate validation is enabled by default.
-        // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback =
-                (message, cert, chain, errors) => true;
-        }
+        // SECURITY: TLS certificate validation must never be bypassed in production.
+        // The _verifySsl flag is intentionally removed to prevent accidental activation
+        // of the cert-skip callback (finding 2729). Certificate pinning or custom CA
+        // should be configured via X509 stores, not by disabling validation globally.
 
         _httpClient = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };
 

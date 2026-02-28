@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.Relational;
 
@@ -31,7 +32,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private volatile int _sdu = 8192;
     private volatile int _tdu = 32767;
     private byte[] _sessionKey = [];
-    private int _sequenceNumber;
+    private int _sequenceNumber; // Access via Interlocked (finding 2731)
 
     /// <inheritdoc/>
     public override string StrategyId => "oracle-tns";
@@ -339,7 +340,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendDataPacketAsync(byte[] data, CancellationToken ct)
     {
-        _sequenceNumber++;
+        Interlocked.Increment(ref _sequenceNumber);
 
         using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);

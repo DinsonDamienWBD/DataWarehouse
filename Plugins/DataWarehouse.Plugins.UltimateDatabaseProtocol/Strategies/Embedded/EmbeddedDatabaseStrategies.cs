@@ -617,32 +617,47 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
             };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows =
-            [
-                new Dictionary<string, object?>
-                {
-                    ["key"] = key,
-                    ["value"] = value
-                }
-            ]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows =
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    }
+                ]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
         var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
+        try
+        {
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
 
         return new QueryResult
         {
@@ -875,32 +890,47 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
             };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows =
-            [
-                new Dictionary<string, object?>
-                {
-                    ["key"] = key,
-                    ["value"] = value
-                }
-            ]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows =
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    }
+                ]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
         var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
+        try
+        {
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
 
         return new QueryResult
         {

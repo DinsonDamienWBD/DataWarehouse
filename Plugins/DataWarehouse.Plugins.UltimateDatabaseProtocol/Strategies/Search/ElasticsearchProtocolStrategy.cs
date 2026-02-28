@@ -24,7 +24,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     private string? _apiKey;
     private string _clusterName = "";
     private string _clusterVersion = "";
-    private bool _verifySsl = true;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -77,10 +77,8 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         var handler = new HttpClientHandler();
         // SECURITY: TLS certificate validation is enabled by default.
         // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
+        // SECURITY: SSL certificate validation must never be bypassed in production (finding 2729).
+        // Removed _verifySsl bypass. Use X509 trust stores for custom CAs.
 
         _httpClient = new HttpClient(handler)
         {
@@ -691,7 +689,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _baseUrl = "";
     private string _clusterVersion = "";
-    private bool _verifySsl = true;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -745,10 +743,8 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
         var handler = new HttpClientHandler();
         // SECURITY: TLS certificate validation is enabled by default.
         // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
+        // SECURITY: SSL certificate validation must never be bypassed in production (finding 2729).
+        // Removed _verifySsl bypass. Use X509 trust stores for custom CAs.
 
         _httpClient = new HttpClient(handler)
         {

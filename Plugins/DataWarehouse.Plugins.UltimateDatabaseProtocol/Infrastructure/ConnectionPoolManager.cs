@@ -634,8 +634,20 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             if (_disposed) return;
             _disposed = true;
 
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
+            // Dispose connections synchronously without blocking on DisposeAsync to avoid
+            // deadlocks in ASP.NET Core synchronization contexts (finding 2691).
+            while (_available.TryDequeue(out var pooled))
+            {
+                try { pooled.Connection.Dispose(); } catch { /* Best-effort */ }
+                _manager.OnConnectionDestroyed();
+            }
+            foreach (var kvp in _inUse)
+            {
+                try { kvp.Value.Connection.Dispose(); } catch { /* Best-effort */ }
+                _manager.OnConnectionDestroyed();
+            }
+            _inUse.Clear();
+
             _acquireSemaphore.Dispose();
             _createLock.Dispose();
         }
