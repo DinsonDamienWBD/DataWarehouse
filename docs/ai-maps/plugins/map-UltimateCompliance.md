@@ -6958,9 +6958,9 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<DataEmbassy> EstablishEmbassyAsync(string embassyId, string hostJurisdiction, string sovereignJurisdiction, IEnumerable<string> protectedJurisdictions, CancellationToken ct = default);
-    public async Task<EmbassyChannel> CreateSecureChannelAsync(string sourceEmbassyId, string destinationEmbassyId, CancellationToken ct = default);
-    public async Task<byte[]> TransferThroughChannelAsync(string channelId, byte[] data, CancellationToken ct = default);
+    public Task<DataEmbassy> EstablishEmbassyAsync(string embassyId, string hostJurisdiction, string sovereignJurisdiction, IEnumerable<string> protectedJurisdictions, CancellationToken ct = default);
+    public Task<EmbassyChannel> CreateSecureChannelAsync(string sourceEmbassyId, string destinationEmbassyId, CancellationToken ct = default);
+    public Task<byte[]> TransferThroughChannelAsync(string channelId, byte[] data, CancellationToken ct = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
@@ -7025,7 +7025,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<DataResidencyPolicy> CreatePolicyAsync(string policyId, IEnumerable<string> allowedLocations, string? primaryLocation = null, IEnumerable<string>? allowedBackupLocations = null, IEnumerable<string>? dataClassifications = null, CancellationToken ct = default);
+    public Task<DataResidencyPolicy> CreatePolicyAsync(string policyId, IEnumerable<string> allowedLocations, string? primaryLocation = null, IEnumerable<string>? allowedBackupLocations = null, IEnumerable<string>? dataClassifications = null, CancellationToken ct = default);
     public DataLocationRecord? GetDataLocation(string resourceId);
     public IList<ResidencyViolation> GetViolations(string resourceId);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
@@ -7076,7 +7076,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<TransferAgreement> CreateAgreementAsync(string sourceJurisdiction, string destinationJurisdiction, string agreementType, bool requiresEncryption = true, CancellationToken ct = default);
+    public Task<TransferAgreement> CreateAgreementAsync(string sourceJurisdiction, string destinationJurisdiction, string agreementType, bool requiresEncryption = true, CancellationToken ct = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
