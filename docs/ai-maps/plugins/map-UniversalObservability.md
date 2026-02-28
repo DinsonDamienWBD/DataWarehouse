@@ -424,10 +424,11 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UniversalObservability/Strategies/SyntheticMonitoring/SyntheticEnhancedStrategies.cs
 ```csharp
-public sealed class SslCertificateMonitorService
+public sealed class SslCertificateMonitorService : IDisposable
 {
 }
     public SslCertificateMonitorService(int expirationWarningDays = 30);
+    public void Dispose();
     public async Task<SslCertificateInfo> CheckCertificateAsync(string host, CancellationToken ct = default);
     public IReadOnlyList<SslCertificateInfo> GetAllCertificates();;
     public IReadOnlyList<SslCertificateInfo> GetExpiringCertificates();;
@@ -1602,10 +1603,10 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     public StatsDStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: true, SupportsTracing: false, SupportsLogging: false, SupportsDistributedTracing: false, SupportsAlerting: false, SupportedExporters: new[] { "StatsD", "DogStatsD", "Telegraf" }));
     public void Configure(string host, int port = 8125, string prefix = "", double sampleRate = 1.0);
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken);
-    public void Increment(string name, IReadOnlyList<MetricLabel>? tags = null);
-    public void Decrement(string name, IReadOnlyList<MetricLabel>? tags = null);
-    public void Gauge(string name, double value, IReadOnlyList<MetricLabel>? tags = null);
-    public void Timing(string name, double milliseconds, IReadOnlyList<MetricLabel>? tags = null);
+    public void Increment(string name, IReadOnlyList<MetricLabel>? tags = null);;
+    public void Decrement(string name, IReadOnlyList<MetricLabel>? tags = null);;
+    public void Gauge(string name, double value, IReadOnlyList<MetricLabel>? tags = null);;
+    public void Timing(string name, double milliseconds, IReadOnlyList<MetricLabel>? tags = null);;
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);

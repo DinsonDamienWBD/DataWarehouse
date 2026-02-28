@@ -1676,6 +1676,7 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;

@@ -1629,7 +1629,7 @@ public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
     public PolicyDashboardItem? GetPolicy(string policyId);;
     public IReadOnlyList<PolicyDashboardItem> ListPolicies(PolicyStatus? status = null, string? category = null, string? createdBy = null, int skip = 0, int take = 100);
     public bool DeletePolicy(string policyId);
-    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId);;
+    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId);
     public PolicyDashboardItem? RestoreVersion(string policyId, int targetVersion, string restoredBy);
     public PolicyApprovalWorkflow SubmitForApproval(string policyId, string submittedBy, string[] approverIds);
     public PolicyApprovalWorkflow? RecordApproval(string workflowId, string approverId, ApprovalDecision decision, string? comment = null);

@@ -561,6 +561,7 @@ public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -576,6 +577,7 @@ public sealed class FirestoreStateStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -591,6 +593,7 @@ public sealed class VercelKvStateStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -697,6 +700,7 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -715,6 +719,7 @@ public sealed class AzureFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -732,6 +737,7 @@ public sealed class GoogleCloudFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -748,6 +754,7 @@ public sealed class CloudflareWorkersFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -1424,6 +1431,7 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -1441,6 +1449,7 @@ public sealed class CloudWatchMetricsStrategy : ServerlessStrategyBase
     public override string DisplayName;;
     public override ServerlessCategory Category;;
     public override ServerlessPlatform? TargetPlatform;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -1497,6 +1506,7 @@ public sealed class PerformanceInsightsStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -1689,6 +1699,7 @@ public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -1733,6 +1744,7 @@ public sealed class CostOptimizationStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -2455,6 +2467,7 @@ public sealed class LazyLoadingStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
@@ -2509,6 +2522,7 @@ public sealed class PredictiveWarmingStrategy : ServerlessStrategyBase
     public override string StrategyId;;
     public override string DisplayName;;
     public override ServerlessCategory Category;;
+    public override bool IsProductionReady;;
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;

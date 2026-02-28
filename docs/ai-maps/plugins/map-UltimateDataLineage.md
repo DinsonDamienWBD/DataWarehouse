@@ -128,6 +128,7 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
     protected virtual Task InitializeCoreAsync(CancellationToken ct);;
     protected virtual Task DisposeCoreAsync();;
     public virtual Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default);
+    public IReadOnlyList<ProvenanceRecord> GetProvenance(string dataObjectId);
     public virtual Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
     public virtual Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
     public virtual Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);

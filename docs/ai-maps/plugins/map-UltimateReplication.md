@@ -390,6 +390,7 @@ public sealed class ReplicationLagMonitoringFeature : IDisposable
 public sealed class LagNodeStatus
 {
 }
+    internal readonly object SyncLock = new();
     public required string NodeKey { get; init; }
     public required string SourceNode { get; init; }
     public required string TargetNode { get; init; }
@@ -2235,6 +2236,7 @@ public sealed class PredictiveReplicationStrategy : EnhancedReplicationStrategyB
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
+    public override bool IsProductionReady;;
     public void Configure(double predictionThreshold, int historyWindowSize);
     public void RecordAccess(string key, string nodeId, bool isWrite);
     public PredictionResult PredictTargetNodes(string key);
@@ -2252,6 +2254,7 @@ public sealed class SemanticReplicationStrategy : EnhancedReplicationStrategyBas
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
+    public override bool IsProductionReady;;
     public void DefineRelationship(string key1, string key2);
     public void CategorizeData(string key, string category);
     public void SetCategoryAffinity(string category, IEnumerable<string> preferredNodes);
@@ -2273,6 +2276,7 @@ public sealed class AdaptiveReplicationStrategy : EnhancedReplicationStrategyBas
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
+    public override bool IsProductionReady;;
     public AdaptiveConfig GetConfig();;
     public void RecordMetrics(string key, bool isWrite, TimeSpan latency, bool hadConflict);
     public override async Task ReplicateAsync(string sourceNodeId, IEnumerable<string> targetNodeIds, ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default);
@@ -2321,6 +2325,7 @@ public sealed class IntelligentReplicationStrategy : EnhancedReplicationStrategy
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
+    public override bool IsProductionReady;;
     public void RecordNodeHealth(string nodeId, double latencyMs, double errorRate);
     public void RecordAnomaly(string nodeId, string type, double severity, string? description = null);
     public IEnumerable<(string NodeId, double Probability, DateTimeOffset? PredictedTime)> GetFailurePredictions();

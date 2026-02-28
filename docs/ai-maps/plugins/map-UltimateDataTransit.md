@@ -307,6 +307,7 @@ internal sealed class DataSegment
     public required long Size { get; init; }
     public required string AssignedPathId { get; set; }
     public bool Completed { get; set; }
+    public bool Failed { get; set; }
 }
 ```
 ```csharp

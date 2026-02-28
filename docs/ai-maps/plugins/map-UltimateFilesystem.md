@@ -121,6 +121,7 @@ public abstract class FilesystemStrategyBase : StrategyBase, IFilesystemStrategy
     public abstract Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
     public abstract Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
     public abstract Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);;
+    protected static void ValidatePath(string path);
 }
 ```
 ```csharp
@@ -922,7 +923,8 @@ public sealed class CasBlock
     public required string ContentHash { get; init; }
     public required byte[] Data { get; init; }
     public int Size { get; init; }
-    public int ReferenceCount { get; set; }
+    internal int _referenceCount;
+    public int ReferenceCount;;
     public DateTime StoredAt { get; init; }
 }
 ```
@@ -1028,7 +1030,7 @@ public sealed class DistributedHaFilesystemManager
     public IReadOnlyList<string> DetectUnhealthyNodes(TimeSpan threshold);
     public IReadOnlyList<RebalanceMovement> Rebalance();
     public string? CurrentLeader;;
-    public ClusterHealth GetClusterHealth();;
+    public ClusterHealth GetClusterHealth();
 }
 ```
 ```csharp
@@ -1563,6 +1565,7 @@ public sealed class DeviceJournal : IAsyncDisposable
     public async Task RollbackAsync(long sequenceNumber, IPhysicalBlockDevice journalDevice, CancellationToken ct = default);
     public async Task<IReadOnlyList<JournalEntry>> ReadJournalAsync(IPhysicalBlockDevice journalDevice, CancellationToken ct = default);
     public async Task<IReadOnlyList<JournalEntry>> GetUncommittedIntentsAsync(IPhysicalBlockDevice journalDevice, CancellationToken ct = default);
+    public async Task InitializeJournalAreaAsync(IPhysicalBlockDevice device, CancellationToken ct);
     public ValueTask DisposeAsync();
 }
 ```

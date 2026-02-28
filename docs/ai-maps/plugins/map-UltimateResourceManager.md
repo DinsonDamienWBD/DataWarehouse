@@ -205,6 +205,7 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -219,6 +220,7 @@ public sealed class VgpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 
@@ -250,6 +252,7 @@ public sealed class PriorityCpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -264,6 +267,7 @@ public sealed class AffinityCpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -278,6 +282,7 @@ public sealed class RealTimeCpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -292,6 +297,7 @@ public sealed class NumaCpuStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 
@@ -567,6 +573,7 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -581,6 +588,18 @@ public sealed class CompositeResourceStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+private sealed class CompositeAlloc
+{
+}
+    public long CoreMilliunits;
+    public long MemoryBytes;
+    public long Iops;
+    public long IoBandwidth;
+    public long GpuPercentMilliunits;
 }
 ```
 ```csharp
@@ -641,6 +660,7 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 ```csharp
@@ -655,6 +675,7 @@ public sealed class PriorityIoStrategy : ResourceStrategyBase
     public override string[] Tags;;
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 

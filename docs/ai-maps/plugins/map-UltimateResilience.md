@@ -743,7 +743,7 @@ public sealed class LeakyBucketRateLimitingStrategy : ResilienceStrategyBase
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     public override void Reset();
     protected override string? GetCurrentState();;
-    public new void Dispose();
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -1323,12 +1323,12 @@ private sealed class BackupJob
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateResilience/Strategies/Bulkhead/BulkheadStrategies.cs
 ```csharp
-public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
 {
 }
     public ThreadPoolBulkheadStrategy() : this(maxParallelism: 10, maxQueueLength: 100);
     public ThreadPoolBulkheadStrategy(int maxParallelism, int maxQueueLength);
-    public new void Dispose();
+    protected override void Dispose(bool disposing);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;
@@ -1341,12 +1341,12 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
 }
 ```
 ```csharp
-public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase
 {
 }
     public SemaphoreBulkheadStrategy() : this(maxParallelism: 10, waitTimeout: TimeSpan.FromSeconds(30));
     public SemaphoreBulkheadStrategy(int maxParallelism, TimeSpan waitTimeout);
-    public new void Dispose();
+    protected override void Dispose(bool disposing);
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Category;;

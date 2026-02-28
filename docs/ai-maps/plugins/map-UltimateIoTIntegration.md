@@ -1363,6 +1363,7 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1378,6 +1379,7 @@ public class EdgeSyncStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1392,6 +1394,7 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1406,6 +1409,7 @@ public class EdgeMonitoringStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1420,6 +1424,7 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -2350,6 +2355,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override string ProtocolName;;
     public override int DefaultPort;;
     public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);;
