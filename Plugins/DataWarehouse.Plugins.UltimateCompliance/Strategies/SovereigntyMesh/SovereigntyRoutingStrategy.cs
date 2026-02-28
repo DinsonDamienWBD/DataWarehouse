@@ -575,15 +575,22 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
 
     private static string? ExtractEuCountry(string lowerBackendId)
     {
-        // Try to extract country suffix: s3-eu-west-1 -> EU, azure-eu-de -> DE
-        if (lowerBackendId.Contains("-de", StringComparison.Ordinal)) return "DE";
-        if (lowerBackendId.Contains("-fr", StringComparison.Ordinal)) return "FR";
-        if (lowerBackendId.Contains("-it", StringComparison.Ordinal)) return "IT";
-        if (lowerBackendId.Contains("-es", StringComparison.Ordinal)) return "ES";
-        if (lowerBackendId.Contains("-nl", StringComparison.Ordinal)) return "NL";
-        if (lowerBackendId.Contains("-ie", StringComparison.Ordinal)) return "IE";
-        if (lowerBackendId.Contains("-se", StringComparison.Ordinal)) return "SE";
-        if (lowerBackendId.Contains("-pl", StringComparison.Ordinal)) return "PL";
+        // P2-1549: Use exact word-boundary matching to prevent country code misidentification.
+        // For example, "-se" must not match "southeast". A country code appears as
+        // a dash-delimited token: "-<CC>" at end or "-<CC>-" in the middle.
+        static bool HasCountryCode(string id, string code)
+            => id.EndsWith(code, StringComparison.Ordinal) ||
+               id.Contains(code + "-", StringComparison.Ordinal);
+
+        // Try to extract country suffix: s3-eu-west-de -> DE, azure-de -> DE
+        if (HasCountryCode(lowerBackendId, "-de")) return "DE";
+        if (HasCountryCode(lowerBackendId, "-fr")) return "FR";
+        if (HasCountryCode(lowerBackendId, "-it")) return "IT";
+        if (HasCountryCode(lowerBackendId, "-es")) return "ES";
+        if (HasCountryCode(lowerBackendId, "-nl")) return "NL";
+        if (HasCountryCode(lowerBackendId, "-ie")) return "IE";
+        if (HasCountryCode(lowerBackendId, "-se")) return "SE";
+        if (HasCountryCode(lowerBackendId, "-pl")) return "PL";
         return null;
     }
 

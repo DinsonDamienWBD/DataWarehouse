@@ -85,6 +85,9 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
         IReadOnlyDictionary<string, object> context,
         CancellationToken ct = default)
     {
+        // P2-1533: Validate required parameters to prevent NRE inside EvaluateAndTranslateAsync.
+        ArgumentException.ThrowIfNullOrEmpty(objectId);
+        ArgumentException.ThrowIfNullOrEmpty(destinationLocation);
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
             IncrementCounter("enforcement_interceptor.write");
@@ -120,6 +123,9 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
         IReadOnlyDictionary<string, object> context,
         CancellationToken ct = default)
     {
+        // P2-1534: Validate required parameters to prevent NRE inside EvaluateAndTranslateAsync.
+        ArgumentException.ThrowIfNullOrEmpty(objectId);
+        ArgumentException.ThrowIfNullOrEmpty(requestorLocation);
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
             IncrementCounter("enforcement_interceptor.read");
