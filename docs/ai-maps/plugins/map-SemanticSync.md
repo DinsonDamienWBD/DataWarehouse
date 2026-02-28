@@ -199,7 +199,7 @@ internal sealed class EmbeddingSimilarityDetector
 {
 }
     public EmbeddingSimilarityDetector(IAIProvider? aiProvider = null);
-    public double? LastSimilarityScore { get; private set; }
+    public double? LastSimilarityScore { get => _lastSimilarityScore is double d ? d : null; private set => _lastSimilarityScore = value.HasValue ? (object)value.Value : null; }
     public async Task<SemanticConflict?> DetectAsync(string dataId, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, CancellationToken ct = default);
 }
 ```
