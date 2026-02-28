@@ -5274,6 +5274,7 @@ public sealed record InstanceConfiguration
     public string? ClientCertificate { get; init; }
     public string? ClientCertificatePassword { get; init; }
     public bool ValidateServerCertificate { get; init; };
+    public bool AllowInsecureTls { get; init; };
     public int Priority { get; init; };
     public int MaxConcurrentRequests { get; init; };
     public int TimeoutMs { get; init; };
@@ -7713,6 +7714,7 @@ public sealed class ContinualLearningStrategy : FeatureStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
     public async Task LearnNewTaskAsync(string taskName, IEnumerable<(object[] Features, object Label)> examples, CancellationToken ct = default);
@@ -7738,6 +7740,7 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 }
     public override string StrategyId;;
     public override string StrategyName;;
+    public override bool IsProductionReady;;
     public override IntelligenceStrategyInfo Info;;
     public async Task ShareKnowledgeAsync(KnowledgePackage knowledgePackage, CancellationToken ct = default);
     public async Task ReceiveKnowledgeAsync(string fromAgentId, KnowledgePackage knowledge, CancellationToken ct = default);
@@ -7751,6 +7754,7 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
 }
     public override string StrategyId;;
     public override string StrategyName;;
+    public override bool IsProductionReady;;
     public override IntelligenceStrategyInfo Info;;
     public async Task<string> LearnFromFewExamplesAsync(IEnumerable<(object Input, object Output)> examples, string taskType, CancellationToken ct = default);
     public async Task TransferKnowledgeAsync(string sourceTask, string targetTask, CancellationToken ct = default);
@@ -12289,6 +12293,7 @@ public sealed class ArangoGraphStrategy : KnowledgeGraphStrategyBase
 }
     public override string StrategyId;;
     public override string StrategyName;;
+    public override bool IsProductionReady;;
     public override IntelligenceStrategyInfo Info;;
     public ArangoGraphStrategy() : this(SharedHttpClient);
     public ArangoGraphStrategy(HttpClient httpClient);
@@ -12338,6 +12343,7 @@ public sealed class TigerGraphStrategy : KnowledgeGraphStrategyBase
 }
     public override string StrategyId;;
     public override string StrategyName;;
+    public override bool IsProductionReady;;
     public override IntelligenceStrategyInfo Info;;
     public TigerGraphStrategy() : this(SharedHttpClient);
     public TigerGraphStrategy(HttpClient httpClient);
@@ -12869,6 +12875,7 @@ public abstract class TabularModelStrategyBase : IntelligenceStrategyBase
 public sealed class TabPfnStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -12883,6 +12890,7 @@ public sealed class TabPfnStrategy : TabularModelStrategyBase
 public sealed class TabNetStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -12897,6 +12905,7 @@ public sealed class TabNetStrategy : TabularModelStrategyBase
 public sealed class SaintStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -12911,6 +12920,7 @@ public sealed class SaintStrategy : TabularModelStrategyBase
 public sealed class TabTransformerStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -12925,6 +12935,7 @@ public sealed class TabTransformerStrategy : TabularModelStrategyBase
 public sealed class AutoMlTabularStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -12939,6 +12950,7 @@ public sealed class AutoMlTabularStrategy : TabularModelStrategyBase
 public sealed class XgBoostLlmStrategy : TabularModelStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -15373,7 +15385,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
     public async Task CompactAsync(CancellationToken ct = default);
     public async Task FlushAsync(CancellationToken ct = default);
     public Task<PersistenceStatistics> GetStatisticsAsync(CancellationToken ct = default);
-    public Task<bool> IsHealthyAsync(CancellationToken ct = default);
+    public async Task<bool> IsHealthyAsync(CancellationToken ct = default);
     public async Task<SnapshotInfo> CreateSnapshotAsync(string name, CancellationToken ct = default);
     public async Task RestoreFromSnapshotAsync(string name, CancellationToken ct = default);
     public async ValueTask DisposeAsync();
@@ -16929,7 +16941,7 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
     public bool AutoPull { get => _autoPull; set => _autoPull = value; }
     public bool KeepAlive { get => _keepAlive; set => _keepAlive = value; }
     public OllamaEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null) : base(config, httpClient);
-    protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
+    protected override Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);;
     protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
     public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
     public async Task<IReadOnlyList<string>> ListLocalModelsAsync(CancellationToken ct = default);
@@ -18433,6 +18445,7 @@ public sealed class PgVectorOptions : VectorStoreOptions
 public sealed class PgVectorStore : ProductionVectorStoreBase
 {
 }
+    public bool IsProductionReady;;
     public override string StoreId;;
     public override string DisplayName;;
     public override int VectorDimensions;;

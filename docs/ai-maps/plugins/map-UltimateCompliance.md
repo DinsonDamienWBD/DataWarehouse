@@ -663,6 +663,46 @@ public sealed class AccessEvaluationResult
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Reporting/ComplianceReportGenerator.cs
+```csharp
+public sealed class ComplianceReportGenerator
+{
+}
+    public string GenerateHtmlReport(ComplianceReportData data);
+    public async Task<PdfExportResult> ExportToPdfAsync(ComplianceReportData data, string outputPath, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class ComplianceReportData
+{
+}
+    public string? Title { get; init; }
+    public string? Framework { get; init; }
+    public DateTime GeneratedAt { get; init; };
+    public string? OverallStatus { get; init; }
+    public IReadOnlyList<ReportFinding>? Findings { get; init; }
+}
+```
+```csharp
+public sealed class ReportFinding
+{
+}
+    public string? Code { get; init; }
+    public string? Description { get; init; }
+    public string? Severity { get; init; }
+}
+```
+```csharp
+public sealed class PdfExportResult
+{
+}
+    public required bool Success { get; init; }
+    public string? OutputPath { get; init; }
+    public DateTime GeneratedAt { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Scaling/ComplianceScalingManager.cs
 ```csharp
 [SdkCompatibility("6.0.0", Notes = "Phase 88-09: Compliance scaling with parallel checks, TTL cache, configurable concurrency")]
@@ -941,7 +981,7 @@ public sealed class IncidentMetrics
 public sealed class ChainOfCustodyExporter
 {
 }
-    public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId);
+    public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId, byte[]? hmacKey = null);
     public async Task<ChainOfCustodyDocument> ExportAsync(ChainOfCustodyRequest request, CancellationToken cancellationToken = default);
     public bool VerifyDocument(ChainOfCustodyDocument document);
 }
@@ -2702,10 +2742,10 @@ private sealed class ComplianceMetric
 {
 }
     public required string Framework { get; init; }
-    public long TotalChecks { get; set; }
-    public long ViolationCount { get; set; }
-    public long CompliantCount { get; set; }
-    public double ComplianceScore { get; set; };
+    public long TotalChecks;
+    public long ViolationCount;
+    public long CompliantCount;
+    public double ComplianceScore { get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _complianceScoreBits)); set => Interlocked.Exchange(ref _complianceScoreBits, BitConverter.DoubleToInt64Bits(value)); }
     public DateTime FirstCheckAt { get; set; }
     public DateTime? LastCheckAt { get; set; }
     public DateTime? LastViolationAt { get; set; }
@@ -6547,7 +6587,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task<ISovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct);
     public async Task RegisterZoneAsync(ISovereigntyZone zone, CancellationToken ct);
     public async Task DeactivateZoneAsync(string zoneId, CancellationToken ct);
-    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAuditAsync(string objectId);
+    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAudit(string objectId);
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -6940,8 +6980,21 @@ public record EmbassyChannel
     public required byte[] SharedKey { get; init; }
     public DateTimeOffset EstablishedAt { get; init; }
     public bool IsActive { get; set; }
-    public long TransferCount { get; set; }
-    public DateTimeOffset? LastTransferAt { get; set; }
+    public long TransferCount;;
+    public long IncrementTransferCount();;
+    public DateTimeOffset? LastTransferAt
+{
+    get
+    {
+        var t = Interlocked.Read(ref _lastTransferAtTicks);
+        return t == 0 ? null : new DateTimeOffset(t, TimeSpan.Zero);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _lastTransferAtTicks, value.HasValue ? value.Value.UtcTicks : 0);
+    }
+}
 }
 ```
 ```csharp
