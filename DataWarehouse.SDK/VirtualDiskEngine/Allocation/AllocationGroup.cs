@@ -62,40 +62,53 @@ public sealed class AllocationGroup : IDisposable
     /// 0.0 means all free space is contiguous; approaches 1.0 as free space
     /// becomes scattered across many fragments.
     /// </summary>
+    /// <remarks>
+    /// P2-763: Snapshot the bitmap under a short-held read lock, then compute
+    /// fragmentation outside the lock to avoid blocking writers for O(n) iterations.
+    /// </remarks>
     public double FragmentationRatio
     {
         get
         {
+            byte[] bitmapSnapshot;
+            long freeCount;
+
+            // Take a snapshot under the read lock (fast copy) then release immediately.
             _lock.EnterReadLock();
             try
             {
                 if (_freeBlockCount == 0 || _freeBlockCount == BlockCount)
                     return 0.0;
-
-                long fragmentCount = 0;
-                bool inFreeRun = false;
-
-                for (long i = 0; i < BlockCount; i++)
-                {
-                    bool isFree = IsBitSet(i);
-                    if (isFree && !inFreeRun)
-                    {
-                        fragmentCount++;
-                        inFreeRun = true;
-                    }
-                    else if (!isFree)
-                    {
-                        inFreeRun = false;
-                    }
-                }
-
-                if (fragmentCount <= 1)
-                    return 0.0;
-
-                // Ratio of fragment count to free block count; capped at 1.0
-                return Math.Min(1.0, (double)(fragmentCount - 1) / _freeBlockCount);
+                freeCount = _freeBlockCount;
+                bitmapSnapshot = (byte[])_bitmap.Clone();
             }
             finally { _lock.ExitReadLock(); }
+
+            // Compute fragmentation off-lock — no writer is blocked.
+            long fragmentCount = 0;
+            bool inFreeRun = false;
+
+            for (long i = 0; i < BlockCount; i++)
+            {
+                int byteIdx = (int)(i >> 3);
+                int bitIdx  = (int)(i & 7);
+                bool isFree = (bitmapSnapshot[byteIdx] & (1 << bitIdx)) == 0;
+                if (isFree && !inFreeRun)
+                {
+                    fragmentCount++;
+                    inFreeRun = true;
+                }
+                else if (!isFree)
+                {
+                    inFreeRun = false;
+                }
+            }
+
+            if (fragmentCount <= 1)
+                return 0.0;
+
+            // Ratio of fragment count to free block count; capped at 1.0
+            return Math.Min(1.0, (double)(fragmentCount - 1) / freeCount);
         }
     }
 

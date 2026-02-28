@@ -53,16 +53,19 @@ public static class HilbertPartitioner
     /// </summary>
     /// <param name="numShards">Number of shards to partition into.</param>
     /// <param name="bitsPerDimension">Bits per dimension (determines total Hilbert space size).</param>
+    /// <param name="dimensions">Number of dimensions (1-8). Defaults to 2.</param>
     /// <returns>Array of (Start, End) inclusive ranges, one per shard.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when numShards is less than 1.</exception>
-    public static (long Start, long End)[] PartitionHilbertSpace(int numShards, int bitsPerDimension)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when numShards is less than 1 or dimensions is out of range.</exception>
+    public static (long Start, long End)[] PartitionHilbertSpace(int numShards, int bitsPerDimension, int dimensions = 2)
     {
         if (numShards < 1)
             throw new ArgumentOutOfRangeException(nameof(numShards), numShards, "Must have at least 1 shard.");
+        // P2-730: Accept dimensions to avoid silent 2D assumption for higher-dimensional keys.
+        if (dimensions < 1 || dimensions > 8)
+            throw new ArgumentOutOfRangeException(nameof(dimensions), dimensions, "Dimensions must be 1-8.");
 
-        // Total Hilbert space is 2^(dimensions * bitsPerDimension), but for partitioning
-        // we use a simplified 1D range based on bitsPerDimension alone
-        long totalRange = 1L << (bitsPerDimension * 2); // Assume 2D for range calculation
+        // Total Hilbert space is 2^(dimensions * bitsPerDimension)
+        long totalRange = 1L << (bitsPerDimension * dimensions);
         long rangePerShard = totalRange / numShards;
 
         var partitions = new (long Start, long End)[numShards];

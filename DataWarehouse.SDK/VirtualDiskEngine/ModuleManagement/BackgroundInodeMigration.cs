@@ -181,7 +181,8 @@ public sealed class BackgroundInodeMigration
             var bitmapRegion = await FindBitmapRegionAsync(ct);
             var scanner = new FreeSpaceScanner(_vdeStream, _blockSize,
                 bitmapRegion.StartBlock, bitmapRegion.BlockCount);
-            var freeRange = scanner.FindContiguousFreeBlocks(newBlocksNeeded);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(newBlocksNeeded, ct).ConfigureAwait(false);
 
             if (!freeRange.HasValue)
                 return MigrationResult.Failed(

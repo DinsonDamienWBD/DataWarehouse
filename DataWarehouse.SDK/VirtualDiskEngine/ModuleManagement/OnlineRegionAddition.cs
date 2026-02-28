@@ -124,7 +124,8 @@ public sealed class OnlineRegionAddition
         foreach (var regionName in moduleDef.RegionNames)
         {
             long requiredBlocks = CalculateRegionBlocks(moduleDef, superblock.TotalBlocks);
-            var freeRange = scanner.FindContiguousFreeBlocks(requiredBlocks);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(requiredBlocks, ct).ConfigureAwait(false);
             if (freeRange is null)
                 return RegionAdditionResult.Failed(
                     $"Insufficient contiguous free space for region '{regionName}' " +
@@ -266,12 +267,12 @@ public sealed class OnlineRegionAddition
         foreach (var regionName in moduleDef.RegionNames)
         {
             long requiredBlocks = CalculateRegionBlocks(moduleDef, superblock.TotalBlocks);
-            var freeRange = scanner.FindContiguousFreeBlocks(requiredBlocks);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(requiredBlocks, ct).ConfigureAwait(false);
             if (freeRange is null)
                 return false;
         }
 
-        await Task.CompletedTask; // Satisfy async signature
         return true;
     }
 
