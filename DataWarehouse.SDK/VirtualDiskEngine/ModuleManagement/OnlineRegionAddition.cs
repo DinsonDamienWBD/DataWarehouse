@@ -311,7 +311,7 @@ public sealed class OnlineRegionAddition
     /// Updates the allocation bitmap to mark the specified block range as allocated.
     /// Flips bits from 0 (free) to 1 (allocated) for each block in the range.
     /// </summary>
-    private async Task UpdateBitmapAllocationAsync(
+    private Task UpdateBitmapAllocationAsync(
         WalJournaledRegionWriter walWriter,
         WalTransaction txn,
         RegionPointer bmapPointer,
@@ -356,7 +356,7 @@ public sealed class OnlineRegionAddition
             walWriter.AddBitmapUpdate(txn, absoluteBlock, oldBits, newBits);
         }
 
-        await Task.CompletedTask; // All WAL entries added synchronously
+        return Task.CompletedTask;
     }
 
     /// <summary>

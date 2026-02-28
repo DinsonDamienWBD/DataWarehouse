@@ -179,16 +179,18 @@ public static class TlaPlusModelGenerator
                 "echo \"=== Verifying {0} ===\"", moduleName));
             sb.AppendLine("TOTAL=$((TOTAL + 1))");
 
+            // P2-799: Inline spec and config content directly into the heredoc rather than
+            // referencing bash variables that were never populated, which produced empty files.
             // Write spec file
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "cat > \"{0}.tla\" << 'SPEC_EOF'", moduleName));
-            sb.AppendLine("${" + moduleName + "_SPEC}");
+            sb.AppendLine(spec.SpecText);
             sb.AppendLine("SPEC_EOF");
 
             // Write config file
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "cat > \"{0}.cfg\" << 'CFG_EOF'", moduleName));
-            sb.AppendLine("${" + moduleName + "_CFG}");
+            sb.AppendLine(GenerateTlcConfig(spec));
             sb.AppendLine("CFG_EOF");
 
             // Run TLC

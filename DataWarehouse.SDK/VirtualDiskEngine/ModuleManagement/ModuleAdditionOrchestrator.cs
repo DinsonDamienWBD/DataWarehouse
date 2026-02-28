@@ -465,12 +465,12 @@ public sealed class ModuleAdditionOrchestrator
     /// Available if the module has inode fields that don't fit in padding AND
     /// sufficient free space exists for a new inode table.
     /// </summary>
-    private async Task<AdditionOption> EvaluateOption3Async(
+    private Task<AdditionOption> EvaluateOption3Async(
         VdeModule moduleDef, SuperblockV2 superblock, uint currentManifest, CancellationToken ct)
     {
         if (!moduleDef.HasInodeFields)
         {
-            return new AdditionOption
+            return Task.FromResult(new AdditionOption
             {
                 OptionNumber = 3,
                 Name = "Background Inode Migration",
@@ -481,7 +481,7 @@ public sealed class ModuleAdditionOrchestrator
                 Downtime = DowntimeEstimate.Zero,
                 PerformanceImpact = "~10% I/O overhead during migration",
                 EstimatedDuration = TimeSpan.FromMinutes(5),
-            };
+            });
         }
 
         // If padding claim is available, migration is also available but not preferred
@@ -499,9 +499,7 @@ public sealed class ModuleAdditionOrchestrator
         bool hasFreeSpace = superblock.FreeBlocks >= newBlocksNeeded;
         TimeSpan estimatedDuration = TimeSpan.FromSeconds(Math.Max(1, estimatedInodes / 200));
 
-        await Task.CompletedTask; // Satisfy async contract
-
-        return new AdditionOption
+        return Task.FromResult(new AdditionOption
         {
             OptionNumber = 3,
             Name = "Background Inode Migration",
@@ -514,7 +512,7 @@ public sealed class ModuleAdditionOrchestrator
             Downtime = DowntimeEstimate.Zero,
             PerformanceImpact = "~10% I/O overhead during migration",
             EstimatedDuration = estimatedDuration,
-        };
+        });
     }
 
     /// <summary>
