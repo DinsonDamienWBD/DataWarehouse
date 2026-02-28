@@ -1366,7 +1366,7 @@ public class AsanaConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1387,7 +1387,7 @@ public class MondayConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1408,7 +1408,7 @@ public class FreshDeskConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1535,7 +1535,7 @@ public class PipedriveConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1892,7 +1892,7 @@ public class IntercomConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -2163,7 +2163,7 @@ public class NotionConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -2247,7 +2247,7 @@ public class HubSpotConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -2289,7 +2289,7 @@ public class MicrosoftDynamicsConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
