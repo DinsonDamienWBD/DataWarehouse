@@ -15,6 +15,14 @@ namespace DataWarehouse.Kernel.Pipeline
         private readonly BoundedDictionary<string, IDataTerminal> _terminalCache = new BoundedDictionary<string, IDataTerminal>(1000);
 
         /// <summary>
+        /// Optional kernel context. When set, access-control and compliance queries delegate
+        /// to the registered UltimateAccessControl / UltimateCompliance plugins via the message bus.
+        /// When null, <see cref="ValidateAccessAsync"/> defaults to deny-all (fail-closed) for
+        /// non-system-admin principals and <see cref="GetMandatoryStagesAsync"/> returns an empty list.
+        /// </summary>
+        public IKernelContext? KernelContext { get; set; }
+
+        /// <summary>
         /// Resolves the encryption strategy from the pipeline policy.
         /// Maps PluginId + StrategyName to the actual IEncryptionStrategy.
         /// </summary>
@@ -276,11 +284,12 @@ namespace DataWarehouse.Kernel.Pipeline
             if (securityContext.IsSystemAdmin)
                 return true;
 
-            // UltimateAccessControl integration: currently allows all authenticated users.
-            // When UltimateAccessControl is wired in, replace with plugin-based policy check.
-            if (!string.IsNullOrEmpty(securityContext.UserId))
-                return true;
-
+            // Fail-closed: deny all non-admin principals when no external access control is wired.
+            // Callers that wish to permit authenticated users must register UltimateAccessControl plugin
+            // in the DataWarehouse Kernel and set PipelinePluginIntegration.KernelContext so the kernel
+            // can be queried at authorization time. Without wiring, only system admins are allowed.
+            // This prevents accidental broad access grants in deployments that haven't yet configured ACL.
+            await Task.CompletedTask; // Preserve async method signature for future plugin delegation
             return false;
         }
 

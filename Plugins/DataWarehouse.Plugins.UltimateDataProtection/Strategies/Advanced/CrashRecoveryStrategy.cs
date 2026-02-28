@@ -511,15 +511,34 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<List<FileMetadata>> ScanSourceFilesAsync(IReadOnlyList<string> sources, CancellationToken ct)
         {
-            // In production, scan source directories
             var files = new List<FileMetadata>();
-            for (int i = 0; i < 15000; i++)
+            foreach (var source in sources)
             {
-                files.Add(new FileMetadata
+                if (string.IsNullOrWhiteSpace(source)) continue;
+                ct.ThrowIfCancellationRequested();
+                try
                 {
-                    Path = $"/data/file{i}.dat",
-                    Size = 1024 * 512 // 512 KB
-                });
+                    if (Directory.Exists(source))
+                    {
+                        foreach (var f in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+                        {
+                            try
+                            {
+                                var fi = new FileInfo(f);
+                                files.Add(new FileMetadata { Path = f, Size = fi.Length });
+                            }
+                            catch { /* skip inaccessible files */ }
+                            if (files.Count >= 500000) break; // safety cap
+                        }
+                    }
+                    else if (File.Exists(source))
+                    {
+                        var fi = new FileInfo(source);
+                        files.Add(new FileMetadata { Path = source, Size = fi.Length });
+                    }
+                }
+                catch (UnauthorizedAccessException) { /* skip inaccessible paths */ }
+                catch (DirectoryNotFoundException) { /* skip missing paths */ }
             }
             return Task.FromResult(files);
         }

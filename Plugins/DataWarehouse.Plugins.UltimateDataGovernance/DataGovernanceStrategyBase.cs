@@ -82,13 +82,21 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     /// <summary>Gets a cached health status, refreshing every 60 seconds.</summary>
     public HealthStatus GetHealth()
     {
-        var result = GetCachedHealthAsync(ct =>
+        // Avoid sync-over-async deadlock: compute synchronously without async context capture.
+        var status = IsInitialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
+        return status;
+    }
+
+    /// <summary>Gets a cached health status asynchronously, refreshing every 60 seconds.</summary>
+    public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
+    {
+        var result = await GetCachedHealthAsync(innerCt =>
         {
             var status = IsInitialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
             return Task.FromResult(new StrategyHealthCheckResult(
                 status == HealthStatus.Healthy,
                 status.ToString()));
-        }, TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
+        }, TimeSpan.FromSeconds(60));
 
         return result.IsHealthy ? HealthStatus.Healthy : HealthStatus.NotInitialized;
     }

@@ -285,16 +285,17 @@ public class PlacementOptimizer
         // Sort by score descending and take top N
         scoredCandidates.Sort((a, b) => b.Score.CompareTo(a.Score));
 
-        return scoredCandidates.Take(count).Select((s, i) =>
+        // Compute alternatives once (backends ranked below the top-count selection).
+        var alternativeBackends = scoredCandidates.Count > count
+            ? scoredCandidates.Skip(count).Select(r => r.Backend).ToList().AsReadOnly()
+            : null;
+
+        return scoredCandidates.Take(count).Select((s, i) => new PlacementResult
         {
-            var remaining = scoredCandidates.Skip(count).Select(r => r.Backend).ToList();
-            return new PlacementResult
-            {
-                Backend = s.Backend,
-                Score = s.Score,
-                ScoreBreakdown = s.Breakdown,
-                Alternatives = i == 0 && remaining.Count > 0 ? remaining.AsReadOnly() : null
-            };
+            Backend = s.Backend,
+            Score = s.Score,
+            ScoreBreakdown = s.Breakdown,
+            Alternatives = i == 0 ? alternativeBackends : null
         }).ToList().AsReadOnly();
     }
 

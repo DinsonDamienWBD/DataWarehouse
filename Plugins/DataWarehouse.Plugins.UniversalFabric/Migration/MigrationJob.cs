@@ -38,10 +38,20 @@ public class MigrationJob
     /// </summary>
     public MigrationMode Mode { get; init; } = MigrationMode.Copy;
 
+    // Status and timestamp fields use volatile int/long backing to provide memory barriers
+    // for cross-thread visibility (finding 4532).
+    private volatile int _statusValue = (int)MigrationJobStatus.Pending;
+    private long _startedAtTicks = 0;
+    private long _completedAtTicks = 0;
+
     /// <summary>
     /// Current status of this migration job.
     /// </summary>
-    public MigrationJobStatus Status { get; private set; } = MigrationJobStatus.Pending;
+    public MigrationJobStatus Status
+    {
+        get => (MigrationJobStatus)_statusValue;
+        private set => _statusValue = (int)value;
+    }
 
     /// <summary>
     /// When this job was created.
@@ -51,12 +61,28 @@ public class MigrationJob
     /// <summary>
     /// When this job started executing.
     /// </summary>
-    public DateTime? StartedAt { get; private set; }
+    public DateTime? StartedAt
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _startedAtTicks);
+            return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+        }
+        private set => Interlocked.Exchange(ref _startedAtTicks, value?.Ticks ?? 0);
+    }
 
     /// <summary>
     /// When this job completed (success, failure, or cancellation).
     /// </summary>
-    public DateTime? CompletedAt { get; private set; }
+    public DateTime? CompletedAt
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _completedAtTicks);
+            return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+        }
+        private set => Interlocked.Exchange(ref _completedAtTicks, value?.Ticks ?? 0);
+    }
 
     /// <summary>
     /// Error message if the job failed.

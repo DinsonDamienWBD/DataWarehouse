@@ -133,7 +133,8 @@ public class BackendAbstractionLayer : IStorageStrategy
         // List is streaming -- circuit breaker check only, no timeout wrapping
         CheckCircuitBreaker();
 
-        IAsyncEnumerator<StorageObjectMetadata>? enumerator = null;
+        // Use await using to guarantee disposal even if the consumer abandons mid-iteration (finding 4533).
+        IAsyncEnumerator<StorageObjectMetadata> enumerator;
         try
         {
             enumerator = _inner.ListAsync(prefix, ct).GetAsyncEnumerator(ct);
@@ -144,24 +145,9 @@ public class BackendAbstractionLayer : IStorageStrategy
             throw _normalizer.Normalize(ex, _backendId, "List", prefix);
         }
 
-        bool hasNext;
-        try
+        await using (enumerator)
         {
-            hasNext = await enumerator.MoveNextAsync();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            RecordFailure();
-            await enumerator.DisposeAsync();
-            throw _normalizer.Normalize(ex, _backendId, "List", prefix);
-        }
-
-        while (hasNext)
-        {
-            var current = enumerator.Current;
-            RecordSuccess();
-            yield return current;
-
+            bool hasNext;
             try
             {
                 hasNext = await enumerator.MoveNextAsync();
@@ -169,12 +155,26 @@ public class BackendAbstractionLayer : IStorageStrategy
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 RecordFailure();
-                await enumerator.DisposeAsync();
                 throw _normalizer.Normalize(ex, _backendId, "List", prefix);
             }
-        }
 
-        await enumerator.DisposeAsync();
+            while (hasNext)
+            {
+                var current = enumerator.Current;
+                RecordSuccess();
+                yield return current;
+
+                try
+                {
+                    hasNext = await enumerator.MoveNextAsync();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    RecordFailure();
+                    throw _normalizer.Normalize(ex, _backendId, "List", prefix);
+                }
+            }
+        }
     }
 
     /// <inheritdoc/>

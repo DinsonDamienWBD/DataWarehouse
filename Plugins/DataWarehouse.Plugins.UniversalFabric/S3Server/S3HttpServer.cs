@@ -351,12 +351,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
             });
         }
 
-        // Handle pagination via continuation token (offset-based)
+        // Handle pagination via HMAC-signed opaque continuation token (finding 4534).
+        // The token encodes the offset signed with a server secret to prevent client probing.
         var startIndex = 0;
-        if (request.ContinuationToken != null &&
-            int.TryParse(request.ContinuationToken, out var offset))
+        if (request.ContinuationToken != null)
         {
-            startIndex = offset;
+            startIndex = DecodeAndVerifyContinuationToken(request.ContinuationToken);
         }
 
         var pageObjects = allObjects
@@ -365,7 +365,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
             .ToList();
 
         var isTruncated = startIndex + request.MaxKeys < allObjects.Count;
-        string? nextToken = isTruncated ? (startIndex + request.MaxKeys).ToString() : null;
+        string? nextToken = isTruncated ? CreateContinuationToken(startIndex + request.MaxKeys) : null;
 
         return new S3ListObjectsResponse
         {
@@ -861,6 +861,46 @@ public sealed class S3HttpServer : IS3CompatibleServer
             throw new KeyNotFoundException(
                 $"NoSuchBucket: The specified bucket '{bucketName}' does not exist. " +
                 "Create the bucket with CreateBucketAsync before accessing it.");
+    }
+
+    // Continuation token signing key — derived per server instance.
+    // In a clustered deployment, use a shared secret from configuration.
+    private static readonly byte[] _tokenSigningKey = RandomNumberGenerator.GetBytes(32);
+
+    private static string CreateContinuationToken(int offset)
+    {
+        // Encode offset as 4-byte big-endian and sign with HMACSHA256 to prevent client tampering.
+        var payload = BitConverter.GetBytes(offset);
+        if (BitConverter.IsLittleEndian) Array.Reverse(payload);
+        using var hmac = new HMACSHA256(_tokenSigningKey);
+        var sig = hmac.ComputeHash(payload);
+        // Token = Base64(offset_bytes + sig_bytes)
+        var combined = new byte[payload.Length + sig.Length];
+        payload.CopyTo(combined, 0);
+        sig.CopyTo(combined, payload.Length);
+        return Convert.ToBase64String(combined);
+    }
+
+    private static int DecodeAndVerifyContinuationToken(string token)
+    {
+        try
+        {
+            var combined = Convert.FromBase64String(token);
+            if (combined.Length < 4 + 32)
+                return 0; // malformed token, start from beginning
+            var payload = combined[..4];
+            var sig = combined[4..];
+            using var hmac = new HMACSHA256(_tokenSigningKey);
+            var expected = hmac.ComputeHash(payload);
+            if (!sig.SequenceEqual(expected))
+                return 0; // invalid signature, restart from beginning
+            if (BitConverter.IsLittleEndian) Array.Reverse(payload);
+            return BitConverter.ToInt32(payload);
+        }
+        catch
+        {
+            return 0; // invalid token, start from beginning
+        }
     }
 
     private static string ComputeETag(byte[] data)

@@ -108,6 +108,18 @@ namespace DataWarehouse.Kernel.Messaging
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
 
+        /// <summary>
+        /// Attempts to add the key-value pair atomically. Returns false if the key already exists.
+        /// </summary>
+        public bool TryAdd(TKey key, TValue value)
+        {
+            if (!_dictionary.TryAdd(key, value))
+                return false;
+            _keyOrder.Enqueue(key);
+            EnforceCapacity();
+            return true;
+        }
+
         public IEnumerable<TValue> Values => _dictionary.Values;
 
         public IEnumerable<TKey> Keys => _dictionary.Keys;
@@ -528,17 +540,22 @@ namespace DataWarehouse.Kernel.Messaging
 
             foreach (var pending in toRetry)
             {
-                if (pending.RetryCount >= pending.Options.MaxRetries)
+                // All state mutations guarded by SyncRoot to prevent races between
+                // the retry timer and concurrent delivery task completions.
+                lock (pending.SyncRoot)
                 {
-                    pending.State = MessageState.Failed;
-                    pending.LastError = $"Max retries ({pending.Options.MaxRetries}) exceeded";
-                    RecordStatistic(s => s.TotalFailed++);
-                    _context.LogWarning($"[MessageBus] Message {pending.MessageId} failed after {pending.RetryCount} retries");
-                    continue;
-                }
+                    if (pending.RetryCount >= pending.Options.MaxRetries)
+                    {
+                        pending.State = MessageState.Failed;
+                        pending.LastError = $"Max retries ({pending.Options.MaxRetries}) exceeded";
+                        RecordStatistic(s => s.TotalFailed++);
+                        _context.LogWarning($"[MessageBus] Message {pending.MessageId} failed after {pending.RetryCount} retries");
+                        continue;
+                    }
 
-                pending.RetryCount++;
-                pending.NextRetryAt = now + CalculateBackoff(pending.RetryCount, pending.Options);
+                    pending.RetryCount++;
+                    pending.NextRetryAt = now + CalculateBackoff(pending.RetryCount, pending.Options);
+                }
 
                 _context.LogDebug($"[MessageBus] Retrying message {pending.MessageId} (attempt {pending.RetryCount})");
 
@@ -547,16 +564,22 @@ namespace DataWarehouse.Kernel.Messaging
                     try
                     {
                         var delivered = await DeliverMessageAsync(pending.Topic, pending.Message, CancellationToken.None);
-                        if (delivered)
+                        lock (pending.SyncRoot)
                         {
-                            pending.State = MessageState.Delivered;
-                            pending.DeliveredAt = DateTime.UtcNow;
-                            RecordStatistic(s => { s.TotalDelivered++; s.TotalRetried++; });
+                            if (delivered)
+                            {
+                                pending.State = MessageState.Delivered;
+                                pending.DeliveredAt = DateTime.UtcNow;
+                                RecordStatistic(s => { s.TotalDelivered++; s.TotalRetried++; });
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        pending.LastError = ex.Message;
+                        lock (pending.SyncRoot)
+                        {
+                            pending.LastError = ex.Message;
+                        }
                         _context.LogError($"[MessageBus] Retry failed for {pending.MessageId}: {ex.Message}", ex);
                     }
                 });
@@ -639,11 +662,6 @@ namespace DataWarehouse.Kernel.Messaging
         /// </summary>
         public IMessageGroup CreateGroup(string groupId)
         {
-            if (_messageGroups.ContainsKey(groupId))
-            {
-                throw new InvalidOperationException($"Message group '{groupId}' already exists");
-            }
-
             var group = new MessageGroup
             {
                 GroupId = groupId,
@@ -652,7 +670,12 @@ namespace DataWarehouse.Kernel.Messaging
                 Messages = new List<GroupedMessage>()
             };
 
-            _messageGroups.AddOrUpdate(groupId, group);
+            // Use TryAdd semantics: if a group with this ID already exists the add is rejected atomically
+            if (!_messageGroups.TryAdd(groupId, group))
+            {
+                throw new InvalidOperationException($"Message group '{groupId}' already exists");
+            }
+
             _context.LogDebug($"[MessageBus] Created message group {groupId}");
 
             return new MessageGroupHandle(groupId, this);
@@ -854,6 +877,8 @@ namespace DataWarehouse.Kernel.Messaging
 
         private class PendingMessage
         {
+            /// <summary>Guards all mutable fields against concurrent access from retry timer and delivery tasks.</summary>
+            public readonly object SyncRoot = new();
             public string MessageId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
             public required PluginMessage Message { get; set; }

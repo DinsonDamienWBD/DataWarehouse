@@ -482,20 +482,25 @@ namespace DataWarehouse.Kernel.Storage
                 return;
             }
 
-            if (!_usage.TryGetValue(container.Id, out var usage))
+            // GetOrAdd is not available on BoundedDictionary; use AddOrUpdate to ensure atomic insert
+            var usage = _usage.AddOrUpdate(
+                container.Id,
+                _ => new ContainerUsage { ContainerId = container.Id },
+                (_, existing) => existing);
+
+            // All field mutations are guarded by the usage-level lock to prevent torn reads
+            // from concurrent RecordUsage calls on the same container.
+            lock (usage.SyncRoot)
             {
-                usage = new ContainerUsage { ContainerId = container.Id };
-                _usage[container.Id] = usage;
+                usage.CurrentSizeBytes = Math.Max(0, usage.CurrentSizeBytes + bytesChanged);
+                usage.CurrentItemCount = Math.Max(0, usage.CurrentItemCount + itemsChanged);
+                usage.LastUpdated = DateTime.UtcNow;
+
+                if (bytesChanged > 0)
+                    usage.TotalBytesWritten += bytesChanged;
+                else
+                    usage.TotalBytesDeleted += Math.Abs(bytesChanged);
             }
-
-            usage.CurrentSizeBytes = Math.Max(0, usage.CurrentSizeBytes + bytesChanged);
-            usage.CurrentItemCount = Math.Max(0, usage.CurrentItemCount + itemsChanged);
-            usage.LastUpdated = DateTime.UtcNow;
-
-            if (bytesChanged > 0)
-                usage.TotalBytesWritten += bytesChanged;
-            else
-                usage.TotalBytesDeleted += Math.Abs(bytesChanged);
         }
 
         #endregion
@@ -635,6 +640,8 @@ namespace DataWarehouse.Kernel.Storage
     /// </summary>
     public class ContainerUsage
     {
+        /// <summary>Guards all mutable fields against concurrent RecordUsage calls.</summary>
+        internal readonly object SyncRoot = new();
         public string ContainerId { get; set; } = string.Empty;
         public long CurrentSizeBytes { get; set; }
         public int CurrentItemCount { get; set; }

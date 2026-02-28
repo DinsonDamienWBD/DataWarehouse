@@ -508,18 +508,9 @@ public sealed class ComplianceValueStrategy : ConsciousnessStrategyBase
                 frameworkCount = frameworkStrings.Count();
             }
 
-            score = Math.Max(score, frameworkCount * 10.0);
-            // If audit was set, keep the max of audit base + framework bonus
-            if (metadata.TryGetValue("audit_required", out var auditObj2) && Convert.ToBoolean(auditObj2))
-            {
-                score = Math.Max(80.0, score) + frameworkCount * 10.0;
-                // But re-applying: the base is 80, add framework bonus on top
-                score = 80.0 + frameworkCount * 10.0;
-            }
-            else
-            {
-                score = frameworkCount * 10.0;
-            }
+            // Framework bonus: each framework adds 10 points, take max with existing (audit) base.
+            var frameworkBonus = frameworkCount * 10.0;
+            score = Math.Max(score, frameworkBonus);
         }
 
         // If audit is required but no frameworks, ensure minimum 80

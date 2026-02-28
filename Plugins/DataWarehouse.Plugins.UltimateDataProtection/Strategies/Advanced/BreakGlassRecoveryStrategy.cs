@@ -565,36 +565,98 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private List<KeyShare> SplitSecretKey(byte[] secret, int threshold, int totalShares)
         {
-            // In production, use Shamir's Secret Sharing algorithm
-            var shares = new List<KeyShare>();
-            for (int i = 1; i <= totalShares; i++)
+            // XOR-based secret sharing (t-of-n): n-1 random shares XOR'd together to produce share n.
+            // For t=n this guarantees all shares required. A full Shamir's SSS implementation
+            // requires a finite-field polynomial library; this provides correct k=n semantics.
+            if (threshold != totalShares)
+                throw new NotSupportedException("Only t=n threshold supported in this implementation. Use threshold == totalShares.");
+
+            var shares = new List<byte[]>();
+            byte[] xorCumulative = new byte[secret.Length];
+
+            // Generate n-1 random shares
+            for (int i = 1; i < totalShares; i++)
             {
-                shares.Add(new KeyShare
-                {
-                    ShareId = $"share-{i:D2}",
-                    ShareIndex = i,
-                    ShareData = Convert.ToBase64String(secret) // Simplified
-                });
+                var share = new byte[secret.Length];
+                RandomNumberGenerator.Fill(share);
+                shares.Add(share);
+                for (int b = 0; b < secret.Length; b++)
+                    xorCumulative[b] ^= share[b];
             }
-            return shares;
+
+            // Last share = secret XOR all previous shares
+            var lastShare = new byte[secret.Length];
+            for (int b = 0; b < secret.Length; b++)
+                lastShare[b] = (byte)(secret[b] ^ xorCumulative[b]);
+            shares.Add(lastShare);
+
+            return shares.Select((s, idx) => new KeyShare
+            {
+                ShareId = $"share-{idx + 1:D2}",
+                ShareIndex = idx + 1,
+                ShareData = Convert.ToBase64String(s)
+            }).ToList();
         }
 
         private byte[] ReconstructSecretKey(List<string> shareData, int threshold)
         {
-            // In production, use Shamir's Secret Sharing reconstruction
-            // For now, simulate with first share
-            return Convert.FromBase64String(shareData[0]);
+            // XOR reconstruction: XOR all share bytes together to recover the secret.
+            if (shareData.Count < threshold)
+                throw new InvalidOperationException($"Insufficient shares: need {threshold}, got {shareData.Count}");
+
+            byte[]? result = null;
+            foreach (var b64 in shareData)
+            {
+                var share = Convert.FromBase64String(b64);
+                if (result == null)
+                {
+                    result = share.ToArray();
+                }
+                else
+                {
+                    for (int i = 0; i < result.Length; i++)
+                        result[i] ^= share[i];
+                }
+            }
+            return result!;
         }
 
-        private async Task<CatalogResult> CatalogSourceDataAsync(IReadOnlyList<string> sources, CancellationToken ct)
+        private Task<CatalogResult> CatalogSourceDataAsync(IReadOnlyList<string> sources, CancellationToken ct)
         {
-            await Task.CompletedTask;
-            return new CatalogResult
+            // Enumerate source paths to build catalog metadata.
+            long totalBytes = 0;
+            var files = new List<string>();
+            foreach (var source in sources)
             {
-                FileCount = 5000,
-                TotalBytes = 2L * 1024 * 1024 * 1024, // 2 GB
-                Files = new List<string>()
-            };
+                if (!string.IsNullOrWhiteSpace(source))
+                {
+                    try
+                    {
+                        if (Directory.Exists(source))
+                        {
+                            foreach (var f in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+                            {
+                                files.Add(f);
+                                try { totalBytes += new FileInfo(f).Length; } catch { /* best effort */ }
+                                if (files.Count >= 100000) break; // safety cap
+                            }
+                        }
+                        else if (File.Exists(source))
+                        {
+                            files.Add(source);
+                            try { totalBytes += new FileInfo(source).Length; } catch { /* best effort */ }
+                        }
+                    }
+                    catch (UnauthorizedAccessException) { /* skip inaccessible paths */ }
+                    catch (DirectoryNotFoundException) { /* skip missing paths */ }
+                }
+            }
+            return Task.FromResult(new CatalogResult
+            {
+                FileCount = files.Count,
+                TotalBytes = totalBytes,
+                Files = files
+            });
         }
 
         private async Task<byte[]> CreateBackupDataAsync(
@@ -603,9 +665,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             Action<long> progressCallback,
             CancellationToken ct)
         {
-            await Task.Delay(100, ct);
-            progressCallback(2L * 1024 * 1024 * 1024);
-            return new byte[1024 * 1024]; // Placeholder
+            // Produce a backup archive: iterate files and concatenate their bytes.
+            // In production this would stream to a compressed/encrypted archive format.
+            using var ms = new System.IO.MemoryStream();
+            long bytesWritten = 0;
+            foreach (var file in files)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    var data = await File.ReadAllBytesAsync(file, ct);
+                    await ms.WriteAsync(data, ct);
+                    bytesWritten += data.Length;
+                    progressCallback(bytesWritten);
+                }
+                catch (IOException) { /* skip unreadable files */ }
+            }
+            return ms.ToArray();
         }
 
         private async Task<byte[]> EncryptBackupAsync(byte[] data, byte[] key, CancellationToken ct)
@@ -662,8 +738,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<bool> ValidateEmergencyTokenAsync(string token, CancellationToken ct)
         {
-            // In production, validate token signature and expiration
-            return Task.FromResult(true);
+            if (string.IsNullOrWhiteSpace(token))
+                return Task.FromResult(false);
+
+            // Check token exists in the active token store and has not expired.
+            if (_activeTokens.TryGetValue(token, out var tokenRecord))
+            {
+                return Task.FromResult(tokenRecord.ExpiresAt > DateTimeOffset.UtcNow);
+            }
+
+            return Task.FromResult(false);
         }
 
         private async Task<BreakGlassSession> InitiateBreakGlassSessionAsync(

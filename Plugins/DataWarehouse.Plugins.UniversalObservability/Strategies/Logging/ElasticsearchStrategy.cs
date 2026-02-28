@@ -28,10 +28,10 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     private readonly SemaphoreSlim _flushLock = new(1, 1);
     private int _batchSize = 500; // Elasticsearch can handle larger batches
     private int _flushIntervalMs = 5000; // Default 5 seconds
-    private int _circuitBreakerFailures = 0;
+    private int _circuitBreakerFailures = 0; // Interlocked
     private const int CircuitBreakerThreshold = 5;
     private volatile bool _circuitOpen = false;
-    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private long _circuitOpenedAtTicks = DateTimeOffset.MinValue.UtcTicks; // Interlocked
     private readonly object _circuitLock = new();
     private int _flushIntervalSeconds = 5;
 
@@ -181,7 +181,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
 
     private async Task FlushLogsAsync(CancellationToken ct)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && (DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks)) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, skip flush
 
         if (_logsBatch.IsEmpty) return;
@@ -246,7 +246,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             try
             {
                 await action();
-                _circuitBreakerFailures = 0; // Reset on success
+                Interlocked.Exchange(ref _circuitBreakerFailures, 0); // Reset on success
                 _circuitOpen = false;
                 return;
             }
@@ -285,11 +285,10 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                _circuitBreakerFailures++;
-                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                if (Interlocked.Increment(ref _circuitBreakerFailures) >= CircuitBreakerThreshold)
                 {
                     _circuitOpen = true;
-                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                    Interlocked.Exchange(ref _circuitOpenedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
                 }
                 throw;
             }
@@ -299,7 +298,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && (DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks)) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop logs
 
         foreach (var entry in logEntries)

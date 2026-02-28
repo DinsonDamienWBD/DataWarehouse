@@ -234,7 +234,8 @@ namespace DataWarehouse.SDK.Utilities
 
         /// <summary>
         /// Attempts to get the value associated with the specified key.
-        /// Promotes the entry to most-recently-used on success.
+        /// Promotes the entry to most-recently-used on success (write lock required for LRU update).
+        /// Use <see cref="TryPeek"/> for read-only access without LRU promotion.
         /// </summary>
         /// <param name="key">The key to look up.</param>
         /// <param name="value">When this method returns, contains the associated value if found.</param>
@@ -254,6 +255,30 @@ namespace DataWarehouse.SDK.Utilities
                 return false;
             }
             finally { _lock.ExitWriteLock(); }
+        }
+
+        /// <summary>
+        /// Reads the value associated with the specified key WITHOUT updating LRU order.
+        /// Uses a read lock so concurrent peeks can proceed in parallel.
+        /// Use this when LRU promotion is not desired (e.g., read-only scanning or metrics).
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">When this method returns, contains the associated value if found.</param>
+        /// <returns><c>true</c> if the key was found; otherwise <c>false</c>.</returns>
+        public bool TryPeek(TKey key, out TValue value)
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                if (_map.TryGetValue(key, out var node))
+                {
+                    value = node.Value.Value;
+                    return true;
+                }
+                value = default!;
+                return false;
+            }
+            finally { _lock.ExitReadLock(); }
         }
 
         /// <summary>

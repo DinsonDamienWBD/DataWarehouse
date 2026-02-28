@@ -20,7 +20,7 @@ public sealed class MoonshotHealthAggregator
     private readonly IReadOnlyDictionary<MoonshotId, IMoonshotHealthProbe> _probes;
     private readonly IMoonshotRegistry _registry;
     private readonly ILogger<MoonshotHealthAggregator> _logger;
-    private readonly Dictionary<MoonshotId, DateTimeOffset> _lastCheckTimes = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<MoonshotId, DateTimeOffset> _lastCheckTimes = new();
 
     /// <summary>
     /// Creates a new aggregator from the set of registered health probes.
