@@ -76,7 +76,11 @@ public sealed class DefaultTagPolicyEngine : ITagPolicyEngine
         PolicyScope? scope = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        foreach (var kvp in _policies)
+        // Snapshot keys to avoid holding an enumerator over the concurrent dictionary
+        // while callers consume the async stream.
+        var snapshot = _policies.ToArray();
+
+        foreach (var kvp in snapshot)
         {
             ct.ThrowIfCancellationRequested();
             if (scope is null || kvp.Value.Scope == scope.Value)
@@ -85,7 +89,9 @@ public sealed class DefaultTagPolicyEngine : ITagPolicyEngine
             }
         }
 
-        await Task.CompletedTask; // Ensure async signature is valid
+        // IAsyncEnumerable<T> requires at least one await in the iterator; delegate to
+        // ValueTask.CompletedTask to satisfy the compiler without allocating a state machine.
+        await ValueTask.CompletedTask;
     }
 
     /// <inheritdoc />

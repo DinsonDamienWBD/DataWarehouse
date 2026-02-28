@@ -265,18 +265,70 @@ public sealed class KernelStorageService : IKernelStorageService
     }
 
     /// <summary>
-    /// Rebuilds the metadata index from storage.
-    /// Call this on startup to restore the index.
+    /// Rebuilds the metadata index from storage by scanning all stored items.
+    /// Uses <see cref="IListableStorage"/> when the underlying provider supports listing;
+    /// otherwise the in-memory index is cleared (items will be lazily re-added on next access).
     /// </summary>
     public async Task RebuildIndexAsync(CancellationToken ct = default)
     {
         _logger?.LogInformation("Rebuilding storage metadata index...");
 
-        // Note: This is a simplified implementation.
-        // In production, you'd scan the storage provider for all items.
-        // For now, the index is built as items are saved.
+        var storage = _getStorageProvider();
+        if (storage == null)
+        {
+            _logger?.LogWarning("RebuildIndexAsync: no storage provider available, index cleared.");
+            _metadataIndex.Clear();
+            return;
+        }
 
-        await Task.CompletedTask;
-        _logger?.LogInformation("Storage metadata index rebuilt");
+        // If the provider supports listing, do a full scan; otherwise clear and let items
+        // be re-indexed on next SaveAsync (the index is a cache, not the source of truth).
+        if (storage is IListableStorage listable)
+        {
+            var rebuilt = 0;
+            await _indexLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                _metadataIndex.Clear();
+                var prefix = _basePath.Replace('\\', '/');
+                await foreach (var item in listable.ListFilesAsync(prefix, ct).ConfigureAwait(false))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    // Derive the relative path by stripping the base path prefix from the URI.
+                    var uriPath = item.Uri.AbsolutePath.TrimStart('/');
+                    var relPath = uriPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        ? uriPath.Substring(prefix.Length).TrimStart('/')
+                        : uriPath;
+
+                    // Skip metadata sidecar files (*.meta.json)
+                    if (relPath.EndsWith(".meta.json", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var info = new StorageItemInfo
+                    {
+                        Path = relPath,
+                        SizeBytes = item.SizeBytes,
+                        CreatedAt = DateTime.MinValue,   // Not available from listing
+                        ModifiedAt = DateTime.UtcNow,
+                    };
+                    _metadataIndex[relPath] = info;
+                    rebuilt++;
+                }
+            }
+            finally
+            {
+                _indexLock.Release();
+            }
+
+            _logger?.LogInformation("Storage metadata index rebuilt: {Count} items.", rebuilt);
+        }
+        else
+        {
+            // Provider does not support listing — clear stale index so subsequent ExistsAsync
+            // calls fall through to storage rather than returning a stale cached false-positive.
+            _metadataIndex.Clear();
+            _logger?.LogInformation(
+                "Storage metadata index cleared (provider does not implement IListableStorage).");
+        }
     }
 }
