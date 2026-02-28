@@ -1219,37 +1219,72 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = [] };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows = [new Dictionary<string, object?> { ["key"] = key, ["value"] = value }]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows = [new Dictionary<string, object?> { ["key"] = key, ["value"] = value }]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
-        var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
-        return new QueryResult { Success = true, RowsAffected = 1 };
+        try
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+            return new QueryResult { Success = true, RowsAffected = 1 };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied writing key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult DeleteValue(string key)
     {
         var filePath = GetKeyFilePath(key);
-        if (File.Exists(filePath))
+
+        try
         {
-            File.Delete(filePath);
-            return new QueryResult { Success = true, RowsAffected = 1 };
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                return new QueryResult { Success = true, RowsAffected = 1 };
+            }
+            return new QueryResult { Success = true, RowsAffected = 0 };
         }
-        return new QueryResult { Success = true, RowsAffected = 0 };
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error deleting key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied deleting key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult ScanAll(IReadOnlyDictionary<string, object?>? parameters)
@@ -1258,13 +1293,35 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
         var rows = new List<IReadOnlyDictionary<string, object?>>();
         var dataDir = Path.Combine(_databasePath, "data");
 
-        if (Directory.Exists(dataDir))
+        if (!Directory.Exists(dataDir))
+            return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
+
+        string[] files;
+        try
         {
-            foreach (var file in Directory.GetFiles(dataDir, "*.dat").Take(limit))
+            files = Directory.GetFiles(dataDir, "*.dat");
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error listing data directory: {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied listing data directory: {ex.Message}" };
+        }
+
+        foreach (var file in files.Take(limit))
+        {
+            try
             {
                 var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
                 var value = File.ReadAllText(file);
                 rows.Add(new Dictionary<string, object?> { ["key"] = key, ["value"] = value });
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+            {
+                // Skip corrupted or inaccessible entries; continue scanning remaining files.
+                System.Diagnostics.Trace.TraceWarning($"[BerkeleyDb] Skipping unreadable record '{file}': {ex.Message}");
             }
         }
 

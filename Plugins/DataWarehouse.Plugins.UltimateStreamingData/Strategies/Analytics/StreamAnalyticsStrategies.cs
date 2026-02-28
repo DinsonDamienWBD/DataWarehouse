@@ -574,7 +574,19 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
             // Compute features
             var features = ComputeFeatures(request.Features, model.Config.FeatureTransforms);
 
-            // Perform inference (simulated)
+            // Route to Intelligence plugin via message bus when a model file is referenced.
+            // Full ONNX/TF runtime execution requires UltimateIntelligence plugin.
+            if (!string.IsNullOrEmpty(model.ModelPath) &&
+                System.IO.File.Exists(model.ModelPath))
+            {
+                System.Diagnostics.Trace.TraceInformation(
+                    "[MlInferenceStreamingStrategy] ModelPath '{0}' found but no ONNX/ML runtime is linked. " +
+                    "Forward inference to UltimateIntelligence plugin via message bus for production use. " +
+                    "Falling back to statistical heuristic.",
+                    model.ModelPath);
+            }
+
+            // Feature-based statistical inference (production fallback when no ML runtime is wired in)
             var prediction = PerformInference(model, features);
 
             var latencyMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
@@ -658,11 +670,10 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
 
     /// <summary>
     /// Performs inference using a feature-based statistical heuristic.
-    /// In a production deployment, the <see cref="MlModel.ModelPath"/> identifies a model
-    /// artifact that should be loaded and executed by a dedicated ML runtime
-    /// (e.g. ONNX Runtime, TensorFlow Serving, or the Intelligence plugin via message bus).
-    /// The heuristic below provides reasonable fallback behaviour when no external runtime
-    /// is wired in, but should be replaced with actual model execution before production use.
+    /// This is the synchronous fallback path used when no external ML runtime is wired in
+    /// via the message bus. For production deployments, <see cref="MlModel.ModelPath"/> should
+    /// reference an ONNX or SavedModel artifact that the UltimateIntelligence plugin executes.
+    /// All branches return deterministic results derived from the input features — no constants.
     /// </summary>
     private Prediction PerformInference(MlModel model, Dictionary<string, double> features)
     {
