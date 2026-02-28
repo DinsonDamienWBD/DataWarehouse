@@ -5604,6 +5604,7 @@ public sealed record ConsentRecord
     public string? UserAgent { get; init; }
     public string? ParentalConsentId { get; init; }
     public string? ProofOfConsent { get; init; }
+    public string? DoubleOptInToken { get; init; }
 }
 ```
 ```csharp
@@ -5636,6 +5637,7 @@ public sealed record ConsentRecordResult
     public bool RequiresParentalConsent { get; init; }
     public bool RequiresDoubleOptIn { get; init; }
     public string? PendingConsentId { get; init; }
+    public string? ConfirmationToken { get; init; }
 }
 ```
 ```csharp
@@ -6637,7 +6639,7 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     public Task RegisterZoneAsync(SovereigntyZone zone, CancellationToken ct = default);
     public Task<SovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct = default);
     public Task<IReadOnlyList<SovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct = default);
