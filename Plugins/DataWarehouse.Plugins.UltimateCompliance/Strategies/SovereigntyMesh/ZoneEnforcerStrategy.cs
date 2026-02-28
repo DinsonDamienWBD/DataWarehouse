@@ -274,7 +274,8 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     /// </summary>
     /// <param name="objectId">Identifier of the data object.</param>
     /// <returns>Audit entries for the object, ordered most recent first.</returns>
-    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAuditAsync(string objectId)
+    /// <remarks>Renamed from GetEnforcementAuditAsync — method is synchronous and should not have Async suffix.</remarks>
+    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAudit(string objectId)
     {
         if (_auditTrail.TryGetValue(objectId, out var entries))
         {

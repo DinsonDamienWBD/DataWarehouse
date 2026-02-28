@@ -73,10 +73,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             recommendations.Add("Consider private/permissioned blockchains for regulated data");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
                         violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
+            // isCompliant derived from status for consistency
+            var isCompliant = status == ComplianceStatus.Compliant;
 
             return Task.FromResult(new ComplianceResult
             {

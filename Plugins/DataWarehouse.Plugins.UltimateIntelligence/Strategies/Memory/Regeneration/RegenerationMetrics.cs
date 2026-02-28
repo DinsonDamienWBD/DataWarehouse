@@ -13,6 +13,8 @@ public sealed class RegenerationMetrics
     private readonly ConcurrentQueue<MetricEvent> _eventLog = new();
     private readonly MetricsConfiguration _config;
     private readonly object _aggregateLock = new();
+    // Finding 3221: Separate counter for event log size — ConcurrentQueue.Count is O(n).
+    private long _eventLogCount;
 
     private long _totalOperations;
     private long _successfulOperations;
@@ -368,10 +370,19 @@ public sealed class RegenerationMetrics
     {
         _eventLog.Enqueue(evt);
 
-        // Trim old events
-        while (_eventLog.Count > _config.MaxEventLogSize)
+        // Finding 3221: ConcurrentQueue.Count is O(n) and not atomic with TryDequeue.
+        // Use a separate counter to bound the log size without per-Count enumeration.
+        // Accept that trimming is approximate (at most a few entries over the limit).
+        if (Interlocked.Read(ref _eventLogCount) > _config.MaxEventLogSize)
         {
-            _eventLog.TryDequeue(out _);
+            if (_eventLog.TryDequeue(out _))
+            {
+                Interlocked.Decrement(ref _eventLogCount);
+            }
+        }
+        else
+        {
+            Interlocked.Increment(ref _eventLogCount);
         }
     }
 
@@ -600,10 +611,18 @@ internal sealed class StrategyMetrics
 
     private double CalculateRecentTrend()
     {
-        if (_recentAccuracies.Count < 20) return 0;
+        // Finding 3220: Snapshot the list under lock before computing trend to avoid
+        // reading a partially-written or resized list.
+        double[] snapshot;
+        lock (_lock)
+        {
+            if (_recentAccuracies.Count < 20) return 0;
+            snapshot = _recentAccuracies.ToArray();
+        }
 
-        var firstHalf = _recentAccuracies.Take(_recentAccuracies.Count / 2).Average();
-        var secondHalf = _recentAccuracies.Skip(_recentAccuracies.Count / 2).Average();
+        var half = snapshot.Length / 2;
+        var firstHalf = snapshot.Take(half).Average();
+        var secondHalf = snapshot.Skip(half).Average();
 
         return secondHalf - firstHalf;
     }

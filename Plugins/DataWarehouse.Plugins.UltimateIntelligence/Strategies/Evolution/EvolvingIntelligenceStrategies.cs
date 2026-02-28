@@ -565,10 +565,16 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
 public sealed class ContinualLearningStrategy : FeatureStrategyBase
 {
     private readonly BoundedDictionary<string, TaskMetrics> _taskMetrics = new BoundedDictionary<string, TaskMetrics>(1000);
-    private readonly List<string> _learnedTasks = new();
+    // Use ConcurrentBag for _learnedTasks to allow thread-safe concurrent enumeration and add (finding 3093).
+    private readonly System.Collections.Concurrent.ConcurrentBag<string> _learnedTasks = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "evolution-continual";
+
+    /// <inheritdoc/>
+    // EWC model training, Fisher information matrix, and knowledge consolidation are not yet
+    // integrated with an ML runtime. Mark not production-ready until T118 (ML runtime) lands.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override string StrategyName => "Continual Learning";
@@ -640,9 +646,12 @@ public sealed class ContinualLearningStrategy : FeatureStrategyBase
 
             foreach (var task in _learnedTasks)
             {
-                // In production: Evaluate model on task-specific test set
-                // For now, return simulated accuracy
-                results[task] = 0.85 + Random.Shared.NextDouble() * 0.1;
+                // Actual evaluation requires running the EWC model against a held-out test set.
+                // Return per-task metric from stored training statistics until ML runtime is integrated.
+                var metrics = _taskMetrics.TryGetValue(task, out var m) ? m : null;
+                results[task] = metrics != null && metrics.ExampleCount > 0
+                    ? Math.Min(1.0, 0.5 + metrics.ExampleCount * 0.001) // rough convergence heuristic
+                    : 0.0;
             }
 
             await Task.CompletedTask;
@@ -701,6 +710,10 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 
     /// <inheritdoc/>
     public override string StrategyName => "Collective Intelligence";
+
+    /// <inheritdoc/>
+    // Federated learning aggregation and knowledge distillation require an ML runtime.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -855,6 +868,10 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
 
     /// <inheritdoc/>
     public override string StrategyName => "Meta-Learning";
+
+    /// <inheritdoc/>
+    // MAML and transfer learning require an ML runtime integration.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()

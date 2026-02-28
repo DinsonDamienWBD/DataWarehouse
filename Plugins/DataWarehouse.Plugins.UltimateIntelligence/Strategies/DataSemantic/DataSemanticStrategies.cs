@@ -35,6 +35,9 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
     private readonly BoundedDictionary<string, LineageNode> _nodes = new BoundedDictionary<string, LineageNode>(1000);
     private readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
     private readonly BoundedDictionary<string, LineageVersion> _versions = new BoundedDictionary<string, LineageVersion>(1000);
+    // Adjacency lists for O(degree) BFS lookups instead of O(E) full-scan.
+    private readonly BoundedDictionary<string, System.Collections.Concurrent.ConcurrentBag<string>> _upstreamEdges = new BoundedDictionary<string, System.Collections.Concurrent.ConcurrentBag<string>>(1000);
+    private readonly BoundedDictionary<string, System.Collections.Concurrent.ConcurrentBag<string>> _downstreamEdges = new BoundedDictionary<string, System.Collections.Concurrent.ConcurrentBag<string>>(1000);
     private readonly ReaderWriterLockSlim _graphLock = new();
     private long _edgeIdCounter;
 
@@ -124,17 +127,32 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
 
         _edges[edgeId] = edge;
 
-        // Update node modification time
-        if (_nodes.TryGetValue(targetId, out var target))
-        {
-            target.LastModifiedAt = DateTimeOffset.UtcNow;
-            target.Version++;
-            target.UpstreamCount++;
-        }
+        // Update adjacency index for O(degree) BFS.
+        _downstreamEdges.GetOrAdd(sourceId, _ => new System.Collections.Concurrent.ConcurrentBag<string>()).Add(edgeId);
+        _upstreamEdges.GetOrAdd(targetId, _ => new System.Collections.Concurrent.ConcurrentBag<string>()).Add(edgeId);
 
-        if (_nodes.TryGetValue(sourceId, out var source))
+        // Update node modification time — use graphLock to make mutations atomic.
+        _graphLock.EnterWriteLock();
+        try
         {
-            source.DownstreamCount++;
+            if (_nodes.TryGetValue(targetId, out var target))
+            {
+                _nodes[targetId] = target with
+                {
+                    LastModifiedAt = DateTimeOffset.UtcNow,
+                    Version = target.Version + 1,
+                    UpstreamCount = target.UpstreamCount + 1
+                };
+            }
+
+            if (_nodes.TryGetValue(sourceId, out var source))
+            {
+                _nodes[sourceId] = source with { DownstreamCount = source.DownstreamCount + 1 };
+            }
+        }
+        finally
+        {
+            _graphLock.ExitWriteLock();
         }
 
         return await Task.FromResult(edge);
@@ -172,17 +190,15 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
                 result.Nodes.Add(node);
             }
 
-            // Find upstream edges (edges where this node is the target)
-            var upstreamEdges = _edges.Values
-                .Where(e => e.TargetId == currentId && e.IsActive)
-                .ToList();
-
-            foreach (var edge in upstreamEdges)
+            // Use adjacency index for O(degree) lookup instead of O(E) full scan.
+            if (_upstreamEdges.TryGetValue(currentId, out var upstreamEdgeIds))
             {
-                result.Edges.Add(edge);
-                if (!visited.Contains(edge.SourceId))
+                foreach (var eid in upstreamEdgeIds)
                 {
-                    queue.Enqueue((edge.SourceId, depth + 1));
+                    if (!_edges.TryGetValue(eid, out var edge) || !edge.IsActive) continue;
+                    result.Edges.Add(edge);
+                    if (!visited.Contains(edge.SourceId))
+                        queue.Enqueue((edge.SourceId, depth + 1));
                 }
             }
         }
@@ -225,17 +241,15 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
                 result.Nodes.Add(node);
             }
 
-            // Find downstream edges (edges where this node is the source)
-            var downstreamEdges = _edges.Values
-                .Where(e => e.SourceId == currentId && e.IsActive)
-                .ToList();
-
-            foreach (var edge in downstreamEdges)
+            // Use adjacency index for O(degree) lookup instead of O(E) full scan.
+            if (_downstreamEdges.TryGetValue(currentId, out var downstreamEdgeIds))
             {
-                result.Edges.Add(edge);
-                if (!visited.Contains(edge.TargetId))
+                foreach (var eid in downstreamEdgeIds)
                 {
-                    queue.Enqueue((edge.TargetId, depth + 1));
+                    if (!_edges.TryGetValue(eid, out var edge) || !edge.IsActive) continue;
+                    result.Edges.Add(edge);
+                    if (!visited.Contains(edge.TargetId))
+                        queue.Enqueue((edge.TargetId, depth + 1));
                 }
             }
         }

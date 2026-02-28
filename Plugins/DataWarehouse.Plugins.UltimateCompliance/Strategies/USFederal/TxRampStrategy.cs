@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckBreachNotification(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(context.OperationType, "security-incident", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("TexasStateData", out var texasObj) && texasObj is true)
                 {

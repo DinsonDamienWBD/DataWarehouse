@@ -621,7 +621,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
         Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
         Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
 
-        channel.TransferCount++;
+        channel.IncrementTransferCount(); // atomic increment via Interlocked
         channel.LastTransferAt = DateTimeOffset.UtcNow;
 
         return await Task.FromResult(result);
@@ -668,8 +668,17 @@ public record EmbassyChannel
     public required byte[] SharedKey { get; init; }
     public DateTimeOffset EstablishedAt { get; init; }
     public bool IsActive { get; set; }
-    public long TransferCount { get; set; }
-    public DateTimeOffset? LastTransferAt { get; set; }
+    // Backing field allows Interlocked.Increment for thread-safe counter
+    private long _transferCount;
+    public long TransferCount => Interlocked.Read(ref _transferCount);
+    public long IncrementTransferCount() => Interlocked.Increment(ref _transferCount);
+    // LastTransferAt encoded as UTC ticks for Interlocked-safe write
+    private long _lastTransferAtTicks;
+    public DateTimeOffset? LastTransferAt
+    {
+        get { var t = Interlocked.Read(ref _lastTransferAtTicks); return t == 0 ? null : new DateTimeOffset(t, TimeSpan.Zero); }
+        set { Interlocked.Exchange(ref _lastTransferAtTicks, value.HasValue ? value.Value.UtcTicks : 0); }
+    }
 }
 
 /// <summary>

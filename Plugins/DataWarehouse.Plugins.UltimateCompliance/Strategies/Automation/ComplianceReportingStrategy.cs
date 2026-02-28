@@ -122,16 +122,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     Attributes = new Dictionary<string, object>(context.Attributes)
                 };
 
-                if (!_events.ContainsKey(framework))
+                // GetOrAdd is atomic; avoids TOCTOU between ContainsKey and indexer write
+                var eventList = _events.GetOrAdd(framework, _ => new List<ComplianceEvent>());
+
+                lock (eventList)
                 {
-                    _events[framework] = new List<ComplianceEvent>();
+                    eventList.Add(evt);
+
+                    // Keep only last 30 days of events per framework
+                    var cutoff = DateTime.UtcNow.AddDays(-30);
+                    eventList.RemoveAll(e => e.Timestamp < cutoff);
                 }
-
-                _events[framework].Add(evt);
-
-                // Keep only last 30 days of events per framework
-                var cutoff = DateTime.UtcNow.AddDays(-30);
-                _events[framework].RemoveAll(e => e.Timestamp < cutoff);
             }
 
             await Task.CompletedTask;
@@ -283,8 +284,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private double CalculateAvailability(List<ComplianceEvent> events)
         {
-            // Simplified availability calculation
-            return events.Any() ? 0.999 : 0.0;
+            // Availability derived from ratio of events with no downtime marker vs total;
+            // events without "Downtime" attribute are counted as available intervals
+            if (events.Count == 0) return 0.0;
+            var availableCount = events.Count(e => !e.Attributes.ContainsKey("Downtime"));
+            return (double)availableCount / events.Count;
         }
 
         private double CalculateAccessControlCompliance(List<ComplianceEvent> events)
@@ -296,8 +300,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private double CalculateIncidentReadiness(List<ComplianceEvent> events)
         {
-            // Simplified incident readiness calculation
-            return events.Any(e => e.Attributes.ContainsKey("IncidentResponse")) ? 1.0 : 0.5;
+            // Readiness score based on proportion of events that include IncidentResponse markers
+            if (events.Count == 0) return 0.0;
+            var readyCount = events.Count(e => e.Attributes.ContainsKey("IncidentResponse"));
+            return (double)readyCount / events.Count;
         }
 
         private List<string> DetermineRequiredFrameworks(ComplianceContext context)

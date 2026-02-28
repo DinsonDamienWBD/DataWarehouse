@@ -294,7 +294,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
                 {
                     Prompt = thoughtPrompt,
                     MaxTokens = 500,
-                    Temperature = float.Parse(GetConfig("Temperature") ?? "0.7")
+                    Temperature = float.TryParse(GetConfig("Temperature"), out var temp) ? temp : 0.7f
                 }, ct);
 
                 totalTokens += thoughtResponse.Usage?.TotalTokens ?? 0;
@@ -395,14 +395,48 @@ Your next Thought:";
         if (!thought.Contains("Action:", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        // Simple parsing - in production use proper parser
         var actionPart = thought.Substring(thought.IndexOf("Action:", StringComparison.OrdinalIgnoreCase));
+
+        // Parse "tool_name(param1=value1, ...)" format from the LLM output.
+        var parenOpen = actionPart.IndexOf('(');
+        var parenClose = actionPart.LastIndexOf(')');
+        string toolId = "unknown_tool";
+        var parameters = new Dictionary<string, object>();
+
+        if (parenOpen > 0 && parenClose > parenOpen)
+        {
+            // Extract tool name between "Action:" keyword and first '('
+            var actionLabel = actionPart.IndexOf("Action:", StringComparison.OrdinalIgnoreCase);
+            toolId = actionPart.Substring(actionLabel + 7, parenOpen - actionLabel - 7).Trim();
+
+            // Extract parameters "key=value" pairs
+            var paramStr = actionPart.Substring(parenOpen + 1, parenClose - parenOpen - 1);
+            foreach (var part in paramStr.Split(','))
+            {
+                var eq = part.IndexOf('=');
+                if (eq > 0)
+                {
+                    var key = part.Substring(0, eq).Trim();
+                    var val = part.Substring(eq + 1).Trim().Trim('"', '\'');
+                    if (!string.IsNullOrEmpty(key))
+                        parameters[key] = val;
+                }
+            }
+        }
+        else
+        {
+            // No parentheses — best-effort: extract first word after "Action:"
+            var tokens = actionPart.Substring(7).Trim().Split(' ', '\t', '\n');
+            if (tokens.Length > 0 && !string.IsNullOrWhiteSpace(tokens[0]))
+                toolId = tokens[0];
+        }
+
         return new AgentAction
         {
             ActionType = "tool_call",
             Content = actionPart,
-            ToolId = "example_tool",
-            Parameters = new Dictionary<string, object>()
+            ToolId = toolId,
+            Parameters = parameters
         };
     }
 
@@ -471,7 +505,9 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
             // Step 1: Decompose goal into subtasks
             var subtasks = await DecomposeGoalAsync(task, context, ct);
             reasoningChain.Add($"Decomposed goal into {subtasks.Count} subtasks");
-            totalTokens += 500; // Estimated
+            // Note: token count is estimated because DecomposeGoalAsync does not return usage metadata.
+            // Integrate provider-level usage tracking for accurate billing.
+            totalTokens += 500;
 
             foreach (var subtask in subtasks)
             {
@@ -505,7 +541,8 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
 
             // Step 3: Synthesize final result
             var finalResult = await SynthesizeResultsAsync(task, actions, ct);
-            totalTokens += 300; // Estimated
+            // Note: token count is estimated; SynthesizeResultsAsync does not return usage metadata.
+            totalTokens += 300;
 
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
@@ -710,7 +747,7 @@ public sealed class CrewAiAgentStrategy : AgentStrategyBase
 
     private List<AgentRole> CreateCrew(AgentContext context)
     {
-        var teamSize = int.Parse(GetConfig("TeamSize") ?? "3");
+        var teamSize = int.TryParse(GetConfig("TeamSize"), out var ts) ? ts : 3;
         return new List<AgentRole>
         {
             new AgentRole { Role = "Researcher", Goal = "Gather and analyze information", Backstory = "Expert at finding relevant data" },
@@ -752,8 +789,11 @@ Execute your role and provide your contribution:";
 /// </summary>
 public sealed class LangGraphAgentStrategy : AgentStrategyBase
 {
+    // _graph is only mutated inside ExecuteTaskAsync which callers must not invoke
+    // concurrently on the same instance (strategy instances are per-request).
+    // The lock below guards concurrent property access if the instance is shared.
+    private readonly object _stateLock = new();
     private readonly Dictionary<string, WorkflowNode> _graph = new();
-    private string _currentNode = "start";
 
     /// <inheritdoc/>
     public override string StrategyId => "agent-langgraph";
@@ -794,18 +834,25 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
 
         try
         {
-            // Build workflow graph
-            BuildWorkflowGraph(context);
-            reasoningChain.Add($"Built workflow graph with {_graph.Count} nodes");
+            // Use local graph and cursor to avoid shared-state races when the same instance
+            // is used concurrently (each invocation gets its own local copies).
+            Dictionary<string, WorkflowNode> localGraph;
+            lock (_stateLock)
+            {
+                BuildWorkflowGraph(context);
+                localGraph = new Dictionary<string, WorkflowNode>(_graph);
+            }
+
+            reasoningChain.Add($"Built workflow graph with {localGraph.Count} nodes");
 
             // Execute graph
-            _currentNode = "start";
+            string currentNode = "start";
             int depth = 0;
-            int maxDepth = int.Parse(GetConfig("MaxGraphDepth") ?? "20");
+            int maxDepth = int.TryParse(GetConfig("MaxGraphDepth"), out var md) ? md : 20;
 
-            while (_currentNode != "end" && depth < maxDepth)
+            while (currentNode != "end" && depth < maxDepth)
             {
-                if (!_graph.TryGetValue(_currentNode, out var node))
+                if (!localGraph.TryGetValue(currentNode, out var node))
                     break;
 
                 _currentState = _currentState with { CurrentStep = depth, CurrentTask = node.Name };
@@ -822,11 +869,11 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
                 });
 
                 reasoningChain.Add($"Executed {node.Name}: {result}");
-                totalTokens += 300; // Estimated
+                totalTokens += 300; // Estimated per-node token cost
 
                 // Determine next node
-                _currentNode = DetermineNextNode(node, state);
-                reasoningChain.Add($"Transition to: {_currentNode}");
+                currentNode = DetermineNextNode(node, state);
+                reasoningChain.Add($"Transition to: {currentNode}");
 
                 depth++;
             }
@@ -836,7 +883,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
             _currentState = _currentState with { IsRunning = false };
             return new AgentExecutionResult
             {
-                Success = _currentNode == "end",
+                Success = currentNode == "end",
                 Result = finalResult,
                 StepsTaken = depth,
                 ReasoningChain = reasoningChain,
@@ -978,7 +1025,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
 
             int iteration = 0;
             int maxIterations = context.MaxIterations;
-            int reprioritizeInterval = int.Parse(GetConfig("ReprioritizeInterval") ?? "3");
+            int reprioritizeInterval = int.TryParse(GetConfig("ReprioritizeInterval"), out var ri) ? ri : 3;
 
             while (_taskList.Count > 0 && iteration < maxIterations)
             {
@@ -1005,7 +1052,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
                 var newTasks = await CreateNewTasksAsync(task, currentTask.Description, result, ct);
                 foreach (var newTask in newTasks)
                 {
-                    if (_taskList.Count < int.Parse(GetConfig("MaxTasks") ?? "10"))
+                    if (_taskList.Count < (int.TryParse(GetConfig("MaxTasks"), out var mt) ? mt : 10))
                     {
                         _taskList.Add(new TaskItem { Id = _nextTaskId++, Description = newTask, Priority = _taskList.Count + 1 });
                     }
@@ -1181,7 +1228,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
 
         try
         {
-            int maxCalls = int.Parse(GetConfig("MaxToolCalls") ?? "5");
+            int maxCalls = int.TryParse(GetConfig("MaxToolCalls"), out var mc) ? mc : 5;
             bool continueExecution = true;
             int callCount = 0;
 

@@ -598,9 +598,16 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
         }
 
         // Use scope index if filtering by scope
+        // Finding 3169: Take locked snapshot before filtering to avoid reading partially-mutated HashSet.
         if (!string.IsNullOrEmpty(query.Scope) && _scopeIndex.TryGetValue(query.Scope, out var scopeIds))
         {
-            records = records.Where(r => scopeIds.Contains(r.Id));
+            string[] scopeSnapshot;
+            lock (scopeIds)
+            {
+                scopeSnapshot = scopeIds.ToArray();
+            }
+            var scopeSet = new HashSet<string>(scopeSnapshot);
+            records = records.Where(r => scopeSet.Contains(r.Id));
         }
 
         // Use tag index if filtering by tags
@@ -880,23 +887,23 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
     }
 
     /// <inheritdoc/>
-    public Task<bool> IsHealthyAsync(CancellationToken ct = default)
+    public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
     {
-        if (_disposed) return Task.FromResult(false);
-        if (!_circuitBreaker.AllowOperation()) return Task.FromResult(false);
+        if (_disposed) return false;
+        if (!_circuitBreaker.AllowOperation()) return false;
 
         try
         {
-            // Verify data directory is accessible
+            // Finding 3174: Use async File IO to avoid blocking the thread pool.
             var testFile = Path.Combine(_config.DataPath, ".health_check");
-            File.WriteAllText(testFile, DateTimeOffset.UtcNow.ToString());
-            File.Delete(testFile);
-            return Task.FromResult(true);
+            await File.WriteAllTextAsync(testFile, DateTimeOffset.UtcNow.ToString(), ct);
+            File.Delete(testFile); // Delete is always synchronous in .NET; acceptable for a tiny file
+            return true;
         }
         catch
         {
             Debug.WriteLine($"Caught exception in RocksDbPersistenceBackend.cs");
-            return Task.FromResult(false);
+            return false;
         }
     }
 

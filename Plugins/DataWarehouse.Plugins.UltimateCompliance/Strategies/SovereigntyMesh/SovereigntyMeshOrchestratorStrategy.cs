@@ -125,6 +125,9 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
             _lifecycleManager = new PassportLifecycleStrategy();
             await _lifecycleManager.InitializeAsync(new Dictionary<string, object>(Configuration), cancellationToken);
 
+            // Full memory barrier ensures all sub-strategy writes above are visible to other threads
+            // before _meshInitialized (volatile) is set — completes the double-checked lock pattern
+            System.Threading.Thread.MemoryBarrier();
             _meshInitialized = true;
             IncrementCounter("sovereignty_mesh.initialized");
         }
@@ -183,32 +186,27 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
             passport = _passportIssuance.GetCachedPassport(registryEntry.ObjectId);
         }
 
-        // Also try direct passport ID lookup across all cached passports
+        // If passport not found or ID mismatch, return not-found result
         if (passport == null || passport.PassportId != passportId)
         {
-            // The passport is not in the issuance cache by objectId, or the IDs don't match
-            // Return a not-found result
-            if (passport == null || passport.PassportId != passportId)
+            return new PassportVerificationResult
             {
-                return new PassportVerificationResult
+                IsValid = false,
+                Passport = new CompliancePassport
                 {
-                    IsValid = false,
-                    Passport = new CompliancePassport
-                    {
-                        PassportId = passportId,
-                        ObjectId = registryEntry?.ObjectId ?? "unknown",
-                        Status = PassportStatus.PendingReview,
-                        Scope = PassportScope.Object,
-                        Entries = Array.Empty<PassportEntry>(),
-                        EvidenceChain = Array.Empty<EvidenceLink>(),
-                        IssuedAt = DateTimeOffset.UtcNow,
-                        ExpiresAt = DateTimeOffset.UtcNow,
-                        IssuerId = "unknown"
-                    },
-                    FailureReasons = new[] { "Passport not found" },
-                    VerifiedAt = DateTimeOffset.UtcNow
-                };
-            }
+                    PassportId = passportId,
+                    ObjectId = registryEntry?.ObjectId ?? "unknown",
+                    Status = PassportStatus.PendingReview,
+                    Scope = PassportScope.Object,
+                    Entries = Array.Empty<PassportEntry>(),
+                    EvidenceChain = Array.Empty<EvidenceLink>(),
+                    IssuedAt = DateTimeOffset.UtcNow,
+                    ExpiresAt = DateTimeOffset.UtcNow,
+                    IssuerId = "unknown"
+                },
+                FailureReasons = new[] { "Passport not found" },
+                VerifiedAt = DateTimeOffset.UtcNow
+            };
         }
 
         // Verify via the verification API

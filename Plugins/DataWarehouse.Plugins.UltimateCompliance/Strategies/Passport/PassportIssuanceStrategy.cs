@@ -42,7 +42,11 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
 
         if (configuration.TryGetValue("SigningKey", out var keyObj) && keyObj is string keyStr && keyStr.Length > 0)
         {
-            _signingKey = Convert.FromBase64String(keyStr);
+            var keyBytes = Convert.FromBase64String(keyStr);
+            // Require minimum 32-byte (256-bit) key for HMAC-SHA256
+            if (keyBytes.Length < 32)
+                throw new ArgumentException("SigningKey must be at least 32 bytes (256 bits) for HMAC-SHA256.", "SigningKey");
+            _signingKey = keyBytes;
         }
         else
         {

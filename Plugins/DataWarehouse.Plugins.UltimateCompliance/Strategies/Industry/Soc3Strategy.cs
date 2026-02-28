@@ -62,10 +62,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
                 recommendations.Add("Obtain SOC 3 seal for public display of trust services compliance");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
                         violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
+            // isCompliant is derived from status to ensure consistency
+            var isCompliant = status == ComplianceStatus.Compliant;
 
             return Task.FromResult(new ComplianceResult
             {

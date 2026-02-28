@@ -54,6 +54,8 @@ public sealed class ChromaVectorStore : ProductionVectorStoreBase
     private readonly ChromaOptions _options;
     private string? _collectionId;
     private int _dimensions;
+    // Finding 3195: Guard _collectionId check-and-set to prevent concurrent double-init.
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     /// <inheritdoc/>
     public override string StoreId => $"chroma-{_options.Collection}";
@@ -88,7 +90,22 @@ public sealed class ChromaVectorStore : ProductionVectorStoreBase
 
     private async Task EnsureCollectionAsync(CancellationToken ct)
     {
+        // Fast path — already initialized (volatile read is sufficient for the happy path).
         if (_collectionId != null) return;
+
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            // Double-check inside the semaphore to handle the race.
+            if (_collectionId != null) return;
+            await EnsureCollectionCoreAsync(ct);
+        }
+        finally { _initLock.Release(); }
+    }
+
+    private async Task EnsureCollectionCoreAsync(CancellationToken ct)
+    {
+        // Renamed body — called only while holding _initLock.
 
         // Try to get existing collection
         try

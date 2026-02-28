@@ -621,11 +621,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 {
                     listener.OnLocationChange(notification);
                 }
-                catch
+                catch (OperationCanceledException)
                 {
-
+                    throw; // Propagate cancellation; do not swallow
+                }
+                catch (Exception ex)
+                {
                     // Log but don't fail on listener errors
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    System.Diagnostics.Debug.WriteLine($"[Warning] Listener OnLocationChange failed: {ex.Message}");
                 }
             }
         }

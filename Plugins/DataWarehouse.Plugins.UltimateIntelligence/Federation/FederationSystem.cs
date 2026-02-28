@@ -175,6 +175,13 @@ public sealed record InstanceConfiguration
     /// <summary>Whether to validate the server certificate.</summary>
     public bool ValidateServerCertificate { get; init; } = true;
 
+    /// <summary>
+    /// Secondary dangerous-mode flag. Both ValidateServerCertificate=false AND AllowInsecureTls=true
+    /// must be set to bypass TLS validation. This prevents accidental certificate bypass from a
+    /// single misconfigured property. Only for non-production/test environments.
+    /// </summary>
+    public bool AllowInsecureTls { get; init; } = false;
+
     /// <summary>Priority of this instance (higher = preferred).</summary>
     public int Priority { get; init; } = 50;
 
@@ -338,11 +345,6 @@ public sealed class InstanceRegistry : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        if (_instances.ContainsKey(config.InstanceId))
-        {
-            throw new InvalidOperationException($"Instance '{config.InstanceId}' is already registered");
-        }
-
         var info = new InstanceInfo
         {
             Configuration = config,
@@ -351,13 +353,18 @@ public sealed class InstanceRegistry : IAsyncDisposable
 
         // Create HTTP client for this instance
         var httpClient = CreateHttpClient(config);
+
+        // Atomically register all associated state; if a concurrent call already won, discard ours.
+        if (!_instances.TryAdd(config.InstanceId, info))
+        {
+            httpClient.Dispose();
+            throw new InvalidOperationException($"Instance '{config.InstanceId}' is already registered");
+        }
+
         _httpClients[config.InstanceId] = httpClient;
 
         // Create request semaphore for concurrency control
         _requestSemaphores[config.InstanceId] = new SemaphoreSlim(config.MaxConcurrentRequests);
-
-        // Register the instance
-        _instances[config.InstanceId] = info;
 
         // Perform initial health check
         await PerformHealthCheckAsync(config.InstanceId, ct);
@@ -603,9 +610,10 @@ public sealed class InstanceRegistry : IAsyncDisposable
     {
         var handler = new HttpClientHandler();
 
-        // SECURITY: TLS certificate validation is always enabled by default.
-        // Only bypass validation if explicitly configured to false.
-        if (!config.ValidateServerCertificate)
+        // SECURITY: TLS certificate validation must be explicitly disabled via both
+        // ValidateServerCertificate=false AND AllowInsecureTls=true (defense-in-depth).
+        // Bypassing TLS validation in production exposes connections to MITM attacks.
+        if (!config.ValidateServerCertificate && config.AllowInsecureTls)
         {
             handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
         }

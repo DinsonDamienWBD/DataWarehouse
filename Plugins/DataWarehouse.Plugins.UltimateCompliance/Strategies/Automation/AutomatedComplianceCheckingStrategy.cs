@@ -38,11 +38,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             {
                 foreach (var rule in rules)
                 {
-                    if (!_rulesByFramework.ContainsKey(rule.Framework))
-                    {
-                        _rulesByFramework[rule.Framework] = new List<ComplianceRule>();
-                    }
-                    _rulesByFramework[rule.Framework].Add(rule);
+                    // AddOrUpdate is atomic; avoids TOCTOU between ContainsKey and indexer write
+                    var ruleList = _rulesByFramework.GetOrAdd(rule.Framework, _ => new List<ComplianceRule>());
+                    lock (ruleList) { ruleList.Add(rule); }
                 }
             }
 

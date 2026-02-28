@@ -303,14 +303,48 @@ Return JSON:
 
             RecordTokens(response.Usage?.TotalTokens ?? 0);
 
+            // Parse patterns from the AI response JSON.
+            var patterns = ParseLogPatterns(response.Content);
+
             return new LogAnalysisResult
             {
                 TotalLogsAnalyzed = logs.Count,
                 ErrorLogsFound = errorLogs.Count,
-                Patterns = new List<LogPattern>(), // Would parse from response
+                Patterns = patterns,
                 AnalyzedAt = DateTime.UtcNow
             };
         });
+    }
+
+    private static List<LogPattern> ParseLogPatterns(string response)
+    {
+        var patterns = new List<LogPattern>();
+        try
+        {
+            var jsonStart = response.IndexOf('{');
+            var jsonEnd = response.LastIndexOf('}');
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("patterns", out var arr))
+                {
+                    foreach (var item in arr.EnumerateArray())
+                    {
+                        patterns.Add(new LogPattern
+                        {
+                            Pattern = item.TryGetProperty("pattern", out var p) ? p.GetString() ?? "" : "",
+                            Frequency = item.TryGetProperty("frequency", out var f) ? f.GetInt32() : 0,
+                            Severity = item.TryGetProperty("severity", out var s) ? s.GetString() ?? "" : "",
+                            RootCause = item.TryGetProperty("root_cause", out var rc) ? rc.GetString() : null,
+                            Recommendation = item.TryGetProperty("recommendation", out var r) ? r.GetString() : null
+                        });
+                    }
+                }
+            }
+        }
+        catch { /* Parsing failure — return results collected so far */ }
+        return patterns;
     }
 
     private static (List<PredictedRisk> Risks, float HealthScore) ParseFailurePrediction(string response, float threshold)

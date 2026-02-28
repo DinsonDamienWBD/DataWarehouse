@@ -84,8 +84,11 @@ public sealed class GeminiProviderStrategy : AIProviderStrategyBase
                 }
             };
 
+            // Finding 3200: Use x-goog-api-key header instead of URL query parameter to prevent
+            // API key from appearing in proxy/server access logs.
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post,
-                $"{apiBase}/models/{model}:generateContent?key={apiKey}");
+                $"{apiBase}/models/{model}:generateContent");
+            httpRequest.Headers.Add("x-goog-api-key", apiKey);
             httpRequest.Content = JsonContent.Create(payload);
 
             using var response = await _httpClient.SendAsync(httpRequest, ct);
@@ -131,8 +134,10 @@ public sealed class GeminiProviderStrategy : AIProviderStrategyBase
             }
         };
 
+        // Finding 3200: Use x-goog-api-key header for streaming too.
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post,
-            $"{apiBase}/models/{model}:streamGenerateContent?key={apiKey}");
+            $"{apiBase}/models/{model}:streamGenerateContent");
+        httpRequest.Headers.Add("x-goog-api-key", apiKey);
         httpRequest.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);

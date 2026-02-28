@@ -22,6 +22,9 @@ public sealed class TopicModelIndex : ContextIndexBase
     private readonly BoundedDictionary<string, Dictionary<string, float>> _entryTopicDistribution = new BoundedDictionary<string, Dictionary<string, float>>(1000);
     private readonly BoundedDictionary<string, TopicEvolution> _topicEvolution = new BoundedDictionary<string, TopicEvolution>(1000);
     private readonly BoundedDictionary<(string, string), float> _topicSimilarity = new BoundedDictionary<(string, string), float>(1000);
+    // Finding 3167/3168: Inner mutable objects (TopicEvolution.Events, distribution dicts)
+    // require a dedicated lock since BoundedDictionary only protects the outer map.
+    private readonly object _innerMutationLock = new();
 
     private const int DefaultTopicCount = 50;
     private const float TopicAssignmentThreshold = 0.1f;
@@ -505,17 +508,21 @@ public sealed class TopicModelIndex : ContextIndexBase
         _topics[mergedTopicId] = mergedTopic;
 
         // Update entry distributions
+        // Finding 3168: Inner Dictionary<string,float> values are not thread-safe; lock mutations.
         foreach (var kvp in _entryTopicDistribution)
         {
             var dist = kvp.Value;
-            var weight1 = dist.TryGetValue(topicId1, out var w1) ? w1 : 0;
-            var weight2 = dist.TryGetValue(topicId2, out var w2) ? w2 : 0;
-
-            if (weight1 > 0 || weight2 > 0)
+            lock (_innerMutationLock)
             {
-                dist.Remove(topicId1);
-                dist.Remove(topicId2);
-                dist[mergedTopicId] = weight1 + weight2;
+                var weight1 = dist.TryGetValue(topicId1, out var w1) ? w1 : 0;
+                var weight2 = dist.TryGetValue(topicId2, out var w2) ? w2 : 0;
+
+                if (weight1 > 0 || weight2 > 0)
+                {
+                    dist.Remove(topicId1);
+                    dist.Remove(topicId2);
+                    dist[mergedTopicId] = weight1 + weight2;
+                }
             }
         }
 
@@ -638,17 +645,21 @@ public sealed class TopicModelIndex : ContextIndexBase
             evolution = _topicEvolution[topicId];
         }
 
-        evolution.Events.Add(new TopicEvent
+        // Finding 3167: TopicEvolution.Events is a List<T> — guard all mutations.
+        lock (_innerMutationLock)
         {
-            Timestamp = DateTimeOffset.UtcNow,
-            EventType = eventType,
-            Details = details
-        });
+            evolution.Events.Add(new TopicEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                EventType = eventType,
+                Details = details
+            });
 
-        // Limit history size
-        if (evolution.Events.Count > 1000)
-        {
-            evolution.Events = evolution.Events.TakeLast(500).ToList();
+            // Limit history size
+            if (evolution.Events.Count > 1000)
+            {
+                evolution.Events = evolution.Events.TakeLast(500).ToList();
+            }
         }
     }
 

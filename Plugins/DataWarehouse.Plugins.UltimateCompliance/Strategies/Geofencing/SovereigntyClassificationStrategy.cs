@@ -33,6 +33,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     public sealed class SovereigntyClassificationStrategy : ComplianceStrategyBase
     {
         private readonly BoundedDictionary<string, ClassificationCache> _classificationCache = new BoundedDictionary<string, ClassificationCache>(1000);
+        // Written only during InitializeAsync (single-threaded init); read-only afterward — safe for concurrent reads
         private readonly Dictionary<string, Regex> _piiPatterns = new();
         private readonly Dictionary<string, List<string>> _jurisdictionRegulations = new();
 
@@ -341,7 +342,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
             // Russia patterns
             _piiPatterns["RU-INN"] = new Regex(
-                @"\b\d{10}|\d{12}\b",
+                @"\b(\d{10}|\d{12})\b",  // parentheses ensure \b anchors both alternatives
                 RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["RU-PHONE"] = new Regex(
@@ -450,14 +451,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             // and wait for response from GeolocationServiceStrategy
             await Task.Delay(1, cancellationToken); // Placeholder for async message bus call
 
-            // For now, return a simulated signal with lower confidence
-            return new ClassificationSignal
-            {
-                Source = ClassificationSource.SourceIP,
-                Jurisdiction = "US", // Would be actual resolved location
-                Confidence = 0.6,
-                Reason = $"Source IP {sourceIp} resolved to location"
-            };
+            // Resolution via message bus (geolocation.resolve topic) returns the actual jurisdiction;
+            // until that response arrives return null so no spurious "US" signal is injected
+            return null;
         }
 
         private SovereigntyClassification CalculateClassification(
@@ -530,13 +526,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private DataSensitivity DetermineSensitivity(List<ClassificationSignal> signals, string jurisdiction)
         {
-            // Check for high-sensitivity PII patterns
+            // Check for high-sensitivity PII patterns (all conditions scoped to ContentAnalysis signals)
             var hasHighSensitivityPii = signals.Any(s =>
                 s.Source == ClassificationSource.ContentAnalysis &&
-                s.Reason.Contains("SSN", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("AADHAAR", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("CPF", StringComparison.OrdinalIgnoreCase));
+                (s.Reason.Contains("SSN", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("AADHAAR", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("CPF", StringComparison.OrdinalIgnoreCase)));
 
             if (hasHighSensitivityPii)
                 return DataSensitivity.Restricted;
@@ -555,7 +551,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private string GenerateCacheKey(ClassificationInput input)
         {
-            return $"{input.ResourceId}:{input.SourceIp}:{input.StorageLocation}:{input.UserJurisdiction}";
+            // Use length-prefixed segments to prevent key collision when values contain the separator char
+            static string Seg(string? v) => v is null ? "~" : $"{v.Length},{v}";
+            return $"{Seg(input.ResourceId)}|{Seg(input.SourceIp)}|{Seg(input.StorageLocation)}|{Seg(input.UserJurisdiction)}";
         }
 
         private sealed class ClassificationCache

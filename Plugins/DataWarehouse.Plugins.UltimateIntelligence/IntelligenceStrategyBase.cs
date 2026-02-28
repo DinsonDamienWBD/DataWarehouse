@@ -23,7 +23,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
     private long _totalEdgesCreated;
     private long _totalLatencyMsTicks;
     private readonly DateTime _startTime = DateTime.UtcNow;
-    private DateTime _lastOperationTime = DateTime.UtcNow;
+    private long _lastOperationTimeTicks = DateTime.UtcNow.Ticks; // Accessed via Interlocked
 
     /// <summary>
     /// Configuration dictionary for this strategy.
@@ -127,7 +127,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
             TotalEdgesCreated = Interlocked.Read(ref _totalEdgesCreated),
             AverageLatencyMs = totalOps > 0 ? Interlocked.Read(ref _totalLatencyMsTicks) / 1000.0 / totalOps : 0,
             StartTime = _startTime,
-            LastOperationTime = _lastOperationTime
+            LastOperationTime = new DateTime(Interlocked.Read(ref _lastOperationTimeTicks), DateTimeKind.Utc)
         };
     }
 
@@ -155,7 +155,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
         Interlocked.Increment(ref _totalOperations);
         Interlocked.Increment(ref _successfulOperations);
         Interlocked.Add(ref _totalLatencyMsTicks, (long)(latencyMs * 1000)); // Store as microseconds for precision
-        _lastOperationTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastOperationTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>
@@ -165,7 +165,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
     {
         Interlocked.Increment(ref _totalOperations);
         Interlocked.Increment(ref _failedOperations);
-        _lastOperationTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastOperationTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>

@@ -23,6 +23,11 @@ public sealed class ArangoGraphStrategy : KnowledgeGraphStrategyBase
     public override string StrategyName => "ArangoDB Graph Database";
 
     /// <inheritdoc/>
+    // GetEdgesAsync, FindNodesByLabelAsync, FindNodesByPropertyAsync, TraverseAsync, FindPathAsync
+    // and QueryAsync return empty/hardcoded results — AQL traversal not yet implemented.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
     {
         ProviderName = "ArangoDB",
@@ -364,6 +369,11 @@ public sealed class TigerGraphStrategy : KnowledgeGraphStrategyBase
 
     /// <inheritdoc/>
     public override string StrategyName => "TigerGraph";
+
+    /// <inheritdoc/>
+    // AddEdgeAsync makes no HTTP call; GetNodeAsync, GetEdgesAsync, FindNodes*, Traverse, FindPath,
+    // QueryAsync all return hardcoded empty results — GSQL integration not yet implemented.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()

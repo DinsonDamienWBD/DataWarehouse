@@ -117,11 +117,9 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(metricName);
 
-        _counters.AddOrUpdate(metricName, value, (_, current) =>
-        {
-            Interlocked.Add(ref current, value);
-            return current;
-        });
+        // ConcurrentDictionary.AddOrUpdate guarantees the update factory is retried on conflict;
+        // simple addition is correct here — no need for Interlocked inside the lambda (current is a value-type copy)
+        _counters.AddOrUpdate(metricName, value, (_, current) => current + value);
 
         return Task.CompletedTask;
     }

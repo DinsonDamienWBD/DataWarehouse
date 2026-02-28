@@ -252,6 +252,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// </summary>
         public WithdrawConsentResult WithdrawConsent(string subjectId, string purposeId, string? reason = null)
         {
+            // Snapshot the values to find the target consent, then use AddOrUpdate for atomic update
             var consent = _consents.Values
                 .FirstOrDefault(c => c.SubjectId == subjectId &&
                                     c.PurposeId == purposeId &&
@@ -266,15 +267,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 };
             }
 
-            // Update consent status
-            var withdrawnConsent = consent with
-            {
-                Status = ConsentStatus.Withdrawn,
-                WithdrawnAt = DateTime.UtcNow,
-                WithdrawalReason = reason
-            };
+            // Atomically replace: if concurrent withdrawal already changed status, the factory won't re-withdraw
+            ConsentRecord? withdrawnConsent = null;
+            _consents.AddOrUpdate(
+                consent.ConsentId,
+                _ => consent, // should not happen; key already exists
+                (_, existing) =>
+                {
+                    if (existing.Status != ConsentStatus.Active)
+                        return existing; // Already withdrawn concurrently; no-op
+                    withdrawnConsent = existing with
+                    {
+                        Status = ConsentStatus.Withdrawn,
+                        WithdrawnAt = DateTime.UtcNow,
+                        WithdrawalReason = reason
+                    };
+                    return withdrawnConsent;
+                });
 
-            _consents[consent.ConsentId] = withdrawnConsent;
+            if (withdrawnConsent == null)
+            {
+                return new WithdrawConsentResult { Success = false, ErrorMessage = "Consent already withdrawn" };
+            }
 
             // Update preferences
             UpdatePreferences(subjectId, purposeId, false);

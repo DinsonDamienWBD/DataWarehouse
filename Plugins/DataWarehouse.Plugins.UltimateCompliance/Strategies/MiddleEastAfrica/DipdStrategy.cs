@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
     /// </summary>
     public sealed class DipdStrategy : ComplianceStrategyBase
     {
-        public override string StrategyId => "dipd";
+        public override string StrategyId => "difc-dpl";
         public override string StrategyName => "DIFC Data Protection Law Compliance";
-        public override string Framework => "DIPD";
+        public override string Framework => "DIFC-DPL"; // Corrected: DIFC-DPL (Dubai International Financial Centre Data Protection Law)
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {

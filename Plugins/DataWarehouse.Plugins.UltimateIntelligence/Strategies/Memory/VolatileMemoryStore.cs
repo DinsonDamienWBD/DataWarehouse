@@ -105,7 +105,9 @@ public sealed class VolatileMemoryStore
                 return Task.FromResult<TieredMemoryEntry?>(null);
             }
 
-            // Update LRU position
+            // Update LRU position and access stats atomically under the same lock.
+            // Finding 3197/3198: entry.AccessCount++ is a non-atomic RMW on a shared record
+            // field; guard it alongside the LRU update.
             lock (_lruLock)
             {
                 if (_lruNodes.TryGetValue(entryId, out var node))
@@ -114,10 +116,10 @@ public sealed class VolatileMemoryStore
                     var newNode = _lruOrder.AddLast(entryId);
                     _lruNodes[entryId] = newNode;
                 }
-            }
 
-            entry.AccessCount++;
-            entry.LastAccessedAt = DateTime.UtcNow;
+                entry.AccessCount++;
+                entry.LastAccessedAt = DateTime.UtcNow;
+            }
 
             Interlocked.Increment(ref _hits);
             return Task.FromResult<TieredMemoryEntry?>(entry);

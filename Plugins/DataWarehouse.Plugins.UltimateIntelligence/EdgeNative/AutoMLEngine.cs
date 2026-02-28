@@ -201,8 +201,8 @@ public sealed class SchemaExtractionService
             {
                 Name = header,
                 DataType = columnType,
-                IsNullable = sampleRows.Any(r => r[header] == null || string.IsNullOrEmpty(r[header]?.ToString())),
-                SampleValues = sampleRows.Take(5).Select(r => r[header]?.ToString()).ToArray()
+                IsNullable = sampleRows.Any(r => !r.TryGetValue(header, out var v) || v == null || string.IsNullOrEmpty(v.ToString())),
+                SampleValues = sampleRows.Take(5).Select(r => r.TryGetValue(header, out var sv) ? sv?.ToString() : null).ToArray()
             });
         }
 

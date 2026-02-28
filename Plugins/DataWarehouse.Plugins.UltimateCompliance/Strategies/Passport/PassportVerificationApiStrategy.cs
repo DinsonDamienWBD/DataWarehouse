@@ -418,21 +418,27 @@ public sealed class PassportVerificationApiStrategy : ComplianceStrategyBase
             return false;
         }
 
-        // Recompute HMAC-SHA256 of canonical passport content
-        var content = BuildSignatureContent(passport);
+        // Recompute HMAC-SHA256 using the same JSON serializer options as PassportIssuanceStrategy.SignPassport
+        // (camelCase, no indentation, DigitalSignature nulled out) to ensure byte-for-byte match
+        var signable = passport with { DigitalSignature = null };
+        var json = JsonSerializer.Serialize(signable, _signerOptions);
         byte[] computed;
         using (var hmac = new HMACSHA256(_signingKey))
         {
-            computed = hmac.ComputeHash(Encoding.UTF8.GetBytes(content));
+            computed = hmac.ComputeHash(Encoding.UTF8.GetBytes(json));
         }
 
         return CryptographicOperations.FixedTimeEquals(computed, passport.DigitalSignature);
     }
 
-    /// <summary>
-    /// Builds a canonical string representation of passport content for signature verification.
-    /// Must match the signing logic in <see cref="PassportIssuanceStrategy"/>.
-    /// </summary>
+    // Serializer options must exactly match PassportIssuanceStrategy._serializerOptions
+    private static readonly JsonSerializerOptions _signerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
+    // Legacy canonical builder — retained for reference but no longer used for signature computation
     private static string BuildSignatureContent(CompliancePassport passport)
     {
         var sb = new StringBuilder();

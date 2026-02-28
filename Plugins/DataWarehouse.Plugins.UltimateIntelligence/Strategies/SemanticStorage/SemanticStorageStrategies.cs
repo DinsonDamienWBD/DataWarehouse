@@ -579,6 +579,8 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
     private readonly BoundedDictionary<string, HashSet<string>> _outgoingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _incomingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, DataNode> _nodes = new BoundedDictionary<string, DataNode>(1000);
+    // Finding 3235: Inner HashSet<string> values are not thread-safe; guard all mutations.
+    private readonly object _linkSetLock = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-linking";
@@ -675,8 +677,12 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
             };
 
             _links[linkId] = link;
-            _outgoingLinks[sourceId].Add(linkId);
-            _incomingLinks[targetId].Add(linkId);
+            // Finding 3235: Guard inner HashSet mutations with a dedicated lock.
+            lock (_linkSetLock)
+            {
+                if (_outgoingLinks.TryGetValue(sourceId, out var outSet)) outSet.Add(linkId);
+                if (_incomingLinks.TryGetValue(targetId, out var inSet)) inSet.Add(linkId);
+            }
 
             // Create reverse link if bidirectional
             if (bool.Parse(GetConfig("EnableBidirectional") ?? "true") && IsSymmetricLinkType(linkType))
@@ -696,8 +702,11 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
                         CreatedAt = link.CreatedAt
                     };
                     _links[reverseLinkId] = reverseLink;
-                    _outgoingLinks[targetId].Add(reverseLinkId);
-                    _incomingLinks[sourceId].Add(reverseLinkId);
+                    lock (_linkSetLock)
+                    {
+                        if (_outgoingLinks.TryGetValue(targetId, out var revOutSet)) revOutSet.Add(reverseLinkId);
+                        if (_incomingLinks.TryGetValue(sourceId, out var revInSet)) revInSet.Add(reverseLinkId);
+                    }
                 }
             }
 

@@ -94,6 +94,8 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
 
     // In-memory fallback indexes
     private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    // Finding 3169: Inner HashSet<string> values are not thread-safe — all mutations use lock(scopeIds)
+    // but reads must also lock on the same object to avoid partial-mutation visibility.
     private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, string> _fullTextIndex = new BoundedDictionary<string, string>(1000); // id -> tsvector text
 
@@ -503,14 +505,22 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
         // Use indexes
         if (!string.IsNullOrEmpty(query.Scope))
         {
+            // Finding 3169: Take a locked snapshot so we don't read a partially-mutated HashSet.
+            string[]? scopeSnapshot = null;
             if (_scopeIndex.TryGetValue(query.Scope, out var scopeIds))
             {
-                rows = rows.Where(r => scopeIds.Contains(r.Id));
+                lock (scopeIds)
+                {
+                    scopeSnapshot = scopeIds.ToArray();
+                }
             }
-            else
+
+            if (scopeSnapshot == null)
             {
                 yield break;
             }
+            var scopeSet = new HashSet<string>(scopeSnapshot);
+            rows = rows.Where(r => scopeSet.Contains(r.Id));
         }
 
         // Full-text search using tsvector
@@ -756,10 +766,17 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
             return Task.FromResult<IEnumerable<MemoryRecord>>(Array.Empty<MemoryRecord>());
         }
 
+        // Finding 3169: Snapshot under lock before iterating.
+        string[] idSnapshot;
+        lock (ids)
+        {
+            idSnapshot = ids.Take(limit).ToArray();
+        }
+
         var now = DateTimeOffset.UtcNow;
         var records = new List<MemoryRecord>();
 
-        foreach (var id in ids.Take(limit))
+        foreach (var id in idSnapshot)
         {
             foreach (var partition in _partitions.Values)
             {

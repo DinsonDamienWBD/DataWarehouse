@@ -518,23 +518,31 @@ public sealed class AdvancedEvolvingContextManager : IAsyncDisposable
 
     private void RecordEvolutionEvent(string scope, EvolutionEventType type, string description)
     {
-        var history = _evolutionHistory.GetOrAdd(scope, _ => new List<EvolutionEvent>());
-
-        lock (history)
+        // Finding 3143: BoundedDictionary can LRU-evict a scope entry between GetOrAdd and
+        // lock(history), making the obtained list reference permanently detached.
+        // Fix: use AddOrUpdate so the mutation happens atomically inside BoundedDictionary's
+        // write lock — the list is never accessible to another path without going through it.
+        var newEvent = new EvolutionEvent
         {
-            history.Add(new EvolutionEvent
-            {
-                EventType = type,
-                Description = description,
-                Timestamp = DateTimeOffset.UtcNow
-            });
+            EventType = type,
+            Description = description,
+            Timestamp = DateTimeOffset.UtcNow
+        };
 
-            // Keep only last 1000 events per scope
-            if (history.Count > 1000)
+        _evolutionHistory.AddOrUpdate(
+            scope,
+            _ =>
             {
-                history.RemoveRange(0, history.Count - 1000);
-            }
-        }
+                var list = new List<EvolutionEvent> { newEvent };
+                return list;
+            },
+            (_, existing) =>
+            {
+                existing.Add(newEvent);
+                if (existing.Count > 1000)
+                    existing.RemoveRange(0, existing.Count - 1000);
+                return existing;
+            });
     }
 
     private async Task UpdateDomainExpertiseAsync(ContextEntry entry, CancellationToken ct)

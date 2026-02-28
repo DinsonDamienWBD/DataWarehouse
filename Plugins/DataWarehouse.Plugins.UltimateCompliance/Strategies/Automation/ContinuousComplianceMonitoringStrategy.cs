@@ -170,23 +170,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     _metrics[framework] = metric;
                 }
 
-                metric.TotalChecks++;
+                var totalChecks = Interlocked.Increment(ref metric.TotalChecks);
                 metric.LastCheckAt = DateTime.UtcNow;
 
                 // Update compliance status based on context
+                long compliantCount;
                 if (HasViolation(context))
                 {
-                    metric.ViolationCount++;
+                    Interlocked.Increment(ref metric.ViolationCount);
                     metric.LastViolationAt = DateTime.UtcNow;
+                    compliantCount = Interlocked.Read(ref metric.CompliantCount);
                 }
                 else
                 {
-                    metric.CompliantCount++;
+                    compliantCount = Interlocked.Increment(ref metric.CompliantCount);
                 }
 
-                // Update compliance score
-                metric.ComplianceScore = metric.TotalChecks > 0
-                    ? (double)metric.CompliantCount / metric.TotalChecks
+                // Update compliance score (volatile write; slight stale read acceptable)
+                metric.ComplianceScore = totalChecks > 0
+                    ? (double)compliantCount / totalChecks
                     : 1.0;
             }
 
@@ -371,10 +373,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         private sealed class ComplianceMetric
         {
             public required string Framework { get; init; }
-            public long TotalChecks { get; set; }
-            public long ViolationCount { get; set; }
-            public long CompliantCount { get; set; }
-            public double ComplianceScore { get; set; } = 1.0;
+            // Use long fields for Interlocked.Increment/Read
+            public long TotalChecks;
+            public long ViolationCount;
+            public long CompliantCount;
+            // ComplianceScore stored as long bits for Interlocked-safe access
+            private long _complianceScoreBits = BitConverter.DoubleToInt64Bits(1.0);
+            public double ComplianceScore
+            {
+                get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _complianceScoreBits));
+                set => Interlocked.Exchange(ref _complianceScoreBits, BitConverter.DoubleToInt64Bits(value));
+            }
             public DateTime FirstCheckAt { get; set; }
             public DateTime? LastCheckAt { get; set; }
             public DateTime? LastViolationAt { get; set; }

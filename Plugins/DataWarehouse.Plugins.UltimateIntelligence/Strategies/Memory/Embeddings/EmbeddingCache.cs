@@ -142,14 +142,19 @@ public sealed class EmbeddingCache : IDisposable
             SizeBytes = embedding.Length * sizeof(float) + key.Length * 2
         };
 
-        // Evict if necessary before adding
-        while (_cache.Count >= _maxEntries)
+        // Evict under the LRU lock to prevent TOCTOU: count check and eviction must be atomic.
+        lock (_lruLock)
         {
-            EvictLru();
+            while (_cache.Count >= _maxEntries)
+            {
+                EvictLruUnderLock();
+            }
+
+            _cache[cacheKey] = entry;
+            // AddToLru inline (must also run under lock to keep _cache and _lruList consistent).
+            _lruList.AddLast(cacheKey);
         }
 
-        _cache[cacheKey] = entry;
-        AddToLru(cacheKey);
         _statistics.TotalBytesStored += entry.SizeBytes;
     }
 
@@ -328,23 +333,25 @@ public sealed class EmbeddingCache : IDisposable
         }
     }
 
-    private void EvictLru()
+    /// <summary>Evicts the LRU entry. Must be called while already holding <see cref="_lruLock"/>.</summary>
+    private void EvictLruUnderLock()
     {
-        string? keyToEvict = null;
+        if (_lruList.Last == null) return;
+        var keyToEvict = _lruList.Last.Value;
+        _lruList.RemoveLast();
 
-        lock (_lruLock)
-        {
-            if (_lruList.Last != null)
-            {
-                keyToEvict = _lruList.Last.Value;
-                _lruList.RemoveLast();
-            }
-        }
-
-        if (keyToEvict != null && _cache.TryRemove(keyToEvict, out var entry))
+        if (_cache.TryRemove(keyToEvict, out var entry))
         {
             _statistics.TotalBytesStored -= entry.SizeBytes;
             _statistics.Evictions++;
+        }
+    }
+
+    private void EvictLru()
+    {
+        lock (_lruLock)
+        {
+            EvictLruUnderLock();
         }
     }
 

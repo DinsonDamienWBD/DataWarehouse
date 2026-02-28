@@ -439,9 +439,39 @@ Return JSON:
 
             RecordTokens(response.Usage?.TotalTokens ?? 0);
 
-            // Execute query against indexed versions
+            // Parse AI response to extract targeted file paths, then query indexed snapshots.
             var results = new List<TimeTravelResult>();
-            // In production: parse response and query actual snapshots
+            var jsonStart = response.Content.IndexOf('{');
+            var jsonEnd = response.Content.LastIndexOf('}');
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                try
+                {
+                    var json = response.Content.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("file_path", out var fp))
+                    {
+                        var filePath = fp.GetString();
+                        if (!string.IsNullOrEmpty(filePath))
+                        {
+                            var version = await QueryAtTimeAsync(filePath, asOfTime, ct);
+                            if (version.Found)
+                            {
+                                results.Add(new TimeTravelResult
+                                {
+                                    FilePath = filePath,
+                                    RequestedTime = asOfTime,
+                                    Found = true,
+                                    VersionId = version.VersionId,
+                                    ContentHash = version.ContentHash,
+                                    SizeBytes = version.SizeBytes
+                                });
+                            }
+                        }
+                    }
+                }
+                catch { /* JSON parse failure — return empty results */ }
+            }
 
             return new TemporalQueryResult
             {
@@ -538,13 +568,54 @@ Return JSON:
 
             RecordTokens(response.Usage?.TotalTokens ?? 0);
 
+            // Parse extracted search parameters from AI response and query the snapshot index.
+            var matches = new List<HistoricalSearchMatch>();
+            var jsonStart2 = response.Content.IndexOf('{');
+            var jsonEnd2 = response.Content.LastIndexOf('}');
+            if (jsonStart2 >= 0 && jsonEnd2 > jsonStart2)
+            {
+                try
+                {
+                    var json = response.Content.Substring(jsonStart2, jsonEnd2 - jsonStart2 + 1);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    IEnumerable<string>? filePatterns = null;
+                    if (doc.RootElement.TryGetProperty("file_patterns", out var fp))
+                        filePatterns = fp.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => s.Length > 0);
+
+                    foreach (var kvp in _snapshotIndex)
+                    {
+                        var path = kvp.Key;
+                        // Match against any of the requested file patterns (simplified glob prefix match).
+                        bool pathMatches = filePatterns == null || filePatterns.Any(pattern =>
+                            path.Contains(pattern.TrimStart('*').TrimStart('/'), StringComparison.OrdinalIgnoreCase));
+                        if (!pathMatches) continue;
+
+                        List<SnapshotVersion> versions;
+                        lock (kvp.Value) { versions = kvp.Value.ToList(); }
+
+                        foreach (var v in versions)
+                        {
+                            if (startTime.HasValue && v.CreatedAt < startTime.Value) continue;
+                            if (endTime.HasValue && v.CreatedAt > endTime.Value) continue;
+                            matches.Add(new HistoricalSearchMatch
+                            {
+                                FilePath = path,
+                                VersionId = v.VersionId,
+                                VersionTime = v.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* Parse failure — return empty */ }
+            }
+
             return new HistoricalSearchResult
             {
                 Query = naturalLanguageQuery,
                 StartTime = startTime,
                 EndTime = endTime,
                 ExecutedAt = DateTime.UtcNow,
-                Results = new List<HistoricalSearchMatch>()
+                Results = matches
             };
         });
     }

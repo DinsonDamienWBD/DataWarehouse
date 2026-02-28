@@ -70,16 +70,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check Identification and Authentication (IA family)
+            // Applies to confidential, secret, top-secret, and restricted classifications
             if (!context.Attributes.TryGetValue("AuthenticationStrength", out var authObj) ||
                 authObj is not string authStrength ||
                 authStrength.Equals("single-factor", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase))
+                var sensitiveClassifications = new[] { "confidential", "secret", "top-secret", "restricted" };
+                if (sensitiveClassifications.Any(c => context.DataClassification.Equals(c, StringComparison.OrdinalIgnoreCase)))
                 {
                     violations.Add(new ComplianceViolation
                     {
                         Code = "NIST80053-IA-001",
-                        Description = "Multi-factor authentication not used for confidential data access",
+                        Description = $"Multi-factor authentication not used for {context.DataClassification} data access",
                         Severity = ViolationSeverity.High,
                         Remediation = "Implement multi-factor authentication for privileged access (IA-2(1))",
                         RegulatoryReference = "NIST SP 800-53 Rev. 5 IA-2(1)"

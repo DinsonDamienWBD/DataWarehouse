@@ -265,9 +265,48 @@ public sealed class Neo4jGraphStrategy : KnowledgeGraphStrategyBase
             var nodeIds = new HashSet<string>();
             var edgeIds = new HashSet<string>();
 
+            // Neo4j returns paths as arrays: [node, rel, node, rel, ...].
             foreach (var row in GetRows(result))
             {
-                // Parse path - this is simplified; real implementation would parse Neo4j path format
+                try
+                {
+                    foreach (var element in row.EnumerateArray())
+                    {
+                        if (element.ValueKind != JsonValueKind.Object) continue;
+                        if (element.TryGetProperty("id", out var eid) &&
+                            element.TryGetProperty("start", out _) &&
+                            element.TryGetProperty("end", out _))
+                        {
+                            // It is a relationship element
+                            if (edgeIds.Add(eid.GetString() ?? Guid.NewGuid().ToString()))
+                            {
+                                edges.Add(new GraphEdge
+                                {
+                                    Id = eid.GetString() ?? "",
+                                    FromNodeId = element.TryGetProperty("startNode", out var sn) ? sn.GetString() ?? "" : "",
+                                    ToNodeId = element.TryGetProperty("endNode", out var en) ? en.GetString() ?? "" : "",
+                                    Relationship = element.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
+                                    Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()) ?? new()
+                                });
+                            }
+                        }
+                        else if (element.TryGetProperty("id", out var nid))
+                        {
+                            if (nodeIds.Add(nid.GetString() ?? Guid.NewGuid().ToString()))
+                            {
+                                nodes.Add(new GraphNode
+                                {
+                                    Id = nid.GetString() ?? "",
+                                    Label = element.TryGetProperty("labels", out var lbls) && lbls.GetArrayLength() > 0
+                                        ? lbls[0].GetString() ?? ""
+                                        : "",
+                                    Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()) ?? new()
+                                });
+                            }
+                        }
+                    }
+                }
+                catch { /* Malformed row — skip */ }
             }
 
             return new GraphTraversalResult
@@ -299,12 +338,45 @@ public sealed class Neo4jGraphStrategy : KnowledgeGraphStrategyBase
             var row = GetFirstRow(result);
             if (row == null) return null;
 
-            // Parse path - simplified
+            // Parse shortestPath result — Neo4j returns alternating [node, rel, node, ...].
+            var pathNodes = new List<GraphNode>();
+            var pathEdges = new List<GraphEdge>();
+            try
+            {
+                var rowElement = row.Value;
+                foreach (var element in rowElement.EnumerateArray())
+                {
+                    if (element.ValueKind != JsonValueKind.Object) continue;
+                    if (element.TryGetProperty("start", out _) || element.TryGetProperty("type", out _))
+                    {
+                        pathEdges.Add(new GraphEdge
+                        {
+                            Id = element.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : Guid.NewGuid().ToString(),
+                            FromNodeId = element.TryGetProperty("startNode", out var sn) ? sn.GetString() ?? "" : "",
+                            ToNodeId = element.TryGetProperty("endNode", out var en) ? en.GetString() ?? "" : "",
+                            Relationship = element.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
+                            Properties = new Dictionary<string, object>()
+                        });
+                    }
+                    else
+                    {
+                        pathNodes.Add(new GraphNode
+                        {
+                            Id = element.TryGetProperty("id", out var nid) ? nid.GetString() ?? "" : "",
+                            Label = element.TryGetProperty("labels", out var lbls) && lbls.GetArrayLength() > 0
+                                ? lbls[0].GetString() ?? "" : "",
+                            Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()) ?? new()
+                        });
+                    }
+                }
+            }
+            catch { /* Malformed path — return what was parsed */ }
+
             return new GraphPath
             {
-                Nodes = new List<GraphNode>(),
-                Edges = new List<GraphEdge>(),
-                TotalWeight = 0
+                Nodes = pathNodes,
+                Edges = pathEdges,
+                TotalWeight = pathEdges.Count
             };
         });
     }
@@ -318,11 +390,47 @@ public sealed class Neo4jGraphStrategy : KnowledgeGraphStrategyBase
             var result = await ExecuteCypherAsync(query, parameters, ct);
             sw.Stop();
 
+            // Parse all returned rows as nodes/edges based on their properties.
+            var resultNodes = new List<GraphNode>();
+            var resultEdges = new List<GraphEdge>();
+            foreach (var row in GetRows(result))
+            {
+                try
+                {
+                    foreach (var element in row.EnumerateArray())
+                    {
+                        if (element.ValueKind != JsonValueKind.Object) continue;
+                        if (element.TryGetProperty("start", out _) || element.TryGetProperty("type", out _))
+                        {
+                            resultEdges.Add(new GraphEdge
+                            {
+                                Id = element.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : Guid.NewGuid().ToString(),
+                                FromNodeId = element.TryGetProperty("startNode", out var sn) ? sn.GetString() ?? "" : "",
+                                ToNodeId = element.TryGetProperty("endNode", out var en) ? en.GetString() ?? "" : "",
+                                Relationship = element.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
+                                Properties = new Dictionary<string, object>()
+                            });
+                        }
+                        else if (element.TryGetProperty("id", out var nid))
+                        {
+                            resultNodes.Add(new GraphNode
+                            {
+                                Id = nid.GetString() ?? "",
+                                Label = element.TryGetProperty("labels", out var lbls) && lbls.GetArrayLength() > 0
+                                    ? lbls[0].GetString() ?? "" : "",
+                                Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()) ?? new()
+                            });
+                        }
+                    }
+                }
+                catch { /* Malformed row — skip */ }
+            }
+
             return new GraphQueryResult
             {
                 Success = true,
-                Nodes = new List<GraphNode>(),
-                Edges = new List<GraphEdge>(),
+                Nodes = resultNodes,
+                Edges = resultEdges,
                 ExecutionTime = sw.Elapsed
             };
         });

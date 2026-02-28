@@ -259,9 +259,24 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
         string? scopeFilter = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var candidates = scopeFilter != null && _scopeIndex.TryGetValue(scopeFilter, out var scopeEntries)
-            ? scopeEntries.Where(id => _vectorIndex.ContainsKey(id))
-            : _vectorIndex.Keys;
+        // Finding 3166: Take a locked snapshot of the scope entry IDs before reading,
+        // since StoreAsync mutates the inner HashSet under _lockObject.
+        IEnumerable<string> candidates;
+        if (scopeFilter != null)
+        {
+            string[] snapshot;
+            lock (_lockObject)
+            {
+                snapshot = _scopeIndex.TryGetValue(scopeFilter, out var scopeEntries)
+                    ? scopeEntries.ToArray()
+                    : Array.Empty<string>();
+            }
+            candidates = snapshot.Where(id => _vectorIndex.ContainsKey(id));
+        }
+        else
+        {
+            candidates = _vectorIndex.Keys;
+        }
 
         var scored = candidates
             .Select(id => (Id: id, Score: CosineSimilarity(queryVector, _vectorIndex[id])))
@@ -891,8 +906,10 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
             tasks.Add(_shards[shardIndex].StoreAsync(entry, ct));
         }
 
-        _entryToShardMap[entry.EntryId] = primaryShard;
+        // Finding 3165: Write shard map only after all shards have confirmed the write,
+        // so concurrent readers never see a mapped shard that doesn't have the data yet.
         await Task.WhenAll(tasks);
+        _entryToShardMap[entry.EntryId] = primaryShard;
     }
 
     /// <inheritdoc/>
@@ -1076,7 +1093,10 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
 
     private int GetPrimaryShardIndex(string entryId)
     {
-        if (_shards.Count == 0) return 0;
+        // Finding 3175: Returning 0 when shards is empty causes IndexOutOfRangeException
+        // in the caller; throw a descriptive exception instead.
+        if (_shards.Count == 0)
+            throw new InvalidOperationException("No shards are configured. Call AddShard() before storing entries.");
 
         if (_enableConsistentHashing)
         {

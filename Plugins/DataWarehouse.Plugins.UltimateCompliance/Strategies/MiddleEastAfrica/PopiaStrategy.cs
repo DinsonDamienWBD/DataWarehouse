@@ -34,11 +34,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 }
             }
 
-            if (!context.Attributes.TryGetValue("PriorAuthorization", out var authObj))
+            // Check PriorAuthorization for special personal information; treat missing OR false as violation
+            if (context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
+                if (!context.Attributes.TryGetValue("PriorAuthorization", out var authObj) || authObj is not true)
                 {
-                    violations.Add(new ComplianceViolation { Code = "POPIA-003", Description = "Special personal information requires prior authorization", Severity = ViolationSeverity.High, Remediation = "Obtain Information Regulator authorization", RegulatoryReference = "POPIA Section 26-32" });
+                    violations.Add(new ComplianceViolation { Code = "POPIA-003", Description = "Special personal information requires prior authorization from Information Regulator", Severity = ViolationSeverity.High, Remediation = "Obtain Information Regulator authorization", RegulatoryReference = "POPIA Section 26-32" });
                 }
             }
 
@@ -47,8 +48,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "POPIA-004", Description = "Information Officer not appointed", Severity = ViolationSeverity.High, Remediation = "Appoint and register Information Officer", RegulatoryReference = "POPIA Section 55" });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
             var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var isCompliant = status == ComplianceStatus.Compliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     

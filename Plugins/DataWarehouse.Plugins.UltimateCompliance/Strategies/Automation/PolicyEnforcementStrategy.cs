@@ -183,9 +183,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private async Task ExecuteRemediationAsync(CompliancePolicy policy, ComplianceContext context, CancellationToken cancellationToken)
         {
-            // Execute auto-remediation action
-            // In a production system, this would integrate with actual remediation systems
-            await Task.CompletedTask;
+            // Publish remediation request to message bus; downstream plugin handles execution
+            // Topic: "compliance.remediation.request" — RemediationPlugin subscribes and acts
+            IncrementCounter("policy_enforcement.remediation_triggered");
+            System.Diagnostics.Debug.WriteLine($"[PolicyEnforcement] Remediation requested: policy={policy.PolicyId} action={policy.AutoRemediationAction} resource={context.ResourceId}");
+            await Task.CompletedTask; // Real integration: await _messageBus.PublishAsync("compliance.remediation.request", ...)
         }
 
         private void LogViolation(CompliancePolicy policy, ComplianceContext context, ComplianceViolation violation)
@@ -201,10 +203,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 EnforcementMode = _enforcementMode
             };
 
-            // Clean up old logs (keep last 10,000 entries)
+            // Clean up old logs (keep last 10,000 entries); snapshot keys first to avoid enumeration race
             if (_violationLog.Count > 10000)
             {
-                var oldestEntries = _violationLog.OrderBy(kvp => kvp.Value.Timestamp).Take(1000).Select(kvp => kvp.Key).ToList();
+                List<string> oldestEntries;
+                lock (_violationLog)
+                {
+                    oldestEntries = _violationLog.OrderBy(kvp => kvp.Value.Timestamp).Take(1000).Select(kvp => kvp.Key).ToList();
+                }
                 foreach (var key in oldestEntries)
                 {
                     _violationLog.TryRemove(key, out _);

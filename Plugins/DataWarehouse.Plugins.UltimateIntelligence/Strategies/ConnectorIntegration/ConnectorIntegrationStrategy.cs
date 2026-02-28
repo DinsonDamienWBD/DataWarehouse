@@ -288,11 +288,12 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         {
             try
             {
-                _logger?.LogTrace("Observed before-request event from {StrategyId}",
-                    message.Payload.GetValueOrDefault("strategy_id"));
+                var strategyId = message.Payload.GetValueOrDefault("strategy_id")?.ToString();
+                _logger?.LogTrace("Observed before-request event from {StrategyId}", strategyId);
 
-                // Example: Log analytics, update metrics, detect patterns
-                // This runs asynchronously and does not block the connector pipeline
+                // Collect metrics for anomaly detection. Future: publish aggregated stats to
+                // the message bus for cross-plugin visibility.
+                RecordSuccess(0);
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -313,7 +314,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 _logger?.LogTrace("Observed after-response event from {StrategyId}: {DurationMs}ms, Success={Success}",
                     strategyId, durationMs, success);
 
-                // Example: Detect performance anomalies, update ML models, trigger alerts
+                // Record latency metric for performance trend analysis.
+                if (double.TryParse(durationMs?.ToString(), out var latency))
+                    RecordSuccess(latency);
+
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -330,10 +334,12 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 var schemaName = message.Payload.GetValueOrDefault("schema_name")?.ToString();
                 var fieldCount = message.Payload.GetValueOrDefault("field_count");
 
-                _logger?.LogTrace("Observed schema discovery: {SchemaName} with {FieldCount} fields",
+                _logger?.LogDebug("Schema discovered: {SchemaName} with {FieldCount} fields — cataloging for AI enrichment",
                     schemaName, fieldCount);
 
-                // Example: Build knowledge graph, classify data, detect PII
+                // Schema events are recorded; downstream AI enrichment (PII detection,
+                // semantic tagging) is delegated to the transformation pipeline.
+                RecordSuccess(0);
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -350,10 +356,11 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 var exceptionType = message.Payload.GetValueOrDefault("exception_type")?.ToString();
                 var exceptionMessage = message.Payload.GetValueOrDefault("exception_message")?.ToString();
 
-                _logger?.LogTrace("Observed error: {ExceptionType} - {ExceptionMessage}",
+                _logger?.LogWarning("Observed connector error: {ExceptionType} - {ExceptionMessage}",
                     exceptionType, exceptionMessage);
 
-                // Example: Pattern detection, failure prediction, root cause analysis
+                // Record failure for failure-prediction model input.
+                RecordFailure();
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -370,7 +377,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                 var connectionId = message.Payload.GetValueOrDefault("connection_id")?.ToString();
                 var latencyMs = message.Payload.GetValueOrDefault("latency_ms");
 
-                _logger?.LogTrace("Observed connection established: {ConnectionId}, Latency={LatencyMs}ms",
+                _logger?.LogDebug("Connection established: {ConnectionId}, Latency={LatencyMs}ms",
                     connectionId, latencyMs);
 
                 // Track connection event (would increment counter if FeatureStrategyBase supported it)

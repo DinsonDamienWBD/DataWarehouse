@@ -798,12 +798,14 @@ Generate ONLY the C# class code, no markdown formatting.";
         return (errors.Count == 0, errors, warnings);
     }
 
-    private async Task<IConnectionStrategy?> CompileInWasmSandboxAsync(string code, CancellationToken ct)
+    private Task<IConnectionStrategy?> CompileInWasmSandboxAsync(string code, CancellationToken ct)
     {
-        // WASM sandbox compilation would integrate with T111 if available
-        // For now, return null indicating compilation not available
-        await Task.CompletedTask;
-        return null;
+        // WASM sandbox compilation requires the T111 WASM runtime integration which is not
+        // yet available in this deployment. Callers must check for null and fall back to a
+        // non-sandboxed strategy or reject the request.
+        throw new PlatformNotSupportedException(
+            "WASM sandbox compilation is not yet available. " +
+            "Ensure the T111 WASM runtime package is installed and the WasmSandbox feature flag is enabled.");
     }
 
     private static string ComputeHash(string content)

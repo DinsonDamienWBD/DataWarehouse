@@ -153,7 +153,10 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
     }
 
     /// <inheritdoc/>
-    protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct)
+    protected override Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct)
+        => GetEmbeddingCoreInternalAsync(text, ct, retryAfterPull: false);
+
+    private async Task<float[]> GetEmbeddingCoreInternalAsync(string text, CancellationToken ct, bool retryAfterPull)
     {
         var payload = new OllamaEmbeddingRequest
         {
@@ -180,12 +183,11 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
             var errorContent = await response.Content.ReadAsStringAsync(ct);
             var statusCode = (int)response.StatusCode;
 
-            // Check if model needs to be pulled
-            if (statusCode == 404 && errorContent.Contains("not found") && _autoPull)
+            // Pull model once if not found; never retry more than once (prevents unbounded recursion).
+            if (statusCode == 404 && errorContent.Contains("not found") && _autoPull && !retryAfterPull)
             {
                 await PullModelAsync(_currentModel, ct);
-                // Retry after pulling
-                return await GetEmbeddingCoreAsync(text, ct);
+                return await GetEmbeddingCoreInternalAsync(text, ct, retryAfterPull: true);
             }
 
             var isTransient = statusCode >= 500;

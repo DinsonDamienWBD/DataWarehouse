@@ -38,6 +38,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         private readonly BoundedDictionary<string, AnonymizationProfile> _profiles = new BoundedDictionary<string, AnonymizationProfile>(1000);
         private readonly BoundedDictionary<string, AnonymizationResult> _resultCache = new BoundedDictionary<string, AnonymizationResult>(1000);
         private readonly ConcurrentBag<AnonymizationAuditEntry> _auditLog = new();
+        // Per-instance ephemeral hash salt; configurable via "HashSalt" in InitializeAsync
+        private string _defaultHashSalt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         private int _kAnonymityDefault = 5;
         private int _lDiversityDefault = 3;
@@ -63,6 +65,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (configuration.TryGetValue("DifferentialPrivacyEpsilon", out var epsObj) && epsObj is double eps)
                 _differentialPrivacyEpsilon = Math.Max(0.1, eps);
+
+            // Allow operator to supply a stable deployment-wide salt (Base64-encoded, min 16 bytes)
+            if (configuration.TryGetValue("HashSalt", out var saltObj) && saltObj is string saltStr && saltStr.Length >= 24)
+                _defaultHashSalt = saltStr;
 
             InitializeDefaultProfiles();
             return base.InitializeAsync(configuration, cancellationToken);
@@ -340,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
         private string HashValue(string value, FieldAnonymizationRule rule)
         {
-            var salt = rule.HashSalt ?? "default-salt";
+            var salt = rule.HashSalt ?? _defaultHashSalt;
             using var sha256 = SHA256.Create();
             var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(value + salt));
             return Convert.ToHexString(bytes)[..16].ToLowerInvariant();

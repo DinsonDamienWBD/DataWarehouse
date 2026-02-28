@@ -106,8 +106,17 @@ public sealed class VectorStoreFactory : IAsyncDisposable
             }
         }
 
+        // Finding 3199: Check again inside the lock to avoid leaking a store instance when
+        // two threads both miss the initial check and both create a store concurrently.
         lock (_lock)
         {
+            if (_instances.TryGetValue(instanceKey, out var winner))
+            {
+                // Another thread installed its instance first; discard ours.
+                store.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                return winner;
+            }
+
             _instances[instanceKey] = store;
         }
 

@@ -114,10 +114,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            var isCompliant = violations.Count == 0;
-            var status = isCompliant ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity == ViolationSeverity.Critical) ? ComplianceStatus.NonCompliant :
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant :
+                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
+            // isCompliant derived from status for consistency
+            var isCompliant = status == ComplianceStatus.Compliant;
 
             return Task.FromResult(new ComplianceResult
             {

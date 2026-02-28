@@ -22,12 +22,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
     {
         private readonly IMessageBus? _messageBus;
         private readonly string _pluginId;
-        private static readonly byte[] DefaultHmacKey = SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse-ChainOfCustody-Seal"));
+        private readonly byte[] _hmacKey;
 
-        public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId)
+        public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId, byte[]? hmacKey = null)
         {
             _messageBus = messageBus;
             _pluginId = pluginId;
+            // Use caller-supplied key; fall back to a per-instance ephemeral key to avoid hardcoded secret
+            _hmacKey = hmacKey is { Length: >= 16 } ? hmacKey : System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
         }
 
         /// <summary>
@@ -247,7 +249,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
             sealData.Append('|');
             sealData.Append(document.Entries.LastOrDefault()?.Hash ?? "EMPTY");
 
-            using var hmac = new HMACSHA256(DefaultHmacKey);
+            using var hmac = new HMACSHA256(_hmacKey);
             var sealBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(sealData.ToString()));
             return Convert.ToHexString(sealBytes).ToLowerInvariant();
         }

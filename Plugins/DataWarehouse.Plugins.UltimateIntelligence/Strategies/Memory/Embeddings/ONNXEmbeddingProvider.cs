@@ -79,7 +79,7 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
     private readonly PoolingStrategy _poolingStrategy;
 
     // Simulated ONNX session and tokenizer (in production, use Microsoft.ML.OnnxRuntime)
-    private bool _isLoaded;
+    private volatile bool _isLoaded; // volatile for double-checked locking correctness
     private readonly BoundedDictionary<string, int> _vocabulary = new BoundedDictionary<string, int>(1000);
     private readonly object _loadLock = new();
 
@@ -140,8 +140,13 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         if (string.IsNullOrWhiteSpace(modelPath))
             throw new ArgumentException("Model path is required", nameof(modelPath));
 
-        _modelPath = modelPath;
-        _tokenizerPath = tokenizerPath ?? Path.ChangeExtension(modelPath, null); // Look for tokenizer in same directory
+        // Validate path to prevent directory traversal (e.g., ../../etc/passwd).
+        var fullPath = Path.GetFullPath(modelPath);
+        if (!fullPath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Model path must point to an .onnx file", nameof(modelPath));
+
+        _modelPath = fullPath;
+        _tokenizerPath = tokenizerPath != null ? Path.GetFullPath(tokenizerPath) : Path.GetDirectoryName(fullPath);
         _currentModel = config.Model ?? "custom";
 
         // Get dimensions from known models or config
@@ -208,15 +213,38 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
             return;
         }
 
-        // Try to load tokenizer.json
+        // Try to load tokenizer.json (HuggingFace/Tokenizers format).
         var tokenizerJsonPath = Path.Combine(_tokenizerPath ?? Path.GetDirectoryName(_modelPath) ?? "", "tokenizer.json");
         if (File.Exists(tokenizerJsonPath))
         {
-            // Parse tokenizer.json for vocabulary
-            // This is a simplified implementation
-            var json = File.ReadAllText(tokenizerJsonPath);
-            // In production, properly parse the tokenizer.json format
-            return;
+            try
+            {
+                var json = File.ReadAllText(tokenizerJsonPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                // HuggingFace tokenizer.json stores the vocabulary under "model.vocab" as an object.
+                if (doc.RootElement.TryGetProperty("model", out var model) &&
+                    model.TryGetProperty("vocab", out var vocab))
+                {
+                    foreach (var kv in vocab.EnumerateObject())
+                    {
+                        if (kv.Value.TryGetInt32(out var id))
+                            _vocabulary[kv.Name] = id;
+                    }
+                }
+                else if (doc.RootElement.TryGetProperty("vocab", out var directVocab))
+                {
+                    foreach (var kv in directVocab.EnumerateObject())
+                    {
+                        if (kv.Value.TryGetInt32(out var id))
+                            _vocabulary[kv.Name] = id;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to parse tokenizer.json: {ex.Message}. Falling back to basic vocabulary.");
+            }
+            if (_vocabulary.Count > 0) return;
         }
 
         // Fall back to basic word-level tokenization with unknown token handling

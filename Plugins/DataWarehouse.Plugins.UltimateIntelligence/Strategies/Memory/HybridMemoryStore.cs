@@ -250,11 +250,12 @@ public sealed class HybridMemoryStore : IPersistentMemoryStore
 
         var persistentCount = await _persistentStore.GetEntryCountAsync(scopeFilter, ct);
 
-        // Subtract overlap (entries in both)
+        // Subtract overlap (entries that are in both hot-cache and persistent store)
+        // to avoid double-counting: total unique = hot + persistent - overlap.
         var overlapCount = _hotCache.Values
             .Count(e => scopeFilter == null || e.Scope == scopeFilter);
 
-        return Math.Max(hotCount, persistentCount);
+        return hotCount + Math.Max(0, persistentCount - overlapCount);
     }
 
     /// <inheritdoc/>
@@ -424,7 +425,9 @@ public sealed class HybridMemoryStore : IPersistentMemoryStore
 
         _hotCache[entry.EntryId] = entry;
         _accessTimes[entry.EntryId] = DateTimeOffset.UtcNow;
-        _accessCounts[entry.EntryId] = entry.AccessCount + 1;
+        // Finding 3142: AddOrUpdate preserves any counts accumulated by concurrent threads
+        // rather than resetting from the (possibly stale) entry.AccessCount field.
+        _accessCounts.AddOrUpdate(entry.EntryId, entry.AccessCount + 1, (_, existing) => existing + 1);
 
         Interlocked.Increment(ref _promotions);
     }
